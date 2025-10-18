@@ -1,0 +1,47 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Axorith.Client.ViewModels"
+             xmlns:models="using:Axorith.Core.Models"
+             x:Class="Axorith.Client.Views.MainView"
+             x:DataType="vm:MainViewModel">
+    
+    <Grid RowDefinitions="Auto, *, Auto" Margin="20">
+        <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="Gray" Padding="10" Margin="0,0,0,10">
+            <TextBlock Text="{Binding SessionStatus}" HorizontalAlignment="Center" Opacity="0.8"/>
+        </Border>
+        
+        <ListBox Grid.Row="1" 
+                 ItemsSource="{Binding Presets}" 
+                 SelectedItem="{Binding SelectedPreset}"
+                 IsEnabled="{Binding !IsSessionActive}"
+                 Background="Transparent">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:SessionPreset">
+                    <Border Padding="15" BorderThickness="1" BorderBrush="Gray" CornerRadius="5" Margin="5">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="18"/>
+                            <TextBlock Text="{Binding Modules.Count, StringFormat='{}{0} modules'}" Opacity="0.7"/>
+                            
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0"
+                                        IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
+                                <Button Content="Start" 
+                                Command="{Binding $parent[ListBox].DataContext.StartSelectedCommand}"
+                                Classes="accent"/>
+                                <Button Content="Edit" 
+                                        Command="{Binding $parent[ListBox].DataContext.EditSelectedCommand}"/>
+                                <Button Content="Delete" 
+                                        Command="{Binding $parent[ListBox].DataContext.DeleteSelectedCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,20,0,0">
+            <Button Content="Create New Session" Command="{Binding CreateSessionCommand}" IsVisible="{Binding !IsSessionActive}"/>
+            <Button Content="Refresh List" Command="{Binding LoadPresetsCommand}" IsVisible="{Binding !IsSessionActive}"/>
+            <Button Content="Stop Current Session" Command="{Binding StopSessionCommand}" Classes="accent" IsVisible="{Binding IsSessionActive}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>Axorith.Sdk</AssemblyName>
+        <RootNamespace>Axorith.Sdk</RootNamespace>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <LangVersion>13</LangVersion>
+
+        <Version>0.0.1-alpha</Version>
+        <Authors>AxorithLabs</Authors>
+        <Description>Software Development Kit (SDK) for creating Axorith OS modules.</Description>
+    </PropertyGroup>
+</Project>

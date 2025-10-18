@@ -1,0 +1,19 @@
+﻿<Project>
+    <PropertyGroup>
+        <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
+    </PropertyGroup>
+
+    <Target Name="CopyModuleOutput" AfterTargets="Build" Condition="$(AssemblyName.StartsWith('Axorith.Module.'))">
+        <ItemGroup>
+            <ModuleOutputFiles Include="$(OutDir)$(AssemblyName).dll" />
+            <ModuleOutputFiles Include="$(OutDir)$(AssemblyName).pdb" Condition="Exists('$(OutDir)$(AssemblyName).pdb')" />
+            <ModuleOutputFiles Include="$(OutDir)$(AssemblyName).deps.json" />
+        </ItemGroup>
+
+        <Copy
+                SourceFiles="@(ModuleOutputFiles)"
+                DestinationFolder="$(OutDir)modules\"
+        />
+    </Target>
+
+</Project>

@@ -1,0 +1,43 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Axorith.Client.ViewModels"
+        x:Class="Axorith.Client.Views.MainWindow"
+        x:DataType="vm:ShellViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Axorith"
+        Width="1600"
+        Height="900"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="40"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="#1E1E1E">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Custom title bar -->
+        <Border x:Name="TitleBar"
+                Background="#2D2D2D"
+                Height="40"
+                BorderBrush="#444"
+                BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="*,Auto,*">
+                <Border/>
+
+                <TextBlock Text="Axorith"
+                           Foreground="White"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Grid.Column="1"/>
+                <Border/>
+            </Grid>
+        </Border>
+
+
+        <!-- Main content -->
+        <ContentControl Grid.Row="1"
+                        Content="{Binding Content}"
+                        Margin="0"/>
+    </Grid>
+</Window>

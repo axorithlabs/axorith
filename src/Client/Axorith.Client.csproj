@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>Axorith.Client</AssemblyName>
+        <RootNamespace>Axorith.Client</RootNamespace>
+        
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Axorith.Core.csproj" />
+        <ProjectReference Include="..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="11.3.7" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.3.7" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.7" />
+        <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.0" />
+        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.7" />
+        <PackageReference Include="Xaml.Behaviors.Avalonia" Version="11.3.6.5" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AvaloniaResource Include="Assets\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="app.manifest">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>

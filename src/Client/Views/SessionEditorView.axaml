@@ -1,0 +1,80 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Axorith.Client.ViewModels"
+             xmlns:sdk="using:Axorith.Sdk"
+             xmlns:converters="using:Axorith.Client.Converters"
+             x:Class="Axorith.Client.Views.SessionEditorView"
+             x:DataType="vm:SessionEditorViewModel">
+    
+    <Grid ColumnDefinitions="300, *">
+        <Border Grid.Column="0" Margin="10" Padding="10" BorderThickness="1" BorderBrush="#444" CornerRadius="5">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Vertical" HorizontalAlignment="Stretch" Spacing="5" Margin="0,10,0,0">
+                    <ComboBox ItemsSource="{Binding AvailableModulesToAdd}" 
+                              SelectedItem="{Binding ModuleToAdd}"
+                              PlaceholderText="Select module to add...">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Content="Add Selected Module" Command="{Binding AddModuleCommand}" HorizontalAlignment="Stretch"/>
+                    <Button Content="Remove Selected Module" Command="{Binding RemoveModuleCommand}" HorizontalAlignment="Stretch" Margin="0,10,0,0"/>
+                </StackPanel>
+                
+                <TextBlock Text="Configured Modules" DockPanel.Dock="Top" FontWeight="Bold" TextAlignment="Center" Classes="h3"/>
+                
+                <Separator DockPanel.Dock="Top" Margin="0,5"></Separator>
+                
+                <ListBox ItemsSource="{Binding ConfiguredModules}" DockPanel.Dock="Top" SelectedItem="{Binding SelectedModule}" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
+                            <TextBlock Text="{Binding Name}" Padding="5"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Column="1" Margin="0,10,10,10">
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,20,0,0">
+                <Button Content="Save &amp; Close" Command="{Binding SaveAndCloseCommand}" Classes="accent"/>
+                <Button Content="Cancel" Command="{Binding CancelCommand}"/>
+            </StackPanel>
+            
+            <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5" DockPanel.Dock="Top">
+                <StackPanel>
+                    <TextBlock Text="Preset Settings" Classes="h2" Margin="0,0,0,10"/>
+                    <TextBox Text="{Binding Name}" Watermark="Enter a name for this preset..." FontSize="16"/>
+                </StackPanel>
+            </Border>
+
+            <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5" Margin="0,10,0,0"
+                    IsVisible="{Binding SelectedModule}">
+                <DockPanel>
+                    <TextBlock Text="{Binding SelectedModule.Name, StringFormat='{}Settings for {0}'}" Classes="h2" Margin="0,0,0,15" DockPanel.Dock="Top"/>
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding SelectedModule.Settings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettingViewModel">
+                                    <Grid ColumnDefinitions="150, *" Margin="0,8" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="0" Margin="0,0,15,0">
+                                            <TextBlock Text="{Binding Setting.Label}" FontWeight="Medium"/>
+                                            <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Grid.Column="1">
+                                            <TextBox Text="{Binding StringValue, Mode=TwoWay}" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.Text}}"/>
+                                            <TextBox Text="{Binding StringValue, Mode=TwoWay}" AcceptsReturn="True" Height="80" TextWrapping="Wrap" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.TextArea}}"/>
+                                            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.Checkbox}}"/>
+                                            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.Number}}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </DockPanel>
+    </Grid>
+</UserControl>

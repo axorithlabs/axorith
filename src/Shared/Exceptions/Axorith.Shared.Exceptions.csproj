@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>Axorith.Shared.Exceptions</AssemblyName>
+        <RootNamespace>Axorith.Shared.Exceptions</RootNamespace>
+        <LangVersion>13</LangVersion>
+
+        <Version>0.0.1-alpha</Version>
+        <Authors>AxorithLabs</Authors>
+        <Description>Shared exceptions for Axorith OS.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+    </ItemGroup>
+</Project>
