@@ -63,6 +63,7 @@ It's your personal `init()` and `dispose()` script for your brain.
 ## Project Architecture
 
 Axorith is built on a clean, modular architecture to ensure stability, testability, and extensibility.
+See the detailed architecture guide [here](docs/architecture.md).
 
 ```
 /src/
@@ -111,12 +112,13 @@ Interested in contributing or just running the project from source? Here’s how
 
 ## Roadmap
 
-The project is in its early stages. The path forward is clear and focused on delivering value to power users.
+The project is in its early stages. The path forward is clear and focused on delivering value to power users. 
+See the full roadmap [here](docs/roadmap.md)
 
 *   **MVP (Minimum Viable Product)**
     *   [x] Stable Core architecture with module loading.
     *   [x] Functional Client with session creation and editing.
-    *   [ ] Implement `Start/Stop` session logic in the UI.
+    *   [x] Implement `Start/Stop` session logic in the UI.
     *   [ ] First-party modules: Site Blocker, Application Launcher.
     *   [ ] Basic API-based module: Spotify.
 
