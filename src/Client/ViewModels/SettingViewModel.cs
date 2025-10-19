@@ -1,35 +1,55 @@
-﻿using Axorith.Sdk;
+﻿using Axorith.Sdk.Settings;
 using ReactiveUI;
-using System.Globalization;
 
 namespace Axorith.Client.ViewModels;
 
-public class SettingViewModel(ModuleSetting setting, string currentValue) : ReactiveObject
+/// <summary>
+/// ViewModel for a single module setting, acting as a bridge between the SDK's setting definitions and the UI controls.
+/// Implements <see cref="ISettingViewModel"/> to allow setting definitions to populate it without casting.
+/// </summary>
+public class SettingViewModel : ReactiveObject, ISettingViewModel
 {
-    public ModuleSetting Setting { get; } = setting;
+    /// <summary>
+    /// Gets the underlying setting definition from the SDK.
+    /// </summary>
+    public SettingBase Setting { get; }
 
-    private string _value = currentValue;
+    /// <summary>
+    /// Gets the actual <see cref="System.Type"/> of the setting definition.
+    /// Used in XAML to select the correct UI control.
+    /// </summary>
+    public Type SettingType => Setting.GetType();
 
-    public string StringValue
+    private string _stringValue = string.Empty;
+    /// <summary>
+    /// The value for text-based settings. Bound to TextBox controls.
+    /// </summary>
+    public string StringValue { get => _stringValue; set => this.RaiseAndSetIfChanged(ref _stringValue, value); }
+
+    private bool _boolValue;
+    /// <summary>
+    /// The value for boolean settings. Bound to CheckBox controls.
+    /// </summary>
+    public bool BoolValue { get => _boolValue; set => this.RaiseAndSetIfChanged(ref _boolValue, value); }
+
+    private decimal _decimalValue;
+    /// <summary>
+    /// The value for numeric settings. Bound to NumericUpDown controls.
+    /// </summary>
+    public decimal DecimalValue { get => _decimalValue; set => this.RaiseAndSetIfChanged(ref _decimalValue, value); }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SettingViewModel"/> class.
+    /// </summary>
+    /// <param name="setting">The setting definition from the SDK.</param>
+    /// <param name="savedSettings">The dictionary of all saved string values for the parent module.</param>
+    public SettingViewModel(SettingBase setting, IReadOnlyDictionary<string, string> savedSettings)
     {
-        get => _value;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _value, value);
-            this.RaisePropertyChanged(nameof(BoolValue));
-            this.RaisePropertyChanged(nameof(DecimalValue));
-        }
-    }
-
-    public bool BoolValue
-    {
-        get => bool.TryParse(_value, out var b) && b;
-        set => StringValue = value.ToString();
-    }
-
-    public decimal DecimalValue
-    {
-        get => decimal.TryParse(_value, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : 0;
-        set => StringValue = value.ToString(CultureInfo.InvariantCulture);
+        Setting = setting;
+        savedSettings.TryGetValue(setting.Key, out var savedValue);
+        
+        // The setting definition itself is responsible for parsing the saved value
+        // and populating the correct property on this ViewModel.
+        setting.InitializeViewModel(this, savedValue);
     }
 }

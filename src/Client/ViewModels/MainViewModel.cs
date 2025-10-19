@@ -3,11 +3,7 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
-using System;
 using System.Collections.ObjectModel;
-using System.Reactive;
-using System.Reactive.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace Axorith.Client.ViewModels;
@@ -55,11 +51,34 @@ public class MainViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<SessionPreset> Presets { get; } = new();
     
+    /// <summary>
+    /// Command to delete the currently selected preset.
+    /// </summary>
     public ICommand DeleteSelectedCommand { get; }
+    
+    /// <summary>
+    /// Command to open the editor for the currently selected preset.
+    /// </summary>
     public ICommand EditSelectedCommand { get; }
+    
+    /// <summary>
+    /// Command to start a session with the currently selected preset.
+    /// </summary>
     public ICommand StartSelectedCommand { get; }
+    
+    /// <summary>
+    /// Command to stop the currently active session.
+    /// </summary>
     public ICommand StopSessionCommand { get; }
+    
+    /// <summary>
+    /// Command to reload the list of presets from storage.
+    /// </summary>
     public ICommand LoadPresetsCommand { get; }
+    
+    /// <summary>
+    /// Command to open the editor to create a new preset.
+    /// </summary>
     public ICommand CreateSessionCommand { get; }
 
     public MainViewModel(ShellViewModel shell, IPresetManager presetManager, ISessionManager sessionManager, IServiceProvider serviceProvider)
@@ -78,7 +97,6 @@ public class MainViewModel : ReactiveObject
             (selected, isActive) => selected != null && !isActive);
 
         var canStopSession = this.WhenAnyValue(vm => vm.IsSessionActive);
-        
         var canDoGlobalActions = this.WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive);
 
         DeleteSelectedCommand = ReactiveCommand.CreateFromTask(DeleteSelectedAsync, canManipulatePreset);
@@ -101,6 +119,9 @@ public class MainViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(IsSessionActive));
     }
 
+    /// <summary>
+    /// Asynchronously initializes the ViewModel by loading the initial list of presets.
+    /// </summary>
     public async Task InitializeAsync()
     {
         await LoadPresetsAsync();
@@ -109,7 +130,6 @@ public class MainViewModel : ReactiveObject
     private async Task StartSelectedAsync()
     {
         if (SelectedPreset is null) return;
-        
         try
         {
             await _sessionManager.StartSessionAsync(SelectedPreset);
@@ -123,7 +143,6 @@ public class MainViewModel : ReactiveObject
     private void EditSelected()
     {
         if (SelectedPreset is null) return;
-        
         var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
         editor.PresetToEdit = SelectedPreset;
         _shell.NavigateTo(editor);
@@ -139,7 +158,6 @@ public class MainViewModel : ReactiveObject
     private async Task DeleteSelectedAsync()
     {
         if (SelectedPreset is null) return;
-        
         await _presetManager.DeletePresetAsync(SelectedPreset.Id, CancellationToken.None);
         Presets.Remove(SelectedPreset);
     }
@@ -147,7 +165,6 @@ public class MainViewModel : ReactiveObject
     private async Task LoadPresetsAsync()
     {
         var presetsFromCore = await _presetManager.LoadAllPresetsAsync(CancellationToken.None);
-        
         Presets.Clear();
         foreach (var preset in presetsFromCore)
         {

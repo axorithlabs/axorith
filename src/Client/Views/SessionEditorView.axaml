@@ -1,8 +1,8 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
-             xmlns:sdk="using:Axorith.Sdk"
              xmlns:converters="using:Axorith.Client.Converters"
+             xmlns:settings="clr-namespace:Axorith.Sdk.Settings;assembly=Axorith.Sdk"
              x:Class="Axorith.Client.Views.SessionEditorView"
              x:DataType="vm:SessionEditorViewModel">
     
@@ -51,7 +51,7 @@
             <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5" Margin="0,10,0,0"
                     IsVisible="{Binding SelectedModule}">
                 <DockPanel>
-                    <TextBlock Text="{Binding SelectedModule.Name, StringFormat='{}Settings for {0}'}" Classes="h2" Margin="0,0,0,15" DockPanel.Dock="Top"/>
+                    <TextBlock Text="{Binding SelectedModule.Name, StringFormat='{}Settings for {0}'}" FontWeight="Bold" Classes="h2" Margin="0,0,0,15" DockPanel.Dock="Top"/>
                     <ScrollViewer>
                         <ItemsControl ItemsSource="{Binding SelectedModule.Settings}">
                             <ItemsControl.ItemTemplate>
@@ -59,14 +59,18 @@
                                     <Grid ColumnDefinitions="150, *" Margin="0,8" VerticalAlignment="Center">
                                         <StackPanel Grid.Column="0" Margin="0,0,15,0">
                                             <TextBlock Text="{Binding Setting.Label}" FontWeight="Medium"/>
-                                            <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"/>
                                         </StackPanel>
                                         
                                         <StackPanel Grid.Column="1">
-                                            <TextBox Text="{Binding StringValue, Mode=TwoWay}" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.Text}}"/>
-                                            <TextBox Text="{Binding StringValue, Mode=TwoWay}" AcceptsReturn="True" Height="80" TextWrapping="Wrap" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.TextArea}}"/>
-                                            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.Checkbox}}"/>
-                                            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" IsVisible="{Binding Setting.Type, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Static sdk:SettingType.Number}}"/>
+                                            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
+                                                     IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:TextSetting}}"/>
+                                            
+                                            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" 
+                                                      IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:CheckboxSetting}}"/>
+                                            
+                                            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
+                                                           IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:NumberSetting}}"/>
                                         </StackPanel>
                                     </Grid>
                                 </DataTemplate>

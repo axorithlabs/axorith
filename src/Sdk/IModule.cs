@@ -1,4 +1,6 @@
-﻿namespace Axorith.Sdk;
+﻿using Axorith.Sdk.Settings;
+
+namespace Axorith.Sdk;
 
 /// <summary>
 /// The main contract that every Axorith module must implement.
@@ -44,8 +46,8 @@ public interface IModule
     /// <summary>
     /// Gets the list of all available settings for this module.
     /// </summary>
-    /// <returns>A read-only list of <see cref="ModuleSetting"/> definitions.</returns>
-    IReadOnlyList<ModuleSetting> GetSettings();
+    /// <returns>A read-only list of <see cref="SettingBase"/> definitions.</returns>
+    IReadOnlyList<SettingBase> GetSettings();
     
     /// <summary>
     /// Asynchronously validates the provided user settings.

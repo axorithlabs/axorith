@@ -1,7 +1,4 @@
 ﻿using Avalonia.Controls;
-using Avalonia.Interactivity;
-using Axorith.Client.ViewModels;
-using Axorith.Sdk;
 
 namespace Axorith.Client.Views;
 
