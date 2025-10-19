@@ -5,6 +5,7 @@
         <Nullable>enable</Nullable>
         <AssemblyName>Axorith.Module.Test</AssemblyName>
         <RootNamespace>Axorith.Module.Test</RootNamespace>
+        <LangVersion>13</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>

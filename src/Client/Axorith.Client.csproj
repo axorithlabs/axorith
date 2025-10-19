@@ -7,6 +7,8 @@
         <Nullable>enable</Nullable>
         <AssemblyName>Axorith.Client</AssemblyName>
         <RootNamespace>Axorith.Client</RootNamespace>
+
+        <LangVersion>13</LangVersion>
         
         <ApplicationManifest>app.manifest</ApplicationManifest>
 

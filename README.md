@@ -54,7 +54,7 @@ It's your personal `init()` and `dispose()` script for your brain.
 
 ## Tech Stack
 
-*   **.NET 9** & **C# 12**
+*   **.NET 9** & **C# 13**
 *   **Avalonia UI** for the cross-platform user interface.
 *   **ReactiveUI (MVVM)** for a modern, reactive UI architecture.
 *   **Serilog** for structured logging.
