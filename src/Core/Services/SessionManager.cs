@@ -36,13 +36,13 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         var modulesToStart = new List<IModule>();
         foreach (var configuredModule in preset.Modules)
         {
-            var module = moduleRegistry.GetModuleById(configuredModule.ModuleId);
-            if (module == null)
+            var moduleInstance = moduleRegistry.CreateInstance(configuredModule.ModuleId);
+            if (moduleInstance == null)
             {
                 logger.LogWarning("Module with ID {ModuleId} not found in registry. Skipping.", configuredModule.ModuleId);
                 continue;
             }
-            modulesToStart.Add(module);
+            modulesToStart.Add(moduleInstance);
         }
 
         // Design decision: The session will attempt to start even if some modules fail.
@@ -104,7 +104,8 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         var sessionName = _activeSession!.Name;
         logger.LogInformation("Stopping session '{PresetName}'...", sessionName);
 
-        _sessionCts?.Cancel();
+        if (_sessionCts != null)
+            await _sessionCts.CancelAsync();
 
         var modulesToStop = new List<IModule>(_activeModules);
 
@@ -122,6 +123,18 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         });
 
         await Task.WhenAll(stopTasks);
+        
+        foreach (var module in _activeModules)
+        {
+            try
+            {
+                module.Dispose();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Module '{ModuleName}' threw an exception during Dispose.", module.Name);
+            }
+        }
 
         _activeSession = null;
         _activeModules.Clear();

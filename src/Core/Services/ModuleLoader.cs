@@ -11,11 +11,12 @@ namespace Axorith.Core.Services;
 /// </summary>
 public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 {
-    public Task<IReadOnlyList<IModule>> LoadModulesAsync(IEnumerable<string> searchPaths, CancellationToken cancellationToken)
+    public Task<(IReadOnlyList<IModule> Definitions, IReadOnlyDictionary<Guid, Type> Types)> LoadModuleTypesAsync(IEnumerable<string> searchPaths, CancellationToken cancellationToken)
     {
         logger.LogInformation("Starting module discovery...");
 
-        var loadedModules = new List<IModule>();
+        var definitions = new List<IModule>();
+        var types = new Dictionary<Guid, Type>();
         var currentPlatform = GetCurrentPlatform();
 
         foreach (var path in searchPaths)
@@ -53,7 +54,8 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                             if (moduleInstance.SupportedPlatforms.Contains(currentPlatform))
                             {
                                 logger.LogInformation("Successfully loaded module '{ModuleName}' from {Assembly}", moduleInstance.Name, file.Name);
-                                loadedModules.Add(moduleInstance);
+                                definitions.Add(moduleInstance); 
+                                types[moduleInstance.Id] = moduleType;
                             }
                             else
                             {
@@ -69,7 +71,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             }
         }
 
-        logger.LogInformation("Module discovery finished. Found {Count} compatible modules.", loadedModules.Count);
-        return Task.FromResult<IReadOnlyList<IModule>>(loadedModules);
+        logger.LogInformation("Module discovery finished. Found {Count} compatible modules.", definitions.Count);
+        return Task.FromResult<(IReadOnlyList<IModule>, IReadOnlyDictionary<Guid, Type>)>((definitions, types));
     }
 }

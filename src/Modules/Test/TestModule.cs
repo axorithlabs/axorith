@@ -121,4 +121,12 @@ public class TestModule : IModule
         // Perform any cleanup here. For this module, there's nothing to clean up.
         return Task.CompletedTask;
     }
+    
+    /// <summary>
+    /// Releases any resources used by the module. For TestModule, there's nothing to release.
+    /// </summary>
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+    }
 }

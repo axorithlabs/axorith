@@ -116,7 +116,7 @@ public class SessionEditorViewModel : ReactiveObject
         ConfiguredModules.Clear();
         foreach (var configured in _preset.Modules)
         {
-            var moduleDef = _moduleRegistry.GetModuleById(configured.ModuleId);
+            var moduleDef = _moduleRegistry.GetDefinitionById(configured.ModuleId);
             if (moduleDef != null)
             {
                 ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured));
@@ -128,7 +128,7 @@ public class SessionEditorViewModel : ReactiveObject
     private void UpdateAvailableModules()
     {
         AvailableModulesToAdd.Clear();
-        var allModules = _moduleRegistry.GetAllModules();
+        var allModules = _moduleRegistry.GetAllDefinitions();
         var configuredModuleIds = new HashSet<Guid>(ConfiguredModules.Select(cm => cm.Module.Id));
         foreach (var module in allModules)
         {

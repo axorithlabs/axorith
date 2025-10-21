@@ -4,8 +4,12 @@ namespace Axorith.Sdk;
 
 /// <summary>
 /// The main contract that every Axorith module must implement.
+/// 
+/// A module represents a disposable, stateful component that executes tasks during a session.
+/// A new instance of a module is created by the Core for each session it participates in,
+/// and its <see cref="IDisposable.Dispose"/> method is called upon session completion.
 /// </summary>
-public interface IModule
+public interface IModule : IDisposable
 {
     /// <summary>
     /// A unique and constant identifier for the module.
