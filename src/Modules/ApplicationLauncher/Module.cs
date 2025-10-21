@@ -161,4 +161,19 @@ public class Module : IModule
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Releases the resources used by the module, specifically the running process.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_currentProcess is { HasExited: false })
+        {
+            _currentProcess.Kill();
+        }
+        
+        _currentProcess?.Dispose();
+        _currentProcess = null;
+        GC.SuppressFinalize(this);
+    }
 }

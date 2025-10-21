@@ -11,8 +11,8 @@ namespace Axorith.Core.Services;
 /// </summary>
 public class ModuleRegistry(IModuleLoader moduleLoader, ILogger<ModuleRegistry> logger) : IModuleRegistry
 {
-    private IReadOnlyDictionary<Guid, IModule> _modules = ImmutableDictionary<Guid, IModule>.Empty;
-    private IReadOnlyList<IModule> _moduleList = ImmutableList<IModule>.Empty;
+    private IReadOnlyDictionary<Guid, Type> _moduleTypes = ImmutableDictionary<Guid, Type>.Empty;
+    private IReadOnlyList<IModule> _moduleDefs = ImmutableList<IModule>.Empty;
     private bool _isInitialized;
 
     /// <summary>
@@ -23,23 +23,42 @@ public class ModuleRegistry(IModuleLoader moduleLoader, ILogger<ModuleRegistry> 
     {
         logger.LogInformation("Initializing module registry...");
         
-        _moduleList = await moduleLoader.LoadModulesAsync(GetDefaultSearchPaths(), cancellationToken);
-        _modules = _moduleList.ToDictionary(m => m.Id);
+        var (definitions, types) = await moduleLoader.LoadModuleTypesAsync(GetDefaultSearchPaths(), cancellationToken);
+        _moduleDefs = definitions;
+        _moduleTypes = types;
         _isInitialized = true;
 
-        logger.LogInformation("Module registry initialized with {Count} modules.", _modules.Count);
+        logger.LogInformation("Module registry initialized with {Count} modules.", _moduleTypes.Count);
     }
 
-    public IReadOnlyList<IModule> GetAllModules()
+    public IReadOnlyList<IModule> GetAllModuleDefs()
     {
         EnsureInitialized();
-        return _moduleList;
+        return _moduleDefs;
     }
 
-    public IModule? GetModuleById(Guid moduleId)
+    public IModule? GetModuleDefById(Guid moduleId)
     {
         EnsureInitialized();
-        return _modules.GetValueOrDefault(moduleId);
+        return _moduleDefs.FirstOrDefault(m => m.Id == moduleId);
+    }
+
+    public IModule? CreateModuleInstance(Guid moduleId)
+    {
+        EnsureInitialized();
+        if (_moduleTypes.TryGetValue(moduleId, out var moduleType))
+        {
+            try
+            {
+                return Activator.CreateInstance(moduleType) as IModule;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to create an instance of module with ID {ModuleId}", moduleId);
+                return null;
+            }
+        }
+        return null;
     }
 
     private void EnsureInitialized()

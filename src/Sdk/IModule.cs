@@ -5,7 +5,7 @@ namespace Axorith.Sdk;
 /// <summary>
 /// The main contract that every Axorith module must implement.
 /// </summary>
-public interface IModule
+public interface IModule : IDisposable
 {
     /// <summary>
     /// A unique and constant identifier for the module.
