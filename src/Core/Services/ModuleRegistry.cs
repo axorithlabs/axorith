@@ -31,19 +31,19 @@ public class ModuleRegistry(IModuleLoader moduleLoader, ILogger<ModuleRegistry> 
         logger.LogInformation("Module registry initialized with {Count} modules.", _moduleTypes.Count);
     }
 
-    public IReadOnlyList<IModule> GetAllModuleDefs()
+    public IReadOnlyList<IModule> GetAllDefinitions()
     {
         EnsureInitialized();
         return _moduleDefs;
     }
 
-    public IModule? GetModuleDefById(Guid moduleId)
+    public IModule? GetDefinitionById(Guid moduleId)
     {
         EnsureInitialized();
         return _moduleDefs.FirstOrDefault(m => m.Id == moduleId);
     }
 
-    public IModule? CreateModuleInstance(Guid moduleId)
+    public IModule? CreateInstance(Guid moduleId)
     {
         EnsureInitialized();
         if (_moduleTypes.TryGetValue(moduleId, out var moduleType))
