@@ -32,7 +32,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             try
             {
                 await using var stream = File.OpenRead(filePath);
-                var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken);
+                var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions);
                 if (preset != null)
                 {
                     presets.Add(preset);
