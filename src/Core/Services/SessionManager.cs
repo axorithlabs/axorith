@@ -36,7 +36,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         var modulesToStart = new List<IModule>();
         foreach (var configuredModule in preset.Modules)
         {
-            var moduleInstance = moduleRegistry.CreateModuleInstance(configuredModule.ModuleId);
+            var moduleInstance = moduleRegistry.CreateInstance(configuredModule.ModuleId);
             if (moduleInstance == null)
             {
                 logger.LogWarning("Module with ID {ModuleId} not found in registry. Skipping.", configuredModule.ModuleId);
