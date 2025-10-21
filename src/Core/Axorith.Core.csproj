@@ -1,14 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <AssemblyName>Axorith.Core</AssemblyName>
         <RootNamespace>Axorith.Core</RootNamespace>
-        <LangVersion>13</LangVersion>
-
-        <Version>0.0.1-alpha</Version>
-        <Authors>AxorithLabs</Authors>
+        
         <Description>Core system for Axorith OS.</Description>
     </PropertyGroup>
 

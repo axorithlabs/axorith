@@ -1,11 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <RootNamespace>Axorith.Module.ApplicationLauncher</RootNamespace>
-        <LangVersion>13</LangVersion>
-        <PackageId>Axorith.Module.ApplicationLauncher.Windows</PackageId>
+        <AssemblyName>Axorith.Module.ApplicationLauncher.Windows</AssemblyName>
+        <RootNamespace>Axorith.Module.ApplicationLauncher.Windows</RootNamespace>
+
+        <Description>Application Launcher module for Axorith OS.</Description>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,0 +1,18 @@
+﻿<Project>
+    <Target Name="CopyModuleWithDependencies" AfterTargets="Build" Condition="$(AssemblyName.StartsWith('Axorith.Module.'))">
+        <PropertyGroup>
+            <ModulesOutputPath>$(BaseOutputPath)$(Configuration)\modules\</ModulesOutputPath>
+        </PropertyGroup>
+        <ItemGroup>
+            <ModuleFiles Include="$(OutputPath)$(AssemblyName).dll" />
+            <ModuleFiles Include="$(OutputPath)$(AssemblyName).pdb" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
+            <ModuleFiles Include="$(OutputPath)$(AssemblyName).deps.json" Condition="Exists('$(OutputPath)$(AssemblyName).deps.json')" />
+        </ItemGroup>
+        <ItemGroup>
+            <ModuleDependencies Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' != 'Axorith.Sdk'" />
+        </ItemGroup>
+        <Copy SourceFiles="@(ModuleFiles)" DestinationFolder="$(ModulesOutputPath)" SkipUnchangedFiles="true" />
+        <Copy SourceFiles="@(ModuleDependencies)" DestinationFolder="$(ModulesOutputPath)" SkipUnchangedFiles="true" />
+        <Message Text="[Axorith Build] Copied module '$(AssemblyName)' and its dependencies to '$(ModulesOutputPath)'" Importance="high" />
+    </Target>
+</Project>

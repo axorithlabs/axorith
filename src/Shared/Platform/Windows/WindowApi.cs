@@ -3,8 +3,18 @@ using System.Runtime.InteropServices;
 
 namespace Axorith.Shared.Platform.Windows;
 
+/// <summary>
+/// Provides Windows-specific API for manipulating windows.
+/// </summary>
 public static class WindowApi
 {
+    /// <summary>
+    /// Moves a window to the specified monitor.
+    /// </summary>
+    /// <param name="windowHandle">The handle of the window to move.</param>
+    /// <param name="monitorIndex">The index of the monitor to move the window to.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="monitorIndex"/> is out of range.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the process has no main window.</exception>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         if (monitorIndex < 0) throw new ArgumentOutOfRangeException(nameof(monitorIndex));
@@ -33,6 +43,14 @@ public static class WindowApi
         NativeApi.SetWindowPlacement(windowHandle, ref placement);
     }
     
+    /// <summary>
+    /// Asynchronously waits for a process's main window to be initialized.
+    /// </summary>
+    /// <param name="process">The process to monitor.</param>
+    /// <param name="timeoutMs">The timeout in milliseconds.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="process"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the process exits before creating a main window.</exception>
+    /// <exception cref="TimeoutException">Thrown when the process window does not appear in time.</exception>
     public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000)
     {
         if (process == null) throw new ArgumentNullException(nameof(process));

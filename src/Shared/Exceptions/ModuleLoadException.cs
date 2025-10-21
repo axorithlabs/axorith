@@ -6,5 +6,8 @@
 public class ModuleLoadException(string message, string? modulePath = null, Exception? innerException = null)
     : AxorithException(message, innerException!)
 {
+    /// <summary>
+    /// The path to the module that failed to load.
+    /// </summary>
     public string? ModulePath { get; } = modulePath;
 }

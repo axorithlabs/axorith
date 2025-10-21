@@ -1,15 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <AssemblyName>Axorith.Shared.Utils</AssemblyName>
         <RootNamespace>Axorith.Shared.Utils</RootNamespace>
-        <LangVersion>13</LangVersion>
 
-        <Version>0.0.1-alpha</Version>
-        <Authors>AxorithLabs</Authors>
         <Description>Shared utils for Axorith OS.</Description>
+
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>

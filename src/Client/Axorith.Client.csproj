@@ -1,17 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <OutputType>WinExe</OutputType>
-        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <AssemblyName>Axorith.Client</AssemblyName>
         <RootNamespace>Axorith.Client</RootNamespace>
-
-        <LangVersion>13</LangVersion>
         
+        <Description>UI client for Axorith OS.</Description>
+        
+        <OutputType>WinExe</OutputType>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-
+        
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
 
