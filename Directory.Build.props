@@ -10,8 +10,16 @@
             <ModuleOutputFiles Include="$(OutDir)$(AssemblyName).deps.json" />
         </ItemGroup>
 
+        <ItemGroup>
+            <ModuleDependencies Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' != 'Axorith.Sdk'" />
+        </ItemGroup>
+
         <Copy
                 SourceFiles="@(ModuleOutputFiles)"
+                DestinationFolder="$(OutDir)modules\"
+        />
+        <Copy
+                SourceFiles="@(ModuleDependencies)"
                 DestinationFolder="$(OutDir)modules\"
         />
     </Target>
