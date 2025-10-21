@@ -4,25 +4,27 @@ using Axorith.Sdk.Settings;
 namespace Axorith.Module.Test;
 
 /// <summary>
-/// A test module to demonstrate the capabilities of the Axorith SDK
-/// and to verify that the Core loads and interacts with modules correctly.
+///     A test module to demonstrate the capabilities of the Axorith SDK
+///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class TestModule(IModuleLogger logger) : IModule
+public class Module : IModule
 {
-    /// <inheritdoc />
-    public Guid Id => Guid.Parse("f47ac10b-58cc-4372-a567-0e02b2c3d479");
-    
-    /// <inheritdoc />
-    public string Name => "Test Module";
-    
-    /// <inheritdoc />
-    public string Description => "A simple module for testing and demonstration purposes. It logs messages and simulates work.";
-    
-    /// <inheritdoc />
-    public string Category => "System";
-    
-    /// <inheritdoc />
-    public IReadOnlySet<Platform> SupportedPlatforms => new HashSet<Platform> { Platform.Windows, Platform.Linux, Platform.MacOs };
+    private ModuleDefinition _definition;
+    private IServiceProvider _serviceProvider;
+    private IModuleLogger _logger;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="TestModule" /> class.
+    ///     Dependencies are injected by the Core.
+    /// </summary>
+    public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+        _definition = definition;
+        // Resolve the _logger from the provided service provider.
+
+        _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
+    }
 
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
@@ -30,22 +32,22 @@ public class TestModule(IModuleLogger logger) : IModule
         return new List<SettingBase>
         {
             new TextSetting(
-                key: "GreetingMessage", 
-                label: "Greeting Message", 
-                description: "This message will be logged on session start.", 
-                defaultValue: "Hello from TestModule!"),
-            
+                "GreetingMessage",
+                "Greeting Message",
+                "This message will be logged on session start.",
+                "Hello from TestModule!"),
+
             new CheckboxSetting(
-                key: "EnableExtraLogging", 
-                label: "Enable Extra Logging", 
-                description: "If checked, the module will log a countdown.", 
-                defaultValue: true),
-            
+                "EnableExtraLogging",
+                "Enable Extra Logging",
+                "If checked, the module will log a countdown.",
+                true),
+
             new NumberSetting(
-                key: "WorkDurationSeconds", 
-                label: "Work Duration (sec)", 
-                description: "How long the module should simulate work.", 
-                defaultValue: 5)
+                "WorkDurationSeconds",
+                "Work Duration (sec)",
+                "How long the module should simulate work.",
+                5)
         };
     }
 
@@ -60,70 +62,70 @@ public class TestModule(IModuleLogger logger) : IModule
     }
 
     /// <inheritdoc />
-    public Task<ValidationResult> ValidateSettingsAsync(IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateSettingsAsync(IReadOnlyDictionary<string, string> userSettings,
+        CancellationToken cancellationToken)
     {
         // Try to get the value for 'WorkDurationSeconds'. If it doesn't exist, settings are considered valid.
         if (!userSettings.TryGetValue("WorkDurationSeconds", out var durationStr))
             return Task.FromResult(ValidationResult.Success);
-        
+
         // If the value exists, ensure it's a non-negative number.
         if (!decimal.TryParse(durationStr, out var duration) || duration < 0)
-        {
             return Task.FromResult(ValidationResult.Fail("'Work Duration' must be a non-negative number."));
-        }
-        
+
         return Task.FromResult(ValidationResult.Success);
     }
 
     /// <inheritdoc />
-    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken)
+    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
+        CancellationToken cancellationToken)
     {
-        logger.LogInfo("Test Module is starting...");
+        _logger.LogInfo("Test Module is starting...");
 
         // Retrieve settings safely, using default values from the module definition if a key is not found.
         var message = userSettings.GetValueOrDefault("GreetingMessage", "Default Greeting");
-        
+
         // For booleans, parse the string value, defaulting to 'true' if not found.
         var enableExtraLogging = bool.Parse(userSettings.GetValueOrDefault("EnableExtraLogging", "true"));
-        
+
         // For numbers, parse with a fallback and log a warning on failure.
         if (!decimal.TryParse(userSettings.GetValueOrDefault("WorkDurationSeconds", "5"), out var duration))
         {
             duration = 5;
-            logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
+            _logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
         }
 
-        logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
+        _logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
 
         if (enableExtraLogging)
         {
-            logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
+            _logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
             for (var i = (int)duration; i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                logger.LogDebug("... {SecondsLeft} seconds left.", i);
+                _logger.LogDebug("... {SecondsLeft} seconds left.", i);
                 await Task.Delay(1000, cancellationToken);
             }
         }
         else
         {
-            logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
+            _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
             await Task.Delay((int)duration * 1000, cancellationToken);
         }
 
-        logger.LogInfo("Test Module has finished its work.");
+        _logger.LogInfo("Test Module has finished its work.");
     }
 
     /// <inheritdoc />
     public Task OnSessionEndAsync()
     {
-        logger.LogInfo("Test Module has been requested to shut down.");
+        _logger.LogInfo("Test Module has been requested to shut down.");
         // Perform any cleanup here. For this module, there's nothing to clean up.
         return Task.CompletedTask;
     }
-    
+
     /// <summary>
-    /// Releases any resources used by the module. For TestModule, there's nothing to release.
+    ///     Releases any resources used by the module. For TestModule, there's nothing to release.
     /// </summary>
     public void Dispose()
     {

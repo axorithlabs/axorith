@@ -1,10 +1,12 @@
-﻿using Axorith.Core.Services.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Serilog;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Services;
+using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Exceptions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace Axorith.Core;
 
@@ -17,6 +19,7 @@ public sealed class AxorithHost : IDisposable
         _host = host;
     }
 
+    public ILifetimeScope RootScope => _host.Services.GetRequiredService<ILifetimeScope>();
     public ISessionManager Sessions => _host.Services.GetRequiredService<ISessionManager>();
     public IPresetManager Presets => _host.Services.GetRequiredService<IPresetManager>();
     public IModuleRegistry Modules => _host.Services.GetRequiredService<IModuleRegistry>();
@@ -24,7 +27,7 @@ public sealed class AxorithHost : IDisposable
     public static async Task<AxorithHost> CreateAsync(CancellationToken cancellationToken = default)
     {
         var totalSw = Stopwatch.StartNew();
-        
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Debug()
@@ -35,12 +38,13 @@ public sealed class AxorithHost : IDisposable
         try
         {
             var hostBuilder = new HostBuilder()
-                .ConfigureServices((context, services) =>
+                .UseServiceProviderFactory(new AutofacServiceProviderFactory())
+                .ConfigureContainer<ContainerBuilder>(builder =>
                 {
-                    services.AddSingleton<IModuleLoader, ModuleLoader>();
-                    services.AddSingleton<IModuleRegistry, ModuleRegistry>();
-                    services.AddSingleton<IPresetManager, PresetManager>();
-                    services.AddSingleton<ISessionManager, SessionManager>();
+                    builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();
+                    builder.RegisterType<ModuleRegistry>().As<IModuleRegistry>().SingleInstance();
+                    builder.RegisterType<PresetManager>().As<IPresetManager>().SingleInstance();
+                    builder.RegisterType<SessionManager>().As<ISessionManager>().SingleInstance();
                 })
                 .UseSerilog((context, services, configuration) =>
                 {
@@ -60,17 +64,12 @@ public sealed class AxorithHost : IDisposable
 
             var host = hostBuilder.Build();
 
-            // Асинхронная инициализация теперь делается здесь, после сборки хоста
             var stepSw = Stopwatch.StartNew();
             Log.Information("--> Initializing module registry...");
-            
-            // ModuleRegistry теперь должен быть IHostedService или мы его получаем и инициализируем вручную
-            var moduleRegistry = host.Services.GetRequiredService<IModuleRegistry>() as ModuleRegistry;
-            if (moduleRegistry != null)
-            {
+
+            if (host.Services.GetRequiredService<IModuleRegistry>() is ModuleRegistry moduleRegistry)
                 await moduleRegistry.InitializeAsync(cancellationToken);
-            }
-            
+
             stepSw.Stop();
             Log.Information("--> Module registry initialized in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
 
@@ -92,8 +91,8 @@ public sealed class AxorithHost : IDisposable
 
     private static void ConfigureServices(IServiceCollection services, ILogger logger)
     {
-        services.AddLogging(builder => builder.AddSerilog(logger, dispose: true));
-        
+        services.AddLogging(builder => builder.AddSerilog(logger, true));
+
         services.AddSingleton<IModuleLoader, ModuleLoader>();
         services.AddSingleton<IModuleRegistry, ModuleRegistry>();
         services.AddSingleton<IPresetManager, PresetManager>();

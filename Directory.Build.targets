@@ -1,18 +1,24 @@
 ﻿<Project>
-    <Target Name="CopyModuleWithDependencies" AfterTargets="Build" Condition="$(AssemblyName.StartsWith('Axorith.Module.'))">
+    <Target Name="PublishModuleToOutput" AfterTargets="Build" Condition="'$(AssemblyName)' != '' And $(AssemblyName.StartsWith('Axorith.Module.'))">
         <PropertyGroup>
-            <ModulesOutputPath>$(BaseOutputPath)$(Configuration)\modules\</ModulesOutputPath>
+            <_ModuleName>$(AssemblyName.Replace('Axorith.Module.', '').Split('.')[0])</_ModuleName>
+            <ModuleOutputPath>$(SolutionDir)build\$(Configuration)\modules\$(_ModuleName)\</ModuleOutputPath>
         </PropertyGroup>
+
         <ItemGroup>
-            <ModuleFiles Include="$(OutputPath)$(AssemblyName).dll" />
-            <ModuleFiles Include="$(OutputPath)$(AssemblyName).pdb" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
-            <ModuleFiles Include="$(OutputPath)$(AssemblyName).deps.json" Condition="Exists('$(OutputPath)$(AssemblyName).deps.json')" />
+            <ModulePrimaryFiles Include="$(OutputPath)$(AssemblyName).dll" />
+            <ModulePrimaryFiles Include="$(OutputPath)$(AssemblyName).pdb" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
         </ItemGroup>
         <ItemGroup>
             <ModuleDependencies Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' != 'Axorith.Sdk'" />
         </ItemGroup>
-        <Copy SourceFiles="@(ModuleFiles)" DestinationFolder="$(ModulesOutputPath)" SkipUnchangedFiles="true" />
-        <Copy SourceFiles="@(ModuleDependencies)" DestinationFolder="$(ModulesOutputPath)" SkipUnchangedFiles="true" />
-        <Message Text="[Axorith Build] Copied module '$(AssemblyName)' and its dependencies to '$(ModulesOutputPath)'" Importance="high" />
+        <ItemGroup>
+            <ModuleMetadataFile Include="$(ProjectDir)module.json" Condition="Exists('$(ProjectDir)module.json')" />
+        </ItemGroup>
+        <Copy SourceFiles="@(ModulePrimaryFiles)" DestinationFolder="$(ModuleOutputPath)" SkipUnchangedFiles="true" />
+        <Copy SourceFiles="@(ModuleDependencies)" DestinationFolder="$(ModuleOutputPath)" SkipUnchangedFiles="true" />
+        <Copy SourceFiles="@(ModuleMetadataFile)" DestinationFolder="$(ModuleOutputPath)" SkipUnchangedFiles="true" />
+
+        <Message Text="[Axorith Build] Published module '$(_ModuleName)' to '$(ModuleOutputPath)'" Importance="high" />
     </Target>
 </Project>

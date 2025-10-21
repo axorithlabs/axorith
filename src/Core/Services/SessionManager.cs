@@ -1,4 +1,5 @@
-﻿using Axorith.Core.Models;
+﻿using Autofac;
+using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
@@ -7,139 +8,142 @@ using Microsoft.Extensions.Logging;
 namespace Axorith.Core.Services;
 
 /// <summary>
-/// The concrete implementation for managing the session lifecycle.
-/// This class orchestrates the startup and shutdown of modules based on a preset.
+///     The concrete implementation for managing the session lifecycle.
+///     This class orchestrates the startup and shutdown of modules based on a preset,
+///     managing their isolated lifetime scopes.
 /// </summary>
-public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManager> logger) : ISessionManager
+public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManager> logger)
+    : ISessionManager, IDisposable
 {
-    private SessionPreset? _activeSession;
     private CancellationTokenSource? _sessionCts;
-    private readonly List<IModule> _activeModules = new();
 
-    public bool IsSessionRunning => _activeSession != null;
+    // This private class holds the live instance of a module and its personal DI scope.
+    private class ActiveModule : IDisposable
+    {
+        public required IModule Instance { get; init; }
+        public required ILifetimeScope Scope { get; init; }
 
-    public event Action? SessionStarted;
-    public event Action? SessionStopped;
-    
+        public void Dispose()
+        {
+            Instance.Dispose();
+            Scope.Dispose();
+        }
+    }
+
+    private readonly List<ActiveModule> _activeModules = new();
+
+    public bool IsSessionRunning => ActiveSession != null;
+    public SessionPreset? ActiveSession { get; private set; }
+
+    public event Action<Guid>? SessionStarted;
+    public event Action<Guid>? SessionStopped;
+
+    /// <inheritdoc />
     public async Task StartSessionAsync(SessionPreset preset)
     {
         if (IsSessionRunning)
-        {
-            throw new SessionException("A session is already running. Stop the current session before starting a new one.");
-        }
+            throw new SessionException(
+                "A session is already running. Stop the current session before starting a new one.");
 
         logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
-        _activeSession = preset;
+        ActiveSession = preset;
         _sessionCts = new CancellationTokenSource();
         _activeModules.Clear();
 
-        var modulesToStart = new List<IModule>();
         foreach (var configuredModule in preset.Modules)
         {
-            var moduleInstance = moduleRegistry.CreateInstance(configuredModule.ModuleId);
-            if (moduleInstance == null)
-            {
-                logger.LogWarning("Module with ID {ModuleId} not found in registry. Skipping.", configuredModule.ModuleId);
-                continue;
-            }
-            modulesToStart.Add(moduleInstance);
+            var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
+            if (instance != null && scope != null)
+                _activeModules.Add(new ActiveModule { Instance = instance, Scope = scope });
+            else
+                logger.LogWarning(
+                    "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping.",
+                    configuredModule.ModuleId, preset.Name);
         }
 
-        // Design decision: The session will attempt to start even if some modules fail.
-        // This allows for partial functionality. The errors are logged, and the user
-        // can be notified at a higher level if necessary.
+        if (_activeModules.Count == 0)
+        {
+            logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start.",
+                preset.Name);
+            ActiveSession = null;
+            return;
+        }
+
         try
         {
-            var startTasks = modulesToStart.Select(async module =>
+            var startTasks = _activeModules.Select(activeModule =>
             {
-                try
-                {
-                    var settings = preset.Modules.First(cm => cm.ModuleId == module.Id).Settings;
-                    await module.OnSessionStartAsync(settings, _sessionCts.Token);
-                    
-                    // Only add to active modules on successful start
-                    lock (_activeModules)
-                    {
-                        _activeModules.Add(module);
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    logger.LogWarning("Start of module '{ModuleName}' was cancelled.", module.Name);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Module '{ModuleName}' failed to start. It will be excluded from this session.", module.Name);
-                }
+                var definition = activeModule.Scope.Resolve<ModuleDefinition>();
+                var configuredModule = preset.Modules.First(cm => cm.ModuleId == definition.Id);
+                return activeModule.Instance.OnSessionStartAsync(configuredModule.Settings, _sessionCts.Token);
             });
 
             await Task.WhenAll(startTasks);
 
-            if (_activeModules.Count == 0 && modulesToStart.Count > 0)
-            {
-                logger.LogError("All modules failed to start for session '{PresetName}'. Stopping session immediately.", preset.Name);
-                await StopCurrentSessionAsync();
-                return;
-            }
-
-            logger.LogInformation("Session '{PresetName}' started successfully with {Count}/{Total} modules.", preset.Name, _activeModules.Count, modulesToStart.Count);
-            SessionStarted?.Invoke();
+            logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules.", preset.Name,
+                _activeModules.Count);
+            SessionStarted?.Invoke(preset.Id);
         }
         catch (Exception ex)
         {
-            logger.LogCritical(ex, "An unexpected critical error occurred while starting the session. Attempting to roll back...");
+            logger.LogCritical(ex,
+                "A critical error occurred while starting modules for session '{PresetName}'. Attempting to roll back...",
+                preset.Name);
             await StopCurrentSessionAsync();
             throw;
         }
     }
 
+    /// <inheritdoc />
     public async Task StopCurrentSessionAsync()
     {
-        if (!IsSessionRunning)
-        {
-            return;
-        }
+        if (!IsSessionRunning || ActiveSession is null) return;
 
-        var sessionName = _activeSession!.Name;
-        logger.LogInformation("Stopping session '{PresetName}'...", sessionName);
+        var sessionToStop = ActiveSession;
+        logger.LogInformation("Stopping session '{PresetName}'...", sessionToStop.Name);
 
-        if (_sessionCts != null)
-            await _sessionCts.CancelAsync();
+        _sessionCts?.Cancel();
 
-        var modulesToStop = new List<IModule>(_activeModules);
-
-        var stopTasks = modulesToStop.Select(async module =>
+        var stopTasks = _activeModules.Select(async activeModule =>
         {
             try
             {
-                await module.OnSessionEndAsync();
+                await activeModule.Instance.OnSessionEndAsync();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Module '{ModuleName}' failed during shutdown. Continuing with others.", module.Name);
+                var def = activeModule.Scope.Resolve<ModuleDefinition>();
+                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync.", def.Name);
             }
         });
-
         await Task.WhenAll(stopTasks);
-        
-        foreach (var module in _activeModules)
-        {
+
+        foreach (var activeModule in _activeModules)
             try
             {
-                module.Dispose();
+                activeModule.Dispose();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Module '{ModuleName}' threw an exception during Dispose.", module.Name);
+                logger.LogError(ex, "An error occurred while disposing a module or its scope.");
             }
-        }
 
-        _activeSession = null;
         _activeModules.Clear();
         _sessionCts?.Dispose();
         _sessionCts = null;
+        ActiveSession = null;
 
-        logger.LogInformation("Session '{PresetName}' stopped.", sessionName);
-        SessionStopped?.Invoke();
+        logger.LogInformation("Session '{PresetName}' stopped.", sessionToStop.Name);
+        SessionStopped?.Invoke(sessionToStop.Id);
+    }
+
+    /// <summary>
+    ///     Disposes the SessionManager and ensures any active session is stopped cleanly.
+    /// </summary>
+    public void Dispose()
+    {
+        if (IsSessionRunning)
+            // This is a blocking call, which is acceptable in Dispose.
+            StopCurrentSessionAsync().GetAwaiter().GetResult();
     }
 }
