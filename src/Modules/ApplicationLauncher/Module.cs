@@ -11,7 +11,7 @@ namespace Axorith.Module.ApplicationLauncher.Windows;
 /// <summary>
 /// A module that launches an external application at the start of a session.
 /// </summary>
-public class Module : IModule
+public class Module(IModuleLogger logger) : IModule
 {
     private Process? _currentProcess = null;
 
@@ -89,15 +89,15 @@ public class Module : IModule
     }
 
     /// <inheritdoc />
-    public async Task OnSessionStartAsync(IModuleContext context, IReadOnlyDictionary<string, string> userSettings,
+    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
         CancellationToken cancellationToken)
     {
-        context.LogInfo("Application Launcher Module is starting...");
+        logger.LogInfo("Application Launcher Module is starting...");
 
         var applicationPath = userSettings.GetValueOrDefault("ApplicationPath");
         if (string.IsNullOrWhiteSpace(applicationPath))
         {
-            context.LogError(null, "Application path is not specified. Module cannot start.");
+            logger.LogError(null, "Application path is not specified. Module cannot start.");
             return;
         }
         
@@ -105,23 +105,23 @@ public class Module : IModule
         
         if (!decimal.TryParse(userSettings.GetValueOrDefault("MonitorIndex", "0"), out var monitorIdx))
         {
-            context.LogWarning("Could not parse 'MonitorIndex'. Using default value: 0.");
+            logger.LogWarning("Could not parse 'MonitorIndex'. Using default value: 0.");
             monitorIdx = 0;
         }
 
         try
         {
-            context.LogDebug("Attempting to start process: {Path} {Args}", applicationPath, applicationArgs);
+            logger.LogDebug("Attempting to start process: {Path} {Args}", applicationPath, applicationArgs);
             _currentProcess = Process.Start(applicationPath, applicationArgs);
 
             if (_currentProcess == null)
                 throw new InvalidOperationException("Process.Start returned null.");
             
-            context.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName, _currentProcess.Id);
+            logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName, _currentProcess.Id);
         }
         catch (Exception ex)
         {
-            context.LogError(ex, "Failed to start process for application: {ApplicationPath}. Check path and permissions.", applicationPath);
+            logger.LogError(ex, "Failed to start process for application: {ApplicationPath}. Check path and permissions.", applicationPath);
             return;
         }
 
@@ -131,31 +131,31 @@ public class Module : IModule
 
             if (_currentProcess.MainWindowHandle != IntPtr.Zero)
             {
-                context.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}", _currentProcess.MainWindowHandle, monitorIdx);
+                logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}", _currentProcess.MainWindowHandle, monitorIdx);
                 Shared.Platform.Windows.WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, (int)monitorIdx);
-                context.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}", _currentProcess.ProcessName, monitorIdx);
+                logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}", _currentProcess.ProcessName, monitorIdx);
             }
             else
             {
-                context.LogInfo("Process started without a graphical interface. Skipping window move.");
+                logger.LogInfo("Process started without a graphical interface. Skipping window move.");
             }
         }
         catch (TimeoutException)
         {
-            context.LogWarning("Process {ProcessName} started, but its main window did not appear in time. Could not move window.", _currentProcess.ProcessName);
+            logger.LogWarning("Process {ProcessName} started, but its main window did not appear in time. Could not move window.", _currentProcess.ProcessName);
         }
         catch (Exception ex)
         {
-            context.LogError(ex, "An unexpected error occurred while trying to move the process window.");
+            logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
         }
 
-        context.LogInfo("Application Launcher Module has finished its work.");
+        logger.LogInfo("Application Launcher Module has finished its work.");
     }
 
     /// <inheritdoc />
-    public Task OnSessionEndAsync(IModuleContext context)
+    public Task OnSessionEndAsync()
     {
-        context.LogInfo("Application Launcher Module has been requested to shut down.");
+        logger.LogInfo("Application Launcher Module has been requested to shut down.");
 
         _currentProcess?.CloseMainWindow();
 

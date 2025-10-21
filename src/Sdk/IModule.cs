@@ -76,15 +76,13 @@ public interface IModule : IDisposable
     /// <summary>
     /// The asynchronous method that is called when a session starts.
     /// </summary>
-    /// <param name="context">The context for interacting with the core.</param>
     /// <param name="userSettings">The settings provided by the user for this session.</param>
     /// <param name="cancellationToken">A token to signal that the start-up process should be cancelled.</param>
-    Task OnSessionStartAsync(IModuleContext context, IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken);
+    Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken);
 
     /// <summary>
     /// The asynchronous method that is called when a session ends.
     /// This is where the module should clean up its resources.
     /// </summary>
-    /// <param name="context">The context for interacting with the core, primarily for logging the shutdown process.</param>
-    Task OnSessionEndAsync(IModuleContext context);
+    Task OnSessionEndAsync();
 }

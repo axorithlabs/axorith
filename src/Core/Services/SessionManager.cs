@@ -55,8 +55,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                 try
                 {
                     var settings = preset.Modules.First(cm => cm.ModuleId == module.Id).Settings;
-                    var context = new ModuleContextImplementation(module.Name, logger);
-                    await module.OnSessionStartAsync(context, settings, _sessionCts.Token);
+                    await module.OnSessionStartAsync(settings, _sessionCts.Token);
                     
                     // Only add to active modules on successful start
                     lock (_activeModules)
@@ -113,8 +112,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         {
             try
             {
-                var context = new ModuleContextImplementation(module.Name, logger);
-                await module.OnSessionEndAsync(context);
+                await module.OnSessionEndAsync();
             }
             catch (Exception ex)
             {
@@ -143,20 +141,5 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         logger.LogInformation("Session '{PresetName}' stopped.", sessionName);
         SessionStopped?.Invoke();
-    }
-
-    /// <summary>
-    /// A private, concrete implementation of the IModuleContext interface.
-    /// This acts as a bridge between a module and the Core's logging system,
-    /// ensuring that all module logs are prefixed with the module's name for easy identification.
-    /// It is implemented as a private class as it is tightly coupled with the SessionManager's lifecycle.
-    /// </summary>
-    private class ModuleContextImplementation(string moduleName, ILogger logger) : IModuleContext
-    {
-        public void LogDebug(string messageTemplate, params object[] args) => logger.LogDebug("[{ModuleName}] " + messageTemplate, moduleName, args);
-        public void LogInfo(string messageTemplate, params object[] args) => logger.LogInformation("[{ModuleName}] " + messageTemplate, moduleName, args);
-        public void LogWarning(string messageTemplate, params object[] args) => logger.LogWarning("[{ModuleName}] " + messageTemplate, moduleName, args);
-        public void LogError(Exception? exception, string messageTemplate, params object[] args) => logger.LogError(exception, "[{ModuleName}] " + messageTemplate, moduleName, args);
-        public void LogFatal(Exception? exception, string messageTemplate, params object[] args) => logger.LogCritical(exception, "[{ModuleName}] " + messageTemplate, moduleName, args);
     }
 }

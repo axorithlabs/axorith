@@ -7,7 +7,7 @@ namespace Axorith.Module.Test;
 /// A test module to demonstrate the capabilities of the Axorith SDK
 /// and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class TestModule : IModule
+public class TestModule(IModuleLogger logger) : IModule
 {
     /// <inheritdoc />
     public Guid Id => Guid.Parse("f47ac10b-58cc-4372-a567-0e02b2c3d479");
@@ -76,9 +76,9 @@ public class TestModule : IModule
     }
 
     /// <inheritdoc />
-    public async Task OnSessionStartAsync(IModuleContext context, IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken)
+    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken)
     {
-        context.LogInfo("Test Module is starting...");
+        logger.LogInfo("Test Module is starting...");
 
         // Retrieve settings safely, using default values from the module definition if a key is not found.
         var message = userSettings.GetValueOrDefault("GreetingMessage", "Default Greeting");
@@ -90,34 +90,34 @@ public class TestModule : IModule
         if (!decimal.TryParse(userSettings.GetValueOrDefault("WorkDurationSeconds", "5"), out var duration))
         {
             duration = 5;
-            context.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
+            logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
         }
 
-        context.LogInfo("User setting 'GreetingMessage': {Message}", message);
+        logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
 
         if (enableExtraLogging)
         {
-            context.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
+            logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
             for (var i = (int)duration; i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                context.LogDebug("... {SecondsLeft} seconds left.", i);
+                logger.LogDebug("... {SecondsLeft} seconds left.", i);
                 await Task.Delay(1000, cancellationToken);
             }
         }
         else
         {
-            context.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
+            logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
             await Task.Delay((int)duration * 1000, cancellationToken);
         }
 
-        context.LogInfo("Test Module has finished its work.");
+        logger.LogInfo("Test Module has finished its work.");
     }
 
     /// <inheritdoc />
-    public Task OnSessionEndAsync(IModuleContext context)
+    public Task OnSessionEndAsync()
     {
-        context.LogInfo("Test Module has been requested to shut down.");
+        logger.LogInfo("Test Module has been requested to shut down.");
         // Perform any cleanup here. For this module, there's nothing to clean up.
         return Task.CompletedTask;
     }
