@@ -1,15 +1,15 @@
-﻿using Axorith.Core.Models;
+﻿using System.Collections.ObjectModel;
+using System.Windows.Input;
+using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 
 namespace Axorith.Client.ViewModels;
 
 /// <summary>
-/// ViewModel for the main dashboard view. Manages the list of presets and session lifecycle commands.
+///     ViewModel for the main dashboard view. Manages the list of presets and session lifecycle commands.
 /// </summary>
 public class MainViewModel : ReactiveObject
 {
@@ -19,20 +19,20 @@ public class MainViewModel : ReactiveObject
     private readonly IServiceProvider _serviceProvider;
 
     private SessionPreset? _selectedPreset;
-    
+
     /// <summary>
-    /// The currently selected session preset in the list.
+    ///     The currently selected session preset in the list.
     /// </summary>
     public SessionPreset? SelectedPreset
     {
         get => _selectedPreset;
         set => this.RaiseAndSetIfChanged(ref _selectedPreset, value);
     }
-    
+
     private string _sessionStatus = "No session is active.";
-    
+
     /// <summary>
-    /// A user-friendly string describing the current session status.
+    ///     A user-friendly string describing the current session status.
     /// </summary>
     public string SessionStatus
     {
@@ -41,47 +41,48 @@ public class MainViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Gets a value indicating whether a session is currently active.
-    /// This property is exposed for binding in the View.
+    ///     Gets a value indicating whether a session is currently active.
+    ///     This property is exposed for binding in the View.
     /// </summary>
     public bool IsSessionActive => _sessionManager.IsSessionRunning;
 
     /// <summary>
-    /// A collection of all available session presets loaded from the core.
+    ///     A collection of all available session presets loaded from the core.
     /// </summary>
     public ObservableCollection<SessionPreset> Presets { get; } = new();
-    
+
     /// <summary>
-    /// Command to delete the currently selected preset.
+    ///     Command to delete the currently selected preset.
     /// </summary>
     public ICommand DeleteSelectedCommand { get; }
-    
+
     /// <summary>
-    /// Command to open the editor for the currently selected preset.
+    ///     Command to open the editor for the currently selected preset.
     /// </summary>
     public ICommand EditSelectedCommand { get; }
-    
+
     /// <summary>
-    /// Command to start a session with the currently selected preset.
+    ///     Command to start a session with the currently selected preset.
     /// </summary>
     public ICommand StartSelectedCommand { get; }
-    
+
     /// <summary>
-    /// Command to stop the currently active session.
+    ///     Command to stop the currently active session.
     /// </summary>
     public ICommand StopSessionCommand { get; }
-    
+
     /// <summary>
-    /// Command to reload the list of presets from storage.
+    ///     Command to reload the list of presets from storage.
     /// </summary>
     public ICommand LoadPresetsCommand { get; }
-    
+
     /// <summary>
-    /// Command to open the editor to create a new preset.
+    ///     Command to open the editor to create a new preset.
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
-    public MainViewModel(ShellViewModel shell, IPresetManager presetManager, ISessionManager sessionManager, IServiceProvider serviceProvider)
+    public MainViewModel(ShellViewModel shell, IPresetManager presetManager, ISessionManager sessionManager,
+        IServiceProvider serviceProvider)
     {
         _shell = shell;
         _presetManager = presetManager;
@@ -90,9 +91,9 @@ public class MainViewModel : ReactiveObject
 
         _sessionManager.SessionStarted += OnSessionStarted;
         _sessionManager.SessionStopped += OnSessionStopped;
-        
+
         var canManipulatePreset = this.WhenAnyValue(
-            vm => vm.SelectedPreset, 
+            vm => vm.SelectedPreset,
             vm => vm.IsSessionActive,
             (selected, isActive) => selected != null && !isActive);
 
@@ -106,21 +107,21 @@ public class MainViewModel : ReactiveObject
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
     }
-    
-    private void OnSessionStarted()
+
+    private void OnSessionStarted(Guid presetId)
     {
         SessionStatus = "Session is active.";
         this.RaisePropertyChanged(nameof(IsSessionActive));
     }
 
-    private void OnSessionStopped()
+    private void OnSessionStopped(Guid presetId)
     {
         SessionStatus = "No session is active.";
         this.RaisePropertyChanged(nameof(IsSessionActive));
     }
 
     /// <summary>
-    /// Asynchronously initializes the ViewModel by loading the initial list of presets.
+    ///     Asynchronously initializes the ViewModel by loading the initial list of presets.
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -151,7 +152,7 @@ public class MainViewModel : ReactiveObject
     private void CreateNewSession()
     {
         var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
-        editor.PresetToEdit = null; 
+        editor.PresetToEdit = null;
         _shell.NavigateTo(editor);
     }
 
@@ -166,9 +167,6 @@ public class MainViewModel : ReactiveObject
     {
         var presetsFromCore = await _presetManager.LoadAllPresetsAsync(CancellationToken.None);
         Presets.Clear();
-        foreach (var preset in presetsFromCore)
-        {
-            Presets.Add(preset);
-        }
+        foreach (var preset in presetsFromCore) Presets.Add(preset);
     }
 }

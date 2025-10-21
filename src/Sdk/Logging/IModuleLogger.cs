@@ -1,9 +1,8 @@
-﻿namespace Axorith.Sdk;
-
-/// <summary>
-/// Provides a structured logging mechanism for modules to interact with the Axorith.Core.
+﻿/// <summary>
+/// Defines a simple, abstract logging interface for modules.
+/// This decouples modules from any specific logging implementation (e.g., Serilog, NLog).
 /// </summary>
-public interface IModuleContext
+public interface IModuleLogger
 {
     /// <summary>
     /// Formats and writes a debug-level log message.

@@ -1,74 +1,98 @@
-﻿using Axorith.Core.Services.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Serilog;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Services;
+using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Exceptions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace Axorith.Core;
 
 public sealed class AxorithHost : IDisposable
 {
-    private readonly ServiceProvider _serviceProvider;
+    private readonly IHost _host;
 
-    private AxorithHost(ServiceProvider serviceProvider)
+    private AxorithHost(IHost host)
     {
-        _serviceProvider = serviceProvider;
+        _host = host;
     }
 
-    public ISessionManager Sessions => _serviceProvider.GetRequiredService<ISessionManager>();
-    public IPresetManager Presets => _serviceProvider.GetRequiredService<IPresetManager>();
-    public IModuleRegistry Modules => _serviceProvider.GetRequiredService<IModuleRegistry>();
+    public ILifetimeScope RootScope => _host.Services.GetRequiredService<ILifetimeScope>();
+    public ISessionManager Sessions => _host.Services.GetRequiredService<ISessionManager>();
+    public IPresetManager Presets => _host.Services.GetRequiredService<IPresetManager>();
+    public IModuleRegistry Modules => _host.Services.GetRequiredService<IModuleRegistry>();
 
     public static async Task<AxorithHost> CreateAsync(CancellationToken cancellationToken = default)
     {
         var totalSw = Stopwatch.StartNew();
-        var logger = Logging.CreateLogger();
-    
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Debug()
+            .CreateBootstrapLogger();
+
+        Log.Information("AxorithHost starting up...");
+
         try
         {
-            logger.Information("AxorithHost starting up...");
+            var hostBuilder = new HostBuilder()
+                .UseServiceProviderFactory(new AutofacServiceProviderFactory())
+                .ConfigureContainer<ContainerBuilder>(builder =>
+                {
+                    builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();
+                    builder.RegisterType<ModuleRegistry>().As<IModuleRegistry>().SingleInstance();
+                    builder.RegisterType<PresetManager>().As<IPresetManager>().SingleInstance();
+                    builder.RegisterType<SessionManager>().As<ISessionManager>().SingleInstance();
+                })
+                .UseSerilog((context, services, configuration) =>
+                {
+                    // Здесь мы настраиваем Serilog для всего приложения
+                    var logPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "Axorith", "logs", "axorith-.log");
+
+                    configuration
+                        .ReadFrom.Services(services)
+                        .Enrich.FromLogContext()
+                        .MinimumLevel.Debug()
+                        .WriteTo.Console()
+                        .WriteTo.Debug()
+                        .WriteTo.File(logPath, rollingInterval: RollingInterval.Day);
+                });
+
+            var host = hostBuilder.Build();
+
             var stepSw = Stopwatch.StartNew();
+            Log.Information("--> Initializing module registry...");
 
-            var services = new ServiceCollection();
-            ConfigureServices(services, logger);
-            stepSw.Stop();
-            logger.Information("--> Service configuration finished in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
-
-            stepSw.Restart();
-            var serviceProvider = services.BuildServiceProvider();
-            stepSw.Stop();
-            logger.Information("--> DI container built in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
-
-            stepSw.Restart();
-
-            if (serviceProvider.GetRequiredService<IModuleRegistry>() is ModuleRegistry moduleRegistry)
-            {
+            if (host.Services.GetRequiredService<IModuleRegistry>() is ModuleRegistry moduleRegistry)
                 await moduleRegistry.InitializeAsync(cancellationToken);
-            }
-            
+
             stepSw.Stop();
-            logger.Information("--> Module registry initialized in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
+            Log.Information("--> Module registry initialized in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
 
-            var host = new AxorithHost(serviceProvider);
-        
             totalSw.Stop();
-            logger.Information("AxorithHost created successfully in {ElapsedMs} ms total.", totalSw.ElapsedMilliseconds);
+            Log.Information("AxorithHost created successfully in {ElapsedMs} ms total.", totalSw.ElapsedMilliseconds);
 
-            return host;
+            return new AxorithHost(host);
         }
         catch (Exception ex)
         {
-            logger.Fatal(ex, "A critical error occurred during host initialization. The application cannot start.");
-            
+            Log.Fatal(ex, "A critical error occurred during host initialization.");
             throw new HostInitializationException("Failed to initialize the Axorith Core. See logs for details.", ex);
+        }
+        finally
+        {
+            await Log.CloseAndFlushAsync();
         }
     }
 
     private static void ConfigureServices(IServiceCollection services, ILogger logger)
     {
-        services.AddLogging(builder => builder.AddSerilog(logger, dispose: true));
-        
+        services.AddLogging(builder => builder.AddSerilog(logger, true));
+
         services.AddSingleton<IModuleLoader, ModuleLoader>();
         services.AddSingleton<IModuleRegistry, ModuleRegistry>();
         services.AddSingleton<IPresetManager, PresetManager>();
@@ -77,7 +101,6 @@ public sealed class AxorithHost : IDisposable
 
     public void Dispose()
     {
-        Log.CloseAndFlush();
-        _serviceProvider.Dispose();
+        _host.Dispose();
     }
 }
