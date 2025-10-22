@@ -144,11 +144,8 @@ public class SessionEditorViewModel : ReactiveObject
     {
         AvailableModulesToAdd.Clear();
         var allDefinitions = _moduleRegistry.GetAllDefinitions();
-        var configuredModuleIds = new HashSet<Guid>(ConfiguredModules.Select(cm => cm.Definition.Id));
-
         foreach (var def in allDefinitions)
-            if (!configuredModuleIds.Contains(def.Id))
-                AvailableModulesToAdd.Add(def);
+            AvailableModulesToAdd.Add(def);
     }
 
     private void AddSelectedModule()
@@ -158,10 +155,10 @@ public class SessionEditorViewModel : ReactiveObject
         var defToAdd = ModuleToAdd;
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
         _preset.Modules.Add(newConfiguredModule);
+
         var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _moduleRegistry);
         ConfiguredModules.Add(newVm);
 
-        UpdateAvailableModules();
         SelectedModule = newVm;
         ModuleToAdd = null;
     }

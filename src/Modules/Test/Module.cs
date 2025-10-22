@@ -80,8 +80,6 @@ public class Module : IModule
     public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
         CancellationToken cancellationToken)
     {
-        _logger.LogInfo("Test Module is starting...");
-
         // Retrieve settings safely, using default values from the module definition if a key is not found.
         var message = userSettings.GetValueOrDefault("GreetingMessage", "Default Greeting");
 
@@ -103,7 +101,7 @@ public class Module : IModule
             for (var i = (int)duration; i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _logger.LogDebug("... {SecondsLeft} seconds left.", i);
+                _logger.LogDebug("{SecondsLeft} seconds left.", i);
                 await Task.Delay(1000, cancellationToken);
             }
         }
@@ -112,14 +110,11 @@ public class Module : IModule
             _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
             await Task.Delay((int)duration * 1000, cancellationToken);
         }
-
-        _logger.LogInfo("Test Module has finished its work.");
     }
 
     /// <inheritdoc />
     public Task OnSessionEndAsync()
     {
-        _logger.LogInfo("Test Module has been requested to shut down.");
         // Perform any cleanup here. For this module, there's nothing to clean up.
         return Task.CompletedTask;
     }
