@@ -26,8 +26,8 @@ public class Module : IModule
     {
         _serviceProvider = serviceProvider;
         _definition = definition;
-        // Resolve the _logger from the provided service provider.
 
+        // Resolve the _logger from the provided service provider.
         _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
     }
 
@@ -96,8 +96,6 @@ public class Module : IModule
     public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
         CancellationToken cancellationToken)
     {
-        _logger.LogInfo("Application Launcher Module is starting...");
-
         var applicationPath = userSettings.GetValueOrDefault("ApplicationPath");
         if (string.IsNullOrWhiteSpace(applicationPath))
         {
@@ -161,15 +159,11 @@ public class Module : IModule
         {
             _logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
         }
-
-        _logger.LogInfo("Application Launcher Module has finished its work.");
     }
 
     /// <inheritdoc />
     public Task OnSessionEndAsync()
     {
-        _logger.LogInfo("Application Launcher Module has been requested to shut down.");
-
         _currentProcess?.CloseMainWindow();
 
         return Task.CompletedTask;

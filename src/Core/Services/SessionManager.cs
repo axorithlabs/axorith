@@ -22,6 +22,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
     {
         public required IModule Instance { get; init; }
         public required ILifetimeScope Scope { get; init; }
+        public required ConfiguredModule Configuration { get; init; }
 
         public void Dispose()
         {
@@ -54,7 +55,8 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         {
             var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
             if (instance != null && scope != null)
-                _activeModules.Add(new ActiveModule { Instance = instance, Scope = scope });
+                _activeModules.Add(new ActiveModule
+                    { Instance = instance, Scope = scope, Configuration = configuredModule });
             else
                 logger.LogWarning(
                     "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping",
@@ -71,11 +73,31 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         try
         {
-            var startTasks = _activeModules.Select(activeModule =>
+            var startTasks = _activeModules.Select(async activeModule =>
             {
+                var config = activeModule.Configuration;
                 var definition = activeModule.Scope.Resolve<ModuleDefinition>();
-                var configuredModule = preset.Modules.First(cm => cm.ModuleId == definition.Id);
-                return activeModule.Instance.OnSessionStartAsync(configuredModule.Settings, _sessionCts.Token);
+
+                var scope = logger.BeginScope(new Dictionary<string, object>
+                {
+                    ["ModuleName"] = definition.Name,
+                    ["ModuleInstanceName"] = config.CustomName ?? string.Empty
+                });
+
+                try
+                {
+                    await activeModule.Instance.OnSessionStartAsync(config.Settings, _sessionCts.Token);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Module instance {InstanceName} failed to start",
+                        config.CustomName ?? definition.Name);
+                    throw;
+                }
+                finally
+                {
+                    scope?.Dispose();
+                }
             });
 
             await Task.WhenAll(startTasks);
@@ -106,14 +128,27 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         var stopTasks = _activeModules.Select(async activeModule =>
         {
+            var config = activeModule.Configuration;
+            var definition = activeModule.Scope.Resolve<ModuleDefinition>();
+
+            var scope = logger.BeginScope(new Dictionary<string, object>
+            {
+                ["ModuleName"] = definition.Name,
+                ["ModuleInstanceName"] = config.CustomName ?? string.Empty
+            });
+
             try
             {
                 await activeModule.Instance.OnSessionEndAsync();
             }
             catch (Exception ex)
             {
-                var def = activeModule.Scope.Resolve<ModuleDefinition>();
-                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync", def.Name);
+                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync.",
+                    definition.Name);
+            }
+            finally
+            {
+                scope?.Dispose();
             }
         });
         await Task.WhenAll(stopTasks);

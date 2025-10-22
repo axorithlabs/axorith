@@ -1,18 +1,29 @@
 ﻿namespace Axorith.Core.Models;
 
 /// <summary>
-/// Represents a single module that has been configured by the user within a session preset.
+///     Represents a single instance of a module configured by the user within a session preset.
 /// </summary>
 public class ConfiguredModule
 {
     /// <summary>
-    /// The unique identifier of the module definition. This links back to the IModule in the registry.
+    ///     A unique identifier for THIS SPECIFIC INSTANCE of the module within the preset.
+    ///     This is generated when the module is added to the preset.
+    /// </summary>
+    public Guid InstanceId { get; set; } = Guid.NewGuid();
+
+    /// <summary>
+    ///     The unique identifier of the module's definition. This links back to the ModuleDefinition in the registry.
     /// </summary>
     public Guid ModuleId { get; set; }
 
     /// <summary>
-    /// A dictionary containing the user-provided settings for this specific module instance.
-    /// The key is the setting's key (from ModuleSetting.Key), and the value is the user's input.
+    ///     An optional, user-defined name for this instance (e.g., "Launch Notepad", "Launch OBS").
+    ///     If null or empty, the module's default name will be used.
+    /// </summary>
+    public string? CustomName { get; set; }
+
+    /// <summary>
+    ///     A dictionary containing the user-provided settings for this specific module instance.
     /// </summary>
     public Dictionary<string, string> Settings { get; set; } = new();
 }
