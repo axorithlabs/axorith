@@ -1,5 +1,4 @@
-﻿using System.Runtime.Loader;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
@@ -33,16 +32,14 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             var dirInfo = new DirectoryInfo(path);
             if (dirInfo.LinkTarget != null)
             {
-                var sanitizedPath = path.Replace('\n', '_').Replace('\r', '_');
-                logger.LogWarning("Module directory '{ModuleDir}' is a symbolic link. Skipping for security reasons.",
+                logger.LogWarning("Module directory '{ModuleDir}' is a symbolic link. Skipping for security reasons",
                     path);
                 continue;
             }
 
             if (!Directory.Exists(path))
             {
-                var sanitizedPath = path.Replace('\n', '_').Replace('\r', '_');
-                logger.LogWarning("Module search path not found, skipping: {Path}", sanitizedPath);
+                logger.LogWarning("Module search path not found, skipping: {Path}", path);
                 continue;
             }
 
@@ -63,7 +60,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 
                     if (new FileInfo(jsonFile).Length > 10 * 1024)
                     {
-                        logger.LogWarning("module.json file is too large: {Path}. Skipping.", jsonFile);
+                        logger.LogWarning("module.json file is too large: {Path}. Skipping", jsonFile);
                         continue;
                     }
 
@@ -72,7 +69,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     if (definition == null)
                     {
                         logger.LogWarning(
-                            "Failed to deserialize module.json at {JsonPath}, it resulted in a null object.",
+                            "Failed to deserialize module.json at {JsonPath}, it resulted in a null object",
                             jsonFile);
                         continue;
                     }
@@ -80,7 +77,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     if (!definition.Platforms.Contains(currentPlatform))
                     {
                         logger.LogDebug(
-                            "Skipping module '{ModuleName}' as it does not support the current platform ({Platform}).",
+                            "Skipping module '{ModuleName}' as it does not support the current platform ({Platform})",
                             definition.Name, currentPlatform);
                         continue;
                     }
@@ -92,11 +89,11 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     if (dllFile == null)
                     {
                         logger.LogWarning(
-                            "No DLL found in the directory of {JsonFile}. Skipping module '{ModuleName}'.",
+                            "No DLL found in the directory of {JsonFile}. Skipping module '{ModuleName}'",
                             jsonFile, definition.Name);
                         continue;
                     }
-                    
+
                     var loadContext = new ModuleAssemblyLoadContext(dllFile);
                     var assembly = loadContext.LoadFromAssemblyPath(dllFile);
                     var moduleType = assembly.GetExportedTypes()
@@ -106,24 +103,24 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     {
                         definition.LoadContext = loadContext;
                         definition.ModuleType = moduleType;
-                        
+
                         definitions.Add(definition);
-                        
+
                         logger.LogInformation("Discovered module definition '{ModuleName}' from {DllFile}",
                             definition.Name, Path.GetFileName(dllFile));
                     }
                     else
                     {
                         logger.LogWarning(
-                            "DLL {DllFile} does not contain a public class implementing IModule. Skipping module '{ModuleName}'.",
+                            "DLL {DllFile} does not contain a public class implementing IModule. Skipping module '{ModuleName}'",
                             Path.GetFileName(dllFile), definition.Name);
-                        
+
                         loadContext.Unload();
                     }
                 }
                 catch (JsonException jsonEx)
                 {
-                    logger.LogError(jsonEx, "Invalid JSON format in {JsonFile}. Skipping.", jsonFile);
+                    logger.LogError(jsonEx, "Invalid JSON format in {JsonFile}. Skipping", jsonFile);
                 }
                 catch (Exception ex)
                 {
@@ -132,7 +129,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             }
         }
 
-        logger.LogInformation("Module discovery finished. Found {Count} compatible module definitions.",
+        logger.LogInformation("Module discovery finished. Found {Count} compatible module definitions",
             definitions.Count);
         return Task.FromResult<IReadOnlyList<ModuleDefinition>>(definitions);
     }

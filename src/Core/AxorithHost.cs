@@ -19,7 +19,6 @@ public sealed class AxorithHost : IDisposable
         _host = host;
     }
 
-    public ILifetimeScope RootScope => _host.Services.GetRequiredService<ILifetimeScope>();
     public ISessionManager Sessions => _host.Services.GetRequiredService<ISessionManager>();
     public IPresetManager Presets => _host.Services.GetRequiredService<IPresetManager>();
     public IModuleRegistry Modules => _host.Services.GetRequiredService<IModuleRegistry>();
@@ -46,9 +45,8 @@ public sealed class AxorithHost : IDisposable
                     builder.RegisterType<PresetManager>().As<IPresetManager>().SingleInstance();
                     builder.RegisterType<SessionManager>().As<ISessionManager>().SingleInstance();
                 })
-                .UseSerilog((context, services, configuration) =>
+                .UseSerilog((_, services, configuration) =>
                 {
-                    // Здесь мы настраиваем Serilog для всего приложения
                     var logPath = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                         "Axorith", "logs", "axorith-.log");
@@ -74,29 +72,19 @@ public sealed class AxorithHost : IDisposable
             Log.Information("--> Module registry initialized in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
 
             totalSw.Stop();
-            Log.Information("AxorithHost created successfully in {ElapsedMs} ms total.", totalSw.ElapsedMilliseconds);
+            Log.Information("AxorithHost created successfully in {ElapsedMs} ms total", totalSw.ElapsedMilliseconds);
 
             return new AxorithHost(host);
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "A critical error occurred during host initialization.");
+            Log.Fatal(ex, "A critical error occurred during host initialization");
             throw new HostInitializationException("Failed to initialize the Axorith Core. See logs for details.", ex);
         }
         finally
         {
             await Log.CloseAndFlushAsync();
         }
-    }
-
-    private static void ConfigureServices(IServiceCollection services, ILogger logger)
-    {
-        services.AddLogging(builder => builder.AddSerilog(logger, true));
-
-        services.AddSingleton<IModuleLoader, ModuleLoader>();
-        services.AddSingleton<IModuleRegistry, ModuleRegistry>();
-        services.AddSingleton<IPresetManager, PresetManager>();
-        services.AddSingleton<ISessionManager, SessionManager>();
     }
 
     public void Dispose()

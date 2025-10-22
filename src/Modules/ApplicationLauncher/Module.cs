@@ -31,7 +31,7 @@ public class Module : IModule
         _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
     }
 
-    private Process? _currentProcess = null;
+    private Process? _currentProcess;
 
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
@@ -116,10 +116,12 @@ public class Module : IModule
         try
         {
             _logger.LogDebug("Attempting to start process: {Path} {Args}", applicationPath, applicationArgs);
-            _currentProcess = Process.Start(applicationPath, applicationArgs);
-
-            if (_currentProcess == null)
-                throw new InvalidOperationException("Process.Start returned null.");
+            _currentProcess = new Process();
+            _currentProcess.StartInfo.FileName = applicationPath;
+            _currentProcess.StartInfo.Arguments = applicationArgs;
+            _currentProcess.StartInfo.RedirectStandardOutput = true;
+            _currentProcess.StartInfo.RedirectStandardError = true;
+            _currentProcess.Start();
 
             _logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
                 _currentProcess.Id);

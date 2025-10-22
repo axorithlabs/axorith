@@ -1,12 +1,12 @@
-﻿using Axorith.Core.Models;
+﻿using System.Text.Json;
+using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace Axorith.Core.Services;
 
 /// <summary>
-/// The concrete implementation for managing session presets using JSON files on disk.
+///     The concrete implementation for managing session presets using JSON files on disk.
 /// </summary>
 public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
 {
@@ -25,7 +25,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                logger.LogWarning("Preset loading was cancelled.");
+                logger.LogWarning("Preset loading was cancelled");
                 break;
             }
 
@@ -33,10 +33,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             {
                 await using var stream = File.OpenRead(filePath);
                 var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions);
-                if (preset != null)
-                {
-                    presets.Add(preset);
-                }
+                if (preset != null) presets.Add(preset);
             }
             catch (Exception ex)
             {
@@ -44,7 +41,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             }
         }
 
-        logger.LogInformation("Successfully loaded {Count} presets.", presets.Count);
+        logger.LogInformation("Successfully loaded {Count} presets", presets.Count);
         return presets;
     }
 
@@ -58,7 +55,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             Directory.CreateDirectory(_presetsDirectory);
             await using var stream = File.Create(filePath);
             await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken);
-            logger.LogDebug("Preset '{PresetName}' saved successfully.", preset.Name);
+            logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)
         {
@@ -76,7 +73,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
-                logger.LogDebug("Preset file deleted successfully.");
+                logger.LogDebug("Preset file deleted successfully");
             }
             else
             {

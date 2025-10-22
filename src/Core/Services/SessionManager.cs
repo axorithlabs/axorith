@@ -57,13 +57,13 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                 _activeModules.Add(new ActiveModule { Instance = instance, Scope = scope });
             else
                 logger.LogWarning(
-                    "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping.",
+                    "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping",
                     configuredModule.ModuleId, preset.Name);
         }
 
         if (_activeModules.Count == 0)
         {
-            logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start.",
+            logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
                 preset.Name);
             ActiveSession = null;
             return;
@@ -80,7 +80,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
             await Task.WhenAll(startTasks);
 
-            logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules.", preset.Name,
+            logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules", preset.Name,
                 _activeModules.Count);
             SessionStarted?.Invoke(preset.Id);
         }
@@ -113,7 +113,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
             catch (Exception ex)
             {
                 var def = activeModule.Scope.Resolve<ModuleDefinition>();
-                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync.", def.Name);
+                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync", def.Name);
             }
         });
         await Task.WhenAll(stopTasks);
@@ -125,7 +125,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "An error occurred while disposing a module or its scope.");
+                logger.LogError(ex, "An error occurred while disposing a module or its scope");
             }
 
         _activeModules.Clear();
@@ -133,7 +133,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         _sessionCts = null;
         ActiveSession = null;
 
-        logger.LogInformation("Session '{PresetName}' stopped.", sessionToStop.Name);
+        logger.LogInformation("Session '{PresetName}' stopped", sessionToStop.Name);
         SessionStopped?.Invoke(sessionToStop.Id);
     }
 

@@ -30,29 +30,28 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
             await moduleLoader.LoadModuleDefinitionsAsync(GetDefaultSearchPaths(), cancellationToken);
         _definitions = definitionsList.ToDictionary(d => d.Id);
         _isInitialized = true;
-        logger.LogInformation("Module registry initialized with {Count} modules.", _definitions.Count);
+        logger.LogInformation("Module registry initialized with {Count} modules", _definitions.Count);
     }
-    
+
     /// <summary>
-    /// Unloads all loaded module assemblies from memory.
+    ///     Unloads all loaded module assemblies from memory.
     /// </summary>
     public void Dispose()
     {
         logger.LogInformation("Disposing ModuleRegistry and unloading all module contexts...");
         foreach (var definition in _definitions.Values)
-        {
             try
             {
                 if (definition.LoadContext?.IsCollectible != true) continue;
-                
+
                 definition.LoadContext.Unload();
-                logger.LogDebug("Unloaded assembly context for module '{ModuleName}'.", definition.Name);
+                logger.LogDebug("Unloaded assembly context for module '{ModuleName}'", definition.Name);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to unload assembly context for module '{ModuleName}'.", definition.Name);
+                logger.LogError(ex, "Failed to unload assembly context for module '{ModuleName}'", definition.Name);
             }
-        }
+
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
     }
 
@@ -94,7 +93,7 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                 if (instance == null)
                 {
                     logger.LogError(
-                        "Failed to resolve module instance for {ModuleName}. The resolved object was null or not an IModule.",
+                        "Failed to resolve module instance for {ModuleName}. The resolved object was null or not an IModule",
                         definition.Name);
                     moduleScope.Dispose();
                     return (null, null);
@@ -104,13 +103,13 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to create module instance for {ModuleName} due to an exception.",
+                logger.LogError(ex, "Failed to create module instance for {ModuleName} due to an exception",
                     definition.Name);
                 return (null, null);
             }
 
         logger.LogWarning(
-            "Could not create instance for module ID {ModuleId}. Definition not found or module type is null.",
+            "Could not create instance for module ID {ModuleId}. Definition not found or module type is null",
             moduleId);
         return (null, null);
     }

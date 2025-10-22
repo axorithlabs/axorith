@@ -1,21 +1,21 @@
-﻿using Avalonia.Data.Converters;
-using System.Globalization;
+﻿using System.Globalization;
+using Avalonia.Data.Converters;
 
 namespace Axorith.Client.Converters;
 
 /// <summary>
-/// A value converter that checks for equality between the binding value and a parameter.
-/// Typically used to control visibility based on an enum or type.
+///     A value converter that checks for equality between the binding value and a parameter.
+///     Typically used to control visibility based on an enum or type.
 /// </summary>
 public class EqualsConverter : IValueConverter
 {
     /// <summary>
-    /// A static instance of the converter to be used in XAML.
+    ///     A static instance of the converter to be used in XAML.
     /// </summary>
     public static readonly EqualsConverter Instance = new();
 
     /// <summary>
-    /// Compares the input value with the converter parameter.
+    ///     Compares the input value with the converter parameter.
     /// </summary>
     /// <returns>True if the value and parameter are equal, otherwise false.</returns>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -24,9 +24,9 @@ public class EqualsConverter : IValueConverter
     }
 
     /// <summary>
-    /// This method is not implemented and will throw an exception if used.
+    ///     This method is not implemented and will throw an exception if used.
     /// </summary>
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
     }
