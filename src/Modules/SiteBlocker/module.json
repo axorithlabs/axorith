@@ -1,0 +1,11 @@
+﻿{
+  "id": "1f7e4b8e-a6a5-4f5a-9b8b-2c1d9e8a7b6c",
+  "name": "Site Blocker",
+  "description": "Blocks specified websites in your browser during a session. Requires the Axorith browser extension.",
+  "category": "Productivity",
+  "platforms": [
+    "Windows",
+    "Linux",
+    "MacOs"
+  ]
+}
