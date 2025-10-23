@@ -45,7 +45,6 @@ public static class NativeHostManager
         }
         catch (Exception ex)
         {
-            // Оборачиваем системное исключение в наше, более понятное.
             throw new InvalidOperationException($"Failed to register native messaging host for Firefox. Please check permissions. Inner exception: {ex.Message}", ex);
         }
     }
