@@ -40,8 +40,8 @@ The goal of the MVP is a functional, albeit minimal, application that proves the
 
 Once the MVP is stable, the focus shifts to creating real value with first-party modules.
 
-- [ ] **Module: Site Blocker:** A module to block websites by modifying the `hosts` file or using platform-specific APIs.
-- [ ] **Module: Application Launcher:** A module to start and stop applications (`.exe`, `.app`, etc.).
+- [x] **Module: Site Blocker:** A module to block websites by modifying the `hosts` file or using platform-specific APIs.
+- [x] **Module: Application Launcher:** A module to start and stop applications (`.exe`, `.app`, etc.).
 - [ ] **Module: Spotify (Basic):** A module that can start/stop playback of a specific playlist using the Spotify Web API.
 - [ ] **UI Polishing:** Improve the look and feel of the Client. Add animations and better visual feedback.
 - [ ] **Installer:** Create installers for Windows (MSIX), macOS (DMG), and Linux (AppImage/Flatpak).

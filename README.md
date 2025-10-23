@@ -77,9 +77,9 @@ See the detailed architecture guide [here](docs/architecture.md).
 |    |--- Exceptions/
 |
 |--- /Modules/         # Home for all plugin implementations.
-     |--- Test/
+     |--- ApplicationLauncher/
+     |--- SiteBlocker/
      |--- Spotify/      (Upcoming)
-     |--- SiteBlocker/  (Upcoming)
 ```
 
 ## Getting Started (For Developers)
@@ -119,7 +119,7 @@ See the full roadmap [here](docs/roadmap.md)
     *   [x] Stable Core architecture with module loading.
     *   [x] Functional Client with session creation and editing.
     *   [x] Implement `Start/Stop` session logic in the UI.
-    *   [ ] First-party modules: Site Blocker, Application Launcher.
+    *   [x] First-party modules: Site Blocker, Application Launcher.
     *   [ ] Basic API-based module: Spotify.
 
 *   **Post-MVP**
