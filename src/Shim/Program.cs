@@ -78,7 +78,8 @@ internal static class Program
     {
         try
         {
-            var errorLogPath = Path.Combine(AppContext.BaseDirectory, "shim_error.log");
+            var errorLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Axorith",
+                "logs", "shim_error.log");
             var errorMessage = $"{DateTime.Now}: {(context != null ? $"[{context}] " : "")}{ex}\n";
             File.AppendAllText(errorLogPath, errorMessage);
         }
