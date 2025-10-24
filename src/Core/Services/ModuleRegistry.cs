@@ -5,6 +5,7 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
+using Axorith.Sdk.Services;
 using Microsoft.Extensions.Logging;
 using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
@@ -97,6 +98,15 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                             return client;
                         })
                         .As<IHttpClient>()
+                        .InstancePerLifetimeScope();
+                    
+                    builder.Register(_ =>
+                        {
+                            var underlyingStorage = rootScope.Resolve<ISecureStorageService>();
+                            
+                            return new ModuleScopedSecureStorage(underlyingStorage, definition);
+                        })
+                        .As<ISecureStorageService>()
                         .InstancePerLifetimeScope();
 
                     // Register the module type itself.

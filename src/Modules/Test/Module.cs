@@ -2,6 +2,7 @@
 using Axorith.Sdk;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
+using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
 
 namespace Axorith.Module.Test;
@@ -10,7 +11,7 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module(IModuleLogger logger, IHttpClient httpClient) : IModule
+public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorageService secureStorage) : IModule
 {
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
@@ -118,6 +119,17 @@ public class Module(IModuleLogger logger, IHttpClient httpClient) : IModule
             logger.LogError(ex, ex.Message);
             throw;
         }
+        
+        var token = secureStorage.RetrieveSecret("AccessToken");
+
+        if (token is null)
+        {
+            var newToken = "qwerpoqwprfjofpjweof";
+            secureStorage.StoreSecret("AccessToken", newToken);
+            token = newToken;
+        }
+        
+        logger.LogInfo("token {token}", token);
     }
 
     /// <inheritdoc />
