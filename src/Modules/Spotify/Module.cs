@@ -1,19 +1,21 @@
-﻿using Axorith.Sdk;
+﻿using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using Axorith.Sdk;
+using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
-using SpotifyAPI.Web;
 
 namespace Axorith.Module.Spotify;
 
 public class Module : IModule
 {
-    private readonly ModuleDefinition _definition;
     private readonly IModuleLogger _logger;
-    private SpotifyClient? _spotify = null;
+    private readonly HttpClient _httpClient;
 
     public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
     {
-        _definition = definition;
         _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
+        _httpClient = new HttpClient();
     }
 
     /// <inheritdoc />
@@ -51,15 +53,14 @@ public class Module : IModule
     /// <inheritdoc />
     public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken)
     {
-        _spotify ??= new SpotifyClient(userSettings.GetValueOrDefault("AccessToken", string.Empty));
+        _httpClient.DefaultRequestHeaders.Authorization ??= new AuthenticationHeaderValue("Bearer", userSettings.GetValueOrDefault("AccessToken", string.Empty));
         
         var playlistUrl = userSettings.GetValueOrDefault("PlaylistUrl", string.Empty);
 
         try
         {
             if (string.IsNullOrEmpty(playlistUrl))
-                await _spotify.Player.AddToQueue(new PlayerAddToQueueRequest(ConvertUrlToUri(playlistUrl)), cancellationToken);
-            await _spotify.Player.SkipNext(cancellationToken);
+                await PlayPlaylistAsync(userSettings.GetValueOrDefault("PlaylistUrl", string.Empty), cancellationToken);
         }
         catch (Exception ex)
         {
@@ -70,7 +71,7 @@ public class Module : IModule
     /// <inheritdoc />
     public async Task OnSessionEndAsync()
     {
-        await _spotify?.Player.PausePlayback()!;
+        await StopPlaybackAsync();
     }
 
     /// <inheritdoc />
@@ -104,4 +105,43 @@ public class Module : IModule
 
         return $"spotify:{type}:{id}";
     }
+
+    /// <summary>
+    /// Starts playback of a Spotify playlist given its URL
+    /// </summary>
+    /// <param name="playlistUrl">Spotify playlist URL</param>
+    /// <param name="cancellationToken">CancellationToken</param>
+    private async Task PlayPlaylistAsync(string playlistUrl, CancellationToken cancellationToken)
+    {
+        var playlistUri = ConvertUrlToUri(playlistUrl);
+
+        var content = new StringContent(JsonSerializer.Serialize(new { context_uri = playlistUri }), Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PutAsync("https://api.spotify.com/v1/me/player/play", content, cancellationToken);
+
+        if (response.IsSuccessStatusCode)
+            Console.WriteLine("Playlist started successfully.");
+        else
+        {
+            var resp = await response.Content.ReadAsStringAsync(cancellationToken);
+            Console.WriteLine($"Error playing playlist: {resp}");
+        }
+    }
+
+    /// <summary>
+    /// Stops current playback
+    /// </summary>
+    private async Task StopPlaybackAsync()
+    {
+        var response = await _httpClient.PutAsync("https://api.spotify.com/v1/me/player/pause", null);
+
+        if (response.IsSuccessStatusCode)
+            Console.WriteLine("Playback stopped successfully.");
+        else
+        {
+            var resp = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Error stopping playback: {resp}");
+        }
+    }
+
 }
