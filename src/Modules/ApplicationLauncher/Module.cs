@@ -13,20 +13,8 @@ namespace Axorith.Module.ApplicationLauncher.Windows;
 /// <summary>
 ///     A module that launches an external application at the start of a session.
 /// </summary>
-public class Module : IModule
+public class Module(IModuleLogger logger) : IModule
 {
-    private IModuleLogger _logger;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="Module" /> class.
-    ///     Dependencies are injected by the Core.
-    /// </summary>
-    public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
-    {
-        // Resolve the _logger from the provided service provider.
-        _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
-    }
-
     private Process? _currentProcess;
 
     /// <inheritdoc />
@@ -95,7 +83,7 @@ public class Module : IModule
         var applicationPath = userSettings.GetValueOrDefault("ApplicationPath");
         if (string.IsNullOrWhiteSpace(applicationPath))
         {
-            _logger.LogError(null, "Application path is not specified. Module cannot start.");
+            logger.LogError(null, "Application path is not specified. Module cannot start.");
             return;
         }
 
@@ -103,13 +91,13 @@ public class Module : IModule
 
         if (!decimal.TryParse(userSettings.GetValueOrDefault("MonitorIndex", "0"), out var monitorIdx))
         {
-            _logger.LogWarning("Could not parse 'MonitorIndex'. Using default value: 0.");
+            logger.LogWarning("Could not parse 'MonitorIndex'. Using default value: 0.");
             monitorIdx = 0;
         }
 
         try
         {
-            _logger.LogDebug("Attempting to start process: {Path} {Args}", applicationPath, applicationArgs);
+            logger.LogDebug("Attempting to start process: {Path} {Args}", applicationPath, applicationArgs);
             _currentProcess = new Process();
             _currentProcess.StartInfo.FileName = applicationPath;
             _currentProcess.StartInfo.Arguments = applicationArgs;
@@ -117,12 +105,12 @@ public class Module : IModule
             _currentProcess.StartInfo.RedirectStandardError = true;
             _currentProcess.Start();
 
-            _logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
+            logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
                 _currentProcess.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
+            logger.LogError(ex,
                 "Failed to start process for application: {ApplicationPath}. Check path and permissions.",
                 applicationPath);
             return;
@@ -134,26 +122,26 @@ public class Module : IModule
 
             if (_currentProcess.MainWindowHandle != IntPtr.Zero)
             {
-                _logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
+                logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
                     _currentProcess.MainWindowHandle, monitorIdx);
                 WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, (int)monitorIdx);
-                _logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
+                logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
                     _currentProcess.ProcessName, monitorIdx);
             }
             else
             {
-                _logger.LogInfo("Process started without a graphical interface. Skipping window move.");
+                logger.LogInfo("Process started without a graphical interface. Skipping window move.");
             }
         }
         catch (TimeoutException)
         {
-            _logger.LogWarning(
+            logger.LogWarning(
                 "Process {ProcessName} started, but its main window did not appear in time. Could not move window.",
                 _currentProcess.ProcessName);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
+            logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
         }
     }
 

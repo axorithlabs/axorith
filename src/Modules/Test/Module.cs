@@ -8,21 +8,8 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module : IModule
+public class Module(IModuleLogger logger) : IModule
 {
-    private IModuleLogger _logger;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="Module" /> class.
-    ///     Dependencies are injected by the Core.
-    /// </summary>
-    public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
-    {
-        // Resolve the _logger from the provided service provider.
-
-        _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
-    }
-
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
     {
@@ -87,24 +74,24 @@ public class Module : IModule
         if (!decimal.TryParse(userSettings.GetValueOrDefault("WorkDurationSeconds", "5"), out var duration))
         {
             duration = 5;
-            _logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
+            logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
         }
 
-        _logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
+        logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
 
         if (enableExtraLogging)
         {
-            _logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
+            logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
             for (var i = (int)duration; i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _logger.LogDebug("{SecondsLeft} seconds left.", i);
+                logger.LogDebug("{SecondsLeft} seconds left.", i);
                 await Task.Delay(1000, cancellationToken);
             }
         }
         else
         {
-            _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
+            logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
             await Task.Delay((int)duration * 1000, cancellationToken);
         }
     }

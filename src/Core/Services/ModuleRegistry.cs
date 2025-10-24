@@ -86,19 +86,10 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                         .As<IModuleLogger>()
                         .InstancePerLifetimeScope();
 
-                    builder.RegisterType(definition.ModuleType).AsSelf();
+                    builder.RegisterType(definition.ModuleType).As<IModule>();
                 });
 
-                var instance = moduleScope.Resolve(definition.ModuleType) as IModule;
-
-                if (instance == null)
-                {
-                    logger.LogError(
-                        "Failed to resolve module instance for {ModuleName}. The resolved object was null or not an IModule",
-                        definition.Name);
-                    moduleScope.Dispose();
-                    return (null, null);
-                }
+                var instance = moduleScope.Resolve<IModule>();
 
                 return (instance, moduleScope);
             }
