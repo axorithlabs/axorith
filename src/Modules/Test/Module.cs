@@ -1,4 +1,6 @@
-﻿using Axorith.Sdk;
+﻿using System.Text.Json;
+using Axorith.Sdk;
+using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
 
@@ -8,7 +10,7 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module(IModuleLogger logger) : IModule
+public class Module(IModuleLogger logger, IHttpClient httpClient) : IModule
 {
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
@@ -93,6 +95,28 @@ public class Module(IModuleLogger logger) : IModule
         {
             logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
             await Task.Delay((int)duration * 1000, cancellationToken);
+        }
+
+        try
+        {
+            var responseJson = await httpClient.GetStringAsync("https://jsonplaceholder.typicode.com/todos/1", cancellationToken);
+            
+            using var jsonDoc = JsonDocument.Parse(responseJson);
+            var root = jsonDoc.RootElement;
+
+            var userId = root.TryGetProperty("userId", out var el) ? el.GetInt32() : -1;
+            var title = root.TryGetProperty("title", out el) ? el.GetString() : "N/A";
+            var completed = root.TryGetProperty("completed", out el) && el.GetBoolean();
+
+            logger.LogInfo("Parsed To-Do Item:");
+            logger.LogInfo("  User ID: {UserId}", userId);
+            logger.LogInfo("  Title: '{Title}'", title!);
+            logger.LogInfo("  Completed: {IsCompleted}", completed);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, ex.Message);
+            throw;
         }
     }
 
