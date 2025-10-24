@@ -1,11 +1,14 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Http;
 using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Sdk.Services;
 using Axorith.Shared.Exceptions;
+using Axorith.Shared.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -67,6 +70,12 @@ public sealed class AxorithHost : IDisposable
                 {
                     // Http Services
                     builder.RegisterType<HttpClientFactoryAdapter>().As<IHttpClientFactory>().SingleInstance();
+                    
+                    // Secure Storage services
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        builder.RegisterType<SecureStorage>().As<ISecureStorageService>().SingleInstance();
+                    }
                     
                     // Core Services
                     builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();
