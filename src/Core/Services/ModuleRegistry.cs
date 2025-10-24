@@ -3,8 +3,10 @@ using Autofac;
 using Axorith.Core.Logging;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
+using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Microsoft.Extensions.Logging;
+using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core.Services;
 
@@ -79,6 +81,8 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
             {
                 var moduleScope = rootScope.BeginLifetimeScope(builder =>
                 {
+                    // Register module-specific services.
+                    // Each module instance gets its own logger and http client.
                     builder.RegisterInstance(definition).As<ModuleDefinition>();
 
                     builder.Register(c =>
@@ -86,6 +90,16 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                         .As<IModuleLogger>()
                         .InstancePerLifetimeScope();
 
+                    builder.Register(c =>
+                        {
+                            var factory = c.Resolve<IHttpClientFactory>();
+                            var client = factory.CreateClient(definition.Name);
+                            return client;
+                        })
+                        .As<IHttpClient>()
+                        .InstancePerLifetimeScope();
+
+                    // Register the module type itself.
                     builder.RegisterType(definition.ModuleType).As<IModule>();
                 });
 

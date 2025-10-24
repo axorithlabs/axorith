@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
+using Axorith.Core.Http;
 using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
@@ -8,6 +9,7 @@ using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core;
 
@@ -58,9 +60,15 @@ public sealed class AxorithHost : IDisposable
                 .ConfigureServices(services =>
                 {
                     services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
+                    
+                    services.AddHttpClient();
                 })
                 .ConfigureContainer<ContainerBuilder>(builder =>
                 {
+                    // Http Services
+                    builder.RegisterType<HttpClientFactoryAdapter>().As<IHttpClientFactory>().SingleInstance();
+                    
+                    // Core Services
                     builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();
                     builder.RegisterType<ModuleRegistry>().As<IModuleRegistry>().SingleInstance();
                     builder.RegisterType<PresetManager>().As<IPresetManager>().SingleInstance();
