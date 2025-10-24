@@ -3,6 +3,7 @@ using Axorith.Sdk.Settings;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.SiteBlocker;
 

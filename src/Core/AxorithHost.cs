@@ -57,7 +57,7 @@ public sealed class AxorithHost : IDisposable
                 .UseServiceProviderFactory(new AutofacServiceProviderFactory())
                 .ConfigureServices(services =>
                 {
-                    services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger, false));
+                    services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
                 })
                 .ConfigureContainer<ContainerBuilder>(builder =>
                 {

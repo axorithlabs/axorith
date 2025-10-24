@@ -1,4 +1,5 @@
 ﻿using Axorith.Sdk;
+using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
 
 namespace Axorith.Module.Test;
@@ -9,18 +10,14 @@ namespace Axorith.Module.Test;
 /// </summary>
 public class Module : IModule
 {
-    private ModuleDefinition _definition;
-    private IServiceProvider _serviceProvider;
     private IModuleLogger _logger;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="TestModule" /> class.
+    ///     Initializes a new instance of the <see cref="Module" /> class.
     ///     Dependencies are injected by the Core.
     /// </summary>
     public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
     {
-        _serviceProvider = serviceProvider;
-        _definition = definition;
         // Resolve the _logger from the provided service provider.
 
         _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;

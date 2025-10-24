@@ -1,4 +1,6 @@
-﻿/// <summary>
+﻿namespace Axorith.Sdk.Logging;
+
+/// <summary>
 /// Defines a simple, abstract logging interface for modules.
 /// This decouples modules from any specific logging implementation (e.g., Serilog, NLog).
 /// </summary>

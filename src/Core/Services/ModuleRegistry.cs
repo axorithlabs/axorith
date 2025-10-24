@@ -3,6 +3,7 @@ using Autofac;
 using Axorith.Core.Logging;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
+using Axorith.Sdk.Logging;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
