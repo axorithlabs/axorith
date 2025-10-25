@@ -11,8 +11,10 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorageService secureStorage) : IModule
+public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorageService secureStorage, IEventAggregator eventAggregator) : IModule
 {
+    private IDisposable? _subscription;
+
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
     {
@@ -130,6 +132,14 @@ public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorage
         }
         
         logger.LogInfo("token {token}", token);
+
+        // --- Event Aggregator Test ---
+        logger.LogInfo("Subscribing to TestEvent...");
+        _subscription = eventAggregator.Subscribe<TestEvent>(HandleTestEvent);
+
+        logger.LogInfo("Publishing TestEvent in 2 seconds...");
+        await Task.Delay(2000, cancellationToken);
+        eventAggregator.Publish(new TestEvent { Message = "Hello from Event Aggregator!" });
     }
 
     /// <inheritdoc />
@@ -139,11 +149,17 @@ public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorage
         return Task.CompletedTask;
     }
 
+    private void HandleTestEvent(TestEvent evt)
+    {
+        logger.LogInfo("Received TestEvent! Message: '{Message}'", evt.Message);
+    }
+
     /// <summary>
     ///     Releases any resources used by the module. For TestModule, there's nothing to release.
     /// </summary>
     public void Dispose()
     {
+        _subscription?.Dispose();
         GC.SuppressFinalize(this);
     }
 }
