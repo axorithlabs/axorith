@@ -82,6 +82,9 @@ public sealed class AxorithHost : IDisposable
                     builder.RegisterType<ModuleRegistry>().As<IModuleRegistry>().SingleInstance();
                     builder.RegisterType<PresetManager>().As<IPresetManager>().SingleInstance();
                     builder.RegisterType<SessionManager>().As<ISessionManager>().SingleInstance();
+
+                    // Event Aggregator
+                    builder.RegisterType<EventAggregator>().As<IEventAggregator>().SingleInstance();
                 });
 
             var host = hostBuilder.Build();
