@@ -40,7 +40,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
     public event Action<Guid>? SessionStopped;
 
     /// <inheritdoc />
-    public async Task StartSessionAsync(SessionPreset preset)
+    public Task StartSessionAsync(SessionPreset preset)
     {
         if (IsSessionRunning)
             throw new SessionException(
@@ -49,6 +49,10 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
         ActiveSession = preset;
         _sessionCts = new CancellationTokenSource();
+        
+        // Immediately notify listeners that the session has started so the UI can update.
+        SessionStarted?.Invoke(preset.Id);
+
         _activeModules.Clear();
 
         foreach (var configuredModule in preset.Modules)
@@ -67,52 +71,77 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         {
             logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
                 preset.Name);
+            // We need to roll back the "started" state
             ActiveSession = null;
-            return;
+            SessionStopped?.Invoke(preset.Id);
+            return Task.CompletedTask;
         }
+
+        // Run module startup in the background without blocking the caller.
+        _ = RunModuleStartupsAsync(_activeModules, _sessionCts.Token);
+
+        return Task.CompletedTask;
+    }
+    
+    private async Task RunModuleStartupsAsync(IReadOnlyCollection<ActiveModule> modules, CancellationToken cancellationToken)
+    {
+        var startTasks = modules.Select(async activeModule =>
+        {
+            var config = activeModule.Configuration;
+            var definition = activeModule.Scope.Resolve<ModuleDefinition>();
+
+            var scope = logger.BeginScope(new Dictionary<string, object>
+            {
+                ["ModuleName"] = definition.Name,
+                ["ModuleInstanceName"] = config.CustomName ?? string.Empty
+            });
+
+            try
+            {
+                // Pass the session cancellation token to the module
+                await activeModule.Instance.OnSessionStartAsync(config.Settings, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogWarning("Module instance {InstanceName} startup was canceled",
+                    config.CustomName ?? definition.Name);
+                // Don't rethrow cancellation exceptions
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Module instance {InstanceName} failed to start",
+                    config.CustomName ?? definition.Name);
+                // Rethrow to fail Task.WhenAll
+                throw;
+            }
+            finally
+            {
+                scope?.Dispose();
+            }
+        });
 
         try
         {
-            var startTasks = _activeModules.Select(async activeModule =>
-            {
-                var config = activeModule.Configuration;
-                var definition = activeModule.Scope.Resolve<ModuleDefinition>();
-
-                var scope = logger.BeginScope(new Dictionary<string, object>
-                {
-                    ["ModuleName"] = definition.Name,
-                    ["ModuleInstanceName"] = config.CustomName ?? string.Empty
-                });
-
-                try
-                {
-                    await activeModule.Instance.OnSessionStartAsync(config.Settings, _sessionCts.Token);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Module instance {InstanceName} failed to start",
-                        config.CustomName ?? definition.Name);
-                    throw;
-                }
-                finally
-                {
-                    scope?.Dispose();
-                }
-            });
-
             await Task.WhenAll(startTasks);
-
-            logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules", preset.Name,
-                _activeModules.Count);
-            SessionStarted?.Invoke(preset.Id);
+            if (ActiveSession is not null)
+                logger.LogInformation("All {Count} modules for session '{PresetName}' started successfully", modules.Count, ActiveSession.Name);
         }
-        catch (Exception ex)
+        catch
         {
-            logger.LogCritical(ex,
-                "A critical error occurred while starting modules for session '{PresetName}'. Attempting to roll back...",
-                preset.Name);
-            await StopCurrentSessionAsync();
-            throw;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (ActiveSession is not null)
+                    logger.LogInformation("Session '{PresetName}' startup was canceled by user", ActiveSession.Name);
+            }
+            else
+            {
+                if (ActiveSession is not null)
+                    logger.LogCritical(
+                        "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
+                        ActiveSession.Name);
+                
+                await StopCurrentSessionAsync();
+            }
         }
     }
 
