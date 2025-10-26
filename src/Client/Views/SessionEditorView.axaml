@@ -5,86 +5,131 @@
              xmlns:settings="clr-namespace:Axorith.Sdk.Settings;assembly=Axorith.Sdk"
              x:Class="Axorith.Client.Views.SessionEditorView"
              x:DataType="vm:SessionEditorViewModel">
-    
-    <Grid ColumnDefinitions="300, *">
-        <Border Grid.Column="0" Margin="10" Padding="10" BorderThickness="1" BorderBrush="#444" CornerRadius="5">
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Vertical" HorizontalAlignment="Stretch" Spacing="5" Margin="0,10,0,0">
-                    <ComboBox ItemsSource="{Binding AvailableModulesToAdd}" 
-                              SelectedItem="{Binding ModuleToAdd}"
-                              PlaceholderText="Select module to add...">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <Button Content="Add Selected Module" Command="{Binding AddModuleCommand}" HorizontalAlignment="Stretch"/>
-                    <Button Content="Remove Selected Module" Command="{Binding RemoveModuleCommand}" HorizontalAlignment="Stretch" Margin="0,10,0,0"/>
-                </StackPanel>
-                
-                <TextBlock Text="Configured Modules" DockPanel.Dock="Top" FontWeight="Bold" TextAlignment="Center" Classes="h3"/>
-                
-                <Separator DockPanel.Dock="Top" Margin="0,5"></Separator>
-                
-                <ListBox ItemsSource="{Binding ConfiguredModules}" DockPanel.Dock="Top" SelectedItem="{Binding SelectedModule}" Background="Transparent">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
-                            <TextBlock Text="{Binding DisplayName}"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </DockPanel>
-        </Border>
 
-        <DockPanel Grid.Column="1" Margin="0,10,10,10">
-            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,20,0,0">
-                <Button Content="Save &amp; Close" Command="{Binding SaveAndCloseCommand}" Classes="accent"/>
-                <Button Content="Cancel" Command="{Binding CancelCommand}"/>
-            </StackPanel>
-            
-            <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5" DockPanel.Dock="Top">
-                <StackPanel>
-                    <TextBlock Text="Preset Settings" Classes="h2" Margin="0,0,0,10"/>
-                    <TextBox Text="{Binding Name}" Watermark="Enter a name for this preset..." FontSize="16"/>
-                </StackPanel>
-            </Border>
+    <Panel>
+        <!-- Основной контент (конвейер) -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <Panel MaxWidth="800" HorizontalAlignment="Center">
+                <StackPanel Margin="20" Spacing="5">
+                    <!-- Заголовок пресета -->
+                    <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Text="Preset Settings" Classes="h2" Margin="0,0,0,10"/>
+                            <TextBox Text="{Binding Name}" Watermark="Enter a name for this preset..." FontSize="16"/>
+                        </StackPanel>
+                    </Border>
 
-            <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5" Margin="0,10,0,0"
-                    IsVisible="{Binding SelectedModule, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <DockPanel>
-                    <TextBlock Text="{Binding SelectedModule.DisplayName, StringFormat='{}Settings for {0}'}" Classes="h2" Margin="0,0,0,15" DockPanel.Dock="Top"/>
-                    
-                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,15">
-                        <TextBlock Text="Instance Name (Optional)" Opacity="0.7"/>
-                        <TextBox Text="{Binding SelectedModule.CustomName, Mode=TwoWay}" Watermark="{Binding SelectedModule.Definition.Name}"/>
+                    <Path Data="M 0 0 L 0 30" Stroke="#555" StrokeThickness="2" Margin="0,5" HorizontalAlignment="Center"/>
+
+                    <ItemsControl ItemsSource="{Binding ConfiguredModules}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
+                                <StackPanel Spacing="5" HorizontalAlignment="Center">
+                                    <Border MinWidth="450" Background="#2D2D30" CornerRadius="8" Padding="15">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" DockPanel.Dock="Top"/>
+                                            <TextBlock Text="{Binding Definition.Description}" Opacity="0.7" TextWrapping="Wrap" MaxWidth="300" DockPanel.Dock="Top" Margin="0,5,0,0"/>
+                                            
+                                            <StackPanel Orientation="Horizontal" Spacing="10" DockPanel.Dock="Bottom" Margin="0,15,0,0">
+                                                <Button Content="Settings" 
+                                                        Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="Delete" 
+                                                        Command="{Binding $parent[ItemsControl].DataContext.RemoveModuleCommand}" 
+                                                        CommandParameter="{Binding}"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                    
+                                    <Path Data="M 0 0 L 0 30" Stroke="#555" StrokeThickness="2" Margin="0,5" HorizontalAlignment="Center">
+                                        <Path.IsVisible>
+                                            <MultiBinding Converter="{x:Static converters:AppConverters.IsNotLastItem}">
+                                                <Binding/>
+                                                <Binding Path="$parent[ItemsControl].ItemsSource"/>
+                                            </MultiBinding>
+                                        </Path.IsVisible>
+                                    </Path>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <StackPanel MinWidth="450">
+                        <ComboBox ItemsSource="{Binding AvailableModulesToAdd}" 
+                                  SelectedItem="{Binding ModuleToAdd}"
+                                  PlaceholderText="Select module to add..."
+                                  HorizontalAlignment="Stretch" 
+                                  Margin="0,10,0,0">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Content="+ Add Module to Flow" Command="{Binding AddModuleCommand}" HorizontalAlignment="Stretch" Classes="accent" Margin="0,10,0,0"/>
                     </StackPanel>
-                    
-                    <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding SelectedModule.Settings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettingViewModel">
-                                    <Grid ColumnDefinitions="150, *" Margin="0,8" VerticalAlignment="Center">
-                                        <StackPanel Grid.Column="0" Margin="0,0,15,0">
-                                            <TextBlock Text="{Binding Setting.Label}" FontWeight="Medium"/>
-                                            <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}"/>
-                                        </StackPanel>
-                                        
-                                        <StackPanel Grid.Column="1">
-                                            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
-                                                     IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:TextSetting}}"/>
-                                            
-                                            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" 
-                                                      IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:CheckboxSetting}}"/>
-                                            
-                                            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
-                                                           IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:NumberSetting}}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </DockPanel>
-            </Border>
-        </DockPanel>
-    </Grid>
+                </StackPanel>
+            </Panel>
+        </ScrollViewer>
+
+        <!-- Оверлей настроек (модальное окно) -->
+        <TransitioningContentControl Content="{Binding SelectedModule}" IsVisible="{Binding !!SelectedModule}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0.25"/>
+            </TransitioningContentControl.PageTransition>
+            <TransitioningContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
+                    <Panel>
+                        <Border Background="#000000" Opacity="0.7"/>
+                        <Border Background="#252526" 
+                                Width="500" 
+                                VerticalAlignment="Center" HorizontalAlignment="Center"
+                                CornerRadius="8" Padding="10">
+                            <DockPanel Margin="10">
+                                <Button Content="Close" Command="{Binding $parent[UserControl].DataContext.CloseModuleSettingsCommand}" 
+                                        DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,20,0,0"/>
+                                
+                                <TextBlock Text="{Binding DisplayName, StringFormat='{}Settings for {0}'}" Classes="h2" Margin="0,0,0,15" DockPanel.Dock="Top"/>
+                                
+                                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,15">
+                                    <TextBlock Text="Instance Name (Optional)" Opacity="0.7"/>
+                                    <TextBox Text="{Binding CustomName, Mode=TwoWay}" Watermark="{Binding Definition.Name}"/>
+                                </StackPanel>
+                                
+                                <ScrollViewer>
+                                    <ItemsControl ItemsSource="{Binding Settings}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SettingViewModel">
+                                                <Grid ColumnDefinitions="150, *" Margin="0,8" VerticalAlignment="Center">
+                                                    <StackPanel Grid.Column="0" Margin="0,0,15,0">
+                                                        <TextBlock Text="{Binding Setting.Label}" FontWeight="Medium"/>
+                                                        <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                                                    </StackPanel>
+                                                    
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
+                                                                 IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:TextSetting}}"/>
+                                                        
+                                                        <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" 
+                                                                  IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:CheckboxSetting}}"/>
+                                                        
+                                                        <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
+                                                                       IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:NumberSetting}}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                    </Panel>
+                </DataTemplate>
+            </TransitioningContentControl.ContentTemplate>
+        </TransitioningContentControl>
+
+        <!-- Кнопки Save/Cancel поверх всего -->
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20">
+            <Button Content="Save &amp; Close" Command="{Binding SaveAndCloseCommand}" Classes="accent"/>
+            <Button Content="Cancel" Command="{Binding CancelCommand}"/>
+        </StackPanel>
+    </Panel>
 </UserControl>

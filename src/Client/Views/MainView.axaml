@@ -1,42 +1,102 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
-             xmlns:models="using:Axorith.Core.Models"
+             xmlns:converters="using:Axorith.Client.Converters"
              x:Class="Axorith.Client.Views.MainView"
              x:DataType="vm:MainViewModel">
-    
+
     <Grid RowDefinitions="Auto, *, Auto" Margin="20">
-        <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="Gray" Padding="10" Margin="0,0,0,10">
-            <TextBlock Text="{Binding SessionStatus}" HorizontalAlignment="Center" Opacity="0.8"/>
+        <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="#444" Padding="10" Margin="0,0,0,10">
+            <TextBlock Text="{Binding SessionStatus}" HorizontalAlignment="Center" Opacity="0.8" FontSize="14"/>
         </Border>
-        
-        <ListBox Grid.Row="1" 
-                 ItemsSource="{Binding Presets}" 
-                 SelectedItem="{Binding SelectedPreset}"
-                 IsEnabled="{Binding !IsSessionActive}"
-                 Background="Transparent">
-            <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="models:SessionPreset">
-                    <Border Padding="15" BorderThickness="1" BorderBrush="Gray" CornerRadius="5" Margin="5">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="18"/>
-                            <TextBlock Text="{Binding Modules.Count, StringFormat='{}{0} modules'}" Opacity="0.7"/>
-                            
-                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0"
-                                        IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
-                                <Button Content="Start" 
-                                Command="{Binding $parent[ListBox].DataContext.StartSelectedCommand}"
-                                Classes="accent"/>
-                                <Button Content="Edit" 
-                                        Command="{Binding $parent[ListBox].DataContext.EditSelectedCommand}"/>
-                                <Button Content="Delete" 
-                                        Command="{Binding $parent[ListBox].DataContext.DeleteSelectedCommand}"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+
+        <ScrollViewer Grid.Row="1">
+            <ListBox Name="PresetsListBox" ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" Background="Transparent">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel HorizontalAlignment="Center"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SessionPresetViewModel">
+                        <Border x:Name="RootBorder"
+                                Background="#2D2D30"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="20"
+                                MinWidth="250">
+                            <Border.Styles>
+                                <Style Selector="Border.Active">
+                                    <Setter Property="BorderBrush" Value="#007ACC"/>
+                                    <Setter Property="BorderThickness" Value="2"/>
+                                </Style>
+                                <Style Selector="Border:pointerover">
+                                     <Style Selector="^:not(.Active)">
+                                        <Setter Property="BorderBrush" Value="#777"/>
+                                    </Style>
+                                </Style>
+                            </Border.Styles>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="20" DockPanel.Dock="Top"/>
+                                <TextBlock Text="{Binding Modules.Count, StringFormat='{}{0} modules'}" Opacity="0.6" DockPanel.Dock="Top" Margin="0,5,0,0"/>
+                                
+                                <ItemsControl ItemsSource="{Binding Modules}" DockPanel.Dock="Top" Margin="0,15,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
+                                            <Border CornerRadius="4" Background="#4F4F52" Padding="5,2" Margin="0,0,8,8">
+                                                <TextBlock FontSize="10" Text="{Binding DisplayName}"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Panel DockPanel.Dock="Bottom" Margin="0,15,0,0">
+                                     <StackPanel Orientation="Horizontal" Spacing="10" 
+                                                 Opacity="{Binding $parent[ListBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}">
+                                        <Button Content="Start" 
+                                                Command="{Binding #PresetsListBox.DataContext.StartSelectedCommand}"
+                                                CommandParameter="{Binding}"/>
+                                        <Button Content="Edit" 
+                                                Command="{Binding #PresetsListBox.DataContext.EditSelectedCommand}"
+                                                CommandParameter="{Binding}"/>
+                                        <Button Content="Delete" 
+                                                Command="{Binding #PresetsListBox.DataContext.DeleteSelectedCommand}"
+                                                CommandParameter="{Binding}"/>
+                                    </StackPanel>
+                                </Panel>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="10"/>
+                        <Setter Property="IsEnabled" Value="{Binding #PresetsListBox.DataContext.IsSessionActive, Converter={x:Static BoolConverters.Not}}"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent"/>
+                    </Style>
+                    
+                    <Style Selector="ListBoxItem.Active">
+                         <Setter Property="IsEnabled" Value="True"/>
+                    </Style>
+                    <Style Selector="ListBoxItem" x:DataType="vm:SessionPresetViewModel">
+                        <Setter Property="Classes.Active">
+                            <MultiBinding Converter="{x:Static converters:AppConverters.MultiEqualsConverter}">
+                                <Binding Path="Id"/>
+                                <Binding Path="#PresetsListBox.DataContext.ActiveSessionPresetId"/>
+                            </MultiBinding>
+                        </Setter>
+                    </Style>
+                </ListBox.Styles>
+            </ListBox>
+        </ScrollViewer>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,20,0,0">
             <Button Content="Create New Session" Command="{Binding CreateSessionCommand}" IsVisible="{Binding !IsSessionActive}"/>
