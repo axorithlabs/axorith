@@ -19,7 +19,7 @@ public interface IModuleRegistry
     ///     Finds a specific module definition by its unique identifier.
     /// </summary>
     /// <param name="moduleId">The GUID of the module definition to find.</param>
-    /// <returns>The found <see cref="IModuleDefinition" />, or null if not found.</returns>
+    /// <returns>The found <see cref="ModuleDefinition" />, or null if not found.</returns>
     ModuleDefinition? GetDefinitionById(Guid moduleId);
 
     /// <summary>

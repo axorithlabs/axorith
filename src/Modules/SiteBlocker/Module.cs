@@ -3,6 +3,7 @@ using Axorith.Sdk.Settings;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.SiteBlocker;
 
@@ -10,19 +11,11 @@ namespace Axorith.Module.SiteBlocker;
 /// A module that blocks websites by sending commands to the Axorith.Shim process
 /// via a Named Pipe, which then relays them to a browser extension.
 /// </summary>
-public class Module : IModule
+public class Module(IModuleLogger logger) : IModule
 {
     private const string PipeName = "axorith-nm-pipe";
-    private readonly ModuleDefinition _definition;
-    private readonly IModuleLogger _logger;
 
     private List<string> _activeBlockedSites = [];
-
-    public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
-    {
-        _definition = definition;
-        _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
-    }
 
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
@@ -53,7 +46,7 @@ public class Module : IModule
     /// <inheritdoc />
     public Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings, CancellationToken cancellationToken)
     {
-        _logger.LogInfo("Module '{Name}': Sending 'block' command via Named Pipe...", _definition.Name);
+        logger.LogInfo("Sending 'block' command via Named Pipe...");
 
         var sitesString = userSettings.GetValueOrDefault("BlockedSites", string.Empty);
         _activeBlockedSites = sitesString.Split(',')
@@ -63,11 +56,11 @@ public class Module : IModule
 
         if (_activeBlockedSites.Count == 0)
         {
-            _logger.LogWarning("No sites specified for blocking. Module will do nothing.");
+            logger.LogWarning("No sites specified for blocking. Module will do nothing.");
             return Task.CompletedTask;
         }
 
-        _logger.LogDebug("Sites to block: {Sites}", string.Join(", ", _activeBlockedSites));
+        logger.LogDebug("Sites to block: {Sites}", string.Join(", ", _activeBlockedSites));
 
         var message = new { command = "block", sites = _activeBlockedSites };
         return WriteToPipeAsync(message);
@@ -76,7 +69,7 @@ public class Module : IModule
     /// <inheritdoc />
     public Task OnSessionEndAsync()
     {
-        _logger.LogInfo("Module '{Name}': Sending 'unblock' command via Named Pipe...", _definition.Name);
+        logger.LogInfo("Module '{Name}': Sending 'unblock' command via Named Pipe...");
 
         if (_activeBlockedSites.Count == 0)
         {
@@ -110,15 +103,15 @@ public class Module : IModule
             await pipeClient.FlushAsync();
             
             var commandName = message.GetType().GetProperty("command")?.GetValue(message) ?? "unknown";
-            _logger.LogInfo("Command '{Command}' sent successfully via Named Pipe.", commandName);
+            logger.LogInfo("Command '{Command}' sent successfully via Named Pipe.", commandName);
         }
         catch (TimeoutException ex)
         {
-            _logger.LogError(ex, "Could not connect to the Axorith Shim process via Named Pipe. Is the browser extension installed and running?");
+            logger.LogError(ex, "Could not connect to the Axorith Shim process via Named Pipe. Is the browser extension installed and running?");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send command to Shim via Named Pipe.");
+            logger.LogError(ex, "Failed to send command to Shim via Named Pipe.");
         }
     }
 
@@ -128,7 +121,7 @@ public class Module : IModule
         // If the module is disposed while a session is active, send a final unblock command.
         if (_activeBlockedSites.Count > 0)
         {
-            _logger.LogWarning("Disposing module while sites are still blocked. Attempting to send final unblock command.");
+            logger.LogWarning("Disposing module while sites are still blocked. Attempting to send final unblock command.");
             var message = new { command = "unblock" };
             // Fire-and-forget the async method in a synchronous context.
             _ = WriteToPipeAsync(message);

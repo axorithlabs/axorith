@@ -1,4 +1,8 @@
-﻿using Axorith.Sdk;
+﻿using System.Text.Json;
+using Axorith.Sdk;
+using Axorith.Sdk.Http;
+using Axorith.Sdk.Logging;
+using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
 
 namespace Axorith.Module.Test;
@@ -7,24 +11,9 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module : IModule
+public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorageService secureStorage, IEventAggregator eventAggregator) : IModule
 {
-    private ModuleDefinition _definition;
-    private IServiceProvider _serviceProvider;
-    private IModuleLogger _logger;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="TestModule" /> class.
-    ///     Dependencies are injected by the Core.
-    /// </summary>
-    public Module(ModuleDefinition definition, IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-        _definition = definition;
-        // Resolve the _logger from the provided service provider.
-
-        _logger = (IModuleLogger)serviceProvider.GetService(typeof(IModuleLogger))!;
-    }
+    private IDisposable? _subscription;
 
     /// <inheritdoc />
     public IReadOnlyList<SettingBase> GetSettings()
@@ -90,26 +79,67 @@ public class Module : IModule
         if (!decimal.TryParse(userSettings.GetValueOrDefault("WorkDurationSeconds", "5"), out var duration))
         {
             duration = 5;
-            _logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
+            logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
         }
 
-        _logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
+        logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
 
         if (enableExtraLogging)
         {
-            _logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
+            logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
             for (var i = (int)duration; i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _logger.LogDebug("{SecondsLeft} seconds left.", i);
+                logger.LogDebug("{SecondsLeft} seconds left.", i);
                 await Task.Delay(1000, cancellationToken);
             }
         }
         else
         {
-            _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
+            logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
             await Task.Delay((int)duration * 1000, cancellationToken);
         }
+
+        try
+        {
+            var responseJson = await httpClient.GetStringAsync("https://jsonplaceholder.typicode.com/todos/1", cancellationToken);
+            
+            using var jsonDoc = JsonDocument.Parse(responseJson);
+            var root = jsonDoc.RootElement;
+
+            var userId = root.TryGetProperty("userId", out var el) ? el.GetInt32() : -1;
+            var title = root.TryGetProperty("title", out el) ? el.GetString() : "N/A";
+            var completed = root.TryGetProperty("completed", out el) && el.GetBoolean();
+
+            logger.LogInfo("Parsed To-Do Item:");
+            logger.LogInfo("  User ID: {UserId}", userId);
+            logger.LogInfo("  Title: '{Title}'", title!);
+            logger.LogInfo("  Completed: {IsCompleted}", completed);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, ex.Message);
+            throw;
+        }
+        
+        var token = secureStorage.RetrieveSecret("AccessToken");
+
+        if (token is null)
+        {
+            var newToken = "qwerpoqwprfjofpjweof";
+            secureStorage.StoreSecret("AccessToken", newToken);
+            token = newToken;
+        }
+        
+        logger.LogInfo("token {token}", token);
+
+        // --- Event Aggregator Test ---
+        logger.LogInfo("Subscribing to TestEvent...");
+        _subscription = eventAggregator.Subscribe<TestEvent>(HandleTestEvent);
+
+        logger.LogInfo("Publishing TestEvent in 2 seconds...");
+        await Task.Delay(2000, cancellationToken);
+        eventAggregator.Publish(new TestEvent { Message = "Hello from Event Aggregator!" });
     }
 
     /// <inheritdoc />
@@ -119,11 +149,17 @@ public class Module : IModule
         return Task.CompletedTask;
     }
 
+    private void HandleTestEvent(TestEvent evt)
+    {
+        logger.LogInfo("Received TestEvent! Message: '{Message}'", evt.Message);
+    }
+
     /// <summary>
     ///     Releases any resources used by the module. For TestModule, there's nothing to release.
     /// </summary>
     public void Dispose()
     {
+        _subscription?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -1,13 +1,18 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
+using Axorith.Core.Http;
 using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Sdk.Services;
 using Axorith.Shared.Exceptions;
+using Axorith.Shared.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core;
 
@@ -57,14 +62,29 @@ public sealed class AxorithHost : IDisposable
                 .UseServiceProviderFactory(new AutofacServiceProviderFactory())
                 .ConfigureServices(services =>
                 {
-                    services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger, false));
+                    services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
+                    
+                    services.AddHttpClient();
                 })
                 .ConfigureContainer<ContainerBuilder>(builder =>
                 {
+                    // Http Services
+                    builder.RegisterType<HttpClientFactoryAdapter>().As<IHttpClientFactory>().SingleInstance();
+                    
+                    // Secure Storage services
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        builder.RegisterType<SecureStorage>().As<ISecureStorageService>().SingleInstance();
+                    }
+                    
+                    // Core Services
                     builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();
                     builder.RegisterType<ModuleRegistry>().As<IModuleRegistry>().SingleInstance();
                     builder.RegisterType<PresetManager>().As<IPresetManager>().SingleInstance();
                     builder.RegisterType<SessionManager>().As<ISessionManager>().SingleInstance();
+
+                    // Event Aggregator
+                    builder.RegisterType<EventAggregator>().As<IEventAggregator>().SingleInstance();
                 });
 
             var host = hostBuilder.Build();

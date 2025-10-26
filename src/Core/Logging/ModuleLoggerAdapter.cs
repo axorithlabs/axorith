@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Axorith.Sdk.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Logging;
 

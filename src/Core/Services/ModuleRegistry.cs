@@ -3,7 +3,11 @@ using Autofac;
 using Axorith.Core.Logging;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
+using Axorith.Sdk.Http;
+using Axorith.Sdk.Logging;
+using Axorith.Sdk.Services;
 using Microsoft.Extensions.Logging;
+using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core.Services;
 
@@ -78,6 +82,8 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
             {
                 var moduleScope = rootScope.BeginLifetimeScope(builder =>
                 {
+                    // Register module-specific services.
+                    // Each module instance gets its own logger and http client.
                     builder.RegisterInstance(definition).As<ModuleDefinition>();
 
                     builder.Register(c =>
@@ -85,19 +91,29 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                         .As<IModuleLogger>()
                         .InstancePerLifetimeScope();
 
-                    builder.RegisterType(definition.ModuleType).AsSelf();
+                    builder.Register(c =>
+                        {
+                            var factory = c.Resolve<IHttpClientFactory>();
+                            var client = factory.CreateClient(definition.Name);
+                            return client;
+                        })
+                        .As<IHttpClient>()
+                        .InstancePerLifetimeScope();
+                    
+                    builder.Register(_ =>
+                        {
+                            var underlyingStorage = rootScope.Resolve<ISecureStorageService>();
+                            
+                            return new ModuleScopedSecureStorage(underlyingStorage, definition);
+                        })
+                        .As<ISecureStorageService>()
+                        .InstancePerLifetimeScope();
+
+                    // Register the module type itself.
+                    builder.RegisterType(definition.ModuleType).As<IModule>();
                 });
 
-                var instance = moduleScope.Resolve(definition.ModuleType) as IModule;
-
-                if (instance == null)
-                {
-                    logger.LogError(
-                        "Failed to resolve module instance for {ModuleName}. The resolved object was null or not an IModule",
-                        definition.Name);
-                    moduleScope.Dispose();
-                    return (null, null);
-                }
+                var instance = moduleScope.Resolve<IModule>();
 
                 return (instance, moduleScope);
             }
