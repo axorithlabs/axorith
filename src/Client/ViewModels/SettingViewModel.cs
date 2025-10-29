@@ -14,12 +14,6 @@ public class SettingViewModel : ReactiveObject, ISettingViewModel
     /// </summary>
     public SettingBase Setting { get; }
 
-    /// <summary>
-    /// Gets the actual <see cref="System.Type"/> of the setting definition.
-    /// Used in XAML to select the correct UI control.
-    /// </summary>
-    public Type SettingType => Setting.GetType();
-
     private string _stringValue = string.Empty;
     /// <summary>
     /// The value for text-based settings. Bound to TextBox controls.
@@ -37,6 +31,13 @@ public class SettingViewModel : ReactiveObject, ISettingViewModel
     /// The value for numeric settings. Bound to NumericUpDown controls.
     /// </summary>
     public decimal DecimalValue { get => _decimalValue; set => this.RaiseAndSetIfChanged(ref _decimalValue, value); }
+
+    private IReadOnlyList<KeyValuePair<string, string>> _choicesValue = [];
+    /// <summary>
+    /// Gets the collection of choices for a ChoiceSetting.
+    /// This is exposed for binding to a ComboBox's ItemsSource.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> ChoicesValue { get => _choicesValue; set => this.RaiseAndSetIfChanged(ref _choicesValue, value); }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingViewModel"/> class.

@@ -28,4 +28,31 @@ public interface IHttpClient
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>The response body as a string.</returns>
     Task<string> PostStringAsync(string requestUri, string content, System.Text.Encoding encoding, string mediaType, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Sends a POST request with an empty body.
+    /// </summary>
+    /// <param name="requestUri">The Uri the request is sent to.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The response body as a string.</returns>
+    Task<string> PostStringAsync(string requestUri, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a PUT request with a string body.
+    /// </summary>
+    /// <param name="requestUri">The Uri the request is sent to.</param>
+    /// <param name="content">The string content to send.</param>
+    /// <param name="encoding">The encoding to use for the content.</param>
+    /// <param name="mediaType">The media type of the content (e.g., "application/json").</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The response body as a string.</returns>
+    Task<string> PutStringAsync(string requestUri, string content, System.Text.Encoding encoding, string mediaType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a PUT request with an empty body.
+    /// </summary>
+    /// <param name="requestUri">The Uri the request is sent to.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The response body as a string.</returns>
+    Task<string> PutAsync(string requestUri, CancellationToken cancellationToken = default);
 }

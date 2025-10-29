@@ -90,15 +90,6 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                             new ModuleLoggerAdapter(c.Resolve<ILoggerFactory>().CreateLogger(definition.ModuleType)))
                         .As<IModuleLogger>()
                         .InstancePerLifetimeScope();
-
-                    builder.Register(c =>
-                        {
-                            var factory = c.Resolve<IHttpClientFactory>();
-                            var client = factory.CreateClient(definition.Name);
-                            return client;
-                        })
-                        .As<IHttpClient>()
-                        .InstancePerLifetimeScope();
                     
                     builder.Register(_ =>
                         {
