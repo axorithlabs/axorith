@@ -1,6 +1,5 @@
 ﻿using System.Collections.ObjectModel;
 using System.Windows.Input;
-using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,13 +22,14 @@ public class MainViewModel : ReactiveObject
     /// <summary>
     ///     The currently selected session preset in the list.
     /// </summary>
-            public SessionPresetViewModel? SelectedPreset
+    public SessionPresetViewModel? SelectedPreset
     {
         get => _selectedPreset;
         set => this.RaiseAndSetIfChanged(ref _selectedPreset, value);
     }
 
     private Guid? _activeSessionPresetId;
+
     public Guid? ActiveSessionPresetId
     {
         get => _activeSessionPresetId;
@@ -99,27 +99,29 @@ public class MainViewModel : ReactiveObject
         _sessionManager.SessionStarted += OnSessionStarted;
         _sessionManager.SessionStopped += OnSessionStopped;
 
-                var canManipulatePreset = this.WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive);
+        var canManipulatePreset = this.WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive);
         var canStopSession = this.WhenAnyValue(vm => vm.IsSessionActive);
         var canDoGlobalActions = this.WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive);
 
         // These commands now accept a parameter and are always executable when a session is not active.
-        DeleteSelectedCommand = ReactiveCommand.CreateFromTask<SessionPresetViewModel>(DeletePresetAsync, canManipulatePreset);
+        DeleteSelectedCommand =
+            ReactiveCommand.CreateFromTask<SessionPresetViewModel>(DeletePresetAsync, canManipulatePreset);
         EditSelectedCommand = ReactiveCommand.Create<SessionPresetViewModel>(EditPreset, canManipulatePreset);
-        StartSelectedCommand = ReactiveCommand.CreateFromTask<SessionPresetViewModel>(StartPresetAsync, canManipulatePreset);
+        StartSelectedCommand =
+            ReactiveCommand.CreateFromTask<SessionPresetViewModel>(StartPresetAsync, canManipulatePreset);
         StopSessionCommand = ReactiveCommand.CreateFromTask(_sessionManager.StopCurrentSessionAsync, canStopSession);
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
     }
 
-        private void OnSessionStarted(Guid presetId)
+    private void OnSessionStarted(Guid presetId)
     {
         SessionStatus = "Session is active.";
         ActiveSessionPresetId = presetId;
         this.RaisePropertyChanged(nameof(IsSessionActive));
     }
 
-        private void OnSessionStopped(Guid presetId)
+    private void OnSessionStopped(Guid presetId)
     {
         SessionStatus = "No session is active.";
         ActiveSessionPresetId = null;
@@ -134,9 +136,8 @@ public class MainViewModel : ReactiveObject
         await LoadPresetsAsync();
     }
 
-            private async Task StartPresetAsync(SessionPresetViewModel presetVm)
+    private async Task StartPresetAsync(SessionPresetViewModel presetVm)
     {
-        if (presetVm is null) return;
         try
         {
             await _sessionManager.StartSessionAsync(presetVm.Model);
@@ -147,9 +148,8 @@ public class MainViewModel : ReactiveObject
         }
     }
 
-            private void EditPreset(SessionPresetViewModel presetVm)
+    private void EditPreset(SessionPresetViewModel presetVm)
     {
-        if (presetVm is null) return;
         var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
         editor.PresetToEdit = presetVm.Model;
         _shell.NavigateTo(editor);
@@ -162,21 +162,17 @@ public class MainViewModel : ReactiveObject
         _shell.NavigateTo(editor);
     }
 
-        private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
+    private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
     {
-        if (presetVm is null) return;
         await _presetManager.DeletePresetAsync(presetVm.Id, CancellationToken.None);
         Presets.Remove(presetVm);
     }
 
-        private async Task LoadPresetsAsync()
+    private async Task LoadPresetsAsync()
     {
         var presetsFromCore = await _presetManager.LoadAllPresetsAsync(CancellationToken.None);
         Presets.Clear();
         var moduleRegistry = _serviceProvider.GetRequiredService<IModuleRegistry>();
-        foreach (var preset in presetsFromCore)
-        {
-            Presets.Add(new SessionPresetViewModel(preset, moduleRegistry));
-        }
+        foreach (var preset in presetsFromCore) Presets.Add(new SessionPresetViewModel(preset, moduleRegistry));
     }
 }

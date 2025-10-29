@@ -14,7 +14,6 @@
         Background="#1E1E1E">
 
     <Grid RowDefinitions="Auto,*">
-        <!-- Custom title bar -->
         <Border x:Name="TitleBar"
                 Background="#2D2D2D"
                 Height="40"
@@ -33,9 +32,7 @@
                 <Border/>
             </Grid>
         </Border>
-
-
-        <!-- Main content -->
+        
         <ContentControl Grid.Row="1"
                         Content="{Binding Content}"
                         Margin="0"/>

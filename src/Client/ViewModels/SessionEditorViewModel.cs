@@ -64,7 +64,7 @@ public class SessionEditorViewModel : ReactiveObject
     /// <summary>
     ///     Gets the collection of module definitions that are available to be added to the preset.
     /// </summary>
-    public ObservableCollection<ModuleDefinition> AvailableModulesToAdd { get; } = new();
+    public ObservableCollection<ModuleDefinition> AvailableModulesToAdd { get; } = [];
 
     /// <summary>
     ///     Gets or sets the module definition selected in the ComboBox, ready to be added.
@@ -98,16 +98,14 @@ public class SessionEditorViewModel : ReactiveObject
     public ICommand RemoveModuleCommand { get; }
 
     /// <summary>
-    /// Command to open the settings view for a specific module.
+    ///     Command to open the settings view for a specific module.
     /// </summary>
     public ICommand OpenModuleSettingsCommand { get; }
 
     /// <summary>
-    /// Command to close the module settings overlay.
+    ///     Command to close the module settings overlay.
     /// </summary>
     public ICommand CloseModuleSettingsCommand { get; }
-
-    
 
     public SessionEditorViewModel(ShellViewModel shell, IModuleRegistry moduleRegistry, IPresetManager presetManager,
         IServiceProvider serviceProvider)
@@ -124,29 +122,21 @@ public class SessionEditorViewModel : ReactiveObject
         var canAdd = this.WhenAnyValue(vm => vm.ModuleToAdd).Select(m => m != null);
         AddModuleCommand = ReactiveCommand.Create(AddSelectedModule, canAdd);
 
-                var canRemove = this.WhenAnyValue(vm => vm.SelectedModule).Select(selected => selected != null);
         RemoveModuleCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
         {
-            if (moduleVm != null)
-            {
-                _preset.Modules.Remove(moduleVm.Model);
-                ConfiguredModules.Remove(moduleVm);
-                if (SelectedModule == moduleVm) SelectedModule = null;
-                UpdateAvailableModules();
-            }
+            _preset.Modules.Remove(moduleVm.Model);
+            ConfiguredModules.Remove(moduleVm);
+            if (SelectedModule == moduleVm) SelectedModule = null;
+            UpdateAvailableModules();
         });
 
-                        OpenModuleSettingsCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
+        OpenModuleSettingsCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
         {
             SelectedModule = moduleVm;
         });
 
-        CloseModuleSettingsCommand = ReactiveCommand.Create(() =>
-        {
-            SelectedModule = null;
-        });
+        CloseModuleSettingsCommand = ReactiveCommand.Create(() => { SelectedModule = null; });
 
-        
 
         UpdateAvailableModules();
     }
@@ -184,7 +174,7 @@ public class SessionEditorViewModel : ReactiveObject
         var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _moduleRegistry);
         ConfiguredModules.Add(newVm);
 
-                // We no longer auto-select the module. The user must click 'Settings'.
+        // We no longer auto-select the module. The user must click 'Settings'.
         ModuleToAdd = null;
     }
 

@@ -1,17 +1,55 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:Axorith.Client.ViewModels"
-             xmlns:converters="using:Axorith.Client.Converters"
-             xmlns:settings="clr-namespace:Axorith.Sdk.Settings;assembly=Axorith.Sdk"
-             x:Class="Axorith.Client.Views.SessionEditorView"
-             x:DataType="vm:SessionEditorViewModel">
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:vm="using:Axorith.Client.ViewModels"
+              xmlns:converters="using:Axorith.Client.Converters"
+              xmlns:selectors="using:Axorith.Client.Selectors"
+              x:Class="Axorith.Client.Views.SessionEditorView"
+              x:DataType="vm:SessionEditorViewModel">
+    
+    <UserControl.Resources>
+        <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SecretSettingTemplate" x:DataType="vm:SettingViewModel">
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}"
+                     PasswordChar="*"
+                     Watermark="Enter secret value..."/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="CheckboxSettingTemplate" x:DataType="vm:SettingViewModel">
+            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" VerticalAlignment="Center"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="NumberSettingTemplate" x:DataType="vm:SettingViewModel">
+            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ChoiceSettingTemplate" x:DataType="vm:SettingViewModel">
+            <ComboBox ItemsSource="{Binding ChoicesValue}"
+                      SelectedValue="{Binding StringValue, Mode=TwoWay}"
+                      SelectedValueBinding="{Binding Key}"
+                      MinWidth="200">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Value}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </DataTemplate>
+
+        <selectors:SettingTemplateSelector x:Key="SettingSelector"
+                                           TextTemplate="{StaticResource TextSettingTemplate}"
+                                           SecretTemplate="{StaticResource SecretSettingTemplate}"
+                                           CheckboxTemplate="{StaticResource CheckboxSettingTemplate}"
+                                           NumberTemplate="{StaticResource NumberSettingTemplate}"
+                                           ChoiceTemplate="{StaticResource ChoiceSettingTemplate}"/>
+    </UserControl.Resources>
 
     <Panel>
-        <!-- Основной контент (конвейер) -->
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <Panel MaxWidth="800" HorizontalAlignment="Center">
                 <StackPanel Margin="20" Spacing="5">
-                    <!-- Заголовок пресета -->
                     <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5">
                         <StackPanel>
                             <TextBlock Text="Preset Settings" Classes="h2" Margin="0,0,0,10"/>
@@ -70,7 +108,6 @@
             </Panel>
         </ScrollViewer>
 
-        <!-- Оверлей настроек (модальное окно) -->
         <TransitioningContentControl Content="{Binding SelectedModule}" IsVisible="{Binding !!SelectedModule}">
             <TransitioningContentControl.PageTransition>
                 <CrossFade Duration="0.25"/>
@@ -105,14 +142,9 @@
                                                     </StackPanel>
                                                     
                                                     <StackPanel Grid.Column="1">
-                                                        <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
-                                                                 IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:TextSetting}}"/>
-                                                        
-                                                        <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" 
-                                                                  IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:CheckboxSetting}}"/>
-                                                        
-                                                        <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
-                                                                       IsVisible="{Binding SettingType, Converter={x:Static converters:EqualsConverter.Instance}, ConverterParameter={x:Type settings:NumberSetting}}"/>
+                                                        <ContentControl Content="{Binding}" 
+                                                                        ContentTemplate="{StaticResource SettingSelector}" 
+                                                                        VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Grid>
                                             </DataTemplate>
@@ -126,7 +158,6 @@
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <!-- Кнопки Save/Cancel поверх всего -->
         <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20">
             <Button Content="Save &amp; Close" Command="{Binding SaveAndCloseCommand}" Classes="accent"/>
             <Button Content="Cancel" Command="{Binding CancelCommand}"/>
