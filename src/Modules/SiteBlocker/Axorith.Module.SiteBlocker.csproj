@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Module.SiteBlocker</AssemblyName>
         <RootNamespace>Axorith.Module.SiteBlocker</RootNamespace>
 
-        <Description>test</Description>
+        <Description>Site Blocker module for Axorith OS.</Description>
     </PropertyGroup>
 
     <ItemGroup>

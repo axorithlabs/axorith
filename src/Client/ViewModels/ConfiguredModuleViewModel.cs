@@ -26,7 +26,7 @@ public class ConfiguredModuleViewModel : ReactiveObject
         set
         {
             Model.CustomName = value;
-            this.RaisePropertyChanged(nameof(DisplayName)); // Уведомляем UI, что DisplayName тоже изменился
+            this.RaisePropertyChanged(nameof(DisplayName));
         }
     }
 

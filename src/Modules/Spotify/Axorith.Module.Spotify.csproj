@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Module.Spotify</AssemblyName>
         <RootNamespace>Axorith.Module.Spotify</RootNamespace>
 
-        <Description>test</Description>
+        <Description>Spotify module for Axorith OS.</Description>
     </PropertyGroup>
 
     <ItemGroup>
