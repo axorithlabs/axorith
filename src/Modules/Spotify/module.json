@@ -1,0 +1,11 @@
+﻿{
+  "id": "5fd185cb-21d0-4c2b-9185-cb21d03c2b8e",
+  "name": "Spotify",
+  "description": "",
+  "category": "Music",
+  "platforms": [
+    "Windows",
+    "Linux",
+    "MacOs"
+  ]
+}
