@@ -63,12 +63,12 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                                 <StackPanel Spacing="5" HorizontalAlignment="Center">
-                                    <Border MinWidth="450" Background="#2D2D30" CornerRadius="8" Padding="15">
+                                    <Border MinWidth="350" Background="#2D2D30" CornerRadius="8" Padding="15">
                                         <DockPanel LastChildFill="False">
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" DockPanel.Dock="Top"/>
-                                            <TextBlock Text="{Binding Definition.Description}" Opacity="0.7" TextWrapping="Wrap" MaxWidth="300" DockPanel.Dock="Top" Margin="0,5,0,0"/>
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" TextAlignment="Center" DockPanel.Dock="Top"/>
+                                            <TextBlock Text="{Binding Definition.Description}" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" DockPanel.Dock="Top" Margin="0,5,0,0"/>
                                             
-                                            <StackPanel Orientation="Horizontal" Spacing="10" DockPanel.Dock="Bottom" Margin="0,15,0,0">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" DockPanel.Dock="Bottom" Margin="0,15,0,0">
                                                 <Button Content="Settings" 
                                                         Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
                                                         CommandParameter="{Binding}"/>
