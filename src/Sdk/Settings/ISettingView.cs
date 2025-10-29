@@ -21,4 +21,9 @@ public interface ISettingViewModel
     /// Gets or sets the value for a setting that is represented as a decimal (e.g., NumberSetting).
     /// </summary>
     decimal DecimalValue { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the value for a setting that is represented as a choices (e.g., ChoiceSetting).
+    /// </summary>
+    IReadOnlyList<KeyValuePair<string, string>> ChoicesValue { get; set; }
 }
