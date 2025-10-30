@@ -15,9 +15,9 @@
         <ItemGroup>
             <ModuleMetadataFile Include="$(ProjectDir)module.json" Condition="Exists('$(ProjectDir)module.json')" />
         </ItemGroup>
-        <Copy SourceFiles="@(ModulePrimaryFiles)" DestinationFolder="$(ModuleOutputPath)" SkipUnchangedFiles="true" />
-        <Copy SourceFiles="@(ModuleDependencies)" DestinationFolder="$(ModuleOutputPath)" SkipUnchangedFiles="true" />
-        <Copy SourceFiles="@(ModuleMetadataFile)" DestinationFolder="$(ModuleOutputPath)" SkipUnchangedFiles="true" />
+        <Move SourceFiles="@(ModulePrimaryFiles)" DestinationFolder="$(ModuleOutputPath)"/>
+        <Copy SourceFiles="@(ModuleDependencies)" DestinationFolder="$(ModuleOutputPath)"/>
+        <Copy SourceFiles="@(ModuleMetadataFile)" DestinationFolder="$(ModuleOutputPath)"/>
 
         <Message Text="[Axorith Build] Published module '$(_ModuleName)' to '$(ModuleOutputPath)'" Importance="high" />
     </Target>
