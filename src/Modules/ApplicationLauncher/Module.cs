@@ -22,11 +22,12 @@ public class Module(IModuleLogger logger) : IModule
     {
         return new List<SettingBase>
         {
-            new TextSetting(
+            new FilePickerSetting(
                 "ApplicationPath",
                 "Path",
                 "The path to the application to launch.",
-                @"C:\Windows\notepad.exe"
+                @"C:\Windows\notepad.exe",
+                "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
             ),
             new TextSetting(
                 "ApplicationArgs",

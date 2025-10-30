@@ -16,6 +16,8 @@ public class SettingTemplateSelector : IDataTemplate
     public IDataTemplate? CheckboxTemplate { get; set; }
     public IDataTemplate? NumberTemplate { get; set; }
     public IDataTemplate? ChoiceTemplate { get; set; }
+    public IDataTemplate? FilePickerTemplate { get; set; }
+    public IDataTemplate? DirectoryPickerTemplate { get; set; }
 
     /// <summary>
     ///     This method is called by Avalonia to build the UI for an item.
@@ -31,6 +33,8 @@ public class SettingTemplateSelector : IDataTemplate
             CheckboxSetting => CheckboxTemplate,
             NumberSetting => NumberTemplate,
             ChoiceSetting => ChoiceTemplate,
+            FilePickerSetting => FilePickerTemplate,
+            DirectoryPickerSetting => DirectoryPickerTemplate,
             _ => null
         };
 
