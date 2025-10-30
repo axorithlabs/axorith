@@ -15,12 +15,12 @@ namespace Axorith.Module.Spotify;
 /// </summary>
 public class Module(
     IModuleLogger logger,
-    IHttpClientFactory clientFactory,
+    IHttpClientFactory httpClientFactory,
     ISecureStorageService secureStorage,
     ModuleDefinition definition) : IModule
 {
-    private readonly IHttpClient _apiClient = clientFactory.CreateClient($"{definition.Name}.Api");
-    private readonly IHttpClient _authClient = clientFactory.CreateClient($"{definition.Name}.Auth");
+    private readonly IHttpClient _apiClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
+    private readonly IHttpClient _authClient = httpClientFactory.CreateClient($"{definition.Name}.Auth");
     private string? _inMemoryAccessToken;
 
     private const string ClientIdKey = "SpotifyClientId";

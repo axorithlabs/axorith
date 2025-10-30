@@ -13,10 +13,13 @@ namespace Axorith.Module.Test;
 /// </summary>
 public class Module(
     IModuleLogger logger,
-    IHttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     ISecureStorageService secureStorage,
-    IEventAggregator eventAggregator) : IModule
+    IEventAggregator eventAggregator,
+    ModuleDefinition definition) : IModule
 {
+    private readonly IHttpClient _httpClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
+    
     private IDisposable? _subscription;
 
     /// <inheritdoc />
@@ -40,7 +43,36 @@ public class Module(
                 "WorkDurationSeconds",
                 "Work Duration (sec)",
                 "How long the module should simulate work.",
-                5)
+                5),
+            
+            new SecretSetting(
+                "UserSecret",
+                "User Secret",
+                "A secret value for testing secure storage."),
+
+            new ChoiceSetting(
+                "ProcessingMode",
+                "Processing Mode",
+                [
+                    new KeyValuePair<string, string>("fast", "Fast Mode"),
+                    new KeyValuePair<string, string>("accurate", "Accurate Mode"),
+                    new KeyValuePair<string, string>("balanced", "Balanced (Default)")
+                ],
+                "balanced",
+                "Choose the processing algorithm."),
+
+            new FilePickerSetting(
+                "InputFile",
+                "Input File",
+                "Select a configuration file.",
+                "",
+                "JSON files (*.json)|*.json|All files (*.*)|*.*"),
+
+            new DirectoryPickerSetting(
+                "OutputDirectory",
+                "Output Directory",
+                "Select a directory for output files.",
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))
         };
     }
 
@@ -107,7 +139,7 @@ public class Module(
         try
         {
             var responseJson =
-                await httpClient.GetStringAsync("https://jsonplaceholder.typicode.com/todos/1", cancellationToken);
+                await _httpClient.GetStringAsync("https://jsonplaceholder.typicode.com/todos/1", cancellationToken);
 
             using var jsonDoc = JsonDocument.Parse(responseJson);
             var root = jsonDoc.RootElement;

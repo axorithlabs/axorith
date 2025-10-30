@@ -37,13 +37,42 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
         </DataTemplate>
+        
+        <DataTemplate x:Key="FilePickerSettingTemplate" x:DataType="vm:SettingViewModel">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding StringValue}"
+                         IsReadOnly="True"
+                         Watermark="Select a file..." />
+                <Button Grid.Column="1"
+                        Content="Browse..."
+                        Margin="8,0,0,0"
+                        Click="OnBrowseFileClick" />
+            </Grid>
+        </DataTemplate>
+        
+        <DataTemplate x:Key="DirectoryPickerSettingTemplate" x:DataType="vm:SettingViewModel">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding StringValue}"
+                         IsReadOnly="True"
+                         Watermark="Select a directory..." />
+                <Button Grid.Column="1"
+                        Content="Browse..."
+                        Margin="8,0,0,0"
+                        Click="OnBrowseDirectoryClick" />
+            </Grid>
+        </DataTemplate>
 
         <selectors:SettingTemplateSelector x:Key="SettingSelector"
                                            TextTemplate="{StaticResource TextSettingTemplate}"
                                            SecretTemplate="{StaticResource SecretSettingTemplate}"
                                            CheckboxTemplate="{StaticResource CheckboxSettingTemplate}"
                                            NumberTemplate="{StaticResource NumberSettingTemplate}"
-                                           ChoiceTemplate="{StaticResource ChoiceSettingTemplate}"/>
+                                           ChoiceTemplate="{StaticResource ChoiceSettingTemplate}"
+                                           FilePickerTemplate="{StaticResource FilePickerSettingTemplate}"
+                                           DirectoryPickerTemplate="{StaticResource DirectoryPickerSettingTemplate}"
+                                           />
     </UserControl.Resources>
 
     <Panel>
