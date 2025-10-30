@@ -49,9 +49,15 @@ This is the core process for contributing code.
 3.  **Make your changes.** Adhere to the existing code style and our architectural principles (see below).
 4.  **Add tests.** If you're adding new functionality, it needs to be tested. If you're fixing a bug, add a test that proves the bug is fixed.
 5.  **Update documentation.** If your changes affect the architecture or user-facing features, update the relevant `.md` files in the `docs/` folder.
-6.  **Use meaningful commit messages.** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. (e.g., `feat: Add validation for Spotify API token`, `fix: Prevent crash when module DLL is corrupt`).
+6.  **Use meaningful commit messages.** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. (e.g., `feat(spotify): add validation for Spotify API token`, `fix(module-loader): prevent crash when module DLL is corrupt`).
 7.  **Push your branch** to your fork and **open a Pull Request** against the `main` branch of `axorithlabs/axorith`.
 8.  **Write a clear PR description.** Explain what your PR does and link to the issue it resolves (e.g., "Closes #42").
+
+## Contributor License Agreement (CLA)
+
+Before we can accept your contribution, you will need to sign our Contributor License Agreement (CLA).
+
+When you open your first Pull Request, a bot will automatically ask you to sign the agreement. It's a quick, one-time process that ensures we have the legal rights to use your code as part of the project. This protects both you and the project.
 
 ## Our Architectural Principles (The Golden Rules)
 

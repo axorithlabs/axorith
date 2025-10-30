@@ -34,7 +34,7 @@ The project is divided into several key components with clear dependencies. An a
 ### 1. `Axorith.Sdk` (The Law)
 
 *   **Responsibility:** Defines the public contracts for the entire ecosystem. This is the "law" that all other components must follow.
-*   **Contents:** Interfaces (`IModule`, `IModuleContext`), enums (`Platform`, `SettingType`), and data models (`ModuleSetting`).
+*   **Contents:** Interfaces (`IModule`, `IHttpClient`), enums (`Platform`), and setting definitions (`SettingBase` and its derivatives like `TextSetting`, `FilePickerSetting`, etc.).
 *   **Key Principles:** Contains **zero** implementation logic. Has **zero** external dependencies besides the base .NET library. It is the foundation of the entire project.
 
 ### 2. `Axorith.Core` (The Engine)
@@ -64,6 +64,5 @@ The project is divided into several key components with clear dependencies. An a
 ### 5. `Axorith.Shared` (The Toolbox)
 
 *   **Responsibility:** Provides common, reusable code needed by multiple, otherwise independent parts of the system (e.g., `Core` and `Modules`).
-*   **Contents:** A collection of small, focused libraries like `Axorith.Shared.Utils` and `Axorith.Shared.Exceptions`.
+*   **Contents:** A collection of small, focused libraries like `Axorith.Shared.Utils`, `Axorith.Shared.Exceptions`, and `Axorith.Shared.Platform.Windows`.
 *   **Key Principles:** A project in `Shared` should have a single, clear purpose. This avoids creating a monolithic "common" library.
-```
