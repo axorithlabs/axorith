@@ -187,7 +187,8 @@
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20">
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20"
+                    IsVisible="{Binding SelectedModule, Converter={x:Static converters:AppConverters.IsNull}}">
             <Button Content="Save &amp; Close" Command="{Binding SaveAndCloseCommand}" Classes="accent"/>
             <Button Content="Cancel" Command="{Binding CancelCommand}"/>
         </StackPanel>

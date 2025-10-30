@@ -173,6 +173,8 @@ public class SessionEditorViewModel : ReactiveObject
 
         var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _moduleRegistry);
         ConfiguredModules.Add(newVm);
+        
+        SelectedModule = newVm;
 
         // We no longer auto-select the module. The user must click 'Settings'.
         ModuleToAdd = null;
