@@ -4,7 +4,7 @@ using Axorith.Sdk.Http;
 namespace Axorith.Core.Http;
 
 /// <summary>
-/// Adapter that wraps a real HttpClient and exposes it as IHttpClient.
+///     Adapter that wraps a real HttpClient and exposes it as IHttpClient.
 /// </summary>
 internal class HttpClientAdapter(HttpClient httpClient) : IHttpClient
 {
@@ -19,7 +19,8 @@ internal class HttpClientAdapter(HttpClient httpClient) : IHttpClient
         return httpClient.GetStringAsync(requestUri, cancellationToken);
     }
 
-    public async Task<string> PostStringAsync(string requestUri, string content, Encoding encoding, string mediaType, CancellationToken cancellationToken = default)
+    public async Task<string> PostStringAsync(string requestUri, string content, Encoding encoding, string mediaType,
+        CancellationToken cancellationToken = default)
     {
         using var stringContent = new StringContent(content, encoding, mediaType);
         using var response = await httpClient.PostAsync(requestUri, stringContent, cancellationToken);
@@ -34,7 +35,8 @@ internal class HttpClientAdapter(HttpClient httpClient) : IHttpClient
         return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
-    public async Task<string> PutStringAsync(string requestUri, string content, Encoding encoding, string mediaType, CancellationToken cancellationToken = default)
+    public async Task<string> PutStringAsync(string requestUri, string content, Encoding encoding, string mediaType,
+        CancellationToken cancellationToken = default)
     {
         using var stringContent = new StringContent(content, encoding, mediaType);
         using var response = await httpClient.PutAsync(requestUri, stringContent, cancellationToken);

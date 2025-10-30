@@ -6,8 +6,8 @@ using Axorith.Sdk.Services;
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-/// A Windows-specific implementation of ISecureStorageService that uses DPAPI (ProtectedData)
-/// to encrypt data based on the current user's credentials.
+///     A Windows-specific implementation of ISecureStorageService that uses DPAPI (ProtectedData)
+///     to encrypt data based on the current user's credentials.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public class SecureStorage : ISecureStorageService
@@ -18,8 +18,8 @@ public class SecureStorage : ISecureStorageService
     private readonly string _storagePath;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SecureStorage"/> class.
-    /// Ensures that the storage directory exists in the user's application data folder.
+    ///     Initializes a new instance of the <see cref="SecureStorage" /> class.
+    ///     Ensures that the storage directory exists in the user's application data folder.
     /// </summary>
     public SecureStorage()
     {
@@ -41,10 +41,7 @@ public class SecureStorage : ISecureStorageService
     public string? RetrieveSecret(string key)
     {
         var filePath = GetFilePathForKey(key);
-        if (!File.Exists(filePath))
-        {
-            return null;
-        }
+        if (!File.Exists(filePath)) return null;
 
         try
         {
@@ -61,8 +58,8 @@ public class SecureStorage : ISecureStorageService
     }
 
     /// <summary>
-    /// Creates a safe filename by hashing the key. This avoids invalid characters
-    /// and prevents leaking key names into the filesystem.
+    ///     Creates a safe filename by hashing the key. This avoids invalid characters
+    ///     and prevents leaking key names into the filesystem.
     /// </summary>
     private string GetFilePathForKey(string key)
     {

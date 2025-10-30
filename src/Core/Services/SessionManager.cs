@@ -49,7 +49,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
         ActiveSession = preset;
         _sessionCts = new CancellationTokenSource();
-        
+
         // Immediately notify listeners that the session has started so the UI can update.
         SessionStarted?.Invoke(preset.Id);
 
@@ -82,8 +82,9 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         return Task.CompletedTask;
     }
-    
-    private async Task RunModuleStartupsAsync(IReadOnlyCollection<ActiveModule> modules, CancellationToken cancellationToken)
+
+    private async Task RunModuleStartupsAsync(IReadOnlyCollection<ActiveModule> modules,
+        CancellationToken cancellationToken)
     {
         var startTasks = modules.Select(async activeModule =>
         {
@@ -124,7 +125,8 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         {
             await Task.WhenAll(startTasks);
             if (ActiveSession is not null)
-                logger.LogInformation("All {Count} modules for session '{PresetName}' started successfully", modules.Count, ActiveSession.Name);
+                logger.LogInformation("All {Count} modules for session '{PresetName}' started successfully",
+                    modules.Count, ActiveSession.Name);
         }
         catch
         {
@@ -139,7 +141,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                     logger.LogCritical(
                         "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
                         ActiveSession.Name);
-                
+
                 await StopCurrentSessionAsync();
             }
         }

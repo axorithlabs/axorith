@@ -63,20 +63,18 @@ public sealed class AxorithHost : IDisposable
                 .ConfigureServices(services =>
                 {
                     services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
-                    
+
                     services.AddHttpClient();
                 })
                 .ConfigureContainer<ContainerBuilder>(builder =>
                 {
                     // Http Services
                     builder.RegisterType<HttpClientFactoryAdapter>().As<IHttpClientFactory>().SingleInstance();
-                    
+
                     // Secure Storage services
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
                         builder.RegisterType<SecureStorage>().As<ISecureStorageService>().SingleInstance();
-                    }
-                    
+
                     // Core Services
                     builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();
                     builder.RegisterType<ModuleRegistry>().As<IModuleRegistry>().SingleInstance();

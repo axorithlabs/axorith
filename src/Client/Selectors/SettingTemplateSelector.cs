@@ -6,8 +6,8 @@ using Axorith.Sdk.Settings;
 namespace Axorith.Client.Selectors;
 
 /// <summary>
-/// A data template selector that chooses the correct UI control for a given SettingViewModel.
-/// This is the robust, code-based alternative to using style selectors.
+///     A data template selector that chooses the correct UI control for a given SettingViewModel.
+///     This is the robust, code-based alternative to using style selectors.
 /// </summary>
 public class SettingTemplateSelector : IDataTemplate
 {
@@ -18,7 +18,7 @@ public class SettingTemplateSelector : IDataTemplate
     public IDataTemplate? ChoiceTemplate { get; set; }
 
     /// <summary>
-    /// This method is called by Avalonia to build the UI for an item.
+    ///     This method is called by Avalonia to build the UI for an item.
     /// </summary>
     public Control Build(object? data)
     {
@@ -38,7 +38,7 @@ public class SettingTemplateSelector : IDataTemplate
     }
 
     /// <summary>
-    /// This method tells Avalonia if this selector can handle the given data.
+    ///     This method tells Avalonia if this selector can handle the given data.
     /// </summary>
     public bool Match(object? data)
     {

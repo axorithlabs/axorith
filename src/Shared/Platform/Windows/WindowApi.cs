@@ -4,16 +4,16 @@ using System.Runtime.InteropServices;
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-/// Provides Windows-specific API for manipulating windows.
+///     Provides Windows-specific API for manipulating windows.
 /// </summary>
 public static class WindowApi
 {
     /// <summary>
-    /// Moves a window to the specified monitor.
+    ///     Moves a window to the specified monitor.
     /// </summary>
     /// <param name="windowHandle">The handle of the window to move.</param>
     /// <param name="monitorIndex">The index of the monitor to move the window to.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="monitorIndex"/> is out of range.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="monitorIndex" /> is out of range.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the process has no main window.</exception>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
@@ -24,13 +24,13 @@ public static class WindowApi
 
         if (windowHandle == IntPtr.Zero) throw new InvalidOperationException("Process has no main window.");
 
-        NativeApi.GetWindowRect(windowHandle, out NativeApi.RECT currentRect);
+        NativeApi.GetWindowRect(windowHandle, out var currentRect);
         var width = currentRect.Right - currentRect.Left;
         var height = currentRect.Bottom - currentRect.Top;
 
-        NativeApi.RECT target = monitors[monitorIndex];
+        var target = monitors[monitorIndex];
 
-        NativeApi.GetWindowPlacement(windowHandle, out NativeApi.WINDOWPLACEMENT placement);
+        NativeApi.GetWindowPlacement(windowHandle, out var placement);
         placement.Length = Marshal.SizeOf(typeof(NativeApi.WINDOWPLACEMENT));
         placement.ShowCmd = NativeApi.SW_SHOWNORMAL;
         placement.NormalPosition = new NativeApi.RECT
@@ -42,13 +42,13 @@ public static class WindowApi
         };
         NativeApi.SetWindowPlacement(windowHandle, ref placement);
     }
-    
+
     /// <summary>
-    /// Asynchronously waits for a process's main window to be initialized.
+    ///     Asynchronously waits for a process's main window to be initialized.
     /// </summary>
     /// <param name="process">The process to monitor.</param>
     /// <param name="timeoutMs">The timeout in milliseconds.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="process"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="process" /> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the process exits before creating a main window.</exception>
     /// <exception cref="TimeoutException">Thrown when the process window does not appear in time.</exception>
     public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000)
@@ -61,7 +61,7 @@ public static class WindowApi
         while (process.MainWindowHandle == IntPtr.Zero)
         {
             await Task.Delay(delay);
-            
+
             process.Refresh();
 
             if (process.HasExited)

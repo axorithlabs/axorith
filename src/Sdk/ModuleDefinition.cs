@@ -50,10 +50,10 @@ public record ModuleDefinition
     /// </summary>
     [JsonIgnore]
     public Type? ModuleType { get; set; }
-    
+
     /// <summary>
-    /// Gets or sets the AssemblyLoadContext used to load this module.
-    /// This is used to unload the module's assemblies from memory.
+    ///     Gets or sets the AssemblyLoadContext used to load this module.
+    ///     This is used to unload the module's assemblies from memory.
     /// </summary>
     [JsonIgnore]
     public AssemblyLoadContext? LoadContext { get; set; }

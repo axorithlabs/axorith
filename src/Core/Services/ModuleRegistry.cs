@@ -3,11 +3,9 @@ using Autofac;
 using Axorith.Core.Logging;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
-using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Microsoft.Extensions.Logging;
-using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core.Services;
 
@@ -90,11 +88,11 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
                             new ModuleLoggerAdapter(c.Resolve<ILoggerFactory>().CreateLogger(definition.ModuleType)))
                         .As<IModuleLogger>()
                         .InstancePerLifetimeScope();
-                    
+
                     builder.Register(_ =>
                         {
                             var underlyingStorage = rootScope.Resolve<ISecureStorageService>();
-                            
+
                             return new ModuleScopedSecureStorage(underlyingStorage, definition);
                         })
                         .As<ISecureStorageService>()

@@ -4,8 +4,8 @@ using Axorith.Sdk.Services;
 namespace Axorith.Core.Services;
 
 /// <summary>
-/// A thread-safe implementation of the <see cref="IEventAggregator"/> interface.
-/// It allows for publishing messages and subscribing to them in a decoupled manner.
+///     A thread-safe implementation of the <see cref="IEventAggregator" /> interface.
+///     It allows for publishing messages and subscribing to them in a decoupled manner.
 /// </summary>
 internal sealed class EventAggregator : IEventAggregator
 {
@@ -37,24 +37,15 @@ internal sealed class EventAggregator : IEventAggregator
         lock (handlers)
         {
             foreach (var weakHandler in handlers)
-            {
                 if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
-                {
                     // Run the handler in the background to avoid blocking the publisher.
                     // In a more complex system, this could be a dedicated thread pool or a message queue.
                     ThreadPool.QueueUserWorkItem(_ => handler(eventMessage));
-                }
                 else
-                {
                     // The subscriber has been garbage collected, so we should clean up.
                     handlersToRemove.Add(weakHandler);
-                }
-            }
 
-            foreach (var toRemove in handlersToRemove)
-            {
-                handlers.Remove(toRemove);
-            }
+            foreach (var toRemove in handlersToRemove) handlers.Remove(toRemove);
         }
     }
 
@@ -65,11 +56,9 @@ internal sealed class EventAggregator : IEventAggregator
 
         lock (handlers)
         {
-            var handlerToRemove = handlers.FirstOrDefault(wh => wh.TryGetTarget(out var target) && target.Equals(handler));
-            if (handlerToRemove != null)
-            {
-                handlers.Remove(handlerToRemove);
-            }
+            var handlerToRemove =
+                handlers.FirstOrDefault(wh => wh.TryGetTarget(out var target) && target.Equals(handler));
+            if (handlerToRemove != null) handlers.Remove(handlerToRemove);
         }
     }
 

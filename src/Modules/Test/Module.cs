@@ -11,7 +11,11 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorageService secureStorage, IEventAggregator eventAggregator) : IModule
+public class Module(
+    IModuleLogger logger,
+    IHttpClient httpClient,
+    ISecureStorageService secureStorage,
+    IEventAggregator eventAggregator) : IModule
 {
     private IDisposable? _subscription;
 
@@ -102,8 +106,9 @@ public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorage
 
         try
         {
-            var responseJson = await httpClient.GetStringAsync("https://jsonplaceholder.typicode.com/todos/1", cancellationToken);
-            
+            var responseJson =
+                await httpClient.GetStringAsync("https://jsonplaceholder.typicode.com/todos/1", cancellationToken);
+
             using var jsonDoc = JsonDocument.Parse(responseJson);
             var root = jsonDoc.RootElement;
 
@@ -121,7 +126,7 @@ public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorage
             logger.LogError(ex, ex.Message);
             throw;
         }
-        
+
         var token = secureStorage.RetrieveSecret("AccessToken");
 
         if (token is null)
@@ -130,7 +135,7 @@ public class Module(IModuleLogger logger, IHttpClient httpClient, ISecureStorage
             secureStorage.StoreSecret("AccessToken", newToken);
             token = newToken;
         }
-        
+
         logger.LogInfo("token {token}", token);
 
         // --- Event Aggregator Test ---

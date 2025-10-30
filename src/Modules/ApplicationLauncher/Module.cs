@@ -24,19 +24,19 @@ public class Module(IModuleLogger logger) : IModule
         {
             new TextSetting(
                 "ApplicationPath",
-                "Application Path",
+                "Path",
                 "The path to the application to launch.",
                 @"C:\Windows\notepad.exe"
             ),
             new TextSetting(
                 "ApplicationArgs",
-                "Application Arguments",
+                "Arguments",
                 "The arguments to pass to the application.",
                 @""
             ),
             new NumberSetting(
                 "MonitorIndex",
-                "Application Target Monitor",
+                "Target Monitor",
                 "The index of the monitor to move the application window to.",
                 0
             )
