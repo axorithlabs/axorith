@@ -43,4 +43,10 @@ public class CheckboxSetting(string key, string label, string? description = nul
     {
         return vm.BoolValue.ToString();
     }
+
+    /// <inheritdoc />
+    public override string GetDefaultValueAsString()
+    {
+        return DefaultValue.ToString();
+    }
 }

@@ -81,20 +81,9 @@ public class Module(IModuleLogger logger) : IModule
     public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
         CancellationToken cancellationToken)
     {
-        var applicationPath = userSettings.GetValueOrDefault("ApplicationPath");
-        if (string.IsNullOrWhiteSpace(applicationPath))
-        {
-            logger.LogError(null, "Application path is not specified. Module cannot start.");
-            return;
-        }
-
-        var applicationArgs = userSettings.GetValueOrDefault("ApplicationArgs", string.Empty);
-
-        if (!decimal.TryParse(userSettings.GetValueOrDefault("MonitorIndex", "0"), out var monitorIdx))
-        {
-            logger.LogWarning("Could not parse 'MonitorIndex'. Using default value: 0.");
-            monitorIdx = 0;
-        }
+        var applicationPath = userSettings["ApplicationPath"];
+        var applicationArgs = userSettings["ApplicationArgs"];
+        var monitorIdx = decimal.Parse(userSettings["MonitorIndex"]);
 
         try
         {

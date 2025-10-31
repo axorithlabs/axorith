@@ -55,4 +55,10 @@ public class NumberSetting : SettingBase
     {
         return vm.DecimalValue.ToString(CultureInfo.InvariantCulture);
     }
+
+    /// <inheritdoc />
+    public override string GetDefaultValueAsString()
+    {
+        return DefaultValue.ToString(CultureInfo.InvariantCulture);
+    }
 }

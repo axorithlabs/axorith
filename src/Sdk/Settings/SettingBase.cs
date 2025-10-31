@@ -54,4 +54,10 @@ public abstract class SettingBase
     /// <param name="vm">The ViewModel containing the current user-provided value.</param>
     /// <returns>A string representation of the current value to be saved in JSON.</returns>
     public abstract string GetValueFromViewModel(ISettingViewModel vm);
+
+    /// <summary>
+    ///     Gets the default value for this setting, formatted as a string suitable for serialization.
+    /// </summary>
+    /// <returns>A string representation of the default value.</returns>
+    public abstract string GetDefaultValueAsString();
 }
