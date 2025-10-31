@@ -42,4 +42,10 @@ public class SecretSetting : SettingBase
     {
         return vm.StringValue;
     }
+
+    /// <inheritdoc />
+    public override string GetDefaultValueAsString()
+    {
+        return string.Empty;
+    }
 }

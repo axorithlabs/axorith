@@ -99,8 +99,12 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
             try
             {
-                // Pass the session cancellation token to the module
-                await activeModule.Instance.OnSessionStartAsync(config.Settings, cancellationToken);
+                var finalSettings = activeModule.Instance.GetSettings()
+                    .ToDictionary(def => def.Key, def => def.GetDefaultValueAsString());
+                foreach (var savedSetting in config.Settings)
+                    finalSettings[savedSetting.Key] = savedSetting.Value;
+
+                await activeModule.Instance.OnSessionStartAsync(finalSettings, cancellationToken);
             }
             catch (OperationCanceledException)
             {

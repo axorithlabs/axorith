@@ -19,7 +19,7 @@ public class Module(
     ModuleDefinition definition) : IModule
 {
     private readonly IHttpClient _httpClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
-    
+
     private IDisposable? _subscription;
 
     /// <inheritdoc />
@@ -44,7 +44,7 @@ public class Module(
                 "Work Duration (sec)",
                 "How long the module should simulate work.",
                 5),
-            
+
             new SecretSetting(
                 "UserSecret",
                 "User Secret",
@@ -105,18 +105,9 @@ public class Module(
     public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
         CancellationToken cancellationToken)
     {
-        // Retrieve settings safely, using default values from the module definition if a key is not found.
-        var message = userSettings.GetValueOrDefault("GreetingMessage", "Default Greeting");
-
-        // For booleans, parse the string value, defaulting to 'true' if not found.
-        var enableExtraLogging = bool.Parse(userSettings.GetValueOrDefault("EnableExtraLogging", "true"));
-
-        // For numbers, parse with a fallback and log a warning on failure.
-        if (!decimal.TryParse(userSettings.GetValueOrDefault("WorkDurationSeconds", "5"), out var duration))
-        {
-            duration = 5;
-            logger.LogWarning("Could not parse 'WorkDurationSeconds'. Using default value: {Duration}s", duration);
-        }
+        var message = userSettings["GreetingMessage"];
+        var enableExtraLogging = bool.Parse(userSettings["EnableExtraLogging"]);
+        var duration = decimal.Parse(userSettings["WorkDurationSeconds"]);
 
         logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
 

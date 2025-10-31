@@ -53,7 +53,7 @@ public class Module(IModuleLogger logger) : IModule
     {
         logger.LogInfo("Sending 'block' command via Named Pipe...");
 
-        var sitesString = userSettings.GetValueOrDefault("BlockedSites", string.Empty);
+        var sitesString = userSettings["BlockedSites"];
         _activeBlockedSites = sitesString.Split(',')
             .Select(s => s.Trim())
             .Where(s => !string.IsNullOrWhiteSpace(s))

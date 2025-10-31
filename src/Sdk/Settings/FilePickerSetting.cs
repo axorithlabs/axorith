@@ -60,4 +60,10 @@ public class FilePickerSetting : SettingBase
     {
         return vm.StringValue;
     }
+
+    /// <inheritdoc />
+    public override string GetDefaultValueAsString()
+    {
+        return DefaultValue;
+    }
 }
