@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
@@ -126,6 +126,7 @@ public class SessionEditorViewModel : ReactiveObject
         {
             _preset.Modules.Remove(moduleVm.Model);
             ConfiguredModules.Remove(moduleVm);
+            moduleVm.Dispose(); // Clean up the live instance and subscriptions
             if (SelectedModule == moduleVm) SelectedModule = null;
             UpdateAvailableModules();
         });
@@ -141,10 +142,14 @@ public class SessionEditorViewModel : ReactiveObject
         UpdateAvailableModules();
     }
 
-    private void LoadFromPreset()
+        private void LoadFromPreset()
     {
         Name = _preset.Name;
+        
+        // Dispose old ViewModels before clearing the collection
+        foreach (var vm in ConfiguredModules) vm.Dispose();
         ConfiguredModules.Clear();
+        
         foreach (var configured in _preset.Modules)
         {
             var moduleDef = _moduleRegistry.GetDefinitionById(configured.ModuleId);

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
@@ -11,7 +11,9 @@ using Axorith.Shared.Exceptions;
 using Axorith.Shared.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Polly;
 using Serilog;
+using Serilog.Events;
 using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core;
@@ -43,13 +45,21 @@ public sealed class AxorithHost : IDisposable
             "{Message:lj}" +
             "{NewLine}{Exception}";
 
+        var isDebug = Debugger.IsAttached;
+        var minLevel = isDebug ? LogEventLevel.Debug : LogEventLevel.Information;
+
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(minLevel)
             .Enrich.With<ShortSourceContextEnricher>()
             .Enrich.With<ModuleContextEnricher>()
             .WriteTo.Console(outputTemplate: outputTemplate)
             .WriteTo.Debug(outputTemplate: outputTemplate)
-            .WriteTo.File(logPath, rollingInterval: RollingInterval.Day, outputTemplate: outputTemplate)
+            .WriteTo.File(logPath, 
+                rollingInterval: RollingInterval.Day,
+                fileSizeLimitBytes: 10 * 1024 * 1024, // 10 MB per file
+                retainedFileCountLimit: 30, // Keep last 30 files
+                rollOnFileSizeLimit: true,
+                outputTemplate: outputTemplate)
             .CreateLogger();
 
         var hostLogger = Log.ForContext<AxorithHost>();
@@ -64,7 +74,11 @@ public sealed class AxorithHost : IDisposable
                 {
                     services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
 
-                    services.AddHttpClient();
+                    services.AddHttpClient("default")
+                        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler())
+                        .AddPolicyHandler(GetRetryPolicy())
+                        .AddPolicyHandler(GetCircuitBreakerPolicy())
+                        .AddPolicyHandler(GetTimeoutPolicy());
                 })
                 .ConfigureContainer<ContainerBuilder>(builder =>
                 {
@@ -106,6 +120,27 @@ public sealed class AxorithHost : IDisposable
             hostLogger.Fatal(ex, "A critical error occurred during host initialization");
             throw new HostInitializationException("Failed to initialize the Axorith Core. See logs for details.", ex);
         }
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+    {
+        return Policy<HttpResponseMessage>
+            .Handle<HttpRequestException>()
+            .OrResult(r => (int)r.StatusCode >= 500)
+            .WaitAndRetryAsync(2, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+    {
+        return Policy<HttpResponseMessage>
+            .Handle<HttpRequestException>()
+            .OrResult(r => (int)r.StatusCode >= 500)
+            .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30));
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy()
+    {
+        return Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(10));
     }
 
     public void Dispose()

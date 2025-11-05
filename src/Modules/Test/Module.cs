@@ -1,9 +1,10 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
+using Axorith.Sdk.Actions;
 
 namespace Axorith.Module.Test;
 
@@ -11,120 +12,155 @@ namespace Axorith.Module.Test;
 ///     A test module to demonstrate the capabilities of the Axorith SDK
 ///     and to verify that the Core loads and interacts with modules correctly.
 /// </summary>
-public class Module(
-    IModuleLogger logger,
-    IHttpClientFactory httpClientFactory,
-    ISecureStorageService secureStorage,
-    IEventAggregator eventAggregator,
-    ModuleDefinition definition) : IModule
+public class Module : IModule
 {
-    private readonly IHttpClient _httpClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
+    private readonly IModuleLogger _logger;
+    private readonly IHttpClient _httpClient;
+    private readonly ISecureStorageService _secureStorage;
+    private readonly IEventAggregator _eventAggregator;
+
+    private readonly Setting<string> _greetingMessage;
+    private readonly Setting<bool> _enableExtraLogging;
+    private readonly Setting<decimal> _workDurationSeconds;
+    private readonly Setting<string> _userSecret;
+    private readonly Setting<string> _processingMode;
+    private readonly Setting<string> _inputFile;
+    private readonly Setting<string> _outputDirectory;
+
+    public Module(IModuleLogger logger,
+        IHttpClientFactory httpClientFactory,
+        ISecureStorageService secureStorage,
+        IEventAggregator eventAggregator,
+        ModuleDefinition definition)
+    {
+        _logger = logger;
+        _httpClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
+        _secureStorage = secureStorage;
+        _eventAggregator = eventAggregator;
+
+        _greetingMessage = Setting.AsText(
+            key: "GreetingMessage",
+            label: "Greeting Message",
+            description: "This message will be logged on session start.",
+            defaultValue: "Hello from TestModule!"
+        );
+
+        _enableExtraLogging = Setting.AsCheckbox(
+            key: "EnableExtraLogging",
+            label: "Enable Extra Logging",
+            description: "If checked, the module will log a countdown.",
+            defaultValue: true
+        );
+
+        _workDurationSeconds = Setting.AsNumber(
+            key: "WorkDurationSeconds",
+            label: "Work Duration (sec)",
+            description: "How long the module should simulate work.",
+            defaultValue: 5
+        );
+
+        _userSecret = Setting.AsSecret(
+            key: "UserSecret",
+            label: "User Secret",
+            description: "A secret value for testing secure storage."
+        );
+
+        _processingMode = Setting.AsChoice(
+            key: "ProcessingMode",
+            label: "Processing Mode",
+            description: "Choose the processing algorithm.",
+            defaultValue: "balanced",
+            initialChoices: [
+                new KeyValuePair<string, string>("fast", "Fast Mode"),
+                new KeyValuePair<string, string>("accurate", "Accurate Mode"),
+                new KeyValuePair<string, string>("balanced", "Balanced (Default)")
+            ]
+        );
+
+        _inputFile = Setting.AsFilePicker(
+            key: "InputFile",
+            label: "Input File",
+            description: "Select a configuration file.",
+            defaultValue: "",
+            filter: "JSON files (*.json)|*.json|All files (*.*)|*.*"
+        );
+
+        _outputDirectory = Setting.AsDirectoryPicker(
+            key: "OutputDirectory",
+            label: "Output Directory",
+            description: "Select a directory for output files.",
+            defaultValue: Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+        );
+
+        // Load secrets from SecureStorage in constructor
+        var userSecret = _secureStorage.RetrieveSecret(_userSecret.Key);
+        if (!string.IsNullOrEmpty(userSecret))
+        {
+            _userSecret.SetValue(userSecret);
+            _logger.LogDebug("Loaded secret '{Key}' from SecureStorage", _userSecret.Key);
+        }
+    }
 
     private IDisposable? _subscription;
 
     /// <inheritdoc />
-    public IReadOnlyList<SettingBase> GetSettings()
+    public IReadOnlyList<ISetting> GetSettings()
     {
-        return new List<SettingBase>
-        {
-            new TextSetting(
-                "GreetingMessage",
-                "Greeting Message",
-                "This message will be logged on session start.",
-                "Hello from TestModule!"),
+        return [
+            _greetingMessage,
+            _enableExtraLogging,
+            _workDurationSeconds,
+            _userSecret,
+            _processingMode,
+            _inputFile,
+            _outputDirectory
+        ];
+    }
 
-            new CheckboxSetting(
-                "EnableExtraLogging",
-                "Enable Extra Logging",
-                "If checked, the module will log a countdown.",
-                true),
-
-            new NumberSetting(
-                "WorkDurationSeconds",
-                "Work Duration (sec)",
-                "How long the module should simulate work.",
-                5),
-
-            new SecretSetting(
-                "UserSecret",
-                "User Secret",
-                "A secret value for testing secure storage."),
-
-            new ChoiceSetting(
-                "ProcessingMode",
-                "Processing Mode",
-                [
-                    new KeyValuePair<string, string>("fast", "Fast Mode"),
-                    new KeyValuePair<string, string>("accurate", "Accurate Mode"),
-                    new KeyValuePair<string, string>("balanced", "Balanced (Default)")
-                ],
-                "balanced",
-                "Choose the processing algorithm."),
-
-            new FilePickerSetting(
-                "InputFile",
-                "Input File",
-                "Select a configuration file.",
-                "",
-                "JSON files (*.json)|*.json|All files (*.*)|*.*"),
-
-            new DirectoryPickerSetting(
-                "OutputDirectory",
-                "Output Directory",
-                "Select a directory for output files.",
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))
-        };
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return Array.Empty<IAction>();
     }
 
     /// <inheritdoc />
     public Type? CustomSettingsViewType => null;
 
     /// <inheritdoc />
-    public object? GetSettingsViewModel(IReadOnlyDictionary<string, string> currentSettings)
+    public object? GetSettingsViewModel()
     {
         // This module uses auto-generated UI, so this method returns null.
         return null;
     }
 
     /// <inheritdoc />
-    public Task<ValidationResult> ValidateSettingsAsync(IReadOnlyDictionary<string, string> userSettings,
-        CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        // Try to get the value for 'WorkDurationSeconds'. If it doesn't exist, settings are considered valid.
-        if (!userSettings.TryGetValue("WorkDurationSeconds", out var durationStr))
-            return Task.FromResult(ValidationResult.Success);
-
         // If the value exists, ensure it's a non-negative number.
-        if (!decimal.TryParse(durationStr, out var duration) || duration < 0)
-            return Task.FromResult(ValidationResult.Fail("'Work Duration' must be a non-negative number."));
+        if (_workDurationSeconds.GetCurrentValue() < 0)
+            return Task.FromResult(ValidationResult.Fail($"{_workDurationSeconds.Label} must be a non-negative number."));
 
         return Task.FromResult(ValidationResult.Success);
     }
 
     /// <inheritdoc />
-    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
-        CancellationToken cancellationToken)
+    public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        var message = userSettings["GreetingMessage"];
-        var enableExtraLogging = bool.Parse(userSettings["EnableExtraLogging"]);
-        var duration = decimal.Parse(userSettings["WorkDurationSeconds"]);
+        _logger.LogInfo("User setting 'GreetingMessage': {Message}", _greetingMessage.GetCurrentValue());
 
-        logger.LogInfo("User setting 'GreetingMessage': {Message}", message);
-
-        if (enableExtraLogging)
+        if (_enableExtraLogging.GetCurrentValue())
         {
-            logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", duration);
-            for (var i = (int)duration; i > 0; i--)
+            _logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", _workDurationSeconds.GetCurrentValue());
+            for (var i = (int)_workDurationSeconds.GetCurrentValue(); i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                logger.LogDebug("{SecondsLeft} seconds left.", i);
+                _logger.LogDebug("{SecondsLeft} seconds left.", i);
                 await Task.Delay(1000, cancellationToken);
             }
         }
         else
         {
-            logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", duration);
-            await Task.Delay((int)duration * 1000, cancellationToken);
+            _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", _workDurationSeconds.GetCurrentValue());
+            await Task.Delay((int)_workDurationSeconds.GetCurrentValue() * 1000, cancellationToken);
         }
 
         try
@@ -139,54 +175,68 @@ public class Module(
             var title = root.TryGetProperty("title", out el) ? el.GetString() : "N/A";
             var completed = root.TryGetProperty("completed", out el) && el.GetBoolean();
 
-            logger.LogInfo("Parsed To-Do Item:");
-            logger.LogInfo("  User ID: {UserId}", userId);
-            logger.LogInfo("  Title: '{Title}'", title!);
-            logger.LogInfo("  Completed: {IsCompleted}", completed);
+            _logger.LogInfo("Parsed To-Do Item:");
+            _logger.LogInfo("  User ID: {UserId}", userId);
+            _logger.LogInfo("  Title: '{Title}'", title!);
+            _logger.LogInfo("  Completed: {IsCompleted}", completed);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, ex.Message);
+            _logger.LogError(ex, ex.Message);
             throw;
         }
 
-        var token = secureStorage.RetrieveSecret("AccessToken");
+        var token = _secureStorage.RetrieveSecret("AccessToken");
 
         if (token is null)
         {
             var newToken = "qwerpoqwprfjofpjweof";
-            secureStorage.StoreSecret("AccessToken", newToken);
+            _secureStorage.StoreSecret("AccessToken", newToken);
             token = newToken;
         }
 
-        logger.LogInfo("token {token}", token);
+        _logger.LogInfo("token {token}", token);
 
         // --- Event Aggregator Test ---
-        logger.LogInfo("Subscribing to TestEvent...");
-        _subscription = eventAggregator.Subscribe<TestEvent>(HandleTestEvent);
+        _logger.LogInfo("Subscribing to TestEvent...");
+        _subscription = _eventAggregator.Subscribe<TestEvent>(HandleTestEvent);
 
-        logger.LogInfo("Publishing TestEvent in 2 seconds...");
+        _logger.LogInfo("Publishing TestEvent in 2 seconds...");
         await Task.Delay(2000, cancellationToken);
-        eventAggregator.Publish(new TestEvent { Message = "Hello from Event Aggregator!" });
+        _eventAggregator.Publish(new TestEvent { Message = "Hello from Event Aggregator!" });
     }
 
     /// <inheritdoc />
     public Task OnSessionEndAsync()
     {
-        // Perform any cleanup here. For this module, there's nothing to clean up.
+        // Save secrets before shutdown
+        var userSecret = _userSecret.GetCurrentValue();
+        if (!string.IsNullOrEmpty(userSecret))
+        {
+            _secureStorage.StoreSecret(_userSecret.Key, userSecret);
+            _logger.LogDebug("Persisted secret '{Key}' to SecureStorage", _userSecret.Key);
+        }
+
         return Task.CompletedTask;
     }
 
     private void HandleTestEvent(TestEvent evt)
     {
-        logger.LogInfo("Received TestEvent! Message: '{Message}'", evt.Message);
+        _logger.LogInfo("Received TestEvent! Message: '{Message}'", evt.Message);
     }
 
     /// <summary>
-    ///     Releases any resources used by the module. For TestModule, there's nothing to release.
+    ///     Releases any resources used by the module.
     /// </summary>
     public void Dispose()
     {
+        // Save secrets for extra safety
+        var userSecret = _userSecret.GetCurrentValue();
+        if (!string.IsNullOrEmpty(userSecret))
+        {
+            _secureStorage.StoreSecret(_userSecret.Key, userSecret);
+        }
+
         _subscription?.Dispose();
         GC.SuppressFinalize(this);
     }

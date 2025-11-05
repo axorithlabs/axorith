@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
@@ -93,30 +93,48 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
             var scope = logger.BeginScope(new Dictionary<string, object>
             {
+                ["SessionId"] = ActiveSession?.Id ?? Guid.Empty,
                 ["ModuleName"] = definition.Name,
                 ["ModuleInstanceName"] = config.CustomName ?? string.Empty
             });
 
             try
             {
-                var finalSettings = activeModule.Instance.GetSettings()
-                    .ToDictionary(def => def.Key, def => def.GetDefaultValueAsString());
-                foreach (var savedSetting in config.Settings)
-                    finalSettings[savedSetting.Key] = savedSetting.Value;
+                // Populate the module's reactive settings with values from the preset
+                var moduleSettings = activeModule.Instance.GetSettings().ToDictionary(s => s.Key);
+                foreach (var savedSetting in activeModule.Configuration.Settings)
+                    if (moduleSettings.TryGetValue(savedSetting.Key, out var setting))
+                        setting.SetValueFromString(savedSetting.Value);
 
-                await activeModule.Instance.OnSessionStartAsync(finalSettings, cancellationToken);
+                // Validate settings with 5 second timeout
+                using var validationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                validationCts.CancelAfter(TimeSpan.FromSeconds(5));
+                
+                var validation = await activeModule.Instance.ValidateSettingsAsync(validationCts.Token);
+                if (validation.Status != ValidationStatus.Ok)
+                {
+                    logger.LogError("Module validation failed: {Error}", validation.Message);
+                    throw new SessionException($"Module validation failed: {validation.Message}");
+                }
+
+                // Start the module with 30 second timeout
+                using var startCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                startCts.CancelAfter(TimeSpan.FromSeconds(30));
+                
+                await activeModule.Instance.OnSessionStartAsync(startCts.Token);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogError(ex, "Module {InstanceName} startup timed out", config.CustomName ?? definition.Name);
+                throw new SessionException($"Module startup timed out after 30 seconds");
             }
             catch (OperationCanceledException)
             {
-                logger.LogWarning("Module instance {InstanceName} startup was canceled",
-                    config.CustomName ?? definition.Name);
-                // Don't rethrow cancellation exceptions
+                logger.LogWarning("Module {InstanceName} startup was canceled", config.CustomName ?? definition.Name);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Module instance {InstanceName} failed to start",
-                    config.CustomName ?? definition.Name);
-                // Rethrow to fail Task.WhenAll
+                logger.LogError(ex, "Module {InstanceName} failed to start", config.CustomName ?? definition.Name);
                 throw;
             }
             finally
@@ -168,6 +186,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
             var scope = logger.BeginScope(new Dictionary<string, object>
             {
+                ["SessionId"] = sessionToStop.Id,
                 ["ModuleName"] = definition.Name,
                 ["ModuleInstanceName"] = config.CustomName ?? string.Empty
             });

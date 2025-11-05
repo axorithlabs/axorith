@@ -1,4 +1,4 @@
-﻿using System.Runtime.Loader;
+using System.Runtime.Loader;
 using System.Text.Json.Serialization;
 
 namespace Axorith.Sdk;
@@ -43,6 +43,14 @@ public record ModuleDefinition
     /// </summary>
     [JsonPropertyName("platforms")]
     public Platform[] Platforms { get; init; } = [];
+
+    /// <summary>
+    ///     Gets the assembly file name (DLL) containing the module implementation.
+    ///     This is mapped from the "assembly" field in module.json.
+    ///     Must be specified to avoid ambiguity in multi-DLL scenarios.
+    /// </summary>
+    [JsonPropertyName("assembly")]
+    public string? AssemblyFileName { get; init; }
 
     /// <summary>
     ///     Gets or sets the actual <see cref="System.Type" /> of the class implementing <see cref="IModule" />.

@@ -17,7 +17,8 @@ public partial class SessionEditorView : UserControl
     private async void OnBrowseFileClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: SettingViewModel vm } button) return;
-        if (vm.Setting is not FilePickerSetting fileSetting) return;
+        if (vm.Setting.ControlType != SettingControlType.FilePicker) return;
+        var fileSetting = vm.Setting;
 
         var topLevel = TopLevel.GetTopLevel(button);
         if (topLevel?.StorageProvider is null) return;
@@ -34,7 +35,7 @@ public partial class SessionEditorView : UserControl
 
         var filePickerOptions = new FilePickerOpenOptions
         {
-            Title = $"Select {fileSetting.Label}",
+            Title = $"Select {vm.Label}",
             AllowMultiple = false,
             SuggestedStartLocation = startLocation
         };
@@ -64,7 +65,7 @@ public partial class SessionEditorView : UserControl
     private async void OnBrowseDirectoryClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: SettingViewModel vm } button) return;
-        if (vm.Setting is not DirectoryPickerSetting dirSetting) return;
+        if (vm.Setting.ControlType != SettingControlType.DirectoryPicker) return;
 
         var topLevel = TopLevel.GetTopLevel(button);
         if (topLevel?.StorageProvider is null) return;
@@ -77,7 +78,7 @@ public partial class SessionEditorView : UserControl
 
         var folderPickerOptions = new FolderPickerOpenOptions
         {
-            Title = $"Select {dirSetting.Label}",
+            Title = $"Select {vm.Label}",
             AllowMultiple = false,
             SuggestedStartLocation = startLocation
         };

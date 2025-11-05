@@ -12,12 +12,14 @@ namespace Axorith.Client.Selectors;
 public class SettingTemplateSelector : IDataTemplate
 {
     public IDataTemplate? TextTemplate { get; set; }
+    public IDataTemplate? TextAreaTemplate { get; set; }
     public IDataTemplate? SecretTemplate { get; set; }
     public IDataTemplate? CheckboxTemplate { get; set; }
     public IDataTemplate? NumberTemplate { get; set; }
     public IDataTemplate? ChoiceTemplate { get; set; }
     public IDataTemplate? FilePickerTemplate { get; set; }
     public IDataTemplate? DirectoryPickerTemplate { get; set; }
+    public IDataTemplate? ButtonTemplate { get; set; }
 
     /// <summary>
     ///     This method is called by Avalonia to build the UI for an item.
@@ -26,15 +28,17 @@ public class SettingTemplateSelector : IDataTemplate
     {
         var vm = data as SettingViewModel;
 
-        var template = vm?.Setting switch
+        var template = vm?.Setting.ControlType switch
         {
-            SecretSetting => SecretTemplate,
-            TextSetting => TextTemplate,
-            CheckboxSetting => CheckboxTemplate,
-            NumberSetting => NumberTemplate,
-            ChoiceSetting => ChoiceTemplate,
-            FilePickerSetting => FilePickerTemplate,
-            DirectoryPickerSetting => DirectoryPickerTemplate,
+            SettingControlType.Secret => SecretTemplate,
+            SettingControlType.Text => TextTemplate,
+            SettingControlType.TextArea => TextAreaTemplate,
+            SettingControlType.Checkbox => CheckboxTemplate,
+            SettingControlType.Number => NumberTemplate,
+            SettingControlType.Choice => ChoiceTemplate,
+            SettingControlType.FilePicker => FilePickerTemplate,
+            SettingControlType.DirectoryPicker => DirectoryPickerTemplate,
+            SettingControlType.Button => ButtonTemplate,
             _ => null
         };
 

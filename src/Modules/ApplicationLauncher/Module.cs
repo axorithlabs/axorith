@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Axorith.Sdk;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
+using Axorith.Sdk.Actions;
 using Axorith.Shared.Platform.Windows;
 
 #endregion
@@ -13,96 +14,104 @@ namespace Axorith.Module.ApplicationLauncher.Windows;
 /// <summary>
 ///     A module that launches an external application at the start of a session.
 /// </summary>
-public class Module(IModuleLogger logger) : IModule
+public class Module : IModule
 {
+    private readonly IModuleLogger _logger;
+
+    private readonly Setting<string> _applicationPath;
+    private readonly Setting<string> _applicationArgs;
+    private readonly Setting<decimal> _monitorIndex;
+    
     private Process? _currentProcess;
 
-    /// <inheritdoc />
-    public IReadOnlyList<SettingBase> GetSettings()
+    public Module(IModuleLogger logger)
     {
-        return new List<SettingBase>
-        {
-            new FilePickerSetting(
-                "ApplicationPath",
-                "Path",
-                "The path to the application to launch.",
-                @"C:\Windows\notepad.exe",
-                "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
-            ),
-            new TextSetting(
-                "ApplicationArgs",
-                "Arguments",
-                "The arguments to pass to the application.",
-                @""
-            ),
-            new NumberSetting(
-                "MonitorIndex",
-                "Target Monitor",
-                "The index of the monitor to move the application window to.",
-                0
-            )
-        };
+        _logger = logger;
+
+        _applicationPath = Setting.AsFilePicker(
+            key: "ApplicationPath",
+            label: "Application Path",
+            description: "The path to the application to launch.",
+            defaultValue: @"C:\Windows\notepad.exe",
+            filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
+        );
+
+        _applicationArgs = Setting.AsText(
+            key: "ApplicationArgs",
+            label: "Application Args",
+            description: "The arguments to pass to the application.",
+            defaultValue: ""
+        );
+
+        _monitorIndex = Setting.AsNumber(
+            key: "MonitorIndex",
+            label: "Target Monitor",
+            description: "The index of the monitor to move the application window to.",
+            defaultValue: 0
+        );
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return [
+            _applicationPath,
+            _applicationArgs,
+            _monitorIndex
+        ];
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return Array.Empty<IAction>();
     }
 
     /// <inheritdoc />
     public Type? CustomSettingsViewType => null;
 
     /// <inheritdoc />
-    public object? GetSettingsViewModel(IReadOnlyDictionary<string, string> currentSettings)
+    public object? GetSettingsViewModel()
     {
         // This module uses auto-generated UI, so this method returns null.
         return null;
     }
 
     /// <inheritdoc />
-    public Task<ValidationResult> ValidateSettingsAsync(IReadOnlyDictionary<string, string> userSettings,
-        CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        if (!userSettings.TryGetValue("ApplicationPath", out var applicationPath) ||
-            string.IsNullOrWhiteSpace(applicationPath))
+        if (string.IsNullOrWhiteSpace(_applicationPath.GetCurrentValue()))
             return Task.FromResult(ValidationResult.Fail("'Application Path' is required."));
 
-        if (!File.Exists(applicationPath))
-            return Task.FromResult(ValidationResult.Fail($"File not found at '{applicationPath}'."));
+        if (!File.Exists(_applicationPath.GetCurrentValue()))
+            return Task.FromResult(ValidationResult.Fail($"File not found at '{_applicationPath.GetCurrentValue()}'."));
 
-        if (userSettings.TryGetValue("MonitorIndex", out var monitorIdxStr))
-        {
-            if (!decimal.TryParse(monitorIdxStr, out var monitorIdx))
-                return Task.FromResult(ValidationResult.Fail("'Monitor Index' must be a valid number."));
-
-            if (monitorIdx < 0)
-                return Task.FromResult(ValidationResult.Fail("'Monitor Index' must be a non-negative number."));
-        }
+        if (_monitorIndex.GetCurrentValue() < 0)
+            return Task.FromResult(ValidationResult.Fail("'Monitor Index' must be a non-negative number."));
 
         return Task.FromResult(ValidationResult.Success);
     }
 
     /// <inheritdoc />
-    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
-        CancellationToken cancellationToken)
+    public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        var applicationPath = userSettings["ApplicationPath"];
-        var applicationArgs = userSettings["ApplicationArgs"];
-        var monitorIdx = decimal.Parse(userSettings["MonitorIndex"]);
-
         try
         {
-            logger.LogDebug("Attempting to start process: {Path} {Args}", applicationPath, applicationArgs);
+            _logger.LogDebug("Attempting to start process: {Path} {Args}", _applicationPath.GetCurrentValue(), _applicationArgs.GetCurrentValue());
             _currentProcess = new Process();
-            _currentProcess.StartInfo.FileName = applicationPath;
-            _currentProcess.StartInfo.Arguments = applicationArgs;
+            _currentProcess.StartInfo.FileName = _applicationPath.GetCurrentValue();
+            _currentProcess.StartInfo.Arguments = _applicationArgs.GetCurrentValue();
             _currentProcess.StartInfo.RedirectStandardOutput = true;
             _currentProcess.StartInfo.RedirectStandardError = true;
             _currentProcess.Start();
 
-            logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
+            _logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
                 _currentProcess.Id);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex,
+            _logger.LogError(ex,
                 "Failed to start process for application: {ApplicationPath}. Check path and permissions.",
-                applicationPath);
+                _applicationPath.GetCurrentValue());
             return;
         }
 
@@ -112,26 +121,26 @@ public class Module(IModuleLogger logger) : IModule
 
             if (_currentProcess.MainWindowHandle != IntPtr.Zero)
             {
-                logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
-                    _currentProcess.MainWindowHandle, monitorIdx);
-                WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, (int)monitorIdx);
-                logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
-                    _currentProcess.ProcessName, monitorIdx);
+                _logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
+                    _currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
+                WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, (int)_monitorIndex.GetCurrentValue());
+                _logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
+                    _currentProcess.ProcessName, _monitorIndex.GetCurrentValue());
             }
             else
             {
-                logger.LogInfo("Process started without a graphical interface. Skipping window move.");
+                _logger.LogInfo("Process started without a graphical interface. Skipping window move.");
             }
         }
         catch (TimeoutException)
         {
-            logger.LogWarning(
+            _logger.LogWarning(
                 "Process {ProcessName} started, but its main window did not appear in time. Could not move window.",
                 _currentProcess.ProcessName);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
+            _logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
         }
     }
 

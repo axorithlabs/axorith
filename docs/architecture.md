@@ -34,7 +34,8 @@ The project is divided into several key components with clear dependencies. An a
 ### 1. `Axorith.Sdk` (The Law)
 
 *   **Responsibility:** Defines the public contracts for the entire ecosystem. This is the "law" that all other components must follow.
-*   **Contents:** Interfaces (`IModule`, `IHttpClient`), enums (`Platform`), and setting definitions (`SettingBase` and its derivatives like `TextSetting`, `FilePickerSetting`, etc.).
+*   **Contents:** Interfaces (`IModule`, `IHttpClient`), enums (`Platform`), settings (`ISetting`/`Setting<T>` factory methods like `AsText`, `AsChoice`, `AsNumber`), and non-persisted module actions (`IAction`).
+*   **Actions vs Settings:** Settings are reactive values that by default are persisted into presets; actions (`IAction`) are non-persisted commands exposed by modules (e.g., "Login"), rendered as buttons in the Client.
 *   **Key Principles:** Contains **zero** implementation logic. Has **zero** external dependencies besides the base .NET library. It is the foundation of the entire project.
 
 ### 2. `Axorith.Core` (The Engine)

@@ -7,5 +7,6 @@
     "Windows",
     "Linux",
     "MacOs"
-  ]
+  ],
+  "assembly": "Axorith.Module.SiteBlocker.dll"
 }

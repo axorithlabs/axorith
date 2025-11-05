@@ -1,8 +1,9 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using static Axorith.Shared.Utils.EnvironmentUtils;
 
 namespace Axorith.Core.Services;
@@ -45,7 +46,18 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 
             logger.LogDebug("Scanning directory for modules: {Path}", path);
 
-            var moduleDirectories = Directory.EnumerateDirectories(path, "*", SearchOption.TopDirectoryOnly);
+            var enumerationOptions = new EnumerationOptions
+            {
+                RecurseSubdirectories = false,
+                AttributesToSkip = System.Diagnostics.Debugger.IsAttached 
+                    ? FileAttributes.System 
+                    : FileAttributes.System | FileAttributes.ReparsePoint
+            };
+
+            if (System.Diagnostics.Debugger.IsAttached)
+                logger.LogDebug("Development mode: Symlinked module directories are allowed");
+
+            var moduleDirectories = Directory.EnumerateDirectories(path, "*", enumerationOptions);
             foreach (var moduleDir in moduleDirectories)
             {
                 var jsonFile = Path.Combine(moduleDir, "module.json");
@@ -56,13 +68,19 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 
                 try
                 {
-                    var jsonString = File.ReadAllText(jsonFile);
-
-                    if (new FileInfo(jsonFile).Length > 10 * 1024)
+                    const int maxSizeBytes = 10 * 1024; // 10 KB
+                    var fileInfo = new FileInfo(jsonFile);
+                    
+                    if (fileInfo.Length > maxSizeBytes)
                     {
-                        logger.LogWarning("module.json file is too large: {Path}. Skipping", jsonFile);
+                        logger.LogError(
+                            "module.json file exceeds {MaxSize} KB limit: {Path} ({ActualSize} KB). " +
+                            "Reduce metadata size or contact support to increase limit. Skipping module",
+                            maxSizeBytes / 1024, jsonFile, fileInfo.Length / 1024);
                         continue;
                     }
+                    
+                    var jsonString = File.ReadAllText(jsonFile);
 
                     var definition = JsonSerializer.Deserialize<ModuleDefinition>(jsonString, _jsonOptions);
 
@@ -85,12 +103,21 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     var moduleDirectory = Path.GetDirectoryName(jsonFile);
                     if (moduleDirectory == null) continue;
 
-                    var dllFile = Directory.EnumerateFiles(moduleDirectory, "*.dll").FirstOrDefault();
-                    if (dllFile == null)
+                    string dllFile;
+                    if (!string.IsNullOrEmpty(definition.AssemblyFileName))
                     {
-                        logger.LogWarning(
-                            "No DLL found in the directory of {JsonFile}. Skipping module '{ModuleName}'",
-                            jsonFile, definition.Name);
+                        dllFile = Path.Combine(moduleDirectory, definition.AssemblyFileName);
+                        if (!File.Exists(dllFile))
+                        {
+                            logger.LogWarning(
+                                "Specified assembly '{Assembly}' not found for module '{ModuleName}'. Skipping",
+                                definition.AssemblyFileName, definition.Name);
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        Log.Warning("Module '{ModuleName}' should specify 'assembly' field in module.json for deterministic loading", definition.Name);
                         continue;
                     }
 

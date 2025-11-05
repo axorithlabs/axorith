@@ -1,77 +1,145 @@
-﻿using Axorith.Sdk.Settings;
+﻿using System.Reactive.Disposables;
+using System.Reactive.Disposables.Fluent;
+using System.Reactive.Linq;
+using System.Windows.Input;
+using Axorith.Sdk.Settings;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
 /// <summary>
-///     ViewModel for a single module setting, acting as a bridge between the SDK's setting definitions and the UI
-///     controls.
-///     Implements <see cref="ISettingViewModel" /> to allow setting definitions to populate it without casting.
+///     ViewModel for a single reactive module setting.
+///     It acts as a bridge between the reactive ISetting from the SDK and the Avalonia UI controls.
 /// </summary>
-public class SettingViewModel : ReactiveObject, ISettingViewModel
+public class SettingViewModel : ReactiveObject, IDisposable
 {
-    /// <summary>
-    ///     Gets the underlying setting definition from the SDK.
-    /// </summary>
-    public SettingBase Setting { get; }
-
-    private string _stringValue = string.Empty;
+    private readonly CompositeDisposable _disposables = [];
 
     /// <summary>
-    ///     The value for text-based settings. Bound to TextBox controls.
+    ///     Gets the underlying reactive setting definition from the SDK.
     /// </summary>
+    public ISetting Setting { get; }
+
+    private string _label = string.Empty;
+
+    public string Label
+    {
+        get => _label;
+        private set => this.RaiseAndSetIfChanged(ref _label, value);
+    }
+
+    private bool _isVisible = true;
+
+    public bool IsVisible
+    {
+        get => _isVisible;
+        private set => this.RaiseAndSetIfChanged(ref _isVisible, value);
+    }
+
+    private bool _isReadOnly;
+
+    public bool IsReadOnly
+    {
+        get => _isReadOnly;
+        private set => this.RaiseAndSetIfChanged(ref _isReadOnly, value);
+    }
+
+    // --- Value Properties for UI Binding ---
+
     public string StringValue
     {
-        get => _stringValue;
-        set => this.RaiseAndSetIfChanged(ref _stringValue, value);
+        get => (Setting.GetCurrentValueAsObject() as string) ?? string.Empty;
+        set => Setting.SetValueFromString(value);
     }
 
-    private bool _boolValue;
-
-    /// <summary>
-    ///     The value for boolean settings. Bound to CheckBox controls.
-    /// </summary>
     public bool BoolValue
     {
-        get => _boolValue;
-        set => this.RaiseAndSetIfChanged(ref _boolValue, value);
+        get => (Setting.GetCurrentValueAsObject() as bool?) ?? false;
+        set => Setting.SetValueFromObject(value);
     }
 
-    private decimal _decimalValue;
-
-    /// <summary>
-    ///     The value for numeric settings. Bound to NumericUpDown controls.
-    /// </summary>
     public decimal DecimalValue
     {
-        get => _decimalValue;
-        set => this.RaiseAndSetIfChanged(ref _decimalValue, value);
+        get => (Setting.GetCurrentValueAsObject() as decimal?) ?? 0;
+        set => Setting.SetValueFromObject(value);
     }
 
-    private IReadOnlyList<KeyValuePair<string, string>> _choicesValue = [];
+    // Helper to support TimeSpan serialization via seconds when saving
+    public static TimeSpan TimeSpanFromDecimal(decimal value) => TimeSpan.FromSeconds((double)value);
 
-    /// <summary>
-    ///     Gets the collection of choices for a ChoiceSetting.
-    ///     This is exposed for binding to a ComboBox's ItemsSource.
-    /// </summary>
-    public IReadOnlyList<KeyValuePair<string, string>> ChoicesValue
+    private IReadOnlyList<KeyValuePair<string, string>> _choices = [];
+
+    public IReadOnlyList<KeyValuePair<string, string>> Choices
     {
-        get => _choicesValue;
-        set => this.RaiseAndSetIfChanged(ref _choicesValue, value);
+        get => _choices;
+        private set => this.RaiseAndSetIfChanged(ref _choices, value);
     }
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SettingViewModel" /> class.
+    ///     A command that can be bound to a button click to trigger the setting's action.
     /// </summary>
-    /// <param name="setting">The setting definition from the SDK.</param>
-    /// <param name="savedSettings">The dictionary of all saved string values for the parent module.</param>
-    public SettingViewModel(SettingBase setting, IReadOnlyDictionary<string, string> savedSettings)
+    public ICommand ClickCommand { get; }
+
+    public SettingViewModel(ISetting setting)
     {
         Setting = setting;
-        savedSettings.TryGetValue(setting.Key, out var savedValue);
 
-        // The setting definition itself is responsible for parsing the saved value
-        // and populating the correct property on this ViewModel.
-        setting.InitializeViewModel(this, savedValue);
+        ClickCommand = ReactiveCommand.Create(() => { BoolValue = true; });
+
+        // Validate type mapping: ensure ControlType matches ValueType expectations
+        if (!IsControlTypeCompatibleWithValueType(setting.ControlType, setting.ValueType))
+            throw new InvalidOperationException(
+                $"Setting '{setting.Key}' ControlType '{setting.ControlType}' is incompatible with ValueType '{setting.ValueType.Name}'.");
+
+        // Subscribe to reactive properties of the setting to update the UI.
+        Setting.Label.ObserveOn(RxApp.MainThreadScheduler).Subscribe(l => Label = l).DisposeWith(_disposables);
+        Setting.IsVisible.ObserveOn(RxApp.MainThreadScheduler).Subscribe(v => IsVisible = v).DisposeWith(_disposables);
+        Setting.IsReadOnly.ObserveOn(RxApp.MainThreadScheduler).Subscribe(r => IsReadOnly = r)
+            .DisposeWith(_disposables);
+
+        // Subscribe to value changes to raise PropertyChanged for the correct UI property.
+        Setting.ValueAsObject.ObserveOn(RxApp.MainThreadScheduler).Subscribe(_ =>
+        {
+            switch (Setting.ControlType)
+            {
+                case SettingControlType.Text:
+                case SettingControlType.TextArea:
+                case SettingControlType.Secret:
+                case SettingControlType.FilePicker:
+                case SettingControlType.DirectoryPicker:
+                case SettingControlType.Choice:
+                    this.RaisePropertyChanged(nameof(StringValue));
+                    break;
+                case SettingControlType.Checkbox:
+                case SettingControlType.Button:
+                    this.RaisePropertyChanged(nameof(BoolValue));
+                    break;
+                case SettingControlType.Number:
+                    this.RaisePropertyChanged(nameof(DecimalValue));
+                    break;
+            }
+        }).DisposeWith(_disposables);
+
+        // Subscribe to choice updates if this is a Choice setting.
+        Setting.Choices?.ObserveOn(RxApp.MainThreadScheduler).Subscribe(c => Choices = c).DisposeWith(_disposables);
+    }
+
+    private static bool IsControlTypeCompatibleWithValueType(SettingControlType controlType, Type valueType)
+    {
+        return controlType switch
+        {
+            SettingControlType.Text or SettingControlType.TextArea or SettingControlType.Secret or
+                SettingControlType.FilePicker or SettingControlType.DirectoryPicker or SettingControlType.Choice
+                => valueType == typeof(string),
+            SettingControlType.Checkbox or SettingControlType.Button => valueType == typeof(bool),
+            SettingControlType.Number => valueType == typeof(decimal) || valueType == typeof(int) ||
+                                         valueType == typeof(double) || valueType == typeof(TimeSpan),
+            _ => true
+        };
+    }
+
+    public void Dispose()
+    {
+        _disposables.Dispose();
     }
 }

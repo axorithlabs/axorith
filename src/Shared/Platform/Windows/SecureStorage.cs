@@ -1,4 +1,4 @@
-﻿using System.Runtime.Versioning;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using Axorith.Sdk.Services;
@@ -49,12 +49,25 @@ public class SecureStorage : ISecureStorageService
             var secretBytes = ProtectedData.Unprotect(encryptedBytes, s_entropy, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(secretBytes);
         }
-        catch (CryptographicException)
+        catch (CryptographicException ex)
         {
-            // This can happen if the data is corrupt, from another user, or another machine.
-            // We treat it as if the secret doesn't exist for security.
+            // Decryption failed, the data may be corrupted or tampered with.
+            // Log warning with sanitized context (no secret values exposed)
+            Console.WriteLine($"Warning: Failed to decrypt secret for key '{key}'. " +
+                            $"File: {Path.GetFileName(filePath)}, " +
+                            $"Size: {new FileInfo(filePath).Length} bytes. " +
+                            $"Error: {ex.Message}. " +
+                            "The data may be corrupted or encrypted under a different user account.");
             return null;
         }
+    }
+
+    /// <inheritdoc />
+    public void DeleteSecret(string key)
+    {
+        var filePath = GetFilePathForKey(key);
+        if (File.Exists(filePath))
+            File.Delete(filePath);
     }
 
     /// <summary>
