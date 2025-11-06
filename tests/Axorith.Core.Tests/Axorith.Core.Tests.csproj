@@ -33,5 +33,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
+        <ProjectReference Include="..\..\src\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
     </ItemGroup>    
 </Project>

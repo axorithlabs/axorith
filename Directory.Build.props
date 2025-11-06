@@ -1,4 +1,4 @@
-﻿<Project>
+<Project>
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -9,17 +9,23 @@
         <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
 
         <BaseOutputPath>$(SolutionDir)build\</BaseOutputPath>
-        <BaseIntermediateOutputPath>$(BaseOutputPath)\$(Configuration)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+        <OutputPath>$(BaseOutputPath)$(Configuration)\$(MSBuildProjectName)\$(TargetFramework)\</OutputPath>
+        <BaseIntermediateOutputPath>$(BaseOutputPath)$(Configuration)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
         <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
-        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-        
+
         <Version Condition="'$(Version)' == ''">0.0.1-alpha</Version>
 
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <WarningsAsErrors Condition="'$(GenerateDocumentationFile)' == 'true'">$(WarningsAsErrors);CS1591</WarningsAsErrors>
 
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    </PropertyGroup>
+
+    <!-- Ensure all test dependencies are copied to output to avoid runtime FileNotFoundException in CI -->
+    <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 </Project>
