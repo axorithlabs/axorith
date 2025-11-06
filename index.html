@@ -1,6 +1,13 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- HTTPS Redirect -->
+    <script>
+    if (location.protocol !== 'https:') {
+        location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+    }
+    </script>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
