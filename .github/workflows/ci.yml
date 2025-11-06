@@ -50,7 +50,7 @@ jobs:
     - name: Run unit tests with coverage (exclude Integration)
       run: >
         dotnet test ${{ env.SOLUTION_PATH }}
-        --configuration Release --no-build --verbosity normal
+        --configuration Release --verbosity normal
         --collect:"XPlat Code Coverage"
         --filter "Category!=Integration"
         --results-directory ./coverage/${{ matrix.os }}/unit
@@ -116,7 +116,7 @@ jobs:
     - name: Run integration tests (Category=Integration)
       run: >
         dotnet test ${{ env.SOLUTION_PATH }}
-        --configuration Release --no-build --verbosity normal
+        --configuration Release --verbosity normal
         --filter "Category=Integration"
         --results-directory ./coverage/windows-latest/integration
         --logger "trx;LogFileName=test-results.trx"
