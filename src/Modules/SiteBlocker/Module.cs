@@ -1,10 +1,10 @@
-﻿using System.IO.Pipes;
+using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
-using Axorith.Sdk.Actions;
 
 namespace Axorith.Module.SiteBlocker;
 
@@ -138,7 +138,31 @@ public class Module : IModule
         _logger.LogWarning(
             "Disposing module while sites are still blocked. Attempting to send final unblock command.");
         var message = new { command = "unblock" };
-        // Fire-and-forget the async method in a synchronous context.
-        _ = WriteToPipeAsync(message);
+
+        try
+        {
+            // Fire-and-forget async cleanup to avoid blocking the calling thread
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var task = WriteToPipeAsync(message);
+                    if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false) != task)
+                        _logger.LogWarning("Unblock command timed out during disposal");
+                }
+                catch (Exception)
+                {
+                    _logger.LogWarning("Failed to send unblock command during disposal");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send unblock command during disposal");
+        }
+        finally
+        {
+            _activeBlockedSites.Clear();
+        }
     }
 }

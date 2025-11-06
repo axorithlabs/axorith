@@ -2,9 +2,9 @@
 
 using System.Diagnostics;
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
-using Axorith.Sdk.Actions;
 using Axorith.Shared.Platform.Windows;
 
 #endregion
@@ -21,7 +21,7 @@ public class Module : IModule
     private readonly Setting<string> _applicationPath;
     private readonly Setting<string> _applicationArgs;
     private readonly Setting<decimal> _monitorIndex;
-    
+
     private Process? _currentProcess;
 
     public Module(IModuleLogger logger)
@@ -54,7 +54,8 @@ public class Module : IModule
     /// <inheritdoc />
     public IReadOnlyList<ISetting> GetSettings()
     {
-        return [
+        return
+        [
             _applicationPath,
             _applicationArgs,
             _monitorIndex
@@ -96,7 +97,8 @@ public class Module : IModule
     {
         try
         {
-            _logger.LogDebug("Attempting to start process: {Path} {Args}", _applicationPath.GetCurrentValue(), _applicationArgs.GetCurrentValue());
+            _logger.LogDebug("Attempting to start process: {Path} {Args}", _applicationPath.GetCurrentValue(),
+                _applicationArgs.GetCurrentValue());
             _currentProcess = new Process();
             _currentProcess.StartInfo.FileName = _applicationPath.GetCurrentValue();
             _currentProcess.StartInfo.Arguments = _applicationArgs.GetCurrentValue();

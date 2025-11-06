@@ -1,4 +1,4 @@
-﻿using System.IO.Pipes;
+using System.IO.Pipes;
 using System.Text;
 
 namespace Axorith.Shim;
@@ -74,10 +74,17 @@ internal static class Program
     {
         try
         {
-            var errorLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Axorith",
-                "logs", "shim_error.log");
-            var errorMessage = $"{DateTime.Now}: {(context != null ? $"[{context}] " : "")}{ex}\n";
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var logsDir = Path.Combine(appDataPath, "Axorith", "logs");
+            var errorLogPath = Path.Combine(logsDir, "shim_error.log");
+
+            Directory.CreateDirectory(logsDir);
+
+            var errorMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
+                               $"{(context != null ? $"[{context}] " : "")}" +
+                               $"{ex.GetType().Name}: {ex.Message}\n" +
+                               $"StackTrace: {ex.StackTrace}\n\n";
+
             File.AppendAllText(errorLogPath, errorMessage);
         }
         catch

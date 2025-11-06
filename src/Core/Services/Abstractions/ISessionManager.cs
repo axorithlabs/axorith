@@ -1,11 +1,11 @@
-﻿using Axorith.Core.Models;
+using Axorith.Core.Models;
 
 namespace Axorith.Core.Services.Abstractions;
 
 /// <summary>
 ///     Defines a service for managing the lifecycle of a deep work session.
 /// </summary>
-public interface ISessionManager
+public interface ISessionManager : IAsyncDisposable
 {
     /// <summary>
     ///     Gets a value indicating whether a session is currently active.

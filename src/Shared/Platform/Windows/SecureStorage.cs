@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -53,7 +54,7 @@ public class SecureStorage : ISecureStorageService
         {
             // Decryption failed, the data may be corrupted or tampered with.
             // Log warning with sanitized context (no secret values exposed)
-            Console.WriteLine($"Warning: Failed to decrypt secret for key '{key}'. " +
+            Debug.WriteLine($"[SecureStorage] Warning: Failed to decrypt secret for key '{key}'. " +
                             $"File: {Path.GetFileName(filePath)}, " +
                             $"Size: {new FileInfo(filePath).Length} bytes. " +
                             $"Error: {ex.Message}. " +

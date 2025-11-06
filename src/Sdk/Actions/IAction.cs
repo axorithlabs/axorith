@@ -33,5 +33,3 @@ public interface IAction
     /// </summary>
     void Invoke();
 }
-
-

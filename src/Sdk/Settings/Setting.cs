@@ -140,14 +140,13 @@ public abstract class Setting
     {
         return new Setting<TimeSpan>(key, label, description, defaultValue, SettingControlType.Number, isVisible,
             isReadOnly, SettingPersistence.Persisted, ts => ts.TotalSeconds.ToString(CultureInfo.InvariantCulture), s =>
-            double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var sec)
-                ? TimeSpan.FromSeconds(sec)
-                : defaultValue);
+                double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var sec)
+                    ? TimeSpan.FromSeconds(sec)
+                    : defaultValue);
     }
 
     /// <summary>
     ///     Creates a setting that is rendered as a dropdown/choice list.
-    ///     
     ///     IMPORTANT: The setting value must always be the KEY from the KeyValuePair, not the display name.
     ///     - Key: The actual value stored in the setting (e.g., "true", "context", "device_id_123")
     ///     - Value: The display text shown to the user (e.g., "On", "Repeat Playlist", "Laptop Speakers")
@@ -273,7 +272,6 @@ public abstract class Setting
 /// <summary>
 ///     A strongly-typed, reactive representation of a single module setting.
 ///     This class encapsulates its value, UI metadata, and reactive state.
-///     
 ///     THREAD-SAFETY:
 ///     - All methods (SetValue, SetLabel, SetVisibility, etc.) are thread-safe and can be called from any thread.
 ///     - Observable subscriptions should use ObserveOn(RxApp.MainThreadScheduler) in UI code to marshal to UI thread.
@@ -360,7 +358,6 @@ public class Setting<T> : ISetting
         {
             // Special cases
             if (typeof(T) == typeof(TimeSpan))
-            {
                 // Interpret as seconds
                 if (value is IConvertible)
                 {
@@ -368,13 +365,11 @@ public class Setting<T> : ISetting
                     _value.OnNext((T)(object)TimeSpan.FromSeconds(seconds));
                     return;
                 }
-            }
 
             if (value is IConvertible)
             {
                 var converted = (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
                 _value.OnNext(converted);
-                return;
             }
         }
         catch
@@ -387,6 +382,11 @@ public class Setting<T> : ISetting
         bool isVisible, bool isReadOnly, SettingPersistence persistence, Func<T, string> serializer,
         Func<string?, T> deserializer)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key, nameof(key));
+        ArgumentException.ThrowIfNullOrWhiteSpace(label, nameof(label));
+        ArgumentNullException.ThrowIfNull(serializer, nameof(serializer));
+        ArgumentNullException.ThrowIfNull(deserializer, nameof(deserializer));
+
         Key = key;
         Description = description;
         ControlType = controlType;
@@ -402,6 +402,7 @@ public class Setting<T> : ISetting
 
     internal void InitializeChoices(IReadOnlyList<KeyValuePair<string, string>> initialChoices)
     {
+        ArgumentNullException.ThrowIfNull(initialChoices, nameof(initialChoices));
         _choices = new BehaviorSubject<IReadOnlyList<KeyValuePair<string, string>>>(initialChoices);
     }
 
@@ -426,7 +427,18 @@ public class Setting<T> : ISetting
     /// </summary>
     public void SetLabel(string newLabel)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newLabel, nameof(newLabel));
         _label.OnNext(newLabel);
+    }
+
+    /// <summary>
+    ///     Dynamically updates the available choices for a Choice setting.
+    /// </summary>
+    public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> newChoices)
+    {
+        ArgumentNullException.ThrowIfNull(newChoices, nameof(newChoices));
+        // Allow empty lists to support clearing dropdowns or error states
+        _choices?.OnNext(newChoices);
     }
 
     /// <summary>
@@ -443,14 +455,6 @@ public class Setting<T> : ISetting
     public void SetReadOnly(bool isReadOnly)
     {
         _isReadOnly.OnNext(isReadOnly);
-    }
-
-    /// <summary>
-    ///     Dynamically updates the list of available choices for a 'Choice' setting.
-    /// </summary>
-    public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> newChoices)
-    {
-        _choices?.OnNext(newChoices);
     }
 
     /// <inheritdoc />

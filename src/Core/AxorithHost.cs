@@ -18,7 +18,7 @@ using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 namespace Axorith.Core;
 
-public sealed class AxorithHost : IDisposable
+public sealed class AxorithHost : IDisposable, IAsyncDisposable
 {
     private readonly IHost _host;
 
@@ -54,7 +54,7 @@ public sealed class AxorithHost : IDisposable
             .Enrich.With<ModuleContextEnricher>()
             .WriteTo.Console(outputTemplate: outputTemplate)
             .WriteTo.Debug(outputTemplate: outputTemplate)
-            .WriteTo.File(logPath, 
+            .WriteTo.File(logPath,
                 rollingInterval: RollingInterval.Day,
                 fileSizeLimitBytes: 10 * 1024 * 1024, // 10 MB per file
                 retainedFileCountLimit: 30, // Keep last 30 files
@@ -74,6 +74,9 @@ public sealed class AxorithHost : IDisposable
                 {
                     services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
 
+                    // NOTE: Circuit breaker is shared across all modules.
+                    // If one module repeatedly fails, it can affect others.
+                    // Consider using named clients per module for better isolation.
                     services.AddHttpClient("default")
                         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler())
                         .AddPolicyHandler(GetRetryPolicy())
@@ -105,7 +108,7 @@ public sealed class AxorithHost : IDisposable
             hostLogger.Information("Initializing module registry...");
 
             if (host.Services.GetRequiredService<IModuleRegistry>() is ModuleRegistry moduleRegistry)
-                await moduleRegistry.InitializeAsync(cancellationToken);
+                await moduleRegistry.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
             stepSw.Stop();
             hostLogger.Information("Module registry initialized in {ElapsedMs} ms", stepSw.ElapsedMilliseconds);
@@ -146,6 +149,16 @@ public sealed class AxorithHost : IDisposable
     public void Dispose()
     {
         _host.Dispose();
+
+        Log.CloseAndFlush();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_host is IAsyncDisposable hostAsyncDisposable)
+            await hostAsyncDisposable.DisposeAsync();
+        else
+            _host.Dispose();
 
         Log.CloseAndFlush();
     }

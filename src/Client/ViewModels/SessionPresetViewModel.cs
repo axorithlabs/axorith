@@ -8,13 +8,11 @@ namespace Axorith.Client.ViewModels;
 /// <summary>
 ///     A ViewModel wrapper for a SessionPreset model, responsible for preparing data for the View.
 /// </summary>
-public class SessionPresetViewModel : ReactiveObject
+public class SessionPresetViewModel : ReactiveObject, IDisposable
 {
-    private readonly SessionPreset _model;
-
-    public Guid Id => _model.Id;
-    public string Name => _model.Name;
-    public SessionPreset Model => _model;
+    public Guid Id => Model.Id;
+    public string Name => Model.Name;
+    public SessionPreset Model { get; }
 
     /// <summary>
     ///     A collection of ViewModels for the configured modules, used to display rich information in the UI.
@@ -23,7 +21,7 @@ public class SessionPresetViewModel : ReactiveObject
 
     public SessionPresetViewModel(SessionPreset model, IModuleRegistry moduleRegistry)
     {
-        _model = model;
+        Model = model;
 
         // Create a ViewModel for each module in the preset to get access to display-friendly properties.
         var moduleVms = model.Modules
@@ -36,5 +34,12 @@ public class SessionPresetViewModel : ReactiveObject
 
         foreach (var vm in moduleVms)
             Modules.Add(vm!);
+    }
+
+    public void Dispose()
+    {
+        foreach (var vm in Modules)
+            vm.Dispose();
+        Modules.Clear();
     }
 }

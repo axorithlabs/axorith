@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Axorith.Shared.Platform.Windows;
@@ -24,13 +24,18 @@ public static class WindowApi
 
         if (windowHandle == IntPtr.Zero) throw new InvalidOperationException("Process has no main window.");
 
-        NativeApi.GetWindowRect(windowHandle, out var currentRect);
+        if (!NativeApi.GetWindowRect(windowHandle, out var currentRect))
+            throw new InvalidOperationException($"Failed to get window rect. Error: {Marshal.GetLastWin32Error()}");
+
         var width = currentRect.Right - currentRect.Left;
         var height = currentRect.Bottom - currentRect.Top;
 
         var target = monitors[monitorIndex];
 
-        NativeApi.GetWindowPlacement(windowHandle, out var placement);
+        if (!NativeApi.GetWindowPlacement(windowHandle, out var placement))
+            throw new InvalidOperationException(
+                $"Failed to get window placement. Error: {Marshal.GetLastWin32Error()}");
+
         placement.Length = Marshal.SizeOf(typeof(NativeApi.WINDOWPLACEMENT));
         placement.ShowCmd = NativeApi.SW_SHOWNORMAL;
         placement.NormalPosition = new NativeApi.RECT
@@ -40,7 +45,10 @@ public static class WindowApi
             Right = target.Left + width,
             Bottom = target.Top + height
         };
-        NativeApi.SetWindowPlacement(windowHandle, ref placement);
+
+        if (!NativeApi.SetWindowPlacement(windowHandle, ref placement))
+            throw new InvalidOperationException(
+                $"Failed to set window placement. Error: {Marshal.GetLastWin32Error()}");
     }
 
     /// <summary>

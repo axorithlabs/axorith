@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Axorith.Core.Services.Abstractions;
@@ -19,7 +20,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
     };
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(IEnumerable<string> searchPaths,
+    public async Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(IEnumerable<string> searchPaths,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Starting module definition discovery from 'module.json' files...");
@@ -49,12 +50,12 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             var enumerationOptions = new EnumerationOptions
             {
                 RecurseSubdirectories = false,
-                AttributesToSkip = System.Diagnostics.Debugger.IsAttached 
-                    ? FileAttributes.System 
+                AttributesToSkip = Debugger.IsAttached
+                    ? FileAttributes.System
                     : FileAttributes.System | FileAttributes.ReparsePoint
             };
 
-            if (System.Diagnostics.Debugger.IsAttached)
+            if (Debugger.IsAttached)
                 logger.LogDebug("Development mode: Symlinked module directories are allowed");
 
             var moduleDirectories = Directory.EnumerateDirectories(path, "*", enumerationOptions);
@@ -70,7 +71,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                 {
                     const int maxSizeBytes = 10 * 1024; // 10 KB
                     var fileInfo = new FileInfo(jsonFile);
-                    
+
                     if (fileInfo.Length > maxSizeBytes)
                     {
                         logger.LogError(
@@ -79,8 +80,8 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                             maxSizeBytes / 1024, jsonFile, fileInfo.Length / 1024);
                         continue;
                     }
-                    
-                    var jsonString = File.ReadAllText(jsonFile);
+
+                    var jsonString = await File.ReadAllTextAsync(jsonFile, cancellationToken).ConfigureAwait(false);
 
                     var definition = JsonSerializer.Deserialize<ModuleDefinition>(jsonString, _jsonOptions);
 
@@ -117,32 +118,53 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     }
                     else
                     {
-                        Log.Warning("Module '{ModuleName}' should specify 'assembly' field in module.json for deterministic loading", definition.Name);
+                        Log.Warning(
+                            "Module '{ModuleName}' should specify 'assembly' field in module.json for deterministic loading",
+                            definition.Name);
                         continue;
                     }
 
-                    var loadContext = new ModuleAssemblyLoadContext(dllFile);
-                    var assembly = loadContext.LoadFromAssemblyPath(dllFile);
-                    var moduleType = assembly.GetExportedTypes()
-                        .FirstOrDefault(t => typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-
-                    if (moduleType != null)
+                    ModuleAssemblyLoadContext? loadContext = null;
+                    try
                     {
-                        definition.LoadContext = loadContext;
-                        definition.ModuleType = moduleType;
+                        loadContext = new ModuleAssemblyLoadContext(dllFile);
+                        var assembly = loadContext.LoadFromAssemblyPath(dllFile);
+                        var moduleType = assembly.GetExportedTypes()
+                            .FirstOrDefault(t =>
+                                typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
 
-                        definitions.Add(definition);
+                        if (moduleType != null)
+                        {
+                            definition.LoadContext = loadContext;
+                            definition.ModuleType = moduleType;
 
-                        logger.LogInformation("Discovered module definition '{ModuleName}' from {DllFile}",
-                            definition.Name, Path.GetFileName(dllFile));
+                            definitions.Add(definition);
+
+                            logger.LogInformation("Discovered module definition '{ModuleName}' from {DllFile}",
+                                definition.Name, Path.GetFileName(dllFile));
+
+                            loadContext = null; // Ownership transferred, don't unload
+                        }
+                        else
+                        {
+                            logger.LogWarning(
+                                "DLL {DllFile} does not contain a public class implementing IModule. Skipping module '{ModuleName}'",
+                                Path.GetFileName(dllFile), definition.Name);
+                        }
                     }
-                    else
+                    finally
                     {
-                        logger.LogWarning(
-                            "DLL {DllFile} does not contain a public class implementing IModule. Skipping module '{ModuleName}'",
-                            Path.GetFileName(dllFile), definition.Name);
-
-                        loadContext.Unload();
+                        // Unload if ownership was not transferred
+                        if (loadContext != null)
+                            try
+                            {
+                                loadContext.Unload();
+                            }
+                            catch (Exception unloadEx)
+                            {
+                                logger.LogError(unloadEx, "Failed to unload assembly context for {DllFile}",
+                                    Path.GetFileName(dllFile));
+                            }
                     }
                 }
                 catch (JsonException jsonEx)
@@ -158,6 +180,6 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 
         logger.LogInformation("Module discovery finished. Found {Count} compatible module definitions",
             definitions.Count);
-        return Task.FromResult<IReadOnlyList<ModuleDefinition>>(definitions);
+        return definitions;
     }
 }

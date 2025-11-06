@@ -6,13 +6,12 @@ using System.Reactive.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
-using Axorith.Sdk.Actions;
 using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.Spotify;
@@ -30,6 +29,11 @@ public class Module : IModule
     private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
     private string? _inMemoryAccessToken;
 
+    private IReadOnlyList<KeyValuePair<string, string>> _currentDeviceChoices =
+        Array.Empty<KeyValuePair<string, string>>();
+
+    private readonly Dictionary<string, string> _knownDevices = new(StringComparer.OrdinalIgnoreCase);
+
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string CustomUrlValue = "custom";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d"; // Public client ID for Axorith
@@ -37,6 +41,9 @@ public class Module : IModule
 
     // --- Actions ---
     private readonly Action _loginAction;
+
+    private readonly Action _logoutAction;
+
     // --- Settings Definition ---
     private readonly Setting<string> _authStatus;
     private readonly Setting<string> _targetDevice;
@@ -56,15 +63,16 @@ public class Module : IModule
 
         // --- Actions Initialization ---
         _loginAction = Action.Create(key: "Login", label: "Login to Spotify");
+        _logoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
         // --- Settings Initialization ---
         _authStatus = Setting.AsText(key: "AuthStatus", label: "Authentication", defaultValue: "", isReadOnly: true);
 
         _targetDevice = Setting.AsChoice(key: "TargetDevice", label: "Target Device", defaultValue: "",
-            initialChoices: [], description: "Device to start playback on.", isVisible: false);
+            initialChoices: [], description: "Device to start playback on.");
         _playbackContext = Setting.AsChoice(key: "PlaybackContext", label: "Playback Source",
             defaultValue: CustomUrlValue,
             initialChoices: [new KeyValuePair<string, string>(CustomUrlValue, "Enter a custom URL...")],
-            description: "Select a source or enter a custom URL.", isVisible: false);
+            description: "Select a source or enter a custom URL.");
         _customUrl = Setting.AsText(key: "CustomUrl", label: "Custom URL", defaultValue: "",
             description: "URL of the track, playlist, or album to play.", isVisible: false);
 
@@ -94,30 +102,39 @@ public class Module : IModule
             UpdateUiForAuthenticationState(success);
             if (success) _ = LoadDynamicChoicesAsync();
         }).DisposeWith(_disposables);
+
+        _logoutAction.Invoked.Subscribe(_ =>
+        {
+            Logout();
+            UpdateUiForAuthenticationState(false);
+        }).DisposeWith(_disposables);
     }
 
     private void UpdateUiForAuthenticationState(bool isAuthenticated)
     {
         if (isAuthenticated)
         {
-            _authStatus.SetValue("Authenticated");
+            _authStatus.SetValue("Authenticated ✓");
             _loginAction.SetLabel("Re-Login with Spotify");
         }
         else
         {
-            _authStatus.SetValue("Login required");
+            _authStatus.SetValue("⚠ Login required");
             _loginAction.SetLabel("Login to Spotify");
         }
 
-        _targetDevice.SetVisibility(isAuthenticated);
-        _playbackContext.SetVisibility(isAuthenticated);
+        _logoutAction.SetEnabled(isAuthenticated);
+        _customUrl.SetVisibility(_playbackContext.GetCurrentValue() == CustomUrlValue);
     }
 
     /// <inheritdoc />
     public Type? CustomSettingsViewType => null;
 
     /// <inheritdoc />
-    public object? GetSettingsViewModel() => null;
+    public object? GetSettingsViewModel()
+    {
+        return null;
+    }
 
     public IReadOnlyList<ISetting> GetSettings()
     {
@@ -130,7 +147,7 @@ public class Module : IModule
 
     public IReadOnlyList<IAction> GetActions()
     {
-        return [_loginAction];
+        return [_loginAction, _logoutAction];
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
@@ -147,7 +164,8 @@ public class Module : IModule
         var accessToken = await GetValidAccessTokenAsync();
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            _logger.LogError(null, "Could not obtain a valid Spotify Access Token. Please login via the module settings.");
+            _logger.LogError(null,
+                "Could not obtain a valid Spotify Access Token. Please login via the module settings.");
             return;
         }
 
@@ -194,14 +212,22 @@ public class Module : IModule
 
     public async Task OnSessionEndAsync()
     {
-        var accessToken = await GetValidAccessTokenAsync();
-        if (string.IsNullOrWhiteSpace(accessToken)) return;
-        _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
+        try
+        {
+            var accessToken = await GetValidAccessTokenAsync();
+            if (string.IsNullOrWhiteSpace(accessToken)) return;
+            _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
 
-        var deviceId = _targetDevice.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(deviceId)) return;
+            var deviceId = _targetDevice.GetCurrentValue();
+            if (string.IsNullOrWhiteSpace(deviceId)) return;
 
-        await StopPlaybackAsync(deviceId);
+            await StopPlaybackAsync(deviceId);
+        }
+        catch (Exception)
+        {
+            _logger.LogWarning("Failed to stop Spotify playback during session end");
+            // Suppress exception to avoid breaking ReactiveUI pipeline
+        }
     }
 
     public void Dispose()
@@ -211,7 +237,7 @@ public class Module : IModule
     }
 
     /// <summary>
-    /// Logout and clear all stored tokens.
+    ///     Logout and clear all stored tokens.
     /// </summary>
     public void Logout()
     {
@@ -237,12 +263,12 @@ public class Module : IModule
         try
         {
             var devices = await GetAvailableDevicesAsync();
-            _targetDevice.SetChoices(devices);
-            _logger.LogInfo("Successfully loaded {Count} devices from Spotify.", devices.Count);
+            UpdateDeviceChoices(devices);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load Spotify devices.");
+            UpdateDeviceChoices(Array.Empty<KeyValuePair<string, string>>());
         }
     }
 
@@ -255,6 +281,38 @@ public class Module : IModule
                 d.GetProperty("id").GetString() ?? "",
                 $"{d.GetProperty("name").GetString()} ({d.GetProperty("type").GetString()})"))
             .ToList();
+    }
+
+    private void UpdateDeviceChoices(IReadOnlyList<KeyValuePair<string, string>> freshDevices)
+    {
+        var merged = new List<KeyValuePair<string, string>>();
+
+        foreach (var (id, label) in freshDevices)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            _knownDevices[id] = label;
+            merged.Add(new KeyValuePair<string, string>(id, label));
+        }
+
+        var selectedDeviceId = _targetDevice.GetCurrentValue();
+        if (!string.IsNullOrWhiteSpace(selectedDeviceId) && merged.All(d => d.Key != selectedDeviceId))
+        {
+            var offlineLabel = _knownDevices.TryGetValue(selectedDeviceId, out var knownName)
+                ? $"{knownName} (offline)"
+                : "Previously selected device (offline)";
+            merged.Insert(0, new KeyValuePair<string, string>(selectedDeviceId, offlineLabel));
+        }
+
+        if (merged.Count == 0)
+            merged.Add(new KeyValuePair<string, string>(string.Empty,
+                "No active devices found. Start Spotify on a device to enable playback."));
+
+        _currentDeviceChoices = merged;
+        _targetDevice.SetChoices(merged);
+        _logger.LogInfo("Device choices updated. Active: {Active}, Selected: {Selected}",
+            merged.Count, selectedDeviceId ?? "<none>");
     }
 
     private async Task LoadPlayableItemsAsync()
@@ -327,7 +385,8 @@ public class Module : IModule
                     { "client_id", SpotifyClientId }
                 });
 
-                var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token", await content.ReadAsStringAsync(),
+                var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
+                    await content.ReadAsStringAsync(),
                     Encoding.UTF8, "application/x-www-form-urlencoded");
                 using var jsonDoc = JsonDocument.Parse(responseJson);
                 var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
@@ -355,7 +414,8 @@ public class Module : IModule
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to refresh token. The refresh token might be invalid. Please login again.");
+                _logger.LogError(ex,
+                    "Failed to refresh token. The refresh token might be invalid. Please login again.");
                 UpdateUiForAuthenticationState(false);
                 return null;
             }
@@ -379,11 +439,11 @@ public class Module : IModule
             var scopes =
                 "user-modify-playback-state user-read-playback-state user-read-private playlist-read-private user-library-read";
             var authUrl = $"https://accounts.spotify.com/authorize?client_id={SpotifyClientId}" +
-                        "&response_type=code" +
-                        $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
-                        $"&scope={Uri.EscapeDataString(scopes)}" +
-                        "&code_challenge_method=S256" +
-                        $"&code_challenge={codeChallenge}";
+                          "&response_type=code" +
+                          $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
+                          $"&scope={Uri.EscapeDataString(scopes)}" +
+                          "&code_challenge_method=S256" +
+                          $"&code_challenge={codeChallenge}";
 
             try
             {
@@ -393,16 +453,32 @@ public class Module : IModule
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to open browser automatically. Please copy and paste this URL into your browser: {Url}", authUrl);
+                _logger.LogError(ex,
+                    "Failed to open browser automatically. Please copy and paste this URL into your browser: {Url}",
+                    authUrl);
                 _authStatus.SetValue("Error: Could not open browser. See logs.");
                 return false;
             }
 
-            var context = await listener.GetContextAsync();
+            // Wait for OAuth callback with 5 minute timeout
+            var contextTask = listener.GetContextAsync();
+            var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
+            var completedTask = await Task.WhenAny(contextTask, timeoutTask).ConfigureAwait(false);
+
+            if (completedTask == timeoutTask)
+            {
+                _logger.LogWarning("Spotify authentication timed out after 5 minutes");
+                _authStatus.SetValue("Error: Authentication timed out");
+                listener.Stop();
+                return false;
+            }
+
+            var context = await contextTask.ConfigureAwait(false);
             var code = context.Request.QueryString.Get("code");
 
             var response = context.Response;
-            var buffer = "<html><body><h1>Success!</h1><p>You can now close this browser tab.</p></body></html>"u8.ToArray();
+            var buffer = "<html><body><h1>Success!</h1><p>You can now close this browser tab.</p></body></html>"u8
+                .ToArray();
             response.ContentLength64 = buffer.Length;
             await response.OutputStream.WriteAsync(buffer);
             response.OutputStream.Close();
@@ -418,19 +494,19 @@ public class Module : IModule
                 { "client_id", SpotifyClientId },
                 { "code_verifier", codeVerifier }
             });
-            
-            var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token", await content.ReadAsStringAsync(),
+
+            var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
+                await content.ReadAsStringAsync(),
                 Encoding.UTF8, "application/x-www-form-urlencoded");
 
             using var jsonDoc = JsonDocument.Parse(responseJson);
             var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();
 
             if (string.IsNullOrWhiteSpace(refreshToken)) return false;
-            
+
             _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
             _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
             return true;
-
         }
         catch (Exception ex)
         {

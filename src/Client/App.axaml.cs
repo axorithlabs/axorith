@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Axorith.Client.ViewModels;
@@ -37,57 +37,70 @@ public class App : Application
     ///     4. Creating and displaying the main window with its shell ViewModel.
     ///     5. Registering a handler for graceful shutdown of the core host.
     /// </summary>
-    public override async void OnFrameworkInitializationCompleted()
+    public override void OnFrameworkInitializationCompleted()
     {
-        var services = new ServiceCollection();
-        await ConfigureServicesAsync(services);
-        Services = services.BuildServiceProvider();
-
-        // Resolve the main shell and the initial page (dashboard)
-        var shellViewModel = Services.GetRequiredService<ShellViewModel>();
-        var mainViewModel = Services.GetRequiredService<MainViewModel>();
-
-        // Load initial data for the dashboard before showing it
-        await mainViewModel.InitializeAsync();
-
-        // Set the initial page in the shell
-        shellViewModel.Content = mainViewModel;
-
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
         {
+            base.OnFrameworkInitializationCompleted();
+            return;
+        }
+
+        try
+        {
+            // Create services synchronously to avoid race condition
+            var services = new ServiceCollection();
+            var host = AxorithHost.CreateAsync().GetAwaiter().GetResult();
+
+            services.AddSingleton(host);
+            services.AddSingleton(host.Sessions);
+            services.AddSingleton(host.Presets);
+            services.AddSingleton(host.Modules);
+            services.AddSingleton<ShellViewModel>();
+            services.AddTransient<MainViewModel>();
+            services.AddTransient<SessionEditorViewModel>();
+
+            Services = services.BuildServiceProvider();
+
+            // Create shell and window synchronously
+            var shellViewModel = Services.GetRequiredService<ShellViewModel>();
+            var mainViewModel = Services.GetRequiredService<MainViewModel>();
+
+            shellViewModel.Content = mainViewModel;
+
             desktop.MainWindow = new MainWindow
             {
                 DataContext = shellViewModel
             };
 
-            // Ensure the core host is properly disposed of when the application closes
-            desktop.ShutdownRequested += (_, _) =>
+            // Register shutdown handler
+            desktop.ShutdownRequested += async (_, e) =>
             {
-                if (Services.GetService<AxorithHost>() is IDisposable host) host.Dispose();
+                var hostService = Services.GetService<AxorithHost>();
+                if (hostService is IAsyncDisposable asyncDisposable)
+                {
+                    e.Cancel = true;
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt)
+                        lt.Shutdown();
+                }
+                else if (hostService is IDisposable disposable)
+                {
+                    e.Cancel = true;
+                    disposable.Dispose();
+                    if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lt)
+                        lt.Shutdown();
+                }
             };
+
+            // Load data asynchronously after window is shown
+            _ = mainViewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Critical initialization error: {ex}");
+            Environment.Exit(1);
         }
 
         base.OnFrameworkInitializationCompleted();
-    }
-
-    /// <summary>
-    ///     Configures the dependency injection container for the application.
-    /// </summary>
-    /// <param name="services">The service collection to configure.</param>
-    private async Task ConfigureServicesAsync(IServiceCollection services)
-    {
-        // Asynchronously create the core host, which handles all business logic.
-        var host = await AxorithHost.CreateAsync();
-
-        // Register the host and its services as singletons.
-        services.AddSingleton(host);
-        services.AddSingleton(host.Sessions);
-        services.AddSingleton(host.Presets);
-        services.AddSingleton(host.Modules);
-
-        // Register ViewModels. The Shell is a singleton, pages are transient.
-        services.AddSingleton<ShellViewModel>();
-        services.AddTransient<MainViewModel>();
-        services.AddTransient<SessionEditorViewModel>();
     }
 }

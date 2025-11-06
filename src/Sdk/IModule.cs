@@ -1,5 +1,5 @@
-using Axorith.Sdk.Settings;
 using Axorith.Sdk.Actions;
+using Axorith.Sdk.Settings;
 
 namespace Axorith.Sdk;
 
@@ -8,7 +8,6 @@ namespace Axorith.Sdk;
 ///     A module represents a disposable, stateful component that executes tasks during a session.
 ///     A new instance of a module is created by the Core for each session it participates in,
 ///     and its <see cref="IDisposable.Dispose" /> method is called upon session completion.
-///     
 ///     IMPORTANT: Module constructors should be lightweight and side-effect free.
 ///     - Do NOT perform heavy initialization, network calls, or file I/O in the constructor.
 ///     - Use InitializeAsync() for lazy loading of resources (called on design-time).

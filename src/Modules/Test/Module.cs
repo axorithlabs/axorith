@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
-using Axorith.Sdk.Actions;
 
 namespace Axorith.Module.Test;
 
@@ -70,7 +70,8 @@ public class Module : IModule
             label: "Processing Mode",
             description: "Choose the processing algorithm.",
             defaultValue: "balanced",
-            initialChoices: [
+            initialChoices:
+            [
                 new KeyValuePair<string, string>("fast", "Fast Mode"),
                 new KeyValuePair<string, string>("accurate", "Accurate Mode"),
                 new KeyValuePair<string, string>("balanced", "Balanced (Default)")
@@ -106,7 +107,8 @@ public class Module : IModule
     /// <inheritdoc />
     public IReadOnlyList<ISetting> GetSettings()
     {
-        return [
+        return
+        [
             _greetingMessage,
             _enableExtraLogging,
             _workDurationSeconds,
@@ -137,7 +139,8 @@ public class Module : IModule
     {
         // If the value exists, ensure it's a non-negative number.
         if (_workDurationSeconds.GetCurrentValue() < 0)
-            return Task.FromResult(ValidationResult.Fail($"{_workDurationSeconds.Label} must be a non-negative number."));
+            return Task.FromResult(
+                ValidationResult.Fail($"{_workDurationSeconds.Label} must be a non-negative number."));
 
         return Task.FromResult(ValidationResult.Success);
     }
@@ -149,7 +152,8 @@ public class Module : IModule
 
         if (_enableExtraLogging.GetCurrentValue())
         {
-            _logger.LogDebug("Simulating work for {Duration} seconds with extra logging.", _workDurationSeconds.GetCurrentValue());
+            _logger.LogDebug("Simulating work for {Duration} seconds with extra logging.",
+                _workDurationSeconds.GetCurrentValue());
             for (var i = (int)_workDurationSeconds.GetCurrentValue(); i > 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -159,7 +163,8 @@ public class Module : IModule
         }
         else
         {
-            _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.", _workDurationSeconds.GetCurrentValue());
+            _logger.LogDebug("Simulating work for {Duration} seconds without extra logging.",
+                _workDurationSeconds.GetCurrentValue());
             await Task.Delay((int)_workDurationSeconds.GetCurrentValue() * 1000, cancellationToken);
         }
 
@@ -232,10 +237,7 @@ public class Module : IModule
     {
         // Save secrets for extra safety
         var userSecret = _userSecret.GetCurrentValue();
-        if (!string.IsNullOrEmpty(userSecret))
-        {
-            _secureStorage.StoreSecret(_userSecret.Key, userSecret);
-        }
+        if (!string.IsNullOrEmpty(userSecret)) _secureStorage.StoreSecret(_userSecret.Key, userSecret);
 
         _subscription?.Dispose();
         GC.SuppressFinalize(this);

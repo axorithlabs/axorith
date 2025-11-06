@@ -20,5 +20,3 @@ public enum SettingPersistence
     /// </summary>
     Transient
 }
-
-

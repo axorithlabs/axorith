@@ -1,11 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using Autofac;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
-using Axorith.Sdk.Actions;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -14,6 +12,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
     private readonly IModule? _liveInstance;
     private readonly ILifetimeScope? _scope;
+    private readonly CancellationTokenSource _initCts = new();
+    private Task? _initializationTask;
 
     public ModuleDefinition Definition { get; }
     public ConfiguredModule Model { get; }
@@ -57,7 +57,25 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         foreach (var action in _liveInstance.GetActions()) Actions.Add(new ActionViewModel(action));
 
         // Initialize heavy resources asynchronously (design-time discovery)
-        _ = _liveInstance.InitializeAsync(CancellationToken.None);
+        _initializationTask = InitializeModuleAsync();
+    }
+
+    private async Task InitializeModuleAsync()
+    {
+        if (_liveInstance == null) return;
+
+        try
+        {
+            await _liveInstance.InitializeAsync(_initCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during disposal
+        }
+        catch (Exception)
+        {
+            // Errors during initialization are logged by the module itself
+        }
     }
 
     public void SaveChangesToModel()
@@ -67,18 +85,27 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         // Ephemeral settings (including secrets) are never persisted to disk.
         foreach (var settingVm in Settings)
         {
-            if (settingVm.Setting.Persistence != SettingPersistence.Persisted) 
+            if (settingVm.Setting.Persistence != SettingPersistence.Persisted)
                 continue;
-                
+
             Model.Settings[settingVm.Setting.Key] = settingVm.Setting.GetValueAsString();
         }
     }
 
     public void Dispose()
     {
+        // Dispose ViewModels FIRST to unsubscribe from observables
         foreach (var setting in Settings) setting.Dispose();
         Settings.Clear();
 
+        foreach (var action in Actions) action.Dispose();
+        Actions.Clear();
+
+        // THEN cancel and dispose module
+        _initCts.Cancel();
+        _initCts.Dispose();
+
+        // Don't wait for initialization to complete - just cancel it
         _liveInstance?.Dispose();
         _scope?.Dispose();
 

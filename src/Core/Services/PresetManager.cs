@@ -34,22 +34,23 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             {
                 await using var stream = File.OpenRead(filePath);
                 var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions);
-                
+
                 if (preset != null)
                 {
                     // Migrate preset if needed
                     if (preset.Version < CurrentPresetVersion)
                     {
-                        logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+                        logger.LogInformation(
+                            "Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
                             preset.Name, preset.Version, CurrentPresetVersion);
-                        
+
                         MigratePreset(preset);
                         preset.Version = CurrentPresetVersion;
-                        
+
                         // Save migrated preset
-                        await SavePresetAsync(preset, cancellationToken);
+                        await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
                     }
-                    
+
                     presets.Add(preset);
                 }
             }
@@ -72,7 +73,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         {
             Directory.CreateDirectory(_presetsDirectory);
             await using var stream = File.Create(filePath);
-            await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken);
+            await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken).ConfigureAwait(false);
             logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)
@@ -107,8 +108,8 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
     }
 
     /// <summary>
-    /// Migrates a preset from an older version to the current version.
-    /// Add migration logic here when preset structure changes.
+    ///     Migrates a preset from an older version to the current version.
+    ///     Add migration logic here when preset structure changes.
     /// </summary>
     private void MigratePreset(SessionPreset preset)
     {
@@ -118,7 +119,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         //     // Migrate from version 0 to 1
         //     // e.g., rename settings keys, convert data formats, etc.
         // }
-        
+
         logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
     }
 

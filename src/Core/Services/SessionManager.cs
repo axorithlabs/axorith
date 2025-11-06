@@ -13,7 +13,7 @@ namespace Axorith.Core.Services;
 ///     managing their isolated lifetime scopes.
 /// </summary>
 public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManager> logger)
-    : ISessionManager, IDisposable
+    : ISessionManager
 {
     private CancellationTokenSource? _sessionCts;
 
@@ -109,8 +109,9 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                 // Validate settings with 5 second timeout
                 using var validationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 validationCts.CancelAfter(TimeSpan.FromSeconds(5));
-                
-                var validation = await activeModule.Instance.ValidateSettingsAsync(validationCts.Token);
+
+                var validation = await activeModule.Instance.ValidateSettingsAsync(validationCts.Token)
+                    .ConfigureAwait(false);
                 if (validation.Status != ValidationStatus.Ok)
                 {
                     logger.LogError("Module validation failed: {Error}", validation.Message);
@@ -120,13 +121,13 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                 // Start the module with 30 second timeout
                 using var startCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 startCts.CancelAfter(TimeSpan.FromSeconds(30));
-                
-                await activeModule.Instance.OnSessionStartAsync(startCts.Token);
+
+                await activeModule.Instance.OnSessionStartAsync(startCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
                 logger.LogError(ex, "Module {InstanceName} startup timed out", config.CustomName ?? definition.Name);
-                throw new SessionException($"Module startup timed out after 30 seconds");
+                throw new SessionException("Module startup timed out after 30 seconds");
             }
             catch (OperationCanceledException)
             {
@@ -145,7 +146,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         try
         {
-            await Task.WhenAll(startTasks);
+            await Task.WhenAll(startTasks).ConfigureAwait(false);
             if (ActiveSession is not null)
                 logger.LogInformation("All {Count} modules for session '{PresetName}' started successfully",
                     modules.Count, ActiveSession.Name);
@@ -164,7 +165,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                         "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
                         ActiveSession.Name);
 
-                await StopCurrentSessionAsync();
+                await StopCurrentSessionAsync().ConfigureAwait(false);
             }
         }
     }
@@ -193,7 +194,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
             try
             {
-                await activeModule.Instance.OnSessionEndAsync();
+                await activeModule.Instance.OnSessionEndAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -205,7 +206,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                 scope?.Dispose();
             }
         });
-        await Task.WhenAll(stopTasks);
+        await Task.WhenAll(stopTasks).ConfigureAwait(false);
 
         foreach (var activeModule in _activeModules)
             try
@@ -227,12 +228,13 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
     }
 
     /// <summary>
-    ///     Disposes the SessionManager and ensures any active session is stopped cleanly.
+    ///     Asynchronously disposes the SessionManager and ensures any active session is stopped cleanly.
     /// </summary>
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         if (IsSessionRunning)
-            // This is a blocking call, which is acceptable in Dispose.
-            StopCurrentSessionAsync().GetAwaiter().GetResult();
+            await StopCurrentSessionAsync().ConfigureAwait(false);
+
+        _sessionCts?.Dispose();
     }
 }
