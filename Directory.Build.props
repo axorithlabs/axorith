@@ -9,11 +9,10 @@
         <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
 
         <BaseOutputPath>$(SolutionDir)build\</BaseOutputPath>
-        <OutputPath>$(BaseOutputPath)$(Configuration)\$(MSBuildProjectName)\$(TargetFramework)\</OutputPath>
-        <BaseIntermediateOutputPath>$(BaseOutputPath)$(Configuration)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+        <BaseIntermediateOutputPath>$(BaseOutputPath)\$(Configuration)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
         <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
-        <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 
         <Version Condition="'$(Version)' == ''">0.0.1-alpha</Version>
@@ -24,7 +23,7 @@
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 
-    <!-- Ensure all test dependencies are copied to output to avoid runtime FileNotFoundException in CI -->
+    <!-- Ensure all test dependencies are copied to output for Rider test discovery -->
     <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>

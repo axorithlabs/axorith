@@ -118,7 +118,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     }
                     else
                     {
-                        Log.Warning(
+                        logger.LogWarning(
                             "Module '{ModuleName}' should specify 'assembly' field in module.json for deterministic loading",
                             definition.Name);
                         continue;

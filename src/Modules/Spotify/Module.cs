@@ -555,9 +555,15 @@ public class Module : IModule
             }
 
             _logger.LogInfo("Starting playback for context: {Context}", context);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
             await _apiClient.PutStringAsync($"https://api.spotify.com/v1/me/player/play?device_id={deviceId}",
-                jsonContent, Encoding.UTF8, "application/json", cancellationToken);
+                jsonContent, Encoding.UTF8, "application/json", cts.Token);
             _logger.LogInfo("Spotify 'play' command sent successfully.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(null, "Failed to start Spotify playback: request timed out after 10 seconds.");
         }
         catch (Exception ex)
         {

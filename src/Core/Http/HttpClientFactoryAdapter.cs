@@ -11,7 +11,9 @@ public class HttpClientFactoryAdapter(System.Net.Http.IHttpClientFactory realFac
 {
     public IHttpClient CreateClient(string name)
     {
-        var realHttpClient = realFactory.CreateClient(name);
+        // Always use "default" client to ensure Polly policies are applied
+        // The name parameter is used only for User-Agent customization
+        var realHttpClient = realFactory.CreateClient("default");
 
         realHttpClient.DefaultRequestHeaders.Add("User-Agent", $"Axorith/{name}");
 

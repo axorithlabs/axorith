@@ -1,13 +1,9 @@
-﻿#region
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform.Windows;
-
-#endregion
 
 namespace Axorith.Module.ApplicationLauncher.Windows;
 
@@ -20,7 +16,7 @@ public class Module : IModule
 
     private readonly Setting<string> _applicationPath;
     private readonly Setting<string> _applicationArgs;
-    private readonly Setting<decimal> _monitorIndex;
+    private readonly Setting<int> _monitorIndex;
 
     private Process? _currentProcess;
 
@@ -43,7 +39,7 @@ public class Module : IModule
             defaultValue: ""
         );
 
-        _monitorIndex = Setting.AsNumber(
+        _monitorIndex = Setting.AsInt(
             key: "MonitorIndex",
             label: "Target Monitor",
             description: "The index of the monitor to move the application window to.",
@@ -102,8 +98,7 @@ public class Module : IModule
             _currentProcess = new Process();
             _currentProcess.StartInfo.FileName = _applicationPath.GetCurrentValue();
             _currentProcess.StartInfo.Arguments = _applicationArgs.GetCurrentValue();
-            _currentProcess.StartInfo.RedirectStandardOutput = true;
-            _currentProcess.StartInfo.RedirectStandardError = true;
+            _currentProcess.StartInfo.UseShellExecute = true;
             _currentProcess.Start();
 
             _logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
@@ -125,7 +120,7 @@ public class Module : IModule
             {
                 _logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
                     _currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
-                WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, (int)_monitorIndex.GetCurrentValue());
+                WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
                 _logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
                     _currentProcess.ProcessName, _monitorIndex.GetCurrentValue());
             }

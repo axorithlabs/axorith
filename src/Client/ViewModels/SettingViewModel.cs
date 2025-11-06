@@ -60,7 +60,21 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
     public decimal DecimalValue
     {
-        get => Setting.GetCurrentValueAsObject() as decimal? ?? 0;
+        get
+        {
+            var value = Setting.GetCurrentValueAsObject();
+            if (value == null) return 0;
+            // Handle different numeric types
+            return value switch
+            {
+                decimal d => d,
+                int i => i,
+                double db => (decimal)db,
+                TimeSpan ts => (decimal)ts.TotalSeconds,
+                IConvertible c => Convert.ToDecimal(c),
+                _ => 0
+            };
+        }
         set => Setting.SetValueFromObject(value);
     }
 
