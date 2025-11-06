@@ -111,7 +111,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
         // Subscribe to reactive properties of the setting to update the UI.
         Setting.Label
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(l => Label = l, ex =>
+            .Subscribe(l => Label = l, _ =>
             {
                 /* Ignore errors after module disposal */
             })
@@ -119,7 +119,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
         Setting.IsVisible
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(v => IsVisible = v, ex =>
+            .Subscribe(v => IsVisible = v, _ =>
             {
                 /* Ignore errors after module disposal */
             })
@@ -127,7 +127,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
         Setting.IsReadOnly
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(r => IsReadOnly = r, ex =>
+            .Subscribe(r => IsReadOnly = r, _ =>
             {
                 /* Ignore errors after module disposal */
             })
@@ -156,7 +156,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
                         this.RaisePropertyChanged(nameof(DecimalValue));
                         break;
                 }
-            }, ex =>
+            }, _ =>
             {
                 /* Ignore errors after module disposal */
             })
@@ -165,7 +165,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
         // Subscribe to choice updates if this is a Choice setting.
         Setting.Choices?
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(c => Choices = c, ex =>
+            .Subscribe(c => Choices = c, _ =>
             {
                 /* Ignore errors after module disposal */
             })

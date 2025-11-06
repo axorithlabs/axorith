@@ -48,7 +48,7 @@ public class SessionEditorViewModel : ReactiveObject
     /// <summary>
     ///     Gets the collection of modules that are configured for the current preset.
     /// </summary>
-    public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = new();
+    public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
     /// <summary>
     ///     Gets or sets the currently selected module in the list of configured modules.

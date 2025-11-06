@@ -17,7 +17,7 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
     /// <summary>
     ///     A collection of ViewModels for the configured modules, used to display rich information in the UI.
     /// </summary>
-    public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = new();
+    public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
 
     public SessionPresetViewModel(SessionPreset model, IModuleRegistry moduleRegistry)
     {

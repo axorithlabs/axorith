@@ -3,7 +3,6 @@ using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
-using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -23,8 +22,8 @@ public class ModuleLifecycleTests
         var executionLog = new List<string>();
 
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
 
         mockModule.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Callback(() => executionLog.Add("Initialize"))
@@ -51,7 +50,7 @@ public class ModuleLifecycleTests
         {
             Id = moduleId,
             Name = "Test Module",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -64,10 +63,7 @@ public class ModuleLifecycleTests
         {
             Id = Guid.NewGuid(),
             Name = "Test Preset",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -91,8 +87,8 @@ public class ModuleLifecycleTests
         var numberSetting = Setting.AsInt("count", "Count", 0);
 
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(new ISetting[] { textSetting, numberSetting });
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([textSetting, numberSetting]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
@@ -106,7 +102,7 @@ public class ModuleLifecycleTests
         {
             Id = moduleId,
             Name = "Config Module",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -119,9 +115,9 @@ public class ModuleLifecycleTests
         {
             Id = Guid.NewGuid(),
             Name = "Config Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new()
+            Modules =
+            [
+                new ConfiguredModule
                 {
                     ModuleId = moduleId,
                     Settings = new Dictionary<string, string>
@@ -130,7 +126,7 @@ public class ModuleLifecycleTests
                         ["count"] = "42"
                     }
                 }
-            }
+            ]
         };
 
         // Act
@@ -149,8 +145,8 @@ public class ModuleLifecycleTests
         var module2Started = false;
 
         var mockModule1 = new Mock<IModule>();
-        mockModule1.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule1.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule1.Setup(m => m.GetSettings()).Returns([]);
+        mockModule1.Setup(m => m.GetActions()).Returns([]);
         mockModule1.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Callback(() => _ = true)
             .Returns(Task.CompletedTask);
@@ -161,8 +157,8 @@ public class ModuleLifecycleTests
             .Returns(Task.CompletedTask);
 
         var mockModule2 = new Mock<IModule>();
-        mockModule2.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule2.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule2.Setup(m => m.GetSettings()).Returns([]);
+        mockModule2.Setup(m => m.GetActions()).Returns([]);
         mockModule2.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Callback(() => _ = true)
             .Returns(Task.CompletedTask);
@@ -177,12 +173,12 @@ public class ModuleLifecycleTests
         var id2 = Guid.NewGuid();
         var definition1 = new ModuleDefinition
         {
-            Id = id1, Name = "Module 1", Platforms = new[] { Platform.Windows },
+            Id = id1, Name = "Module 1", Platforms = [Platform.Windows],
             ModuleType = mockModule1.Object.GetType()
         };
         var definition2 = new ModuleDefinition
         {
-            Id = id2, Name = "Module 2", Platforms = new[] { Platform.Windows },
+            Id = id2, Name = "Module 2", Platforms = [Platform.Windows],
             ModuleType = mockModule2.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -197,11 +193,11 @@ public class ModuleLifecycleTests
         {
             Id = Guid.NewGuid(),
             Name = "Multi Module Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = id1 },
-                new() { ModuleId = id2 }
-            }
+            Modules =
+            [
+                new ConfiguredModule { ModuleId = id1 },
+                new ConfiguredModule { ModuleId = id2 }
+            ]
         };
 
         // Act

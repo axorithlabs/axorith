@@ -31,7 +31,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         }
     }
 
-    private readonly List<ActiveModule> _activeModules = new();
+    private readonly List<ActiveModule> _activeModules = [];
 
     public bool IsSessionRunning => ActiveSession != null;
     public SessionPreset? ActiveSession { get; private set; }
@@ -178,7 +178,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
         var sessionToStop = ActiveSession;
         logger.LogInformation("Stopping session '{PresetName}'...", sessionToStop.Name);
 
-        _sessionCts?.Cancel();
+        await _sessionCts?.CancelAsync()!;
 
         var stopTasks = _activeModules.Select(async activeModule =>
         {

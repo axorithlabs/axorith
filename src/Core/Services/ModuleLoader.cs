@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Microsoft.Extensions.Logging;
-using Serilog;
 using static Axorith.Shared.Utils.EnvironmentUtils;
 
 namespace Axorith.Core.Services;

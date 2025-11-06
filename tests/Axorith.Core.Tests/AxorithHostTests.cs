@@ -93,7 +93,7 @@ public class AxorithHostTests
     {
         // Arrange
         var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         // Act - host creation is fast, cancellation might not affect it
         var host = await AxorithHost.CreateAsync(cts.Token);

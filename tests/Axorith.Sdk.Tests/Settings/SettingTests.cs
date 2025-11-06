@@ -193,7 +193,7 @@ public class SettingTests
         var setting = Setting.AsChoice("choice", "Choice", "opt", choices);
 
         // Act
-        var act = () => setting.SetChoices(Array.Empty<KeyValuePair<string, string>>());
+        var act = () => setting.SetChoices([]);
 
         // Assert
         act.Should().NotThrow();

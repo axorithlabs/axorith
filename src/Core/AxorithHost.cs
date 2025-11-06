@@ -160,6 +160,6 @@ public sealed class AxorithHost : IDisposable, IAsyncDisposable
         else
             _host.Dispose();
 
-        Log.CloseAndFlush();
+        await Log.CloseAndFlushAsync();
     }
 }

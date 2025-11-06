@@ -13,10 +13,9 @@ internal class ModuleAssemblyLoadContext(string modulePath) : AssemblyLoadContex
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
-        if (assemblyPath != null) return LoadFromAssemblyPath(assemblyPath);
-
-        // If not found in the module's directory, fall back to the default context.
-        return null;
+        return assemblyPath != null ? LoadFromAssemblyPath(assemblyPath) :
+            // If not found in the module's directory, fall back to the default context.
+            null;
     }
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)

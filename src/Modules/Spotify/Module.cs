@@ -29,9 +29,6 @@ public class Module : IModule
     private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
     private string? _inMemoryAccessToken;
 
-    private IReadOnlyList<KeyValuePair<string, string>> _currentDeviceChoices =
-        Array.Empty<KeyValuePair<string, string>>();
-
     private readonly Dictionary<string, string> _knownDevices = new(StringComparer.OrdinalIgnoreCase);
 
     private const string RefreshTokenKey = "SpotifyRefreshToken";
@@ -268,7 +265,7 @@ public class Module : IModule
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load Spotify devices.");
-            UpdateDeviceChoices(Array.Empty<KeyValuePair<string, string>>());
+            UpdateDeviceChoices([]);
         }
     }
 
@@ -309,10 +306,9 @@ public class Module : IModule
             merged.Add(new KeyValuePair<string, string>(string.Empty,
                 "No active devices found. Start Spotify on a device to enable playback."));
 
-        _currentDeviceChoices = merged;
         _targetDevice.SetChoices(merged);
         _logger.LogInfo("Device choices updated. Active: {Active}, Selected: {Selected}",
-            merged.Count, selectedDeviceId ?? "<none>");
+            merged.Count, selectedDeviceId);
     }
 
     private async Task LoadPlayableItemsAsync()

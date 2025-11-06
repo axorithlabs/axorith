@@ -6,8 +6,7 @@ namespace Axorith.Sdk.Tests.Settings;
 
 /// <summary>
 ///     Tests for new guard clauses added to Setting
-///     <T>
-///         Validates ArgumentException.ThrowIfNullOrWhiteSpace and ArgumentNullException.ThrowIfNull
+///     Validates ArgumentException.ThrowIfNullOrWhiteSpace and ArgumentNullException.ThrowIfNull
 /// </summary>
 public class SettingGuardClauseTests
 {
@@ -131,7 +130,7 @@ public class SettingGuardClauseTests
         var setting = Setting.AsChoice("choice", "Choice", "k", choices);
 
         // Act
-        var act = () => setting.SetChoices(Array.Empty<KeyValuePair<string, string>>());
+        var act = () => setting.SetChoices([]);
 
         // Assert - this is allowed now (critical requirement from user)
         act.Should().NotThrow();
@@ -191,7 +190,7 @@ public class SettingGuardClauseTests
             var setting = Setting.AsText("key", "Label", "value");
             var method = typeof(Setting<string>).GetMethod("InitializeChoices",
                 BindingFlags.NonPublic | BindingFlags.Instance);
-            method?.Invoke(setting, new object?[] { null });
+            method?.Invoke(setting, [null]);
         };
 
         // Assert

@@ -4,8 +4,8 @@ using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 namespace Axorith.Core.Http;
 
 /// <summary>
-///     The CORRECT implementation of our factory. It USES the built-in IHttpClientFactory
-///     to properly manage handler lifetimes and prevent DNS issues.
+///     Adapter that wraps the standard HttpClientFactory and exposes it as IHttpClientFactory (SDK interface).
+///     Ensures all HTTP clients use the configured Polly policies for resilience.
 /// </summary>
 public class HttpClientFactoryAdapter(System.Net.Http.IHttpClientFactory realFactory) : IHttpClientFactory
 {

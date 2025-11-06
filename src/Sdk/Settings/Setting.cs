@@ -111,8 +111,15 @@ public abstract class Setting
     }
 
     /// <summary>
-    ///     Creates a setting rendered as a numeric input bound to an integer value.
+    ///     Creates a setting that is rendered as a numeric input field bound to an integer value.
     /// </summary>
+    /// <param name="key">The unique key for this setting.</param>
+    /// <param name="label">The display label for the UI.</param>
+    /// <param name="defaultValue">The default integer value.</param>
+    /// <param name="description">An optional description for a tooltip.</param>
+    /// <param name="isVisible">The initial visibility of the control.</param>
+    /// <param name="isReadOnly">The initial read-only state of the control.</param>
+    /// <returns>A new reactive integer setting.</returns>
     public static Setting<int> AsInt(string key, string label, int defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
@@ -122,8 +129,15 @@ public abstract class Setting
     }
 
     /// <summary>
-    ///     Creates a setting rendered as a numeric input bound to a double value.
+    ///     Creates a setting that is rendered as a numeric input field bound to a double value.
     /// </summary>
+    /// <param name="key">The unique key for this setting.</param>
+    /// <param name="label">The display label for the UI.</param>
+    /// <param name="defaultValue">The default double value.</param>
+    /// <param name="description">An optional description for a tooltip.</param>
+    /// <param name="isVisible">The initial visibility of the control.</param>
+    /// <param name="isReadOnly">The initial read-only state of the control.</param>
+    /// <returns>A new reactive double setting.</returns>
     public static Setting<double> AsDouble(string key, string label, double defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
@@ -133,8 +147,15 @@ public abstract class Setting
     }
 
     /// <summary>
-    ///     Creates a setting rendered as a numeric input bound to total seconds of a TimeSpan.
+    ///     Creates a setting that is rendered as a numeric input field bound to a TimeSpan value (in seconds).
     /// </summary>
+    /// <param name="key">The unique key for this setting.</param>
+    /// <param name="label">The display label for the UI.</param>
+    /// <param name="defaultValue">The default TimeSpan value.</param>
+    /// <param name="description">An optional description for a tooltip.</param>
+    /// <param name="isVisible">The initial visibility of the control.</param>
+    /// <param name="isReadOnly">The initial read-only state of the control.</param>
+    /// <returns>A new reactive TimeSpan setting.</returns>
     public static Setting<TimeSpan> AsTimeSpan(string key, string label, TimeSpan defaultValue,
         string? description = null, bool isVisible = true, bool isReadOnly = false)
     {
@@ -212,7 +233,7 @@ public abstract class Setting
     /// <param name="key">The unique key for this setting.</param>
     /// <param name="label">The display label for the UI.</param>
     /// <param name="defaultValue">The default file path.</param>
-    /// <param name="filter"></param>
+    /// <param name="filter">The file dialog filter string (e.g., "JSON files (*.json)|*.json|All files (*.*)|*.*").</param>
     /// <param name="description">An optional description for a tooltip.</param>
     /// <param name="isVisible">The initial visibility of the control.</param>
     /// <param name="isReadOnly">The initial read-only state of the control.</param>

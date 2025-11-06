@@ -25,5 +25,5 @@ public class SessionPreset
     /// <summary>
     ///     The list of modules that are part of this session, along with their specific configurations.
     /// </summary>
-    public List<ConfiguredModule> Modules { get; set; } = new();
+    public List<ConfiguredModule> Modules { get; set; } = [];
 }

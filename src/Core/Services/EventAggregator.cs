@@ -15,7 +15,7 @@ internal sealed class EventAggregator : IEventAggregator
     public IDisposable Subscribe<TEvent>(Action<TEvent> handler)
     {
         var eventType = typeof(TEvent);
-        var handlers = _subscriptions.GetOrAdd(eventType, _ => new ConcurrentBag<WeakReference<object>>());
+        var handlers = _subscriptions.GetOrAdd(eventType, _ => []);
 
         // Use WeakReference to prevent memory leaks if a subscriber is garbage collected without unsubscribing.
         var weakHandler = new WeakReference<object>(handler);
@@ -51,16 +51,16 @@ internal sealed class EventAggregator : IEventAggregator
 
         // Clean up dead references if any found
         if (deadReferences.Count > 0)
-            CleanupDeadReferences(eventType, deadReferences);
+            CleanupDeadReferences(eventType);
     }
 
-    private void CleanupDeadReferences(Type eventType, List<WeakReference<object>> deadReferences)
+    private void CleanupDeadReferences(Type eventType)
     {
         if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
 
         // Create new bag with only live references
         var liveReferences = handlers.Where(wr => wr.TryGetTarget(out _)).ToList();
-        _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(liveReferences);
+        _subscriptions[eventType] = [.. liveReferences];
     }
 
     private void Unsubscribe<TEvent>(Action<TEvent> handler)
@@ -73,23 +73,14 @@ internal sealed class EventAggregator : IEventAggregator
             !wh.TryGetTarget(out var target) || !target.Equals(handler)
         ).ToList();
 
-        _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(filtered);
+        _subscriptions[eventType] = [.. filtered];
     }
 
-    private sealed class Unsubscriber<TEvent> : IDisposable
+    private sealed class Unsubscriber<TEvent>(EventAggregator aggregator, Action<TEvent> handler) : IDisposable
     {
-        private readonly EventAggregator _aggregator;
-        private readonly Action<TEvent> _handler;
-
-        public Unsubscriber(EventAggregator aggregator, Action<TEvent> handler)
-        {
-            _aggregator = aggregator;
-            _handler = handler;
-        }
-
         public void Dispose()
         {
-            _aggregator.Unsubscribe(_handler);
+            aggregator.Unsubscribe(handler);
         }
     }
 }

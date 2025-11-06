@@ -8,8 +8,8 @@ namespace Axorith.Sdk.Tests.Helpers;
 /// </summary>
 public class TestModuleBuilder
 {
-    private readonly List<ISetting> _settings = new();
-    private readonly List<IAction> _actions = new();
+    private readonly List<ISetting> _settings = [];
+    private readonly List<IAction> _actions = [];
     private Func<CancellationToken, Task>? _onInitialize;
     private Func<CancellationToken, Task>? _onSessionStart;
     private Func<Task>? _onSessionEnd;

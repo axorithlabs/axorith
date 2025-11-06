@@ -7,10 +7,13 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
+/// <summary>
+///     ViewModel for a reactive action, bridging IAction from the SDK to the Avalonia UI.
+///     Subscribes to action observables and exposes bindable properties for the View.
+/// </summary>
 public sealed class ActionViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
-    private readonly IAction _action;
 
     private string _label = string.Empty;
 
@@ -32,31 +35,29 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
 
     public ActionViewModel(IAction action)
     {
-        _action = action;
-
         // Create ReactiveCommand with IsEnabled observable on UI thread
         // This ensures CanExecuteChanged fires on the correct thread
-        var canExecute = _action.IsEnabled
+        var canExecute = action.IsEnabled
             .ObserveOn(RxApp.MainThreadScheduler)
             .Catch<bool, Exception>(_ => Observable.Return(false));
 
-        InvokeCommand = ReactiveCommand.Create(_action.Invoke, canExecute);
+        InvokeCommand = ReactiveCommand.Create(action.Invoke, canExecute);
 
-        _action.Label
+        action.Label
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(
                 v => Label = v,
-                ex =>
+                _ =>
                 {
                     /* Ignore errors after module disposal */
                 })
             .DisposeWith(_disposables);
 
-        _action.IsEnabled
+        action.IsEnabled
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(
                 v => IsEnabled = v,
-                ex =>
+                _ =>
                 {
                     /* Ignore errors after module disposal */
                 })

@@ -153,7 +153,7 @@ public class PresetManagerTests : IDisposable
 
         // Assert
         presets.Should().HaveCount(3);
-        presets.Select(p => p.Name).Should().Contain(new[] { "Preset 1", "Preset 2", "Preset 3" });
+        presets.Select(p => p.Name).Should().Contain(["Preset 1", "Preset 2", "Preset 3"]);
     }
 
     [Fact]
@@ -164,9 +164,9 @@ public class PresetManagerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Name = "With Modules",
-            Modules = new List<ConfiguredModule>
-            {
-                new()
+            Modules =
+            [
+                new ConfiguredModule
                 {
                     ModuleId = Guid.NewGuid(),
                     Settings = new Dictionary<string, string>
@@ -174,7 +174,7 @@ public class PresetManagerTests : IDisposable
                         ["setting1"] = "value1"
                     }
                 }
-            }
+            ]
         };
 
         // Act
@@ -192,7 +192,7 @@ public class PresetManagerTests : IDisposable
     {
         // Arrange
         var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         // Act
         var result = await _manager.LoadAllPresetsAsync(cts.Token);

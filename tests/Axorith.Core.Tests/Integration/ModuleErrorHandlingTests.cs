@@ -3,7 +3,6 @@ using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
-using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,8 +20,8 @@ public class ModuleErrorHandlingTests
     {
         // Arrange
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Fail("Settings are invalid"));
 
@@ -32,7 +31,7 @@ public class ModuleErrorHandlingTests
         {
             Id = moduleId,
             Name = "Invalid Module",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -45,10 +44,7 @@ public class ModuleErrorHandlingTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -66,8 +62,8 @@ public class ModuleErrorHandlingTests
         var initializeCallCount = 0;
         var mockModule = new Mock<IModule>();
 
-        mockModule.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
@@ -87,7 +83,7 @@ public class ModuleErrorHandlingTests
         {
             Id = moduleId,
             Name = "Retry Module",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -116,8 +112,8 @@ public class ModuleErrorHandlingTests
         var textSetting = Setting.AsText("required", "Required", "");
 
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(new ISetting[] { textSetting });
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([textSetting]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .Returns<CancellationToken>(ct =>
             {
@@ -133,7 +129,7 @@ public class ModuleErrorHandlingTests
         {
             Id = moduleId,
             Name = "Config Module",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -146,14 +142,14 @@ public class ModuleErrorHandlingTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new()
+            Modules =
+            [
+                new ConfiguredModule
                 {
                     ModuleId = moduleId,
                     Settings = new Dictionary<string, string>() // Empty - should fail validation
                 }
-            }
+            ]
         };
 
         // Act
@@ -169,8 +165,8 @@ public class ModuleErrorHandlingTests
     {
         // Arrange
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
         mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
@@ -184,7 +180,7 @@ public class ModuleErrorHandlingTests
         {
             Id = moduleId,
             Name = "Error Stop",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -197,10 +193,7 @@ public class ModuleErrorHandlingTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         await sessionManager.StartSessionAsync(preset);
@@ -220,8 +213,8 @@ public class ModuleErrorHandlingTests
         var disposed = false;
         var mockModule = new Mock<IModule>();
 
-        mockModule.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mockModule.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns([]);
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
         mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
@@ -241,7 +234,7 @@ public class ModuleErrorHandlingTests
         {
             Id = moduleId,
             Name = "Error Dispose",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = mockModule.Object.GetType()
         };
         var root = new ContainerBuilder().Build();
@@ -254,10 +247,7 @@ public class ModuleErrorHandlingTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         await sessionManager.StartSessionAsync(preset);

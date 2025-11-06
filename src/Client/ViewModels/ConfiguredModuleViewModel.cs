@@ -8,12 +8,15 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
+/// <summary>
+///     ViewModel for a module instance configured within a session preset.
+///     Manages settings, actions, and initialization of a live module instance for editing.
+/// </summary>
 public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
     private readonly IModule? _liveInstance;
     private readonly ILifetimeScope? _scope;
     private readonly CancellationTokenSource _initCts = new();
-    private Task? _initializationTask;
 
     public ModuleDefinition Definition { get; }
     public ConfiguredModule Model { get; }
@@ -57,7 +60,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         foreach (var action in _liveInstance.GetActions()) Actions.Add(new ActionViewModel(action));
 
         // Initialize heavy resources asynchronously (design-time discovery)
-        _initializationTask = InitializeModuleAsync();
+        _ = InitializeModuleAsync();
     }
 
     private async Task InitializeModuleAsync()

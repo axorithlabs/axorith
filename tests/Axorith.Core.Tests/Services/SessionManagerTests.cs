@@ -3,8 +3,6 @@ using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
-using Axorith.Sdk.Actions;
-using Axorith.Sdk.Settings;
 using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -52,10 +50,7 @@ public class SessionManagerTests
         {
             Id = Guid.NewGuid(),
             Name = "Test Session",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -89,10 +84,7 @@ public class SessionManagerTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -117,10 +109,7 @@ public class SessionManagerTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         await _sessionManager.StartSessionAsync(preset);
@@ -148,10 +137,7 @@ public class SessionManagerTests
         {
             Id = Guid.NewGuid(),
             Name = "First",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         await _sessionManager.StartSessionAsync(preset);
@@ -190,11 +176,11 @@ public class SessionManagerTests
         {
             Id = Guid.NewGuid(),
             Name = "Multi-Module",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = id1 },
-                new() { ModuleId = id2 }
-            }
+            Modules =
+            [
+                new ConfiguredModule { ModuleId = id1 },
+                new ConfiguredModule { ModuleId = id2 }
+            ]
         };
 
         // Act
@@ -221,10 +207,7 @@ public class SessionManagerTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         await _sessionManager.StartSessionAsync(preset);
@@ -242,8 +225,8 @@ public class SessionManagerTests
     {
         var mock = new Mock<IModule>();
 
-        mock.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mock.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mock.Setup(m => m.GetSettings()).Returns([]);
+        mock.Setup(m => m.GetActions()).Returns([]);
         mock.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
@@ -262,7 +245,7 @@ public class SessionManagerTests
         {
             Id = id,
             Name = "Test",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = moduleType
         };
     }

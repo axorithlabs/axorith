@@ -173,7 +173,7 @@ public class ModuleRegistryTests
     {
         // Arrange
         var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),

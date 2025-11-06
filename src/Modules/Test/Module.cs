@@ -121,7 +121,7 @@ public class Module : IModule
 
     public IReadOnlyList<IAction> GetActions()
     {
-        return Array.Empty<IAction>();
+        return [];
     }
 
     /// <inheritdoc />

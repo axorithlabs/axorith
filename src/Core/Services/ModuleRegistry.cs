@@ -132,6 +132,6 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
         var appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Axorith",
             "modules");
         var devPath = Path.Combine(AppContext.BaseDirectory, "modules");
-        return new[] { appDataPath, devPath };
+        return [appDataPath, devPath];
     }
 }

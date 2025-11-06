@@ -57,7 +57,7 @@ public class MainViewModel : ReactiveObject
     /// <summary>
     ///     A collection of all available session presets loaded from the core.
     /// </summary>
-    public ObservableCollection<SessionPresetViewModel> Presets { get; } = new();
+    public ObservableCollection<SessionPresetViewModel> Presets { get; } = [];
 
     /// <summary>
     ///     Command to delete the currently selected preset.

@@ -20,8 +20,8 @@ public static class AppConverters
     public static readonly IMultiValueConverter IsNotLastItem =
         new FuncMultiValueConverter<IEnumerable<object?>, bool>(bindings =>
         {
-            var bindingList = bindings?.ToList();
-            if (bindingList == null || bindingList.Count < 2) return false;
+            var bindingList = bindings.ToList();
+            if (bindingList.Count < 2) return false;
             var item = bindingList[0];
             if (item == null) return false;
             if (bindingList[1] is not IEnumerable collection) return false;
@@ -35,8 +35,8 @@ public static class AppConverters
     public static readonly IMultiValueConverter MultiEqualsConverter =
         new FuncMultiValueConverter<IEnumerable<object?>, bool>(bindings =>
         {
-            var values = bindings?.ToList();
-            if (values == null || values.Count < 2) return true;
+            var values = bindings.ToList();
+            if (values.Count < 2) return true;
             var first = values[0];
             for (var i = 1; i < values.Count; i++)
                 if (!Equals(first, values[i]))

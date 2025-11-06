@@ -3,8 +3,6 @@ using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
-using Axorith.Sdk.Actions;
-using Axorith.Sdk.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -42,10 +40,7 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -75,10 +70,7 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -109,10 +101,7 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -143,10 +132,7 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = moduleId }
-            }
+            Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
         // Act
@@ -183,11 +169,11 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = idGood },
-                new() { ModuleId = idBad }
-            }
+            Modules =
+            [
+                new ConfiguredModule { ModuleId = idGood },
+                new ConfiguredModule { ModuleId = idBad }
+            ]
         };
 
         // Act
@@ -229,11 +215,11 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = id1 },
-                new() { ModuleId = id2 }
-            }
+            Modules =
+            [
+                new ConfiguredModule { ModuleId = id1 },
+                new ConfiguredModule { ModuleId = id2 }
+            ]
         };
 
         // Act
@@ -277,11 +263,11 @@ public class SessionManagerNegativeTests
         {
             Id = Guid.NewGuid(),
             Name = "Test",
-            Modules = new List<ConfiguredModule>
-            {
-                new() { ModuleId = id1 },
-                new() { ModuleId = id2 }
-            }
+            Modules =
+            [
+                new ConfiguredModule { ModuleId = id1 },
+                new ConfiguredModule { ModuleId = id2 }
+            ]
         };
 
         await _sessionManager.StartSessionAsync(preset);
@@ -301,8 +287,8 @@ public class SessionManagerNegativeTests
     {
         var mock = new Mock<IModule>();
 
-        mock.Setup(m => m.GetSettings()).Returns(Array.Empty<ISetting>());
-        mock.Setup(m => m.GetActions()).Returns(Array.Empty<IAction>());
+        mock.Setup(m => m.GetSettings()).Returns([]);
+        mock.Setup(m => m.GetActions()).Returns([]);
         mock.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
@@ -321,7 +307,7 @@ public class SessionManagerNegativeTests
         {
             Id = id,
             Name = "Test",
-            Platforms = new[] { Platform.Windows },
+            Platforms = [Platform.Windows],
             ModuleType = moduleType
         };
     }

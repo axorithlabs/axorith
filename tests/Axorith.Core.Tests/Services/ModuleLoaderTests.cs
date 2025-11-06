@@ -144,7 +144,7 @@ public class ModuleLoaderTests : IDisposable
 
         // Create dummy DLL
         var dllPath = Path.Combine(moduleDir, "TestModule.dll");
-        await File.WriteAllBytesAsync(dllPath, new byte[] { 0x4D, 0x5A }); // MZ header
+        await File.WriteAllBytesAsync(dllPath, [0x4D, 0x5A]); // MZ header
 
         var searchPaths = new[] { _testModulesDir };
 
@@ -307,7 +307,7 @@ public class ModuleLoaderTests : IDisposable
     {
         // Arrange
         var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         var searchPaths = new[] { _testModulesDir };
 
