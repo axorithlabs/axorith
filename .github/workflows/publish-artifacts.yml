@@ -1,0 +1,57 @@
+name: Publish Build Artifacts
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  SOLUTION_PATH: './Axorith.sln'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+
+jobs:
+  publish-artifacts:
+    name: Publish Build Artifacts
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release
+
+    - name: Publish Client (Windows)
+      run: |
+        dotnet publish ./src/Client/Axorith.Client.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained false `
+          --output ./publish/client-win-x64
+
+    - name: Publish Shim (Windows)
+      run: |
+        dotnet publish ./src/Shim/Axorith.Shim.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained false `
+          --output ./publish/shim-win-x64
+
+    - name: Upload published artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: axorith-release-${{ github.sha }}
+        path: |
+          ./publish/**/*
+          ./build/Release/modules/**/*
+        retention-days: 90
