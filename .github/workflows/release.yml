@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Determine version
+      id: version
+      shell: pwsh
+      run: |
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          $version = "${{ github.ref_name }}".TrimStart('v')
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Release version: $version"
+        
+    - name: Restore dependencies
+      run: dotnet restore ./Axorith.sln
+      
+    - name: Build solution
+      run: |
+        dotnet build ./Axorith.sln `
+          --configuration Release `
+          --no-restore `
+          /p:Version=${{ steps.version.outputs.VERSION }}
+          
+    - name: Run tests
+      run: |
+        dotnet test ./Axorith.sln `
+          --configuration Release `
+          --no-build `
+          --verbosity normal
+          
+    - name: Publish Client (Windows x64)
+      run: |
+        dotnet publish ./src/Client/Axorith.Client.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output ./release/axorith-client-win-x64 `
+          /p:PublishSingleFile=true `
+          /p:Version=${{ steps.version.outputs.VERSION }}
+          
+    - name: Publish Shim (Windows x64)
+      run: |
+        dotnet publish ./src/Shim/Axorith.Shim.csproj `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output ./release/axorith-shim-win-x64 `
+          /p:PublishSingleFile=true `
+          /p:Version=${{ steps.version.outputs.VERSION }}
+          
+    - name: Copy modules to release
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Path ./release/modules -Force
+        Copy-Item -Path ./build/Release/modules/* -Destination ./release/modules -Recurse
+        
+    - name: Copy browser extension
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Path ./release/browser-extension -Force
+        Copy-Item -Path ./src/BrowserExtension/* -Destination ./release/browser-extension -Recurse -Exclude @('node_modules', '.git')
+        
+    - name: Create release archives
+      shell: pwsh
+      run: |
+        Compress-Archive -Path ./release/axorith-client-win-x64/* -DestinationPath ./axorith-client-win-x64-v${{ steps.version.outputs.VERSION }}.zip
+        Compress-Archive -Path ./release/axorith-shim-win-x64/* -DestinationPath ./axorith-shim-win-x64-v${{ steps.version.outputs.VERSION }}.zip
+        Compress-Archive -Path ./release/modules/* -DestinationPath ./axorith-modules-v${{ steps.version.outputs.VERSION }}.zip
+        Compress-Archive -Path ./release/browser-extension/* -DestinationPath ./axorith-browser-extension-v${{ steps.version.outputs.VERSION }}.zip
+        
+    - name: Generate changelog
+      id: changelog
+      shell: pwsh
+      run: |
+        $changelog = @"
+        ## What's Changed
+        
+        ### Features
+        - Modular productivity system with plugin architecture
+        - Session-based workflow management
+        - Reactive UI with Avalonia and ReactiveUI
+        - Secure credential storage with Windows DPAPI
+        
+        ### Modules
+        - Spotify: Deep work music automation
+        - SiteBlocker: Focus mode website blocking
+        - ApplicationLauncher: Automated app management
+        
+        ### Installation
+        1. Download ``axorith-client-win-x64-v${{ steps.version.outputs.VERSION }}.zip``
+        2. Extract and run ``Axorith.Client.exe``
+        3. Install browser extension from ``axorith-browser-extension-v${{ steps.version.outputs.VERSION }}.zip``
+        
+        **Full Changelog**: https://github.com/${{ github.repository }}/commits/v${{ steps.version.outputs.VERSION }}
+        "@
+        
+        $changelog | Out-File -FilePath ./CHANGELOG.md -Encoding utf8
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: Axorith v${{ steps.version.outputs.VERSION }}
+        body_path: ./CHANGELOG.md
+        draft: false
+        prerelease: false
+        files: |
+          ./axorith-client-win-x64-v${{ steps.version.outputs.VERSION }}.zip
+          ./axorith-shim-win-x64-v${{ steps.version.outputs.VERSION }}.zip
+          ./axorith-modules-v${{ steps.version.outputs.VERSION }}.zip
+          ./axorith-browser-extension-v${{ steps.version.outputs.VERSION }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
