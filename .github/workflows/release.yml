@@ -49,7 +49,6 @@ jobs:
       run: |
         dotnet build ./Axorith.sln `
           --configuration Release `
-          --no-restore `
           /p:Version=${{ steps.version.outputs.VERSION }}
           
     - name: Run tests

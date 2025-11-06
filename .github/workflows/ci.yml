@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest]
         
     steps:
     - name: Checkout code
@@ -127,7 +127,7 @@ jobs:
       run: dotnet restore ${{ env.SOLUTION_PATH }}
       
     - name: Build solution
-      run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+      run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release
       
     - name: Publish Client (Windows)
       run: |
