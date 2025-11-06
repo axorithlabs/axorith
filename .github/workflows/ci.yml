@@ -38,14 +38,7 @@ jobs:
       run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release
       
     - name: Run tests with coverage
-      run: |
-        dotnet test ${{ env.SOLUTION_PATH }} \
-          --configuration Release \
-          --no-build \
-          --verbosity normal \
-          --collect:"XPlat Code Coverage" \
-          --results-directory ./coverage \
-          --logger "trx;LogFileName=test-results.trx"
+      run: dotnet test ${{ env.SOLUTION_PATH }} --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage --logger "trx;LogFileName=test-results.trx"
       
     - name: Upload test results
       if: always()
