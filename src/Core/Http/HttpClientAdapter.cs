@@ -5,6 +5,8 @@ namespace Axorith.Core.Http;
 
 /// <summary>
 ///     Adapter that wraps a real HttpClient and exposes it as IHttpClient.
+///     Note: HttpClient is managed by HttpClientFactory - do NOT dispose it manually.
+///     The factory handles pooling and lifetime management to avoid socket exhaustion.
 /// </summary>
 internal class HttpClientAdapter(HttpClient httpClient) : IHttpClient
 {

@@ -1,4 +1,4 @@
-﻿using Axorith.Sdk;
+using Axorith.Sdk;
 using Axorith.Sdk.Services;
 
 namespace Axorith.Core.Services;
@@ -21,6 +21,12 @@ internal class ModuleScopedSecureStorage(ISecureStorageService underlyingStorage
     {
         var scopedKey = CreateScopedKey(key);
         return underlyingStorage.RetrieveSecret(scopedKey);
+    }
+
+    public void DeleteSecret(string key)
+    {
+        var scopedKey = CreateScopedKey(key);
+        underlyingStorage.DeleteSecret(scopedKey);
     }
 
     /// <summary>

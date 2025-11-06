@@ -1,5 +1,6 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Windows.Input;
+using Avalonia.Threading;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -116,16 +117,22 @@ public class MainViewModel : ReactiveObject
 
     private void OnSessionStarted(Guid presetId)
     {
-        SessionStatus = "Session is active.";
-        ActiveSessionPresetId = presetId;
-        this.RaisePropertyChanged(nameof(IsSessionActive));
+        Dispatcher.UIThread.Post(() =>
+        {
+            SessionStatus = "Session is active.";
+            ActiveSessionPresetId = presetId;
+            this.RaisePropertyChanged(nameof(IsSessionActive));
+        });
     }
 
     private void OnSessionStopped(Guid presetId)
     {
-        SessionStatus = "No session is active.";
-        ActiveSessionPresetId = null;
-        this.RaisePropertyChanged(nameof(IsSessionActive));
+        Dispatcher.UIThread.Post(() =>
+        {
+            SessionStatus = "No session is active.";
+            ActiveSessionPresetId = null;
+            this.RaisePropertyChanged(nameof(IsSessionActive));
+        });
     }
 
     /// <summary>
@@ -166,12 +173,17 @@ public class MainViewModel : ReactiveObject
     {
         await _presetManager.DeletePresetAsync(presetVm.Id, CancellationToken.None);
         Presets.Remove(presetVm);
+        presetVm.Dispose();
     }
 
     private async Task LoadPresetsAsync()
     {
         var presetsFromCore = await _presetManager.LoadAllPresetsAsync(CancellationToken.None);
+
+        // Dispose existing presets before clearing
+        foreach (var preset in Presets) preset.Dispose();
         Presets.Clear();
+
         var moduleRegistry = _serviceProvider.GetRequiredService<IModuleRegistry>();
         foreach (var preset in presetsFromCore) Presets.Add(new SessionPresetViewModel(preset, moduleRegistry));
     }

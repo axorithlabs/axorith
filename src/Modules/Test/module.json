@@ -7,5 +7,6 @@
     "windows",
     "linux",
     "macos"
-  ]
+  ],
+  "assembly": "Axorith.Module.Test.dll"
 }

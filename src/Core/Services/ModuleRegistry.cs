@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using Autofac;
 using Axorith.Core.Logging;
 using Axorith.Core.Services.Abstractions;
@@ -29,7 +29,8 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
     {
         logger.LogInformation("Initializing module registry...");
         var definitionsList =
-            await moduleLoader.LoadModuleDefinitionsAsync(GetDefaultSearchPaths(), cancellationToken);
+            await moduleLoader.LoadModuleDefinitionsAsync(GetDefaultSearchPaths(), cancellationToken)
+                .ConfigureAwait(false);
         _definitions = definitionsList.ToDictionary(d => d.Id);
         _isInitialized = true;
         logger.LogInformation("Module registry initialized with {Count} modules", _definitions.Count);

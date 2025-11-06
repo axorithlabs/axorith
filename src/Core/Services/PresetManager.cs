@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -10,6 +10,7 @@ namespace Axorith.Core.Services;
 /// </summary>
 public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
 {
+    private const int CurrentPresetVersion = 1;
     private readonly string _presetsDirectory = GetPresetsDirectoryPath();
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
@@ -33,7 +34,25 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
             {
                 await using var stream = File.OpenRead(filePath);
                 var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions);
-                if (preset != null) presets.Add(preset);
+
+                if (preset != null)
+                {
+                    // Migrate preset if needed
+                    if (preset.Version < CurrentPresetVersion)
+                    {
+                        logger.LogInformation(
+                            "Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+                            preset.Name, preset.Version, CurrentPresetVersion);
+
+                        MigratePreset(preset);
+                        preset.Version = CurrentPresetVersion;
+
+                        // Save migrated preset
+                        await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    presets.Add(preset);
+                }
             }
             catch (Exception ex)
             {
@@ -54,7 +73,7 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         {
             Directory.CreateDirectory(_presetsDirectory);
             await using var stream = File.Create(filePath);
-            await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken);
+            await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken).ConfigureAwait(false);
             logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)
@@ -86,6 +105,22 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///     Migrates a preset from an older version to the current version.
+    ///     Add migration logic here when preset structure changes.
+    /// </summary>
+    private void MigratePreset(SessionPreset preset)
+    {
+        // Example migration logic (add more as needed when schema changes):
+        // if (preset.Version == 0)
+        // {
+        //     // Migrate from version 0 to 1
+        //     // e.g., rename settings keys, convert data formats, etc.
+        // }
+
+        logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
     }
 
     private static string GetPresetsDirectoryPath()

@@ -1,4 +1,4 @@
-﻿namespace Axorith.Core.Models;
+namespace Axorith.Core.Models;
 
 /// <summary>
 ///     Represents a complete, user-defined session preset.
@@ -6,6 +6,12 @@
 /// </summary>
 public class SessionPreset
 {
+    /// <summary>
+    ///     Schema version for preset format. Used for migration when structure changes.
+    ///     Current version: 1
+    /// </summary>
+    public int Version { get; set; } = 1;
+
     /// <summary>
     ///     A unique identifier for this preset. Crucial for updating and deleting.
     /// </summary>

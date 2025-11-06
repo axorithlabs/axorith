@@ -1,4 +1,4 @@
-﻿namespace Axorith.Sdk.Services;
+namespace Axorith.Sdk.Services;
 
 /// <summary>
 ///     Provides an abstraction for securely storing and retrieving sensitive data,
@@ -21,4 +21,11 @@ public interface ISecureStorageService
     /// <param name="key">The key of the secret to retrieve.</param>
     /// <returns>The decrypted secret, or null if the key is not found.</returns>
     string? RetrieveSecret(string key);
+
+    /// <summary>
+    ///     Deletes a secret value by its module-specific key.
+    ///     Useful for logout scenarios where tokens should be cleared.
+    /// </summary>
+    /// <param name="key">The key of the secret to delete.</param>
+    void DeleteSecret(string key);
 }

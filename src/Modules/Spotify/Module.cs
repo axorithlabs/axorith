@@ -1,387 +1,636 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net;
+using System.Reactive.Disposables;
+using System.Reactive.Disposables.Fluent;
+using System.Reactive.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
+using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.Spotify;
 
 /// <summary>
 ///     A module to control Spotify playback, with fully automated authentication and playback options.
 /// </summary>
-public class Module(
-    IModuleLogger logger,
-    IHttpClientFactory httpClientFactory,
-    ISecureStorageService secureStorage,
-    ModuleDefinition definition) : IModule
+public class Module : IModule
 {
-    private readonly IHttpClient _apiClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
-    private readonly IHttpClient _authClient = httpClientFactory.CreateClient($"{definition.Name}.Auth");
+    private readonly IModuleLogger _logger;
+    private readonly IHttpClient _apiClient;
+    private readonly IHttpClient _authClient;
+    private readonly ISecureStorageService _secureStorage;
+    private readonly CompositeDisposable _disposables = new();
+    private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
     private string? _inMemoryAccessToken;
 
-    private const string ClientIdKey = "SpotifyClientId";
-    private const string ClientSecretKey = "SpotifyClientSecret";
-    private const string RefreshTokenKey = "SpotifyRefreshToken";
+    private IReadOnlyList<KeyValuePair<string, string>> _currentDeviceChoices =
+        Array.Empty<KeyValuePair<string, string>>();
 
-    /// <inheritdoc />
-    public IReadOnlyList<SettingBase> GetSettings()
+    private readonly Dictionary<string, string> _knownDevices = new(StringComparer.OrdinalIgnoreCase);
+
+    private const string RefreshTokenKey = "SpotifyRefreshToken";
+    private const string CustomUrlValue = "custom";
+    private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d"; // Public client ID for Axorith
+    private const string RedirectUri = "http://127.0.0.1:8888/callback/";
+
+    // --- Actions ---
+    private readonly Action _loginAction;
+
+    private readonly Action _logoutAction;
+
+    // --- Settings Definition ---
+    private readonly Setting<string> _authStatus;
+    private readonly Setting<string> _targetDevice;
+    private readonly Setting<string> _playbackContext;
+    private readonly Setting<string> _customUrl;
+    private readonly Setting<decimal> _volume;
+    private readonly Setting<string> _shuffle;
+    private readonly Setting<string> _repeatMode;
+
+    public Module(IModuleLogger logger, IHttpClientFactory httpClientFactory, ISecureStorageService secureStorage,
+        ModuleDefinition definition)
     {
-        return new List<SettingBase>
-        {
-            new SecretSetting(ClientIdKey, "Spotify Client ID", "Your Client ID from the Spotify Developer Dashboard."),
-            new SecretSetting(ClientSecretKey, "Spotify Client Secret",
-                "Your Client Secret from the Spotify Developer Dashboard."),
-            new TextSetting("PlaylistUrl", "Spotify URL", "URL of the track, playlist, or album to play."),
-            new NumberSetting("Volume", "Volume", "Playback volume (0-100).", 80),
-            new ChoiceSetting("Shuffle", "Shuffle Mode", new[]
-            {
-                new KeyValuePair<string, string>("true", "On"),
-                new KeyValuePair<string, string>("false", "Off")
-            }, "false"),
-            new ChoiceSetting("RepeatMode", "Repeat Mode", new[]
-            {
+        _logger = logger;
+        _secureStorage = secureStorage;
+        _apiClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
+        _authClient = httpClientFactory.CreateClient($"{definition.Name}.Auth");
+
+        // --- Actions Initialization ---
+        _loginAction = Action.Create(key: "Login", label: "Login to Spotify");
+        _logoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
+        // --- Settings Initialization ---
+        _authStatus = Setting.AsText(key: "AuthStatus", label: "Authentication", defaultValue: "", isReadOnly: true);
+
+        _targetDevice = Setting.AsChoice(key: "TargetDevice", label: "Target Device", defaultValue: "",
+            initialChoices: [], description: "Device to start playback on.");
+        _playbackContext = Setting.AsChoice(key: "PlaybackContext", label: "Playback Source",
+            defaultValue: CustomUrlValue,
+            initialChoices: [new KeyValuePair<string, string>(CustomUrlValue, "Enter a custom URL...")],
+            description: "Select a source or enter a custom URL.");
+        _customUrl = Setting.AsText(key: "CustomUrl", label: "Custom URL", defaultValue: "",
+            description: "URL of the track, playlist, or album to play.", isVisible: false);
+
+        _volume = Setting.AsNumber(key: "Volume", label: "Volume", defaultValue: 80,
+            description: "Playback volume (0-100).");
+        _shuffle = Setting.AsChoice(key: "Shuffle", label: "Shuffle Mode", defaultValue: "false",
+            initialChoices:
+            [new KeyValuePair<string, string>("true", "On"), new KeyValuePair<string, string>("false", "Off")]);
+        _repeatMode = Setting.AsChoice(key: "RepeatMode", label: "Repeat Mode", defaultValue: "off",
+            initialChoices:
+            [
                 new KeyValuePair<string, string>("off", "Off"),
                 new KeyValuePair<string, string>("context", "Repeat Playlist/Album"),
                 new KeyValuePair<string, string>("track", "Repeat Track")
-            }, "off")
-        };
+            ]);
+
+        // --- Reactive Logic ---
+        var hasRefreshToken = !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
+        UpdateUiForAuthenticationState(hasRefreshToken);
+        if (hasRefreshToken) _ = LoadDynamicChoicesAsync();
+
+        _playbackContext.Value.Select(v => v == CustomUrlValue).Subscribe(_customUrl.SetVisibility)
+            .DisposeWith(_disposables);
+
+        _loginAction.Invoked.SelectMany(_ => PerformPkceLoginAsync()).Subscribe(success =>
+        {
+            UpdateUiForAuthenticationState(success);
+            if (success) _ = LoadDynamicChoicesAsync();
+        }).DisposeWith(_disposables);
+
+        _logoutAction.Invoked.Subscribe(_ =>
+        {
+            Logout();
+            UpdateUiForAuthenticationState(false);
+        }).DisposeWith(_disposables);
+    }
+
+    private void UpdateUiForAuthenticationState(bool isAuthenticated)
+    {
+        if (isAuthenticated)
+        {
+            _authStatus.SetValue("Authenticated ✓");
+            _loginAction.SetLabel("Re-Login with Spotify");
+        }
+        else
+        {
+            _authStatus.SetValue("⚠ Login required");
+            _loginAction.SetLabel("Login to Spotify");
+        }
+
+        _logoutAction.SetEnabled(isAuthenticated);
+        _customUrl.SetVisibility(_playbackContext.GetCurrentValue() == CustomUrlValue);
     }
 
     /// <inheritdoc />
     public Type? CustomSettingsViewType => null;
 
     /// <inheritdoc />
-    public object? GetSettingsViewModel(IReadOnlyDictionary<string, string> currentSettings)
+    public object? GetSettingsViewModel()
     {
         return null;
     }
 
-    /// <inheritdoc />
-    public Task<ValidationResult> ValidateSettingsAsync(IReadOnlyDictionary<string, string> userSettings,
-        CancellationToken cancellationToken)
+    public IReadOnlyList<ISetting> GetSettings()
     {
+        return
+        [
+            _authStatus, _targetDevice, _playbackContext,
+            _customUrl, _volume, _shuffle, _repeatMode
+        ];
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return [_loginAction, _logoutAction];
+    }
+
+    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
+    {
+        var deviceId = _targetDevice.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(deviceId))
+            return Task.FromResult(ValidationResult.Fail("Target device must be selected"));
+
         return Task.FromResult(ValidationResult.Success);
     }
 
-    /// <inheritdoc />
-    public async Task OnSessionStartAsync(IReadOnlyDictionary<string, string> userSettings,
-        CancellationToken cancellationToken)
+    public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        var accessToken = await GetValidAccessTokenAsync(userSettings);
+        var accessToken = await GetValidAccessTokenAsync();
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            logger.LogError(null,
-                "Could not obtain a valid Spotify Access Token. Please configure the module and log in via its settings.");
+            _logger.LogError(null,
+                "Could not obtain a valid Spotify Access Token. Please login via the module settings.");
             return;
         }
 
         _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
 
-        if (!await HasActiveDeviceAsync())
+        var deviceId = _targetDevice.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(deviceId))
         {
-            logger.LogError(null,
-                "ERROR: No active Spotify devices found! Open Spotify on any device, play a song for a second, then try again.");
-            return;
+            var devices = await GetAvailableDevicesAsync();
+            deviceId = devices.FirstOrDefault().Key;
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                _logger.LogError(null, "No available devices found for Spotify playback.");
+                return;
+            }
+
+            _logger.LogWarning("No target device selected, defaulting to first available device: {DeviceName}",
+                devices.FirstOrDefault().Value);
         }
 
-        logger.LogInfo("Configuring playback options...");
+        _logger.LogInfo("Configuring playback options...");
         try
         {
-            var volume = int.Parse(userSettings.GetValueOrDefault("Volume", "80"));
-            var shuffle = bool.Parse(userSettings.GetValueOrDefault("Shuffle", "false"));
-            var repeatMode = userSettings.GetValueOrDefault("RepeatMode", "off");
-
             var setupTasks = new List<Task>
             {
-                SetVolumeAsync(volume),
-                SetShuffleAsync(shuffle),
-                SetRepeatModeAsync(repeatMode)
+                SetVolumeAsync((int)_volume.GetCurrentValue(), deviceId),
+                SetShuffleAsync(_shuffle.GetCurrentValue() == "true", deviceId),
+                SetRepeatModeAsync(_repeatMode.GetCurrentValue(), deviceId)
             };
 
             await Task.WhenAll(setupTasks);
-            logger.LogInfo("Playback options configured successfully.");
+            _logger.LogInfo("Playback options configured successfully.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "One or more playback options failed to apply, but continuing anyway.");
+            _logger.LogError(ex, "One or more playback options failed to apply.");
         }
-        // ----------------------------------------------------
 
-        var spotifyUrl = userSettings.GetValueOrDefault("PlaylistUrl", string.Empty);
-        if (!string.IsNullOrWhiteSpace(spotifyUrl)) await StartPlaybackAsync(spotifyUrl, cancellationToken);
+        var contextSelection = _playbackContext.GetCurrentValue();
+        var urlToPlay = contextSelection == CustomUrlValue ? _customUrl.GetCurrentValue() : contextSelection;
+
+        if (!string.IsNullOrWhiteSpace(urlToPlay)) await StartPlaybackAsync(urlToPlay, deviceId, cancellationToken);
     }
 
-    /// <inheritdoc />
     public async Task OnSessionEndAsync()
     {
-        var accessToken = await GetValidAccessTokenAsync(new Dictionary<string, string>());
-        if (string.IsNullOrWhiteSpace(accessToken)) return;
+        try
+        {
+            var accessToken = await GetValidAccessTokenAsync();
+            if (string.IsNullOrWhiteSpace(accessToken)) return;
+            _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
 
-        _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
-        await StopPlaybackAsync();
+            var deviceId = _targetDevice.GetCurrentValue();
+            if (string.IsNullOrWhiteSpace(deviceId)) return;
+
+            await StopPlaybackAsync(deviceId);
+        }
+        catch (Exception)
+        {
+            _logger.LogWarning("Failed to stop Spotify playback during session end");
+            // Suppress exception to avoid breaking ReactiveUI pipeline
+        }
     }
 
-    /// <inheritdoc />
     public void Dispose()
     {
-        GC.SuppressFinalize(this);
+        _disposables.Dispose();
+        _tokenRefreshSemaphore.Dispose();
     }
 
     /// <summary>
-    ///     Gets a valid access token, refreshing it if necessary or performing initial login.
+    ///     Logout and clear all stored tokens.
     /// </summary>
-    private async Task<string?> GetValidAccessTokenAsync(IReadOnlyDictionary<string, string> userSettings)
+    public void Logout()
+    {
+        _secureStorage.DeleteSecret(RefreshTokenKey);
+        _inMemoryAccessToken = null;
+        UpdateUiForAuthenticationState(false);
+        _logger.LogInfo("Logged out from Spotify");
+    }
+
+    private async Task LoadDynamicChoicesAsync()
+    {
+        var accessToken = await GetValidAccessTokenAsync();
+        if (string.IsNullOrWhiteSpace(accessToken)) return;
+        _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
+
+        var devicesTask = LoadDevicesAsync();
+        var itemsTask = LoadPlayableItemsAsync();
+        await Task.WhenAll(devicesTask, itemsTask);
+    }
+
+    private async Task LoadDevicesAsync()
+    {
+        try
+        {
+            var devices = await GetAvailableDevicesAsync();
+            UpdateDeviceChoices(devices);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load Spotify devices.");
+            UpdateDeviceChoices(Array.Empty<KeyValuePair<string, string>>());
+        }
+    }
+
+    private async Task<List<KeyValuePair<string, string>>> GetAvailableDevicesAsync()
+    {
+        var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
+        using var jsonDoc = JsonDocument.Parse(responseJson);
+        return jsonDoc.RootElement.GetProperty("devices").EnumerateArray()
+            .Select(d => new KeyValuePair<string, string>(
+                d.GetProperty("id").GetString() ?? "",
+                $"{d.GetProperty("name").GetString()} ({d.GetProperty("type").GetString()})"))
+            .ToList();
+    }
+
+    private void UpdateDeviceChoices(IReadOnlyList<KeyValuePair<string, string>> freshDevices)
+    {
+        var merged = new List<KeyValuePair<string, string>>();
+
+        foreach (var (id, label) in freshDevices)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                continue;
+
+            _knownDevices[id] = label;
+            merged.Add(new KeyValuePair<string, string>(id, label));
+        }
+
+        var selectedDeviceId = _targetDevice.GetCurrentValue();
+        if (!string.IsNullOrWhiteSpace(selectedDeviceId) && merged.All(d => d.Key != selectedDeviceId))
+        {
+            var offlineLabel = _knownDevices.TryGetValue(selectedDeviceId, out var knownName)
+                ? $"{knownName} (offline)"
+                : "Previously selected device (offline)";
+            merged.Insert(0, new KeyValuePair<string, string>(selectedDeviceId, offlineLabel));
+        }
+
+        if (merged.Count == 0)
+            merged.Add(new KeyValuePair<string, string>(string.Empty,
+                "No active devices found. Start Spotify on a device to enable playback."));
+
+        _currentDeviceChoices = merged;
+        _targetDevice.SetChoices(merged);
+        _logger.LogInfo("Device choices updated. Active: {Active}, Selected: {Selected}",
+            merged.Count, selectedDeviceId ?? "<none>");
+    }
+
+    private async Task LoadPlayableItemsAsync()
+    {
+        try
+        {
+            var playlistsTask = _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists");
+            var albumsTask = _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums");
+            var tracksTask = _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
+            await Task.WhenAll(playlistsTask, albumsTask, tracksTask);
+
+            var choices = new List<KeyValuePair<string, string>> { new(CustomUrlValue, "Enter a custom URL...") };
+
+            using (var doc = JsonDocument.Parse(await tracksTask))
+            {
+                var tracks = doc.RootElement.GetProperty("items").EnumerateArray().Select(t => t.GetProperty("track"));
+                choices.Add(new KeyValuePair<string, string>(
+                    JsonSerializer.Serialize(new { uris = tracks.Select(t => t.GetProperty("uri").GetString()) }),
+                    "Liked Songs"));
+            }
+
+            using (var doc = JsonDocument.Parse(await playlistsTask))
+            {
+                choices.AddRange(doc.RootElement.GetProperty("items").EnumerateArray().Select(p =>
+                    new KeyValuePair<string, string>(p.GetProperty("uri").GetString() ?? "",
+                        $"{p.GetProperty("name").GetString()} (Playlist)")));
+            }
+
+            using (var doc = JsonDocument.Parse(await albumsTask))
+            {
+                choices.AddRange(doc.RootElement.GetProperty("items").EnumerateArray().Select(a =>
+                    new KeyValuePair<string, string>(a.GetProperty("album").GetProperty("uri").GetString() ?? "",
+                        $"{a.GetProperty("album").GetProperty("name").GetString()} (Album)")));
+            }
+
+            _playbackContext.SetChoices(choices);
+            _logger.LogInfo("Successfully loaded playable items from Spotify.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load playable items from Spotify.");
+        }
+    }
+
+    private async Task<string?> GetValidAccessTokenAsync()
     {
         if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken)) return _inMemoryAccessToken;
 
-        var refreshToken = secureStorage.RetrieveSecret(RefreshTokenKey);
-        if (string.IsNullOrWhiteSpace(refreshToken))
-        {
-            logger.LogWarning("Refresh Token not found. Attempting to perform initial login...");
-            refreshToken = await PerformInitialLoginAsync(userSettings);
-            if (string.IsNullOrWhiteSpace(refreshToken))
-            {
-                logger.LogError(null, "Initial login failed. Please check your Client ID/Secret and try again.");
-                return null;
-            }
-        }
-
-        logger.LogInfo("Access token expired or not found. Refreshing...");
-        var clientId = userSettings.GetValueOrDefault(ClientIdKey, string.Empty);
-        var clientSecret = userSettings.GetValueOrDefault(ClientSecretKey, string.Empty);
-
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
-        {
-            logger.LogError(null, "Client ID or Client Secret is not configured.");
-            return null;
-        }
-
+        await _tokenRefreshSemaphore.WaitAsync();
         try
         {
-            var authHeader = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-            _authClient.AddDefaultHeader("Authorization", $"Basic {authHeader}");
-            var content = $"grant_type=refresh_token&refresh_token={refreshToken}";
-            var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token", content,
-                Encoding.UTF8, "application/x-www-form-urlencoded");
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-            var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
+            // Double-check after acquiring the lock, in case another thread just finished.
+            if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken)) return _inMemoryAccessToken;
 
-            if (string.IsNullOrWhiteSpace(newAccessToken))
+            var refreshToken = _secureStorage.RetrieveSecret(RefreshTokenKey);
+            if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                logger.LogError(null, "Failed to refresh token: API response did not contain an access_token.");
+                _logger.LogWarning("Refresh Token not found. A login is required via the module settings.");
                 return null;
             }
 
-            logger.LogInfo("Successfully refreshed access token.");
-            _inMemoryAccessToken = newAccessToken;
-            return _inMemoryAccessToken;
+            _logger.LogInfo("Access token expired or not found. Refreshing...");
+
+            try
+            {
+                var content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    { "grant_type", "refresh_token" },
+                    { "refresh_token", refreshToken },
+                    { "client_id", SpotifyClientId }
+                });
+
+                var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
+                    await content.ReadAsStringAsync(),
+                    Encoding.UTF8, "application/x-www-form-urlencoded");
+                using var jsonDoc = JsonDocument.Parse(responseJson);
+                var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
+
+                // Handle refresh token rotation: Spotify may issue a new refresh token.
+                if (jsonDoc.RootElement.TryGetProperty("refresh_token", out var newRefreshTokenElement))
+                {
+                    var newRefreshToken = newRefreshTokenElement.GetString();
+                    if (!string.IsNullOrWhiteSpace(newRefreshToken))
+                    {
+                        _logger.LogInfo("Spotify provided a new rotated refresh token. Updating secure storage.");
+                        _secureStorage.StoreSecret(RefreshTokenKey, newRefreshToken);
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(newAccessToken))
+                {
+                    _logger.LogError(null, "Failed to refresh token: API response did not contain an access_token.");
+                    return null;
+                }
+
+                _logger.LogInfo("Successfully refreshed access token.");
+                _inMemoryAccessToken = newAccessToken;
+                return _inMemoryAccessToken;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to refresh token. The refresh token might be invalid. Please login again.");
+                UpdateUiForAuthenticationState(false);
+                return null;
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            logger.LogError(ex,
-                "Failed to refresh token. The refresh token might be invalid. Attempting to re-login on next session start.");
-            secureStorage.StoreSecret(RefreshTokenKey, string.Empty);
-            return null;
+            _tokenRefreshSemaphore.Release();
         }
     }
 
-    /// <summary>
-    ///     Performs the initial OAuth2 login flow to get a refresh token.
-    /// </summary>
-    private async Task<string?> PerformInitialLoginAsync(IReadOnlyDictionary<string, string> userSettings)
+    private async Task<bool> PerformPkceLoginAsync()
     {
-        var clientId = userSettings.GetValueOrDefault(ClientIdKey, string.Empty);
-        var clientSecret = userSettings.GetValueOrDefault(ClientSecretKey, string.Empty);
+        var (codeVerifier, codeChallenge) = GeneratePkcePair();
 
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
-        {
-            logger.LogError(null,
-                "Cannot start login process: Spotify Client ID or Client Secret is not set in the module settings.");
-            return null;
-        }
-
-        secureStorage.StoreSecret(ClientIdKey, clientId);
-        secureStorage.StoreSecret(ClientSecretKey, clientSecret);
-
-        const string redirectUri = "http://127.0.0.1:8888/callback/";
         using var listener = new HttpListener();
-        listener.Prefixes.Add(redirectUri);
+        listener.Prefixes.Add(RedirectUri);
 
         try
         {
             listener.Start();
-            var scopes = "user-modify-playback-state user-read-playback-state";
-            var authUrl =
-                $"https://accounts.spotify.com/authorize?client_id={clientId}&response_type=code&redirect_uri={Uri.EscapeDataString(redirectUri)}&scope={Uri.EscapeDataString(scopes)}";
+            var scopes =
+                "user-modify-playback-state user-read-playback-state user-read-private playlist-read-private user-library-read";
+            var authUrl = $"https://accounts.spotify.com/authorize?client_id={SpotifyClientId}" +
+                          "&response_type=code" +
+                          $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
+                          $"&scope={Uri.EscapeDataString(scopes)}" +
+                          "&code_challenge_method=S256" +
+                          $"&code_challenge={codeChallenge}";
 
-            Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
-            logger.LogWarning("Your browser has been opened to log in to Spotify. Please grant access.");
+            try
+            {
+                _logger.LogInfo("Attempting to open browser for Spotify login.");
+                Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
+                _logger.LogWarning("Your browser has been opened to log in to Spotify. Please grant access.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to open browser automatically. Please copy and paste this URL into your browser: {Url}",
+                    authUrl);
+                _authStatus.SetValue("Error: Could not open browser. See logs.");
+                return false;
+            }
 
-            var context = await listener.GetContextAsync();
+            // Wait for OAuth callback with 5 minute timeout
+            var contextTask = listener.GetContextAsync();
+            var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
+            var completedTask = await Task.WhenAny(contextTask, timeoutTask).ConfigureAwait(false);
+
+            if (completedTask == timeoutTask)
+            {
+                _logger.LogWarning("Spotify authentication timed out after 5 minutes");
+                _authStatus.SetValue("Error: Authentication timed out");
+                listener.Stop();
+                return false;
+            }
+
+            var context = await contextTask.ConfigureAwait(false);
             var code = context.Request.QueryString.Get("code");
 
             var response = context.Response;
-            var buffer =
-                "<html><body><h1>Success!</h1><p>You can now close this browser tab and return to Axorith.</p></body></html>"u8
-                    .ToArray();
+            var buffer = "<html><body><h1>Success!</h1><p>You can now close this browser tab.</p></body></html>"u8
+                .ToArray();
             response.ContentLength64 = buffer.Length;
             await response.OutputStream.WriteAsync(buffer);
             response.OutputStream.Close();
             listener.Stop();
 
-            if (string.IsNullOrWhiteSpace(code)) return null;
+            if (string.IsNullOrWhiteSpace(code)) return false;
 
-            var authHeader = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-            _authClient.AddDefaultHeader("Authorization", $"Basic {authHeader}");
-            var content = $"grant_type=authorization_code&code={code}&redirect_uri={Uri.EscapeDataString(redirectUri)}";
-            var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token", content,
+            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                { "grant_type", "authorization_code" },
+                { "code", code },
+                { "redirect_uri", RedirectUri },
+                { "client_id", SpotifyClientId },
+                { "code_verifier", codeVerifier }
+            });
+
+            var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
+                await content.ReadAsStringAsync(),
                 Encoding.UTF8, "application/x-www-form-urlencoded");
 
             using var jsonDoc = JsonDocument.Parse(responseJson);
             var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();
 
-            if (!string.IsNullOrWhiteSpace(refreshToken))
-            {
-                secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
-                logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
-                return refreshToken;
-            }
+            if (string.IsNullOrWhiteSpace(refreshToken)) return false;
+
+            _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
+            _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
+            return true;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed during initial login process.");
+            _logger.LogError(ex, "Failed during PKCE login process.");
+            return false;
         }
         finally
         {
             if (listener.IsListening) listener.Stop();
         }
-
-        return null;
     }
 
-    /// <summary>
-    ///     Checks if there is an active device to play music on.
-    /// </summary>
-    private async Task<bool> HasActiveDeviceAsync()
+    private static (string, string) GeneratePkcePair()
+    {
+        var randomBytes = RandomNumberGenerator.GetBytes(32);
+        var codeVerifier = Convert.ToBase64String(randomBytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+        using var sha256 = SHA256.Create();
+        var challengeBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
+        var codeChallenge = Convert.ToBase64String(challengeBytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+        return (codeVerifier, codeChallenge);
+    }
+
+    private async Task StartPlaybackAsync(string context, string deviceId, CancellationToken cancellationToken)
     {
         try
         {
-            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-            return jsonDoc.RootElement.GetProperty("devices").EnumerateArray()
-                .Any(device => device.GetProperty("is_active").GetBoolean());
+            string jsonContent;
+            if (context.StartsWith("{"))
+            {
+                jsonContent = context;
+            }
+            else
+            {
+                var spotifyUri = ConvertUrlToUri(context);
+                jsonContent = spotifyUri.Contains(":track:")
+                    ? JsonSerializer.Serialize(new { uris = new[] { spotifyUri } })
+                    : JsonSerializer.Serialize(new { context_uri = spotifyUri });
+            }
+
+            _logger.LogInfo("Starting playback for context: {Context}", context);
+            await _apiClient.PutStringAsync($"https://api.spotify.com/v1/me/player/play?device_id={deviceId}",
+                jsonContent, Encoding.UTF8, "application/json", cancellationToken);
+            _logger.LogInfo("Spotify 'play' command sent successfully.");
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            _logger.LogError(ex, "Failed to start Spotify playback.");
         }
     }
 
-    /// <summary>
-    ///     Converts a Spotify URL to a URI.
-    /// </summary>
-    private static string ConvertUrlToUri(string url)
+    private string ConvertUrlToUri(string url)
     {
+        if (url.Contains("spotify:")) return url;
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) throw new ArgumentException("Invalid URL format");
         var segments = uri.AbsolutePath.Trim('/').Split('/');
         if (segments.Length < 2) throw new ArgumentException("URL does not contain a valid Spotify type and ID");
         return $"spotify:{segments[0]}:{segments[1]}";
     }
 
-    /// <summary>
-    ///     Starts playback of a given track, playlist, or album.
-    /// </summary>
-    private async Task StartPlaybackAsync(string spotifyUrl, CancellationToken cancellationToken)
+    private async Task StopPlaybackAsync(string deviceId)
     {
         try
         {
-            var spotifyUri = ConvertUrlToUri(spotifyUrl);
-            var jsonContent = spotifyUri.Contains(":track:")
-                ? JsonSerializer.Serialize(new { uris = new[] { spotifyUri } })
-                : JsonSerializer.Serialize(new { context_uri = spotifyUri });
-
-            logger.LogInfo("Starting playback for: {SpotifyUri}", spotifyUri);
-            await _apiClient.PutStringAsync("https://api.spotify.com/v1/me/player/play", jsonContent, Encoding.UTF8,
-                "application/json", cancellationToken);
-            logger.LogInfo("Spotify 'play' command sent successfully.");
+            _logger.LogInfo("Pausing Spotify playback...");
+            await _apiClient.PutAsync($"https://api.spotify.com/v1/me/player/pause?device_id={deviceId}",
+                CancellationToken.None);
+            _logger.LogInfo("Spotify 'pause' command sent successfully.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to start Spotify playback.");
+            _logger.LogError(ex, "Failed to pause Spotify playback.");
         }
     }
 
-    /// <summary>
-    ///     Pauses the current playback.
-    /// </summary>
-    private async Task StopPlaybackAsync()
-    {
-        try
-        {
-            logger.LogInfo("Pausing Spotify playback...");
-            await _apiClient.PutAsync("https://api.spotify.com/v1/me/player/pause", CancellationToken.None);
-            logger.LogInfo("Spotify 'pause' command sent successfully.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to pause Spotify playback.");
-        }
-    }
-
-    /// <summary>
-    ///     Sets the playback volume.
-    /// </summary>
-    private async Task SetVolumeAsync(int volume)
+    private async Task SetVolumeAsync(int volume, string deviceId)
     {
         try
         {
             volume = Math.Clamp(volume, 0, 100);
-            logger.LogInfo("Setting volume to {Volume}%...", volume);
-            await _apiClient.PutAsync($"https://api.spotify.com/v1/me/player/volume?volume_percent={volume}",
-                CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to set volume.");
-        }
-    }
-
-    /// <summary>
-    ///     Sets the shuffle mode.
-    /// </summary>
-    private async Task SetShuffleAsync(bool shuffle)
-    {
-        try
-        {
-            logger.LogInfo("Setting shuffle to: {Shuffle}", shuffle);
+            _logger.LogInfo("Setting volume to {Volume}%...", volume);
             await _apiClient.PutAsync(
-                $"https://api.spotify.com/v1/me/player/shuffle?state={shuffle.ToString().ToLower()}",
+                $"https://api.spotify.com/v1/me/player/volume?volume_percent={volume}&device_id={deviceId}",
                 CancellationToken.None);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to set shuffle mode.");
+            _logger.LogError(ex, "Failed to set volume.");
         }
     }
 
-    /// <summary>
-    ///     Sets the repeat mode.
-    /// </summary>
-    private async Task SetRepeatModeAsync(string mode)
+    private async Task SetShuffleAsync(bool shuffle, string deviceId)
     {
         try
         {
-            logger.LogInfo("Setting repeat mode to: {Mode}", mode);
-            await _apiClient.PutAsync($"https://api.spotify.com/v1/me/player/repeat?state={mode}",
+            _logger.LogInfo("Setting shuffle to: {Shuffle}", shuffle);
+            await _apiClient.PutAsync(
+                $"https://api.spotify.com/v1/me/player/shuffle?state={shuffle.ToString().ToLower()}&device_id={deviceId}",
                 CancellationToken.None);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to set repeat mode.");
+            _logger.LogError(ex, "Failed to set shuffle mode.");
+        }
+    }
+
+    private async Task SetRepeatModeAsync(string mode, string deviceId)
+    {
+        try
+        {
+            _logger.LogInfo("Setting repeat mode to: {Mode}", mode);
+            await _apiClient.PutAsync($"https://api.spotify.com/v1/me/player/repeat?state={mode}&device_id={deviceId}",
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set repeat mode.");
         }
     }
 }
