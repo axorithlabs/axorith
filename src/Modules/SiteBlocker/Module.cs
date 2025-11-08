@@ -82,7 +82,7 @@ public class Module : IModule
     }
 
     /// <inheritdoc />
-    public Task OnSessionEndAsync()
+    public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInfo("Sending 'unblock' command via Named Pipe...");
 

@@ -40,7 +40,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
     public event Action<Guid>? SessionStopped;
 
     /// <inheritdoc />
-    public Task StartSessionAsync(SessionPreset preset)
+    public Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default)
     {
         if (IsSessionRunning)
             throw new SessionException(
@@ -48,7 +48,7 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
         ActiveSession = preset;
-        _sessionCts = new CancellationTokenSource();
+        _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         // Immediately notify listeners that the session has started so the UI can update.
         SessionStarted?.Invoke(preset.Id);
@@ -165,66 +165,66 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                         "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
                         ActiveSession.Name);
 
-                await StopCurrentSessionAsync().ConfigureAwait(false);
+                await StopCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
     /// <inheritdoc />
-    public async Task StopCurrentSessionAsync()
+    public async Task StopCurrentSessionAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsSessionRunning || ActiveSession is null) return;
-
-        var sessionToStop = ActiveSession;
-        logger.LogInformation("Stopping session '{PresetName}'...", sessionToStop.Name);
-
-        await _sessionCts?.CancelAsync()!;
-
-        var stopTasks = _activeModules.Select(async activeModule =>
+        if (!IsSessionRunning)
         {
-            var config = activeModule.Configuration;
-            var definition = activeModule.Scope.Resolve<ModuleDefinition>();
+            logger.LogWarning("No session is currently running");
+            return;
+        }
 
-            var scope = logger.BeginScope(new Dictionary<string, object>
-            {
-                ["SessionId"] = sessionToStop.Id,
-                ["ModuleName"] = definition.Name,
-                ["ModuleInstanceName"] = config.CustomName ?? string.Empty
-            });
+        logger.LogInformation("Stopping current session...");
 
-            try
-            {
-                await activeModule.Instance.OnSessionEndAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync.",
-                    definition.Name);
-            }
-            finally
-            {
-                scope?.Dispose();
-            }
-        });
-        await Task.WhenAll(stopTasks).ConfigureAwait(false);
+        try
+        {
+            // Cancel session CancellationToken
+            _sessionCts?.Cancel();
 
-        foreach (var activeModule in _activeModules)
-            try
+            // Stop all active modules
+            foreach (var activeModule in _activeModules)
             {
-                activeModule.Dispose();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "An error occurred while disposing a module or its scope");
+                logger.LogInformation("Stopping module...");
+
+                try
+                {
+                    await activeModule.Instance.OnSessionEndAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Module threw an exception during OnSessionEndAsync");
+                }
             }
 
-        _activeModules.Clear();
-        _sessionCts?.Dispose();
-        _sessionCts = null;
-        ActiveSession = null;
+            // Dispose all modules and scopes
+            foreach (var activeModule in _activeModules)
+                try
+                {
+                    activeModule.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "An error occurred while disposing a module or its scope");
+                }
 
-        logger.LogInformation("Session '{PresetName}' stopped", sessionToStop.Name);
-        SessionStopped?.Invoke(sessionToStop.Id);
+            _activeModules.Clear();
+            _sessionCts?.Dispose();
+            _sessionCts = null;
+            ActiveSession = null;
+
+            logger.LogInformation("Session stopped successfully");
+            SessionStopped?.Invoke(ActiveSession?.Id ?? Guid.Empty);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during session stop");
+            throw;
+        }
     }
 
     /// <summary>

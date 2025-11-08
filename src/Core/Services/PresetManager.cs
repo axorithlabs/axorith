@@ -64,21 +64,75 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         return presets;
     }
 
+    public async Task<SessionPreset?> GetPresetByIdAsync(Guid presetId, CancellationToken cancellationToken)
+    {
+        var filePath = Path.Combine(_presetsDirectory, $"{presetId}.json");
+
+        if (!File.Exists(filePath))
+        {
+            logger.LogWarning("Preset file not found: {FilePath}", filePath);
+            return null;
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(filePath);
+            var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (preset != null && preset.Version < CurrentPresetVersion)
+            {
+                logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+                    preset.Name, preset.Version, CurrentPresetVersion);
+                MigratePreset(preset);
+                preset.Version = CurrentPresetVersion;
+                await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
+            }
+
+            return preset;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load preset {PresetId} from {FilePath}", presetId, filePath);
+            return null;
+        }
+    }
+
     public async Task SavePresetAsync(SessionPreset preset, CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(_presetsDirectory, $"{preset.Id}.json");
+        var tempFilePath = Path.Combine(_presetsDirectory, $"{preset.Id}.json.tmp");
         logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, filePath);
 
         try
         {
             Directory.CreateDirectory(_presetsDirectory);
-            await using var stream = File.Create(filePath);
-            await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken).ConfigureAwait(false);
+
+            // Write to temporary file first to ensure atomic operation
+            await using (var stream = File.Create(tempFilePath))
+            {
+                await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            // Atomic rename: if this succeeds, the file is guaranteed to be complete
+            File.Move(tempFilePath, filePath, overwrite: true);
             logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
+
+            // Clean up temporary file if it exists
+            try
+            {
+                if (File.Exists(tempFilePath))
+                    File.Delete(tempFilePath);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
         }
     }
 

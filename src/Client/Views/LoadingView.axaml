@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Axorith.Client.ViewModels"
+             x:Class="Axorith.Client.Views.LoadingView"
+             x:DataType="vm:LoadingViewModel">
+    <Border Background="#1E1E1E" Padding="40">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="20">
+            <TextBlock Text="⏳" 
+                       FontSize="64" 
+                       Foreground="#4A9EFF"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding Message}" 
+                       FontSize="16" 
+                       Foreground="White"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Please wait..." 
+                       FontSize="12" 
+                       Foreground="#888888"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Border>
+</UserControl>

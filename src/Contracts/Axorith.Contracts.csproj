@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Contracts</AssemblyName>
+        <RootNamespace>Axorith.Contracts</RootNamespace>
+        <Description>gRPC contracts for Axorith client-server communication</Description>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Grpc.Tools" Version="2.64.0" PrivateAssets="All" />
+        <PackageReference Include="Grpc.Core.Api" Version="2.64.0" />
+        <PackageReference Include="Google.Protobuf" Version="3.27.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Protobuf Include="Protos\**\*.proto" GrpcServices="Both" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
+    </ItemGroup>
+</Project>

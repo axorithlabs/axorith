@@ -1,4 +1,4 @@
-﻿using Axorith.Core.Models;
+using Axorith.Core.Models;
 
 namespace Axorith.Core.Services.Abstractions;
 
@@ -11,6 +11,14 @@ public interface IPresetManager
     ///     Loads all session presets from the persistent storage.
     /// </summary>
     Task<IReadOnlyList<SessionPreset>> LoadAllPresetsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Loads a single preset by its ID from persistent storage.
+    /// </summary>
+    /// <param name="presetId">The ID of the preset to load.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The preset if found, otherwise null.</returns>
+    Task<SessionPreset?> GetPresetByIdAsync(Guid presetId, CancellationToken cancellationToken);
 
     /// <summary>
     ///     Saves a session preset to the persistent storage.

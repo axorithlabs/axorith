@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
               xmlns:vm="using:Axorith.Client.ViewModels"
               xmlns:converters="using:Axorith.Client.Converters"
@@ -27,13 +27,15 @@
         </DataTemplate>
 
         <DataTemplate x:Key="NumberSettingTemplate" x:DataType="vm:SettingViewModel">
-            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}"/>
+            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
+                           Increment="{Binding NumberIncrement}" 
+                           FormatString="{Binding NumberFormatString}"
+                           IsEnabled="{Binding !IsReadOnly}"/>
         </DataTemplate>
 
         <DataTemplate x:Key="ChoiceSettingTemplate" x:DataType="vm:SettingViewModel">
             <ComboBox ItemsSource="{Binding Choices}"
-                      SelectedValue="{Binding StringValue, Mode=TwoWay}"
-                      SelectedValueBinding="{Binding Key}"
+                      SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
                       MinWidth="200"
                       IsEnabled="{Binding !IsReadOnly}">
                 <ComboBox.ItemTemplate>

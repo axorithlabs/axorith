@@ -63,7 +63,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
         get
         {
             var value = Setting.GetCurrentValueAsObject();
-            if (value == null) return 0;
+            if (value == null)
+                // Return 0 as safe default for empty values
+                return 0;
+
             // Handle different numeric types
             return value switch
             {
@@ -75,7 +78,14 @@ public class SettingViewModel : ReactiveObject, IDisposable
                 _ => 0
             };
         }
-        set => Setting.SetValueFromObject(value);
+        set
+        {
+            // For int settings, round the value
+            if (Setting.ValueType == typeof(int))
+                Setting.SetValueFromObject((int)Math.Round(value));
+            else
+                Setting.SetValueFromObject(value);
+        }
     }
 
     // Helper to support TimeSpan serialization via seconds when saving
@@ -92,6 +102,23 @@ public class SettingViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _choices, value);
     }
 
+    public decimal NumberIncrement => Setting.ValueType == typeof(int) ? 1 : 0.1m;
+
+    public string NumberFormatString => Setting.ValueType == typeof(int) ? "0" : "0.##";
+
+    public KeyValuePair<string, string>? SelectedChoice
+    {
+        get
+        {
+            var currentValue = StringValue;
+            return Choices.FirstOrDefault(c => c.Key == currentValue);
+        }
+        set
+        {
+            if (value.HasValue) StringValue = value.Value.Key;
+        }
+    }
+
     /// <summary>
     ///     A command that can be bound to a button click to trigger the setting's action.
     /// </summary>
@@ -103,64 +130,45 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
         ClickCommand = ReactiveCommand.Create(() => { BoolValue = true; });
 
-        // Validate type mapping: ensure ControlType matches ValueType expectations
-        if (!IsControlTypeCompatibleWithValueType(setting.ControlType, setting.ValueType))
-            throw new InvalidOperationException(
-                $"Setting '{setting.Key}' ControlType '{setting.ControlType}' is incompatible with ValueType '{setting.ValueType.Name}'.");
-
-        // Subscribe to reactive properties of the setting to update the UI.
-        Setting.Label
+        // Subscribe to label updates
+        setting.Label
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(l => Label = l, _ =>
-            {
-                /* Ignore errors after module disposal */
-            })
+            .Subscribe(newLabel => Label = newLabel)
             .DisposeWith(_disposables);
 
-        Setting.IsVisible
+        // Subscribe to visibility updates
+        setting.IsVisible
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(v => IsVisible = v, _ =>
-            {
-                /* Ignore errors after module disposal */
-            })
+            .Subscribe(visible => IsVisible = visible)
             .DisposeWith(_disposables);
 
-        Setting.IsReadOnly
+        // Subscribe to readonly updates
+        setting.IsReadOnly
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(r => IsReadOnly = r, _ =>
-            {
-                /* Ignore errors after module disposal */
-            })
+            .Subscribe(readOnly => IsReadOnly = readOnly)
             .DisposeWith(_disposables);
 
-        // Subscribe to value changes to raise PropertyChanged for the correct UI property.
-        Setting.ValueAsObject
+        // Subscribe to value changes and raise property changed for appropriate properties
+        setting.ValueAsObject
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ =>
             {
-                switch (Setting.ControlType)
-                {
-                    case SettingControlType.Text:
-                    case SettingControlType.TextArea:
-                    case SettingControlType.Secret:
-                    case SettingControlType.FilePicker:
-                    case SettingControlType.DirectoryPicker:
-                    case SettingControlType.Choice:
-                        this.RaisePropertyChanged(nameof(StringValue));
-                        break;
-                    case SettingControlType.Checkbox:
-                    case SettingControlType.Button:
-                        this.RaisePropertyChanged(nameof(BoolValue));
-                        break;
-                    case SettingControlType.Number:
-                        this.RaisePropertyChanged(nameof(DecimalValue));
-                        break;
-                }
+                // Notify all value properties - the UI will decide which one to use
+                this.RaisePropertyChanged(nameof(StringValue));
+                this.RaisePropertyChanged(nameof(BoolValue));
+                this.RaisePropertyChanged(nameof(DecimalValue));
+                this.RaisePropertyChanged(nameof(SelectedChoice));
             }, _ =>
             {
                 /* Ignore errors after module disposal */
             })
             .DisposeWith(_disposables);
+
+        // CRITICAL: Raise initial property changed for value bindings to show saved values
+        this.RaisePropertyChanged(nameof(StringValue));
+        this.RaisePropertyChanged(nameof(BoolValue));
+        this.RaisePropertyChanged(nameof(DecimalValue));
+        this.RaisePropertyChanged(nameof(SelectedChoice));
 
         // Subscribe to choice updates if this is a Choice setting.
         Setting.Choices?

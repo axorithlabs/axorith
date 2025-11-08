@@ -2,8 +2,14 @@ using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Threading;
+using Axorith.Client.CoreSdk;
 using Axorith.Core.Models;
-using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
@@ -16,9 +22,10 @@ namespace Axorith.Client.ViewModels;
 public class SessionEditorViewModel : ReactiveObject
 {
     private readonly ShellViewModel _shell;
-    private readonly IModuleRegistry _moduleRegistry;
-    private readonly IPresetManager _presetManager;
+    private readonly IModulesApi _modulesApi;
+    private readonly IPresetsApi _presetsApi;
     private readonly IServiceProvider _serviceProvider;
+    private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new() { Id = Guid.NewGuid() };
 
     /// <summary>
@@ -107,13 +114,13 @@ public class SessionEditorViewModel : ReactiveObject
     /// </summary>
     public ICommand CloseModuleSettingsCommand { get; }
 
-    public SessionEditorViewModel(ShellViewModel shell, IModuleRegistry moduleRegistry, IPresetManager presetManager,
+    public SessionEditorViewModel(ShellViewModel shell, IModulesApi modulesApi, IPresetsApi presetsApi,
         IServiceProvider serviceProvider)
     {
         _shell = shell;
-        _moduleRegistry = moduleRegistry;
-        _presetManager = presetManager;
-        _serviceProvider = serviceProvider;
+        _modulesApi = modulesApi ?? throw new ArgumentNullException(nameof(modulesApi));
+        _presetsApi = presetsApi ?? throw new ArgumentNullException(nameof(presetsApi));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
         var canSave = this.WhenAnyValue(vm => vm.Name).Select(name => !string.IsNullOrWhiteSpace(name));
         SaveAndCloseCommand = ReactiveCommand.CreateFromTask(SaveAndCloseAsync, canSave);
@@ -126,9 +133,8 @@ public class SessionEditorViewModel : ReactiveObject
         {
             _preset.Modules.Remove(moduleVm.Model);
             ConfiguredModules.Remove(moduleVm);
-            moduleVm.Dispose(); // Clean up the live instance and subscriptions
+            moduleVm.Dispose();
             if (SelectedModule == moduleVm) SelectedModule = null;
-            UpdateAvailableModules();
         });
 
         OpenModuleSettingsCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
@@ -138,33 +144,55 @@ public class SessionEditorViewModel : ReactiveObject
 
         CloseModuleSettingsCommand = ReactiveCommand.Create(() => { SelectedModule = null; });
 
+        _ = InitializeAsync();
+    }
 
-        UpdateAvailableModules();
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            var modules = await _modulesApi.ListModulesAsync();
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _availableModules = modules;
+                UpdateAvailableModules();
+
+                // Re-populate configured modules once definitions are available
+                LoadFromPreset();
+            });
+        }
+        catch (Exception)
+        {
+            // Surface error via shell status (optional) – fallback to no modules
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _availableModules = Array.Empty<ModuleDefinition>();
+                UpdateAvailableModules();
+            });
+        }
     }
 
     private void LoadFromPreset()
     {
         Name = _preset.Name;
 
-        // Dispose old ViewModels before clearing the collection
         foreach (var vm in ConfiguredModules) vm.Dispose();
         ConfiguredModules.Clear();
 
         foreach (var configured in _preset.Modules)
         {
-            var moduleDef = _moduleRegistry.GetDefinitionById(configured.ModuleId);
+            var moduleDef = _availableModules.FirstOrDefault(m => m.Id == configured.ModuleId);
             if (moduleDef != null)
-                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _moduleRegistry));
+                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _availableModules,
+                    _modulesApi));
         }
-
-        UpdateAvailableModules();
     }
 
     private void UpdateAvailableModules()
     {
         AvailableModulesToAdd.Clear();
-        var allDefinitions = _moduleRegistry.GetAllDefinitions();
-        foreach (var def in allDefinitions)
+        foreach (var def in _availableModules)
             AvailableModulesToAdd.Add(def);
     }
 
@@ -176,21 +204,97 @@ public class SessionEditorViewModel : ReactiveObject
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
         _preset.Modules.Add(newConfiguredModule);
 
-        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _moduleRegistry);
+        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _availableModules, _modulesApi);
         ConfiguredModules.Add(newVm);
 
         SelectedModule = newVm;
-
-        // We no longer auto-select the module. The user must click 'Settings'.
         ModuleToAdd = null;
     }
 
     private async Task SaveAndCloseAsync()
     {
+        // Validate preset name
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            await ShowErrorDialogAsync("Preset name is required.", "Please enter a name for this preset.");
+            return;
+        }
+
+        // Save all module settings to models
         foreach (var moduleVm in ConfiguredModules) moduleVm.SaveChangesToModel();
+
+        // Module validation happens when session starts, not here
+
         _preset.Name = Name;
-        await _presetManager.SavePresetAsync(_preset, CancellationToken.None);
-        Cancel();
+
+        try
+        {
+            var existingPreset = await _presetsApi.GetPresetAsync(_preset.Id);
+            if (existingPreset != null)
+                await _presetsApi.UpdatePresetAsync(_preset);
+            else
+                await _presetsApi.CreatePresetAsync(_preset);
+
+            Cancel();
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorDialogAsync("Save Failed", $"Failed to save preset: {ex.Message}");
+        }
+    }
+
+    private async Task ShowErrorDialogAsync(string title, string message)
+    {
+        var window = Application.Current?.ApplicationLifetime is
+            IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow
+            : null;
+
+        if (window == null) return;
+
+        Window? dialog = null;
+        dialog = new Window
+        {
+            Title = title,
+            Width = 450,
+            Height = 250,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Spacing = 15,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = title,
+                        FontSize = 18,
+                        FontWeight = FontWeight.Bold,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Foreground = new SolidColorBrush(Colors.OrangeRed)
+                    },
+                    new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = TextWrapping.Wrap,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextAlignment = TextAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 10),
+                        MaxWidth = 400
+                    },
+                    new Button
+                    {
+                        Content = "OK",
+                        Width = 100,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Command = ReactiveCommand.Create(() => dialog!.Close())
+                    }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(window);
     }
 
     private void Cancel()

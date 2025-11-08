@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package axorith.v1;
+
+import "Protos/common.proto";
+
+option csharp_namespace = "Axorith.Contracts";
+
+service ModulesService {
+  rpc ListModules(ListModulesRequest) returns (ListModulesResponse);
+  rpc GetModuleSettings(GetModuleSettingsRequest) returns (GetModuleSettingsResponse);
+  rpc InvokeAction(InvokeActionRequest) returns (OperationResult);
+  rpc UpdateSetting(UpdateSettingRequest) returns (OperationResult);
+  rpc StreamSettingUpdates(StreamSettingUpdatesRequest) returns (stream SettingUpdate);
+}
+
+message ListModulesRequest {
+  // Empty for MVP - returns all loaded modules
+}
+
+message ListModulesResponse {
+  repeated ModuleDefinition modules = 1;
+}
+
+message GetModuleSettingsRequest {
+  string module_id = 1;
+}
+
+message GetModuleSettingsResponse {
+  repeated Setting settings = 1;
+  repeated Action actions = 2;
+}
+
+message InvokeActionRequest {
+  string module_instance_id = 1;
+  string action_key = 2;
+}
+
+message UpdateSettingRequest {
+  string module_instance_id = 1;
+  string setting_key = 2;
+  
+  oneof value {
+    string string_value = 10;
+    bool bool_value = 11;
+    double number_value = 12;
+    int32 int_value = 13;
+  }
+}
+
+message StreamSettingUpdatesRequest {
+  // Subscribe to all setting updates
+  // In future can filter by module instance
+  string module_instance_id = 1;
+}

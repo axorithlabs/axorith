@@ -171,7 +171,7 @@ public class ModuleErrorHandlingTests
             .ReturnsAsync(ValidationResult.Success);
         mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.OnSessionEndAsync())
+        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Stop failed"));
 
         var mockRegistry = new Mock<IModuleRegistry>();
@@ -219,7 +219,7 @@ public class ModuleErrorHandlingTests
             .ReturnsAsync(ValidationResult.Success);
         mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.OnSessionEndAsync())
+        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mockModule.Setup(m => m.Dispose())
             .Callback(() =>

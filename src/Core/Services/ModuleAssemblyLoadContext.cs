@@ -13,7 +13,9 @@ internal class ModuleAssemblyLoadContext(string modulePath) : AssemblyLoadContex
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
-        return assemblyPath != null ? LoadFromAssemblyPath(assemblyPath) :
+        return assemblyPath != null
+            ? LoadFromAssemblyPath(assemblyPath)
+            :
             // If not found in the module's directory, fall back to the default context.
             null;
     }

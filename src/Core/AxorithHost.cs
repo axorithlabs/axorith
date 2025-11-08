@@ -74,13 +74,13 @@ public sealed class AxorithHost : IDisposable, IAsyncDisposable
                 {
                     services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(Log.Logger));
 
-                    // NOTE: Circuit breaker is shared across all modules.
-                    // If one module repeatedly fails, it can affect others.
-                    // Consider using named clients per module for better isolation.
+                    // HTTP Client for modules with retry and timeout policies
+                    // NOTE: Circuit breaker intentionally NOT added to default client to prevent
+                    // one module's failures from affecting others. Modules should use named clients
+                    // if they need isolated circuit breakers.
                     services.AddHttpClient("default")
                         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler())
                         .AddPolicyHandler(GetRetryPolicy())
-                        .AddPolicyHandler(GetCircuitBreakerPolicy())
                         .AddPolicyHandler(GetTimeoutPolicy());
                 })
                 .ConfigureContainer<ContainerBuilder>(builder =>

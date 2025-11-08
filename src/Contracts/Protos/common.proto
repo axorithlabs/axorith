@@ -1,0 +1,176 @@
+syntax = "proto3";
+
+package axorith.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option csharp_namespace = "Axorith.Contracts";
+
+// ===== Common Types =====
+
+message OperationResult {
+  bool success = 1;
+  string message = 2;
+  repeated string errors = 3;
+  repeated string warnings = 4;
+}
+
+// ===== Setting-related Messages =====
+
+message Setting {
+  string key = 1;
+  string label = 2;
+  string description = 3;
+  SettingControlType control_type = 4;
+  SettingPersistence persistence = 5;
+  bool is_visible = 6;
+  bool is_read_only = 7;
+  string value_type = 8;
+  
+  oneof value {
+    string string_value = 10;
+    bool bool_value = 11;
+    double number_value = 12;
+    int32 int_value = 13;
+    string decimal_string = 14; // For high-precision decimal values
+  }
+  
+  repeated Choice choices = 20;
+}
+
+message Choice {
+  string key = 1;
+  string display = 2;
+}
+
+enum SettingControlType {
+  SETTING_CONTROL_TYPE_TEXT = 0;
+  SETTING_CONTROL_TYPE_TEXT_AREA = 1;
+  SETTING_CONTROL_TYPE_CHECKBOX = 2;
+  SETTING_CONTROL_TYPE_NUMBER = 3;
+  SETTING_CONTROL_TYPE_CHOICE = 4;
+  SETTING_CONTROL_TYPE_SECRET = 5;
+  SETTING_CONTROL_TYPE_FILE_PICKER = 6;
+  SETTING_CONTROL_TYPE_DIRECTORY_PICKER = 7;
+}
+
+enum SettingPersistence {
+  SETTING_PERSISTENCE_PERSISTED = 0;
+  SETTING_PERSISTENCE_EPHEMERAL = 1;
+  SETTING_PERSISTENCE_TRANSIENT = 2;
+}
+
+message SettingUpdate {
+  string module_instance_id = 1;
+  string setting_key = 2;
+  SettingProperty property = 3;
+  
+  oneof value {
+    string string_value = 10;
+    bool bool_value = 11;
+    double number_value = 12;
+    int32 int_value = 13;
+    ChoiceList choice_list = 14;
+    string decimal_string = 15; // For high-precision decimal values
+  }
+}
+
+message ChoiceList {
+  repeated Choice choices = 1;
+}
+
+enum SettingProperty {
+  SETTING_PROPERTY_VALUE = 0;
+  SETTING_PROPERTY_LABEL = 1;
+  SETTING_PROPERTY_VISIBILITY = 2;
+  SETTING_PROPERTY_READ_ONLY = 3;
+  SETTING_PROPERTY_CHOICES = 4;
+}
+
+// ===== Action-related Messages =====
+
+message Action {
+  string key = 1;
+  string label = 2;
+  string description = 3;
+  bool is_enabled = 4;
+}
+
+// ===== Module-related Messages =====
+
+message ModuleDefinition {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string category = 4;
+  repeated string platforms = 5;
+  string assembly = 6;
+}
+
+message ConfiguredModule {
+  string instance_id = 1;
+  string module_id = 2;
+  string custom_name = 3;
+  map<string, string> settings = 4;
+}
+
+// ===== Preset-related Messages =====
+
+message PresetSummary {
+  string id = 1;
+  string name = 2;
+  int32 version = 3;
+  int32 module_count = 4;
+}
+
+message Preset {
+  string id = 1;
+  string name = 2;
+  int32 version = 3;
+  repeated ConfiguredModule modules = 4;
+}
+
+// ===== Session-related Messages =====
+
+message SessionState {
+  bool is_active = 1;
+  string preset_id = 2;
+  string preset_name = 3;
+  google.protobuf.Timestamp started_at = 4;
+  repeated ModuleInstanceState module_states = 5;
+}
+
+message ModuleInstanceState {
+  string instance_id = 1;
+  string module_name = 2;
+  string custom_name = 3;
+  ModuleStatus status = 4;
+  repeated Setting settings = 5;
+  repeated Action actions = 6;
+}
+
+enum ModuleStatus {
+  MODULE_STATUS_INITIALIZING = 0;
+  MODULE_STATUS_READY = 1;
+  MODULE_STATUS_RUNNING = 2;
+  MODULE_STATUS_ERROR = 3;
+  MODULE_STATUS_STOPPED = 4;
+}
+
+message SessionEvent {
+  SessionEventType type = 1;
+  string preset_id = 2;
+  string message = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> metadata = 5;
+}
+
+enum SessionEventType {
+  SESSION_EVENT_STARTED = 0;
+  SESSION_EVENT_STOPPED = 1;
+  SESSION_EVENT_MODULE_STARTED = 2;
+  SESSION_EVENT_MODULE_STOPPED = 3;
+  SESSION_EVENT_MODULE_ERROR = 4;
+  SESSION_EVENT_VALIDATION_WARNING = 5;
+}

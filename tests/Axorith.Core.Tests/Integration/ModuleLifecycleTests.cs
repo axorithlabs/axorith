@@ -37,7 +37,7 @@ public class ModuleLifecycleTests
             .Callback(() => executionLog.Add("SessionStart"))
             .Returns(Task.CompletedTask);
 
-        mockModule.Setup(m => m.OnSessionEndAsync())
+        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Callback(() => executionLog.Add("SessionEnd"))
             .Returns(Task.CompletedTask);
 

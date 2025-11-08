@@ -32,10 +32,12 @@ public interface ISessionManager : IAsyncDisposable
     ///     Throws a <see cref="Axorith.Shared.Exceptions.SessionException" /> if a session is already running.
     /// </summary>
     /// <param name="preset">The session preset to execute.</param>
-    Task StartSessionAsync(SessionPreset preset);
+    /// <param name="cancellationToken">Cancellation token to observe.</param>
+    Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Stops the currently active session, performing cleanup for all modules.
     /// </summary>
-    Task StopCurrentSessionAsync();
+    /// <param name="cancellationToken">Cancellation token to observe.</param>
+    Task StopCurrentSessionAsync(CancellationToken cancellationToken = default);
 }

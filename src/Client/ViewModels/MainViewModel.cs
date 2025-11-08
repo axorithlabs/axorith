@@ -1,8 +1,14 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
-using Axorith.Core.Services.Abstractions;
-using Axorith.Shared.Exceptions;
+using Axorith.Client.CoreSdk;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 
@@ -11,12 +17,13 @@ namespace Axorith.Client.ViewModels;
 /// <summary>
 ///     ViewModel for the main dashboard view. Manages the list of presets and session lifecycle commands.
 /// </summary>
-public class MainViewModel : ReactiveObject
+public class MainViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
-    private readonly IPresetManager _presetManager;
-    private readonly ISessionManager _sessionManager;
+    private readonly IPresetsApi _presetsApi;
+    private readonly ISessionsApi _sessionsApi;
     private readonly IServiceProvider _serviceProvider;
+    private readonly CompositeDisposable _disposables = new();
 
     private SessionPresetViewModel? _selectedPreset;
 
@@ -48,11 +55,17 @@ public class MainViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _sessionStatus, value);
     }
 
+    private bool _isSessionActive;
+
     /// <summary>
     ///     Gets a value indicating whether a session is currently active.
     ///     This property is exposed for binding in the View.
     /// </summary>
-    public bool IsSessionActive => _sessionManager.IsSessionRunning;
+    public bool IsSessionActive
+    {
+        get => _isSessionActive;
+        private set => this.RaiseAndSetIfChanged(ref _isSessionActive, value);
+    }
 
     /// <summary>
     ///     A collection of all available session presets loaded from the core.
@@ -89,50 +102,56 @@ public class MainViewModel : ReactiveObject
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
-    public MainViewModel(ShellViewModel shell, IPresetManager presetManager, ISessionManager sessionManager,
+
+    public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IServiceProvider serviceProvider)
     {
         _shell = shell;
-        _presetManager = presetManager;
-        _sessionManager = sessionManager;
+        _presetsApi = presetsApi;
+        _sessionsApi = sessionsApi;
         _serviceProvider = serviceProvider;
 
-        _sessionManager.SessionStarted += OnSessionStarted;
-        _sessionManager.SessionStopped += OnSessionStopped;
+        // Subscribe to session events via Observable
+        var subscription = _sessionsApi.SessionEvents
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(evt =>
+            {
+                switch (evt.Type)
+                {
+                    case SessionEventType.Started:
+                        SessionStatus = "Session is active.";
+                        ActiveSessionPresetId = evt.PresetId;
+                        IsSessionActive = true;
+                        break;
+                    case SessionEventType.Stopped:
+                        SessionStatus = "No session is active.";
+                        ActiveSessionPresetId = null;
+                        IsSessionActive = false;
+                        break;
+                }
+            });
 
-        var canManipulatePreset = this.WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive);
-        var canStopSession = this.WhenAnyValue(vm => vm.IsSessionActive);
-        var canDoGlobalActions = this.WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive);
+        _disposables.Add(subscription);
 
-        // These commands now accept a parameter and are always executable when a session is not active.
+        // Ensure canExecute streams update commands on UI thread
+        var canManipulatePreset = this
+            .WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive)
+            .ObserveOn(RxApp.MainThreadScheduler);
+        var canStopSession = this
+            .WhenAnyValue(vm => vm.IsSessionActive)
+            .ObserveOn(RxApp.MainThreadScheduler);
+        var canDoGlobalActions = this
+            .WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive)
+            .ObserveOn(RxApp.MainThreadScheduler);
+
         DeleteSelectedCommand =
             ReactiveCommand.CreateFromTask<SessionPresetViewModel>(DeletePresetAsync, canManipulatePreset);
         EditSelectedCommand = ReactiveCommand.Create<SessionPresetViewModel>(EditPreset, canManipulatePreset);
         StartSelectedCommand =
             ReactiveCommand.CreateFromTask<SessionPresetViewModel>(StartPresetAsync, canManipulatePreset);
-        StopSessionCommand = ReactiveCommand.CreateFromTask(_sessionManager.StopCurrentSessionAsync, canStopSession);
+        StopSessionCommand = ReactiveCommand.CreateFromTask(StopCurrentSessionAsync, canStopSession);
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
-    }
-
-    private void OnSessionStarted(Guid presetId)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            SessionStatus = "Session is active.";
-            ActiveSessionPresetId = presetId;
-            this.RaisePropertyChanged(nameof(IsSessionActive));
-        });
-    }
-
-    private void OnSessionStopped(Guid presetId)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            SessionStatus = "No session is active.";
-            ActiveSessionPresetId = null;
-            this.RaisePropertyChanged(nameof(IsSessionActive));
-        });
     }
 
     /// <summary>
@@ -141,17 +160,42 @@ public class MainViewModel : ReactiveObject
     public async Task InitializeAsync()
     {
         await LoadPresetsAsync();
+        await RefreshSessionStateAsync();
     }
 
     private async Task StartPresetAsync(SessionPresetViewModel presetVm)
     {
         try
         {
-            await _sessionManager.StartSessionAsync(presetVm.Model);
+            SessionStatus = $"Starting '{presetVm.Name}'...";
+
+            var result = await _sessionsApi.StartSessionAsync(presetVm.Id);
+            if (!result.Success)
+                SessionStatus = $"Failed to start session: {result.Message}";
+            else
+                SessionStatus = $"Session '{presetVm.Name}' is now active.";
         }
-        catch (SessionException ex)
+        catch (Exception ex)
         {
-            SessionStatus = $"Error: {ex.Message}";
+            SessionStatus = $"Failed to start session: {ex.Message}";
+        }
+    }
+
+    private async Task StopCurrentSessionAsync()
+    {
+        try
+        {
+            SessionStatus = "Stopping session...";
+
+            var result = await _sessionsApi.StopSessionAsync();
+            if (!result.Success)
+                SessionStatus = $"Failed to stop session: {result.Message}";
+            else
+                SessionStatus = "Session stopped successfully.";
+        }
+        catch (Exception ex)
+        {
+            SessionStatus = $"Failed to stop session: {ex.Message}";
         }
     }
 
@@ -171,20 +215,161 @@ public class MainViewModel : ReactiveObject
 
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
     {
-        await _presetManager.DeletePresetAsync(presetVm.Id, CancellationToken.None);
-        Presets.Remove(presetVm);
-        presetVm.Dispose();
+        // Show confirmation dialog
+        var window = Application.Current?.ApplicationLifetime is
+            IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow
+            : null;
+
+        if (window == null)
+        {
+            SessionStatus = "Cannot show confirmation dialog - window not available.";
+            return;
+        }
+
+        Window? dialog = null;
+        dialog = new Window
+        {
+            Title = "Delete Preset",
+            Width = 400,
+            Height = 200,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Spacing = 15,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Delete preset '{presetVm.Name}'?",
+                        FontSize = 16,
+                        FontWeight = FontWeight.Bold,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
+                    new TextBlock
+                    {
+                        Text = "This action cannot be undone.",
+                        Opacity = 0.7,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 10)
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Spacing = 10,
+                        Children =
+                        {
+                            new Button
+                            {
+                                Content = "Delete",
+                                Width = 100,
+                                Command = ReactiveCommand.Create(() => dialog!.Close(true))
+                            },
+                            new Button
+                            {
+                                Content = "Cancel",
+                                Width = 100,
+                                Command = ReactiveCommand.Create(() => dialog!.Close(false))
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var result = await dialog.ShowDialog<bool>(window);
+
+        if (!result) return;
+
+        try
+        {
+            await _presetsApi.DeletePresetAsync(presetVm.Id);
+            Presets.Remove(presetVm);
+            presetVm.Dispose();
+            SessionStatus = $"Preset '{presetVm.Name}' deleted.";
+        }
+        catch (Exception ex)
+        {
+            SessionStatus = $"Failed to delete preset: {ex.Message}";
+        }
     }
 
     private async Task LoadPresetsAsync()
     {
-        var presetsFromCore = await _presetManager.LoadAllPresetsAsync(CancellationToken.None);
+        try
+        {
+            var presets = await _presetsApi.ListPresetsAsync();
 
-        // Dispose existing presets before clearing
-        foreach (var preset in Presets) preset.Dispose();
-        Presets.Clear();
+            var modulesApi = _serviceProvider.GetRequiredService<IModulesApi>();
+            var modules = await modulesApi.ListModulesAsync();
 
-        var moduleRegistry = _serviceProvider.GetRequiredService<IModuleRegistry>();
-        foreach (var preset in presetsFromCore) Presets.Add(new SessionPresetViewModel(preset, moduleRegistry));
+            // Build VMs off-UI thread
+            var newVms = new List<SessionPresetViewModel>();
+            foreach (var summary in presets)
+            {
+                var fullPreset = await _presetsApi.GetPresetAsync(summary.Id);
+                if (fullPreset != null) newVms.Add(new SessionPresetViewModel(fullPreset, modules, modulesApi));
+            }
+
+            // Apply to ObservableCollection on UI thread
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var preset in Presets) preset.Dispose();
+                Presets.Clear();
+
+                foreach (var vm in newVms) Presets.Add(vm);
+
+                if (Presets.Count == 0) SessionStatus = "No presets found. Click 'Create New Session' to get started.";
+            });
+        }
+        catch (Exception ex)
+        {
+            SessionStatus = $"Failed to load presets: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshSessionStateAsync()
+    {
+        try
+        {
+            var state = await _sessionsApi.GetCurrentSessionAsync();
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (state?.IsActive == true)
+                {
+                    SessionStatus = state.PresetName != null
+                        ? $"Session '{state.PresetName}' is active."
+                        : "Session is active.";
+                    ActiveSessionPresetId = state.PresetId;
+                    IsSessionActive = true;
+                }
+                else
+                {
+                    SessionStatus = "No session is active.";
+                    ActiveSessionPresetId = null;
+                    IsSessionActive = false;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SessionStatus = $"Unable to fetch session state: {ex.Message}";
+                ActiveSessionPresetId = null;
+                IsSessionActive = false;
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposables.Dispose();
+        foreach (var preset in Presets)
+            preset.Dispose();
     }
 }

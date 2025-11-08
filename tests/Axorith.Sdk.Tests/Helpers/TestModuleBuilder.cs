@@ -113,7 +113,7 @@ public class TestModule : IModule
         return _onSessionStart?.Invoke(cancellationToken) ?? Task.CompletedTask;
     }
 
-    public Task OnSessionEndAsync()
+    public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         return _onSessionEnd?.Invoke() ?? Task.CompletedTask;
     }

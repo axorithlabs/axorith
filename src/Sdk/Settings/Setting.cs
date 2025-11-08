@@ -483,4 +483,28 @@ public class Setting<T> : ISetting
     {
         _value.OnNext(_deserializer(value));
     }
+
+    /// <inheritdoc />
+    string ISetting.GetCurrentLabel()
+    {
+        return _label.Value;
+    }
+
+    /// <inheritdoc />
+    bool ISetting.GetCurrentVisibility()
+    {
+        return _isVisible.Value;
+    }
+
+    /// <inheritdoc />
+    bool ISetting.GetCurrentReadOnly()
+    {
+        return _isReadOnly.Value;
+    }
+
+    /// <inheritdoc />
+    IReadOnlyList<KeyValuePair<string, string>>? ISetting.GetCurrentChoices()
+    {
+        return _choices?.Value;
+    }
 }

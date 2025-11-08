@@ -8,7 +8,7 @@ namespace Axorith.Core.Services;
 ///     A thread-safe implementation of the <see cref="IEventAggregator" /> interface.
 ///     It allows for publishing messages and subscribing to them in a decoupled manner.
 /// </summary>
-internal sealed class EventAggregator : IEventAggregator
+public sealed class EventAggregator : IEventAggregator
 {
     private readonly ConcurrentDictionary<Type, ConcurrentBag<WeakReference<object>>> _subscriptions = new();
 

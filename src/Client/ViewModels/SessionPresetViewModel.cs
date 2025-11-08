@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
+using Axorith.Client.CoreSdk;
 using Axorith.Core.Models;
-using Axorith.Core.Services.Abstractions;
+using Axorith.Sdk;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -19,7 +20,8 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
 
-    public SessionPresetViewModel(SessionPreset model, IModuleRegistry moduleRegistry)
+    public SessionPresetViewModel(SessionPreset model, IReadOnlyList<ModuleDefinition> availableModules,
+        IModulesApi modulesApi)
     {
         Model = model;
 
@@ -27,8 +29,8 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
         var moduleVms = model.Modules
             .Select(m =>
             {
-                var def = moduleRegistry.GetDefinitionById(m.ModuleId);
-                return def != null ? new ConfiguredModuleViewModel(def, m, moduleRegistry) : null;
+                var def = availableModules.FirstOrDefault(md => md.Id == m.ModuleId);
+                return def != null ? new ConfiguredModuleViewModel(def, m, availableModules, modulesApi) : null;
             })
             .Where(vm => vm != null);
 

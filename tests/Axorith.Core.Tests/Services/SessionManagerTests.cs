@@ -118,7 +118,7 @@ public class SessionManagerTests
         await _sessionManager.StopCurrentSessionAsync();
 
         // Assert
-        mockModule.Verify(m => m.OnSessionEndAsync(), Times.Once);
+        mockModule.Verify(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()), Times.Once);
         _sessionManager.IsSessionRunning.Should().BeFalse();
         _sessionManager.ActiveSession.Should().BeNull();
     }
@@ -216,7 +216,7 @@ public class SessionManagerTests
         await _sessionManager.DisposeAsync();
 
         // Assert
-        mockModule.Verify(m => m.OnSessionEndAsync(), Times.Once);
+        mockModule.Verify(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()), Times.Once);
         _sessionManager.IsSessionRunning.Should().BeFalse();
         _sessionManager.ActiveSession.Should().BeNull();
     }
@@ -231,7 +231,7 @@ public class SessionManagerTests
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(m => m.OnSessionEndAsync())
+        mock.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);

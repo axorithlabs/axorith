@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <AssemblyName>Axorith.Client</AssemblyName>
         <RootNamespace>Axorith.Client</RootNamespace>
@@ -13,7 +13,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
         <ProjectReference Include="..\Core\Axorith.Core.csproj" />
+        <ProjectReference Include="..\Contracts\Axorith.Contracts.csproj" />
         <ProjectReference Include="..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
     </ItemGroup>
 
@@ -22,6 +24,9 @@
         <PackageReference Include="Avalonia.Desktop" Version="11.3.7" />
         <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.7" />
         <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.0" />
+        <PackageReference Include="System.Reactive" Version="6.1.0" />
+        <PackageReference Include="Grpc.Net.Client" Version="2.64.0" />
+        <PackageReference Include="Polly" Version="8.6.4" />
         <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.7" />
         <PackageReference Include="Xaml.Behaviors.Avalonia" Version="11.3.6.5" />
     </ItemGroup>
@@ -32,6 +37,9 @@
 
     <ItemGroup>
         <None Update="app.manifest">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>

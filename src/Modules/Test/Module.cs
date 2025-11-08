@@ -212,7 +212,7 @@ public class Module : IModule
     }
 
     /// <inheritdoc />
-    public Task OnSessionEndAsync()
+    public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         // Save secrets before shutdown
         var userSecret = _userSecret.GetCurrentValue();

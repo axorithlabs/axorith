@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package axorith.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Axorith.Contracts";
+
+service DiagnosticsService {
+  rpc GetHealth(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message HealthCheckRequest {
+  // Empty for MVP
+}
+
+message HealthCheckResponse {
+  HealthStatus status = 1;
+  string version = 2;
+  google.protobuf.Timestamp uptime_started = 3;
+  int32 active_sessions = 4;
+  int32 loaded_modules = 5;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_HEALTHY = 0;
+  HEALTH_STATUS_DEGRADED = 1;
+  HEALTH_STATUS_UNHEALTHY = 2;
+}

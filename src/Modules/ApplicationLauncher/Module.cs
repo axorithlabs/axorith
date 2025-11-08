@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
@@ -142,7 +142,7 @@ public class Module : IModule
     }
 
     /// <inheritdoc />
-    public Task OnSessionEndAsync()
+    public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         _currentProcess?.CloseMainWindow();
 

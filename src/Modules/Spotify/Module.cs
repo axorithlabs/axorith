@@ -89,7 +89,7 @@ public class Module : IModule
         // --- Reactive Logic ---
         var hasRefreshToken = !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
         UpdateUiForAuthenticationState(hasRefreshToken);
-        if (hasRefreshToken) _ = LoadDynamicChoicesAsync();
+        // NOTE: LoadDynamicChoicesAsync moved to InitializeAsync to comply with lightweight constructor rule
 
         _playbackContext.Value.Select(v => v == CustomUrlValue).Subscribe(_customUrl.SetVisibility)
             .DisposeWith(_disposables);
@@ -145,6 +145,24 @@ public class Module : IModule
     public IReadOnlyList<IAction> GetActions()
     {
         return [_loginAction, _logoutAction];
+    }
+
+    /// <inheritdoc />
+    public async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        // Load dynamic choices (devices, playlists) if authenticated
+        var hasRefreshToken = !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
+        if (hasRefreshToken)
+            try
+            {
+                await LoadDynamicChoicesAsync();
+                _logger.LogInfo("Dynamic choices loaded successfully in InitializeAsync");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Failed to load dynamic choices: {Message}", ex.Message);
+                // Non-fatal error - module can still function without dynamic data
+            }
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
@@ -207,7 +225,7 @@ public class Module : IModule
         if (!string.IsNullOrWhiteSpace(urlToPlay)) await StartPlaybackAsync(urlToPlay, deviceId, cancellationToken);
     }
 
-    public async Task OnSessionEndAsync()
+    public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         try
         {

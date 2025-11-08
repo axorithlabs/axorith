@@ -1,4 +1,4 @@
-﻿<Application xmlns="https://github.com/avaloniaui"
+<Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
              xmlns:views="using:Axorith.Client.Views"
@@ -11,6 +11,12 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:SessionEditorViewModel}">
             <views:SessionEditorView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LoadingViewModel}">
+            <views:LoadingView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ErrorViewModel}">
+            <views:ErrorView/>
         </DataTemplate>
     </Application.DataTemplates>
     

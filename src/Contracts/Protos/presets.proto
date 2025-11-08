@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package axorith.v1;
+
+import "google/protobuf/empty.proto";
+import "Protos/common.proto";
+
+option csharp_namespace = "Axorith.Contracts";
+
+service PresetsService {
+  rpc ListPresets(ListPresetsRequest) returns (ListPresetsResponse);
+  rpc GetPreset(GetPresetRequest) returns (Preset);
+  rpc CreatePreset(CreatePresetRequest) returns (Preset);
+  rpc UpdatePreset(UpdatePresetRequest) returns (Preset);
+  rpc DeletePreset(DeletePresetRequest) returns (google.protobuf.Empty);
+}
+
+message ListPresetsRequest {
+  // Empty for MVP, can add filters later
+}
+
+message ListPresetsResponse {
+  repeated PresetSummary presets = 1;
+}
+
+message GetPresetRequest {
+  string preset_id = 1;
+}
+
+message CreatePresetRequest {
+  Preset preset = 1;
+}
+
+message UpdatePresetRequest {
+  Preset preset = 1;
+}
+
+message DeletePresetRequest {
+  string preset_id = 1;
+}

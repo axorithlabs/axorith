@@ -197,7 +197,7 @@ public class SessionManagerNegativeTests
         var module2 = CreateMockModule();
 
         var module1Stopped = false;
-        module1.Setup(m => m.OnSessionEndAsync())
+        module1.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Callback(() => module1Stopped = true)
             .Returns(Task.CompletedTask);
 
@@ -245,10 +245,10 @@ public class SessionManagerNegativeTests
 
         var module2Stopped = false;
 
-        module1.Setup(m => m.OnSessionEndAsync())
+        module1.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Module 1 stop failed"));
 
-        module2.Setup(m => m.OnSessionEndAsync())
+        module2.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Callback(() => module2Stopped = true)
             .Returns(Task.CompletedTask);
 
@@ -293,7 +293,7 @@ public class SessionManagerNegativeTests
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(m => m.OnSessionEndAsync())
+        mock.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
