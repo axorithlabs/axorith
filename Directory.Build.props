@@ -8,8 +8,9 @@
 
         <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
 
-        <BaseOutputPath>$(SolutionDir)build\</BaseOutputPath>
-        <BaseIntermediateOutputPath>$(BaseOutputPath)\$(Configuration)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+        <BaseOutputPath>$(SolutionDir)build/$(Configuration)/$(MSBuildProjectName)/</BaseOutputPath>
+        <OutputPath>$(BaseOutputPath)</OutputPath>
+        <BaseIntermediateOutputPath>$(BaseOutputPath)/obj/</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
         <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

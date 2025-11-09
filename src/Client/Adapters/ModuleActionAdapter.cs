@@ -13,8 +13,6 @@ namespace Axorith.Client.Adapters;
 /// </summary>
 internal class ModuleActionAdapter : IAction
 {
-    private readonly BehaviorSubject<string> _labelSubject;
-    private readonly BehaviorSubject<bool> _enabledSubject;
     private readonly Subject<Unit> _invokedSubject;
     private readonly IModulesApi _modulesApi;
     private readonly Guid _moduleDefinitionId;
@@ -30,12 +28,12 @@ internal class ModuleActionAdapter : IAction
         _modulesApi = modulesApi ?? throw new ArgumentNullException(nameof(modulesApi));
         _moduleDefinitionId = moduleDefinitionId;
 
-        _labelSubject = new BehaviorSubject<string>(action.Label);
-        _enabledSubject = new BehaviorSubject<bool>(action.IsEnabled);
+        var labelSubject = new BehaviorSubject<string>(action.Label);
+        var enabledSubject = new BehaviorSubject<bool>(action.IsEnabled);
         _invokedSubject = new Subject<Unit>();
 
-        Label = _labelSubject.AsObservable();
-        IsEnabled = _enabledSubject.AsObservable();
+        Label = labelSubject.AsObservable();
+        IsEnabled = enabledSubject.AsObservable();
         Invoked = _invokedSubject.AsObservable();
     }
 

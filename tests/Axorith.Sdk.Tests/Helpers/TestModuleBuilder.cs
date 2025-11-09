@@ -103,7 +103,7 @@ public class TestModule : IModule
         return _onInitialize?.Invoke(cancellationToken) ?? Task.CompletedTask;
     }
 
-    public object? GetSettingsViewModel()
+    public object GetSettingsViewModel()
     {
         throw new NotImplementedException();
     }

@@ -23,6 +23,28 @@ public class ModulesConfiguration
 {
     public List<string> SearchPaths { get; set; } = [];
     public bool EnableHotReload { get; set; }
+
+    /// <summary>
+    ///     Resolves environment variables in all search paths and returns expanded paths.
+    ///     Provides fallback to default paths if configuration is empty.
+    /// </summary>
+    public IEnumerable<string> ResolveSearchPaths()
+    {
+        if (SearchPaths.Count == 0)
+        {
+            // Fallback to default paths if not configured
+            var appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Axorith", "modules");
+            var devPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../modules"));
+            return [appDataPath, devPath];
+        }
+
+        return SearchPaths
+            .Select(Environment.ExpandEnvironmentVariables)
+            .Select(Path.GetFullPath)  // Normalize path (handle ../ and mixed slashes)
+            .ToList();
+    }
 }
 
 public class PersistenceConfiguration
@@ -32,17 +54,35 @@ public class PersistenceConfiguration
 
     /// <summary>
     ///     Resolves environment variables in paths (e.g., %AppData%).
+    ///     Provides fallback to default path if not configured.
     /// </summary>
     public string ResolvePresetsPath()
     {
-        return Environment.ExpandEnvironmentVariables(PresetsPath);
+        if (string.IsNullOrWhiteSpace(PresetsPath))
+        {
+            // Fallback to default if not configured
+            var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            return Path.Combine(appDataFolder, "Axorith", "presets");
+        }
+
+        var expandedPath = Environment.ExpandEnvironmentVariables(PresetsPath);
+        return Path.GetFullPath(expandedPath);  // Normalize path
     }
 
     /// <summary>
     ///     Resolves environment variables in paths.
+    ///     Provides fallback to default path if not configured.
     /// </summary>
     public string ResolveLogsPath()
     {
-        return Environment.ExpandEnvironmentVariables(LogsPath);
+        if (string.IsNullOrWhiteSpace(LogsPath))
+        {
+            // Fallback to default if not configured
+            var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            return Path.Combine(appDataFolder, "Axorith", "logs");
+        }
+
+        var expandedPath = Environment.ExpandEnvironmentVariables(LogsPath);
+        return Path.GetFullPath(expandedPath);  // Normalize path
     }
 }

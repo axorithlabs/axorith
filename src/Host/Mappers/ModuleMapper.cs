@@ -16,14 +16,13 @@ public static class ModuleMapper
         {
             Id = definition.Id.ToString(),
             Name = definition.Name,
-            Description = definition.Description ?? string.Empty,
-            Category = definition.Category ?? string.Empty,
+            Description = definition.Description,
+            Category = definition.Category,
             Assembly = definition.AssemblyFileName ?? string.Empty
         };
 
-        if (definition.Platforms != null)
-            foreach (var platform in definition.Platforms)
-                message.Platforms.Add(platform.ToString());
+        foreach (var platform in definition.Platforms)
+            message.Platforms.Add(platform.ToString());
 
         return message;
     }

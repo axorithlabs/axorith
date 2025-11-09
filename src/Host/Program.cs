@@ -27,7 +27,7 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // Configure Serilog from appsettings.json
-    builder.Host.UseSerilog((context, services, configuration) =>
+    builder.Host.UseSerilog((context, _, configuration) =>
     {
         var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath")
                        ?? "%AppData%/Axorith/logs";
@@ -83,9 +83,9 @@ try
     if (builder.Environment.IsDevelopment()) builder.Services.AddGrpcReflection();
 
     // Configure Autofac container
-    builder.Host.ConfigureContainer<ContainerBuilder>((context, containerBuilder) =>
+    builder.Host.ConfigureContainer<ContainerBuilder>((_, containerBuilder) =>
     {
-        RegisterCoreServices(containerBuilder, context.Configuration);
+        RegisterCoreServices(containerBuilder);
         RegisterBroadcasters(containerBuilder);
     });
 
@@ -136,9 +136,9 @@ finally
 
 // ===== Service Registration Methods =====
 
-static void RegisterCoreServices(ContainerBuilder builder, IConfiguration configuration)
+static void RegisterCoreServices(ContainerBuilder builder)
 {
-    // Register Core services (mirror AxorithHost.cs logic)
+    // Register Core services with configuration-based dependencies
 
     // ISecureStorageService - platform specific
     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -149,12 +149,21 @@ static void RegisterCoreServices(ContainerBuilder builder, IConfiguration config
         // TODO: Add Linux/macOS implementations
         throw new PlatformNotSupportedException("Secure storage not implemented for this platform");
 
-    // Module services
+    // Module services with resolved configuration
     builder.RegisterType<ModuleLoader>()
         .As<IModuleLoader>()
         .SingleInstance();
 
-    builder.RegisterType<ModuleRegistry>()
+    builder.Register(ctx =>
+        {
+            var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
+            var searchPaths = config.Modules.ResolveSearchPaths();
+            var rootScope = ctx.Resolve<ILifetimeScope>();
+            var moduleLoader = ctx.Resolve<IModuleLoader>();
+            var logger = ctx.Resolve<ILogger<ModuleRegistry>>();
+
+            return new ModuleRegistry(rootScope, moduleLoader, searchPaths, logger);
+        })
         .As<IModuleRegistry>()
         .SingleInstance();
 
@@ -170,8 +179,15 @@ static void RegisterCoreServices(ContainerBuilder builder, IConfiguration config
         .As<IHttpClientFactory>()
         .SingleInstance();
 
-    // Preset manager
-    builder.RegisterType<PresetManager>()
+    // Preset manager with resolved configuration
+    builder.Register(ctx =>
+        {
+            var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
+            var presetsDirectory = config.Persistence.ResolvePresetsPath();
+            var logger = ctx.Resolve<ILogger<PresetManager>>();
+
+            return new PresetManager(presetsDirectory, logger);
+        })
         .As<IPresetManager>()
         .SingleInstance();
 

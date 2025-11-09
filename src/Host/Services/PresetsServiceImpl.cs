@@ -10,16 +10,13 @@ namespace Axorith.Host.Services;
 ///     gRPC service implementation for preset management.
 ///     Wraps Core IPresetManager and translates between protobuf and Core models.
 /// </summary>
-public class PresetsServiceImpl : PresetsService.PresetsServiceBase
+public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsServiceImpl> logger)
+    : PresetsService.PresetsServiceBase
 {
-    private readonly IPresetManager _presetManager;
-    private readonly ILogger<PresetsServiceImpl> _logger;
+    private readonly IPresetManager _presetManager =
+        presetManager ?? throw new ArgumentNullException(nameof(presetManager));
 
-    public PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsServiceImpl> logger)
-    {
-        _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<PresetsServiceImpl> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     ///     Retrieves all session presets from persistent storage.

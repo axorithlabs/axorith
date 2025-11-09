@@ -13,7 +13,6 @@ namespace Axorith.Host.Services;
 public class ModulesServiceImpl : ModulesService.ModulesServiceBase
 {
     private readonly IModuleRegistry _moduleRegistry;
-    private readonly ISessionManager _sessionManager;
     private readonly SettingUpdateBroadcaster _settingBroadcaster;
     private readonly ILogger<ModulesServiceImpl> _logger;
 
@@ -21,7 +20,6 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
         SettingUpdateBroadcaster settingBroadcaster, ILogger<ModulesServiceImpl> logger)
     {
         _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
-        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _settingBroadcaster = settingBroadcaster ?? throw new ArgumentNullException(nameof(settingBroadcaster));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }

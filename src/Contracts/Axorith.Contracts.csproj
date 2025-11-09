@@ -19,4 +19,8 @@
     <ItemGroup>
       <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Mappers\" />
+    </ItemGroup>
 </Project>

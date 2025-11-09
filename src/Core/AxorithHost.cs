@@ -35,8 +35,12 @@ public sealed class AxorithHost : IDisposable, IAsyncDisposable
     {
         var totalSw = Stopwatch.StartNew();
 
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Axorith",
-            "logs", "axorith-.log");
+        // Resolve logs path from environment variable (fallback to default)
+        var logsPath = Environment.GetEnvironmentVariable("AXORITH_LOGS_PATH")
+                       ?? Path.Combine(
+                           Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                           "Axorith", "logs");
+        var logPath = Path.Combine(logsPath, "axorith-.log");
 
         const string outputTemplate =
             "[{Timestamp:HH:mm:ss} {Level:u3}] " +
@@ -131,14 +135,6 @@ public sealed class AxorithHost : IDisposable, IAsyncDisposable
             .Handle<HttpRequestException>()
             .OrResult(r => (int)r.StatusCode >= 500)
             .WaitAndRetryAsync(2, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
-    }
-
-    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
-    {
-        return Policy<HttpResponseMessage>
-            .Handle<HttpRequestException>()
-            .OrResult(r => (int)r.StatusCode >= 500)
-            .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30));
     }
 
     private static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy()

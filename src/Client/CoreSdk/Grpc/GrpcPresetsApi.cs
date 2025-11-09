@@ -1,7 +1,6 @@
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Grpc.Core;
-using Microsoft.Extensions.Logging;
 using Polly.Retry;
 using ConfiguredModule = Axorith.Contracts.ConfiguredModule;
 
@@ -10,19 +9,14 @@ namespace Axorith.Client.CoreSdk.Grpc;
 /// <summary>
 ///     gRPC implementation of IPresetsApi.
 /// </summary>
-internal class GrpcPresetsApi : IPresetsApi
+internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncRetryPolicy retryPolicy)
+    : IPresetsApi
 {
-    private readonly PresetsService.PresetsServiceClient _client;
-    private readonly AsyncRetryPolicy _retryPolicy;
-    private readonly ILogger _logger;
+    private readonly PresetsService.PresetsServiceClient _client =
+        client ?? throw new ArgumentNullException(nameof(client));
 
-    public GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncRetryPolicy retryPolicy,
-        ILogger logger)
-    {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
+    private readonly AsyncRetryPolicy
         _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<IReadOnlyList<PresetSummary>> ListPresetsAsync(CancellationToken ct = default)
     {

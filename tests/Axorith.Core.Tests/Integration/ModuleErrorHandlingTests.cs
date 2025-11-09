@@ -90,15 +90,6 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
         // Act - first attempt fails, second succeeds
         // Note: Current implementation doesn't retry automatically,
         // but module should allow retry after fix
@@ -115,7 +106,7 @@ public class ModuleErrorHandlingTests
         mockModule.Setup(m => m.GetSettings()).Returns([textSetting]);
         mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .Returns<CancellationToken>(ct =>
+            .Returns<CancellationToken>(_ =>
             {
                 var value = textSetting.GetCurrentValue();
                 return Task.FromResult(string.IsNullOrWhiteSpace(value)

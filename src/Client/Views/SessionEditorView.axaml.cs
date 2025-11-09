@@ -77,7 +77,7 @@ public partial class SessionEditorView : UserControl
         var selectedFolder = result.FirstOrDefault();
         if (selectedFolder is not null)
         {
-        // Path может быть относительным URI - берем AbsolutePath или LocalPath
+            // Path может быть относительным URI - берем AbsolutePath или LocalPath
             var uri = selectedFolder.Path;
             vm.StringValue = uri.IsAbsoluteUri ? uri.LocalPath : uri.OriginalString;
         }

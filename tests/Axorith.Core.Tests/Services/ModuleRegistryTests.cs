@@ -21,9 +21,13 @@ public class ModuleRegistryTests
         var builder = new ContainerBuilder();
         var container = builder.Build();
 
+        // Mock search paths for testing
+        var searchPaths = new[] { "./test-modules" };
+
         _registry = new ModuleRegistry(
             container,
             _mockLoader.Object,
+            searchPaths,
             NullLogger<ModuleRegistry>.Instance);
     }
 

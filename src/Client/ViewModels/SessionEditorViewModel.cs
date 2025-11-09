@@ -167,7 +167,7 @@ public class SessionEditorViewModel : ReactiveObject
             // Surface error via shell status (optional) – fallback to no modules
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _availableModules = Array.Empty<ModuleDefinition>();
+                _availableModules = [];
                 UpdateAvailableModules();
             });
         }
@@ -253,6 +253,7 @@ public class SessionEditorViewModel : ReactiveObject
         if (window == null) return;
 
         Window? dialog = null;
+        var dialog1 = dialog;
         dialog = new Window
         {
             Title = title,
@@ -288,7 +289,7 @@ public class SessionEditorViewModel : ReactiveObject
                         Content = "OK",
                         Width = 100,
                         HorizontalAlignment = HorizontalAlignment.Center,
-                        Command = ReactiveCommand.Create(() => dialog!.Close())
+                        Command = ReactiveCommand.Create(() => dialog1!.Close())
                     }
                 }
             }

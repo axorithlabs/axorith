@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -26,6 +27,10 @@ public class App : Application
     /// </summary>
     public IServiceProvider Services { get; private set; } = null!;
 
+    private TrayIcon? _trayIcon;
+    private MainWindow? _mainWindow;
+    private bool _isTrayMode;
+
     /// <summary>
     ///     Loads the application's XAML resources.
     /// </summary>
@@ -52,6 +57,9 @@ public class App : Application
             return;
         }
 
+        // Check if running in tray mode (--tray hides window on startup)
+        _isTrayMode = Environment.GetCommandLineArgs().Contains("--tray");
+
         // Load configuration
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
@@ -69,7 +77,7 @@ public class App : Application
         });
 
         var logger = loggerFactory.CreateLogger<App>();
-        logger.LogInformation("=== Axorith Client starting ===");
+        logger.LogInformation("=== Axorith Client starting (Window hidden on startup: {TrayMode}) ===", _isTrayMode);
         logger.LogInformation("Host connection: {Endpoint} (Remote: {IsRemote})",
             clientConfig.Host.GetEndpointUrl(), clientConfig.Host.UseRemoteHost);
 
@@ -94,15 +102,40 @@ public class App : Application
 
         var windowStateManager = Services.GetRequiredService<IWindowStateManager>();
 
-        desktop.MainWindow = new MainWindow
+        _mainWindow = new MainWindow
         {
-            DataContext = shellViewModel
+            DataContext = shellViewModel,
+            // Always show window in taskbar
+            ShowInTaskbar = true
         };
 
-        // Restore window state from previous session
-        windowStateManager.RestoreWindowState(desktop.MainWindow);
+        // If --tray flag, start with window minimized
+        if (_isTrayMode)
+        {
+            logger.LogInformation("Starting with window hidden (--tray flag)");
+            _mainWindow.WindowState = WindowState.Minimized;
+        }
+        else
+        {
+            logger.LogInformation("Starting with window visible");
+            // Restore window state from previous session
+            windowStateManager.RestoreWindowState(_mainWindow);
+        }
 
-        logger.LogInformation("Window created successfully - pure UI, no tray");
+        desktop.MainWindow = _mainWindow;
+
+        // Always create tray icon
+        CreateTrayIcon(desktop, logger);
+
+        // Handle window closing - minimize to tray instead of closing
+        _mainWindow.Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            _mainWindow.WindowState = WindowState.Minimized;
+            logger.LogInformation("Window minimized to tray");
+        };
+
+        logger.LogInformation("Window and tray icon created successfully");
 
         logger.LogInformation("Starting Host connection in background...");
 
@@ -124,6 +157,72 @@ public class App : Application
         RegisterShutdownHandler(desktop, loggerFactory, logger);
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void CreateTrayIcon(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> logger)
+    {
+        _trayIcon = new TrayIcon
+        {
+            ToolTipText = "Axorith Client",
+            Icon = new WindowIcon("Assets/icon.png"),
+            IsVisible = true
+        };
+
+        var showItem = new NativeMenuItem("Show");
+        showItem.Click += (_, _) =>
+        {
+            ShowWindow(logger);
+        };
+
+        var exitItem = new NativeMenuItem("Exit");
+        exitItem.Click += (_, _) =>
+        {
+            logger.LogInformation("Exit requested from tray");
+            if (desktop is IClassicDesktopStyleApplicationLifetime desktopLifetime)
+                desktopLifetime.Shutdown();
+        };
+
+        var menu = new NativeMenu
+        {
+            new NativeMenuItem("Axorith Client") { IsEnabled = false },
+            new NativeMenuItemSeparator(),
+            showItem,
+            new NativeMenuItemSeparator(),
+            exitItem
+        };
+
+        _trayIcon.Menu = menu;
+
+        // Handle double-click on tray icon
+        _trayIcon.Clicked += (_, _) =>
+        {
+            ShowWindow(logger);
+        };
+
+        var trayIcons = new TrayIcons { _trayIcon };
+        SetValue(TrayIcon.IconsProperty, trayIcons);
+
+        logger.LogInformation("Tray icon created");
+    }
+
+    private void ShowWindow(ILogger<App> logger)
+    {
+        if (_mainWindow == null) return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                _mainWindow.WindowState = WindowState.Normal;
+                _mainWindow.Activate();
+                _mainWindow.BringIntoView();
+                logger.LogInformation("Window shown from tray");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to show window from tray");
+            }
+        });
     }
 
     private async Task InitializeConnectionAsync(ShellViewModel shellViewModel, LoadingViewModel loadingViewModel,
@@ -228,7 +327,7 @@ public class App : Application
     private void RegisterShutdownHandler(IClassicDesktopStyleApplicationLifetime desktop,
         ILoggerFactory loggerFactory, ILogger<App> logger)
     {
-        desktop.ShutdownRequested += (_, e) =>
+        desktop.ShutdownRequested += (_, _) =>
         {
             if (_isShuttingDown)
                 return;

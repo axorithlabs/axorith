@@ -7,7 +7,7 @@ public class ErrorViewModel : ReactiveObject
 {
     private Func<Task>? _retryCallback;
 
-    private string _errorMessage;
+    private string _errorMessage = string.Empty;
 
     public string ErrorMessage
     {
@@ -24,12 +24,6 @@ public class ErrorViewModel : ReactiveObject
     }
 
     public ICommand? RetryCommand { get; private set; }
-
-    // DI-friendly constructor
-    public ErrorViewModel()
-    {
-        _errorMessage = string.Empty;
-    }
 
     // Factory method for creating configured instances
     public void Configure(string errorMessage, object? _ = null, Func<Task>? retryCallback = null)

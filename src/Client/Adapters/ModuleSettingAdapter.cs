@@ -111,7 +111,7 @@ internal class ModuleSettingAdapter : ISetting
         return _readOnlySubject.Value;
     }
 
-    public IReadOnlyList<KeyValuePair<string, string>>? GetCurrentChoices()
+    public IReadOnlyList<KeyValuePair<string, string>> GetCurrentChoices()
     {
         return _choicesSubject.Value;
     }

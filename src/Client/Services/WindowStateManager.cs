@@ -60,9 +60,9 @@ public class WindowStateManager : IWindowStateManager
                 return;
 
             // Validate that the position is on a visible screen
-            if (state.X >= 0 && state.Y >= 0) window.Position = new PixelPoint(state.X, state.Y);
+            if (state is { X: >= 0, Y: >= 0 }) window.Position = new PixelPoint(state.X, state.Y);
 
-            if (state.Width > 0 && state.Height > 0)
+            if (state is { Width: > 0, Height: > 0 })
             {
                 window.Width = state.Width;
                 window.Height = state.Height;

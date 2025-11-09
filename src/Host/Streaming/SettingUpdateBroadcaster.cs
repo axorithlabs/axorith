@@ -80,7 +80,7 @@ public class SettingUpdateBroadcaster : IDisposable
     private void OnSessionStopped(Guid presetId)
     {
         // Dispose all setting subscriptions
-        foreach (var (key, subscription) in _settingSubscriptions) subscription.Dispose();
+        foreach (var (_, subscription) in _settingSubscriptions) subscription.Dispose();
         _settingSubscriptions.Clear();
 
         _logger.LogDebug("Session stopped: {PresetId}, cleared {Count} setting subscriptions",

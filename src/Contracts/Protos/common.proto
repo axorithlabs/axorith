@@ -3,7 +3,6 @@ syntax = "proto3";
 package axorith.v1;
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
 
 option csharp_namespace = "Axorith.Contracts";
 

@@ -228,6 +228,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
 
         Window? dialog = null;
+        var dialog1 = dialog;
+        var dialog2 = dialog;
         dialog = new Window
         {
             Title = "Delete Preset",
@@ -266,13 +268,13 @@ public class MainViewModel : ReactiveObject, IDisposable
                             {
                                 Content = "Delete",
                                 Width = 100,
-                                Command = ReactiveCommand.Create(() => dialog!.Close(true))
+                                Command = ReactiveCommand.Create(() => dialog1!.Close(true))
                             },
                             new Button
                             {
                                 Content = "Cancel",
                                 Width = 100,
-                                Command = ReactiveCommand.Create(() => dialog!.Close(false))
+                                Command = ReactiveCommand.Create(() => dialog2!.Close(false))
                             }
                         }
                     }

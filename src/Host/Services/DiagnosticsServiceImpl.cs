@@ -9,21 +9,22 @@ namespace Axorith.Host.Services;
 /// <summary>
 ///     gRPC service implementation for diagnostics and health checks.
 /// </summary>
-public class DiagnosticsServiceImpl : DiagnosticsService.DiagnosticsServiceBase
+public class DiagnosticsServiceImpl(
+    ISessionManager sessionManager,
+    IModuleRegistry moduleRegistry,
+    ILogger<DiagnosticsServiceImpl> logger)
+    : DiagnosticsService.DiagnosticsServiceBase
 {
-    private readonly ISessionManager _sessionManager;
-    private readonly IModuleRegistry _moduleRegistry;
-    private readonly ILogger<DiagnosticsServiceImpl> _logger;
-    private readonly DateTimeOffset _startTime;
+    private readonly ISessionManager _sessionManager =
+        sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
 
-    public DiagnosticsServiceImpl(ISessionManager sessionManager, IModuleRegistry moduleRegistry,
-        ILogger<DiagnosticsServiceImpl> logger)
-    {
-        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-        _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
+    private readonly IModuleRegistry _moduleRegistry =
+        moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
+
+    private readonly ILogger<DiagnosticsServiceImpl>
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _startTime = DateTimeOffset.UtcNow;
-    }
+
+    private readonly DateTimeOffset _startTime = DateTimeOffset.UtcNow;
 
     public override Task<HealthCheckResponse> GetHealth(HealthCheckRequest request, ServerCallContext context)
     {

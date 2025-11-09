@@ -13,13 +13,36 @@ namespace Axorith.Core.Services;
 ///     The concrete implementation of the module registry.
 ///     It uses Autofac to create isolated lifetime scopes for each module instance.
 /// </summary>
-public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader, ILogger<ModuleRegistry> logger)
-    : IModuleRegistry, IDisposable
+public class ModuleRegistry : IModuleRegistry, IDisposable
 {
+    private readonly ILifetimeScope _rootScope;
+    private readonly IModuleLoader _moduleLoader;
+    private readonly IEnumerable<string> _searchPaths;
+    private readonly ILogger<ModuleRegistry> _logger;
+
     private IReadOnlyDictionary<Guid, ModuleDefinition>
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
     private bool _isInitialized;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="ModuleRegistry"/> class.
+    /// </summary>
+    /// <param name="rootScope">The root Autofac lifetime scope.</param>
+    /// <param name="moduleLoader">The module loader for discovering module assemblies.</param>
+    /// <param name="searchPaths">The resolved search paths from configuration.</param>
+    /// <param name="logger">The logger instance.</param>
+    public ModuleRegistry(
+        ILifetimeScope rootScope,
+        IModuleLoader moduleLoader,
+        IEnumerable<string> searchPaths,
+        ILogger<ModuleRegistry> logger)
+    {
+        _rootScope = rootScope ?? throw new ArgumentNullException(nameof(rootScope));
+        _moduleLoader = moduleLoader ?? throw new ArgumentNullException(nameof(moduleLoader));
+        _searchPaths = searchPaths ?? throw new ArgumentNullException(nameof(searchPaths));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
     /// <summary>
     ///     Asynchronously loads all module definitions using the module loader.
@@ -27,13 +50,17 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
     /// </summary>
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Initializing module registry...");
+        _logger.LogInformation("Initializing module registry with search paths: {SearchPaths}",
+            string.Join(", ", _searchPaths));
+
         var definitionsList =
-            await moduleLoader.LoadModuleDefinitionsAsync(GetDefaultSearchPaths(), cancellationToken)
+            await _moduleLoader.LoadModuleDefinitionsAsync(_searchPaths, cancellationToken)
                 .ConfigureAwait(false);
+
         _definitions = definitionsList.ToDictionary(d => d.Id);
         _isInitialized = true;
-        logger.LogInformation("Module registry initialized with {Count} modules", _definitions.Count);
+
+        _logger.LogInformation("Module registry initialized with {Count} modules", _definitions.Count);
     }
 
     /// <summary>
@@ -41,18 +68,18 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
     /// </summary>
     public void Dispose()
     {
-        logger.LogInformation("Disposing ModuleRegistry and unloading all module contexts...");
+        _logger.LogInformation("Disposing ModuleRegistry and unloading all module contexts...");
         foreach (var definition in _definitions.Values)
             try
             {
                 if (definition.LoadContext?.IsCollectible != true) continue;
 
                 definition.LoadContext.Unload();
-                logger.LogDebug("Unloaded assembly context for module '{ModuleName}'", definition.Name);
+                _logger.LogDebug("Unloaded assembly context for module '{ModuleName}'", definition.Name);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to unload assembly context for module '{ModuleName}'", definition.Name);
+                _logger.LogError(ex, "Failed to unload assembly context for module '{ModuleName}'", definition.Name);
             }
 
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
@@ -79,7 +106,7 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
         if (_definitions.TryGetValue(moduleId, out var definition) && definition.ModuleType != null)
             try
             {
-                var moduleScope = rootScope.BeginLifetimeScope(builder =>
+                var moduleScope = _rootScope.BeginLifetimeScope(builder =>
                 {
                     // Register module-specific services.
                     // Each module instance gets its own logger and http client.
@@ -92,7 +119,7 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
 
                     builder.Register(_ =>
                         {
-                            var underlyingStorage = rootScope.Resolve<ISecureStorageService>();
+                            var underlyingStorage = _rootScope.Resolve<ISecureStorageService>();
 
                             return new ModuleScopedSecureStorage(underlyingStorage, definition);
                         })
@@ -109,12 +136,12 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to create module instance for {ModuleName} due to an exception",
+                _logger.LogError(ex, "Failed to create module instance for {ModuleName} due to an exception",
                     definition.Name);
                 return (null, null);
             }
 
-        logger.LogWarning(
+        _logger.LogWarning(
             "Could not create instance for module ID {ModuleId}. Definition not found or module type is null",
             moduleId);
         return (null, null);
@@ -125,13 +152,5 @@ public class ModuleRegistry(ILifetimeScope rootScope, IModuleLoader moduleLoader
         if (!_isInitialized)
             throw new InvalidOperationException(
                 "ModuleRegistry has not been initialized. Call InitializeAsync() first.");
-    }
-
-    private static IEnumerable<string> GetDefaultSearchPaths()
-    {
-        var appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Axorith",
-            "modules");
-        var devPath = Path.Combine(AppContext.BaseDirectory, "modules");
-        return [appDataPath, devPath];
     }
 }

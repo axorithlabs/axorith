@@ -6,6 +6,8 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Axorith.Contracts;
 using Grpc.Net.Client;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using Serilog;
 
 namespace Axorith.Service;
@@ -15,11 +17,21 @@ internal class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // Load configuration from appsettings.json
+        var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        var config = configBuilder.Build();
+
+        // Resolve logs path from configuration
+        var logsPath = config["Persistence:LogsPath"] 
+                      ?? "%AppData%/Axorith/logs";
+        var resolvedLogsPath = Environment.ExpandEnvironmentVariables(logsPath);
+
         Log.Logger = new LoggerConfiguration()
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Axorith", "logs",
-                    "service-.log"),
+                Path.Combine(resolvedLogsPath, "service-.log"),
                 rollingInterval: RollingInterval.Day,
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
@@ -65,6 +77,7 @@ public class App : Application
             _trayIcon = new TrayIcon
             {
                 ToolTipText = "Axorith Service",
+                Icon = new WindowIcon("Assets/icon.png"),
                 IsVisible = true
             };
 
@@ -88,10 +101,11 @@ public class App : Application
     {
         if (_trayIcon == null) return;
 
-        var menu = new NativeMenu();
-
-        menu.Add(new NativeMenuItem("Axorith Service") { IsEnabled = false });
-        menu.Add(new NativeMenuItemSeparator());
+        var menu = new NativeMenu
+        {
+            new NativeMenuItem("Axorith Service") { IsEnabled = false },
+            new NativeMenuItemSeparator()
+        };
 
         _statusItem = new NativeMenuItem("Status: Checking...") { IsEnabled = false };
         menu.Add(_statusItem);
@@ -122,9 +136,10 @@ public class App : Application
         menu.Add(new NativeMenuItemSeparator());
 
         var exitItem = new NativeMenuItem("Exit");
-        exitItem.Click += (_, _) =>
+        exitItem.Click += async (_, _) =>
         {
             Log.Information("Exit requested");
+            await StopHostAsync();
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 desktop.Shutdown();
         };
@@ -191,7 +206,7 @@ public class App : Application
             Process.Start(new ProcessStartInfo
             {
                 FileName = hostExe,
-                UseShellExecute = true,
+                UseShellExecute = false,
                 WorkingDirectory = Path.GetDirectoryName(hostExe) ?? AppContext.BaseDirectory
             });
             Log.Information("Host started");
@@ -231,9 +246,7 @@ public class App : Application
     {
         var probes = new[]
         {
-            Path.Combine(AppContext.BaseDirectory, fileName),
-            Path.Combine(AppContext.BaseDirectory, "..", fileName),
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "build", "Debug", fileName)
+            Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", fileName)
         };
 
         foreach (var path in probes.Select(Path.GetFullPath))

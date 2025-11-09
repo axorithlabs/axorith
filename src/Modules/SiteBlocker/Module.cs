@@ -1,10 +1,12 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Platform.Windows;
 
 namespace Axorith.Module.SiteBlocker;
 
@@ -31,6 +33,28 @@ public class Module : IModule
             description: "A comma-separated list of domains to block (e.g., youtube.com, twitter.com, reddit.com).",
             defaultValue: "youtube.com, twitter.com, reddit.com"
         );
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+        
+        try
+        {
+            var manifestPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+                "../Axorith.Shim/axorith.json"));
+            
+            if (File.Exists(manifestPath))
+            {
+                NativeHostManager.EnsureFirefoxHostRegistered("axorith", manifestPath);
+                logger.LogInfo("Firefox native messaging host registered successfully");
+            }
+            else
+            {
+                logger.LogWarning("Native messaging host manifest not found at {ManifestPath}", manifestPath);
+            }
+        }
+        catch (Exception)
+        {
+            logger.LogWarning("Failed to register Firefox native messaging host");
+        }
     }
 
     /// <inheritdoc />

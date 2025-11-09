@@ -49,7 +49,7 @@ public class GrpcCoreConnection : ICoreConnection
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                onRetry: (exception, timeSpan, retryCount, context) =>
+                onRetry: (exception, timeSpan, retryCount, _) =>
                 {
                     _logger.LogWarning(exception,
                         "gRPC call failed, retry {RetryCount} after {Delay}s",
@@ -132,10 +132,10 @@ public class GrpcCoreConnection : ICoreConnection
             var diagnosticsClient = new DiagnosticsService.DiagnosticsServiceClient(_channel);
 
             // Create API implementations
-            _presetsApi = new GrpcPresetsApi(presetsClient, _retryPolicy, _logger);
+            _presetsApi = new GrpcPresetsApi(presetsClient, _retryPolicy);
             _sessionsApi = new GrpcSessionsApi(sessionsClient, _retryPolicy, _logger);
             _modulesApi = new GrpcModulesApi(modulesClient, _retryPolicy, _logger);
-            _diagnosticsApi = new GrpcDiagnosticsApi(diagnosticsClient, _retryPolicy, _logger);
+            _diagnosticsApi = new GrpcDiagnosticsApi(diagnosticsClient, _retryPolicy);
 
             // Verify connection with health check
             var health = await _diagnosticsApi.GetHealthAsync(ct).ConfigureAwait(false);

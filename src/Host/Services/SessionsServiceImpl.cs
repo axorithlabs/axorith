@@ -11,21 +11,23 @@ namespace Axorith.Host.Services;
 ///     gRPC service implementation for session management.
 ///     Wraps Core ISessionManager and provides event streaming via SessionEventBroadcaster.
 /// </summary>
-public class SessionsServiceImpl : SessionsService.SessionsServiceBase
+public class SessionsServiceImpl(
+    ISessionManager sessionManager,
+    IPresetManager presetManager,
+    SessionEventBroadcaster eventBroadcaster,
+    ILogger<SessionsServiceImpl> logger)
+    : SessionsService.SessionsServiceBase
 {
-    private readonly ISessionManager _sessionManager;
-    private readonly IPresetManager _presetManager;
-    private readonly SessionEventBroadcaster _eventBroadcaster;
-    private readonly ILogger<SessionsServiceImpl> _logger;
+    private readonly ISessionManager _sessionManager =
+        sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
 
-    public SessionsServiceImpl(ISessionManager sessionManager, IPresetManager presetManager,
-        SessionEventBroadcaster eventBroadcaster, ILogger<SessionsServiceImpl> logger)
-    {
-        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-        _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
-        _eventBroadcaster = eventBroadcaster ?? throw new ArgumentNullException(nameof(eventBroadcaster));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IPresetManager _presetManager =
+        presetManager ?? throw new ArgumentNullException(nameof(presetManager));
+
+    private readonly SessionEventBroadcaster _eventBroadcaster =
+        eventBroadcaster ?? throw new ArgumentNullException(nameof(eventBroadcaster));
+
+    private readonly ILogger<SessionsServiceImpl> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public override Task<SessionState> GetSessionState(GetSessionStateRequest request, ServerCallContext context)
     {

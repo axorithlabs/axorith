@@ -51,7 +51,7 @@ public static class SettingMapper
                 break;
 
             case Sdk.Settings.SettingControlType.Checkbox:
-                message.BoolValue = currentValue is bool b && b;
+                message.BoolValue = currentValue is bool and true;
                 break;
 
             case Sdk.Settings.SettingControlType.Number:
@@ -117,10 +117,10 @@ public static class SettingMapper
                 update.StringValue = value?.ToString() ?? string.Empty;
                 break;
             case SettingProperty.Visibility:
-                update.BoolValue = value is bool b && b;
+                update.BoolValue = value is bool and true;
                 break;
             case SettingProperty.ReadOnly:
-                update.BoolValue = value is bool br && br;
+                update.BoolValue = value is bool and true;
                 break;
             case SettingProperty.Choices:
                 if (value is IReadOnlyList<KeyValuePair<string, string>> choices)

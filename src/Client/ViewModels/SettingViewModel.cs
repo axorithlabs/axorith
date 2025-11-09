@@ -180,20 +180,6 @@ public class SettingViewModel : ReactiveObject, IDisposable
             .DisposeWith(_disposables);
     }
 
-    private static bool IsControlTypeCompatibleWithValueType(SettingControlType controlType, Type valueType)
-    {
-        return controlType switch
-        {
-            SettingControlType.Text or SettingControlType.TextArea or SettingControlType.Secret or
-                SettingControlType.FilePicker or SettingControlType.DirectoryPicker or SettingControlType.Choice
-                => valueType == typeof(string),
-            SettingControlType.Checkbox or SettingControlType.Button => valueType == typeof(bool),
-            SettingControlType.Number => valueType == typeof(decimal) || valueType == typeof(int) ||
-                                         valueType == typeof(double) || valueType == typeof(TimeSpan),
-            _ => true
-        };
-    }
-
     public void Dispose()
     {
         _disposables.Dispose();

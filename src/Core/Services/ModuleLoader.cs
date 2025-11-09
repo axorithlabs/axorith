@@ -130,7 +130,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                         var assembly = loadContext.LoadFromAssemblyPath(dllFile);
                         var moduleType = assembly.GetExportedTypes()
                             .FirstOrDefault(t =>
-                                typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+                                typeof(IModule).IsAssignableFrom(t) && t is { IsInterface: false, IsAbstract: false });
 
                         if (moduleType != null)
                         {
