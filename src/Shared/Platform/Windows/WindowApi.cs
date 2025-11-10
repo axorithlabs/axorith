@@ -1,82 +1,88 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-///     Provides Windows-specific API for manipulating windows.
+///     Windows-specific window management API.
 /// </summary>
-public static class WindowApi
+[SupportedOSPlatform("windows")]
+internal static class WindowApi
 {
-    /// <summary>
-    ///     Moves a window to the specified monitor.
-    /// </summary>
-    /// <param name="windowHandle">The handle of the window to move.</param>
-    /// <param name="monitorIndex">The index of the monitor to move the window to.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="monitorIndex" /> is out of range.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the process has no main window.</exception>
-    public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
+
+    private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
     {
-        if (monitorIndex < 0) throw new ArgumentOutOfRangeException(nameof(monitorIndex));
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
-        var monitors = NativeApi.GetMonitors();
-        if (monitorIndex >= monitors.Length) throw new ArgumentOutOfRangeException(nameof(monitorIndex));
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect WorkArea;
+        public uint Flags;
+    }
 
-        if (windowHandle == IntPtr.Zero) throw new InvalidOperationException("Process has no main window.");
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOZORDER = 0x0004;
 
-        if (!NativeApi.GetWindowRect(windowHandle, out var currentRect))
-            throw new InvalidOperationException($"Failed to get window rect. Error: {Marshal.GetLastWin32Error()}");
-
-        var width = currentRect.Right - currentRect.Left;
-        var height = currentRect.Bottom - currentRect.Top;
-
-        var target = monitors[monitorIndex];
-
-        if (!NativeApi.GetWindowPlacement(windowHandle, out var placement))
-            throw new InvalidOperationException(
-                $"Failed to get window placement. Error: {Marshal.GetLastWin32Error()}");
-
-        placement.Length = Marshal.SizeOf(typeof(NativeApi.WINDOWPLACEMENT));
-        placement.ShowCmd = NativeApi.SW_SHOWNORMAL;
-        placement.NormalPosition = new NativeApi.RECT
+    /// <summary>
+    ///     Waits for a process to create its main window handle.
+    /// </summary>
+    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000, CancellationToken cancellationToken = default)
+    {
+        var startTime = DateTime.Now;
+        
+        while (process.MainWindowHandle == IntPtr.Zero)
         {
-            Left = target.Left,
-            Top = target.Top,
-            Right = target.Left + width,
-            Bottom = target.Top + height
-        };
+            if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
+                throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
 
-        if (!NativeApi.SetWindowPlacement(windowHandle, ref placement))
-            throw new InvalidOperationException(
-                $"Failed to set window placement. Error: {Marshal.GetLastWin32Error()}");
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            process.Refresh();
+            await Task.Delay(100, cancellationToken);
+        }
     }
 
     /// <summary>
-    ///     Asynchronously waits for a process's main window to be initialized.
+    ///     Moves a window to a specific monitor by index.
     /// </summary>
-    /// <param name="process">The process to monitor.</param>
-    /// <param name="timeoutMs">The timeout in milliseconds.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="process" /> is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the process exits before creating a main window.</exception>
-    /// <exception cref="TimeoutException">Thrown when the process window does not appear in time.</exception>
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000)
+    public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
-        if (process == null) throw new ArgumentNullException(nameof(process));
+        var monitors = new List<Rect>();
+        
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            (IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData) =>
+            {
+                monitors.Add(lprcMonitor);
+                return true;
+            }, IntPtr.Zero);
 
-        const int delay = 100;
-        var stopwatch = Stopwatch.StartNew();
+        if (monitorIndex < 0 || monitorIndex >= monitors.Count)
+            throw new ArgumentOutOfRangeException(nameof(monitorIndex), 
+                $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
 
-        while (process.MainWindowHandle == IntPtr.Zero)
-        {
-            await Task.Delay(delay);
+        var targetMonitor = monitors[monitorIndex];
+        var targetX = targetMonitor.Left + 50;
+        var targetY = targetMonitor.Top + 50;
 
-            process.Refresh();
-
-            if (process.HasExited)
-                throw new InvalidOperationException("Process exited before creating a main window.");
-
-            if (stopwatch.ElapsedMilliseconds > timeoutMs)
-                throw new TimeoutException("Process window did not appear in time.");
-        }
+        SetWindowPos(windowHandle, IntPtr.Zero, targetX, targetY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
     }
 }

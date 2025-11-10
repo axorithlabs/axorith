@@ -3,7 +3,7 @@ using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
-using Axorith.Shared.Platform.Windows;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Module.ApplicationLauncher.Windows;
 
@@ -114,13 +114,13 @@ public class Module : IModule
 
         try
         {
-            await WindowApi.WaitForWindowInitAsync(_currentProcess);
+            await PublicApi.WaitForWindowInitAsync(_currentProcess);
 
             if (_currentProcess.MainWindowHandle != IntPtr.Zero)
             {
                 _logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
                     _currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
-                WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
+                PublicApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
                 _logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
                     _currentProcess.ProcessName, _monitorIndex.GetCurrentValue());
             }

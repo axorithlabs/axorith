@@ -38,7 +38,7 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -127,7 +127,7 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -178,7 +178,7 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -232,7 +232,7 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {

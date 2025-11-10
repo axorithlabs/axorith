@@ -140,14 +140,15 @@ static void RegisterCoreServices(ContainerBuilder builder)
 {
     // Register Core services with configuration-based dependencies
 
-    // ISecureStorageService - platform specific
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        builder.RegisterType<SecureStorage>()
-            .As<ISecureStorageService>()
-            .SingleInstance();
-    else
-        // TODO: Add Linux/macOS implementations
-        throw new PlatformNotSupportedException("Secure storage not implemented for this platform");
+    // ISecureStorageService - platform-specific implementation
+    // Auto-selects Windows, Linux, or macOS implementation
+    builder.Register(ctx =>
+    {
+        var logger = ctx.Resolve<ILogger<ISecureStorageService>>();
+        return Axorith.Shared.Platform.PlatformServices.CreateSecureStorage(logger);
+    })
+    .As<ISecureStorageService>()
+    .SingleInstance();
 
     // Module services with resolved configuration
     builder.RegisterType<ModuleLoader>()
@@ -158,11 +159,12 @@ static void RegisterCoreServices(ContainerBuilder builder)
         {
             var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
             var searchPaths = config.Modules.ResolveSearchPaths();
+            var allowedSymlinks = config.Modules.AllowedSymlinks.Select(Environment.ExpandEnvironmentVariables);
             var rootScope = ctx.Resolve<ILifetimeScope>();
             var moduleLoader = ctx.Resolve<IModuleLoader>();
             var logger = ctx.Resolve<ILogger<ModuleRegistry>>();
 
-            return new ModuleRegistry(rootScope, moduleLoader, searchPaths, logger);
+            return new ModuleRegistry(rootScope, moduleLoader, searchPaths, allowedSymlinks, logger);
         })
         .As<IModuleRegistry>()
         .SingleInstance();
@@ -191,8 +193,19 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<IPresetManager>()
         .SingleInstance();
 
-    // Session manager
-    builder.RegisterType<SessionManager>()
+    // Session manager with configurable timeouts
+    builder.Register(ctx =>
+        {
+            var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
+            var moduleRegistry = ctx.Resolve<IModuleRegistry>();
+            var logger = ctx.Resolve<ILogger<SessionManager>>();
+            
+            var validationTimeout = TimeSpan.FromSeconds(config.Session.ValidationTimeoutSeconds);
+            var startupTimeout = TimeSpan.FromSeconds(config.Session.StartupTimeoutSeconds);
+            var shutdownTimeout = TimeSpan.FromSeconds(config.Session.ShutdownTimeoutSeconds);
+            
+            return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout);
+        })
         .As<ISessionManager>()
         .SingleInstance();
 }

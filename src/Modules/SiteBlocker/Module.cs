@@ -6,7 +6,7 @@ using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
-using Axorith.Shared.Platform.Windows;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Module.SiteBlocker;
 
@@ -20,7 +20,7 @@ public class Module : IModule
 
     private readonly Setting<string> _blockedSites;
 
-    private const string PipeName = "axorith-nm-pipe";
+    private string _pipeName = "axorith-nm-pipe";
     private List<string> _activeBlockedSites = [];
 
     public Module(IModuleLogger logger)
@@ -43,7 +43,8 @@ public class Module : IModule
             
             if (File.Exists(manifestPath))
             {
-                NativeHostManager.EnsureFirefoxHostRegistered("axorith", manifestPath);
+                _pipeName = PublicApi.GetNativeMessagingHostName();
+                PublicApi.EnsureFirefoxHostRegistered(_pipeName, manifestPath);
                 logger.LogInfo("Firefox native messaging host registered successfully");
             }
             else
@@ -127,7 +128,7 @@ public class Module : IModule
         {
             // The client connects to the pipe server hosted by the Shim.
             await using var pipeClient =
-                new NamedPipeClientStream(".", PipeName, PipeDirection.Out, PipeOptions.Asynchronous);
+                new NamedPipeClientStream(".", _pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
 
             // We give it a short timeout to connect. If the Shim isn't running,
             // we don't want to hang the session indefinitely.

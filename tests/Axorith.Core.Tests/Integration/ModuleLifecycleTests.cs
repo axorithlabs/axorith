@@ -57,7 +57,7 @@ public class ModuleLifecycleTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -109,7 +109,7 @@ public class ModuleLifecycleTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -187,7 +187,7 @@ public class ModuleLifecycleTests
         mockRegistry.Setup(r => r.CreateInstance(id1)).Returns((mockModule1.Object, scope1));
         mockRegistry.Setup(r => r.CreateInstance(id2)).Returns((mockModule2.Object, scope2));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {

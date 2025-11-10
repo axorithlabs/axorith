@@ -8,9 +8,9 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Exceptions;
-using Axorith.Shared.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Polly;
 using Serilog;
 using Serilog.Events;
@@ -92,9 +92,13 @@ public sealed class AxorithHost : IDisposable, IAsyncDisposable
                     // Http Services
                     builder.RegisterType<HttpClientFactoryAdapter>().As<IHttpClientFactory>().SingleInstance();
 
-                    // Secure Storage services
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        builder.RegisterType<SecureStorage>().As<ISecureStorageService>().SingleInstance();
+                    // Secure Storage services - platform-specific
+                    builder.Register(ctx =>
+                    {
+                        var loggerFactory = ctx.Resolve<ILoggerFactory>();
+                        var logger = loggerFactory.CreateLogger("ISecureStorageService");
+                        return Axorith.Shared.Platform.PlatformServices.CreateSecureStorage(logger);
+                    }).As<ISecureStorageService>().SingleInstance();
 
                     // Core Services
                     builder.RegisterType<ModuleLoader>().As<IModuleLoader>().SingleInstance();

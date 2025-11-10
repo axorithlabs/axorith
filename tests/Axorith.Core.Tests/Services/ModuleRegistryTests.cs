@@ -23,11 +23,13 @@ public class ModuleRegistryTests
 
         // Mock search paths for testing
         var searchPaths = new[] { "./test-modules" };
+        var allowedSymlinks = Array.Empty<string>();
 
         _registry = new ModuleRegistry(
             container,
             _mockLoader.Object,
             searchPaths,
+            allowedSymlinks,
             NullLogger<ModuleRegistry>.Instance);
     }
 
@@ -48,7 +50,8 @@ public class ModuleRegistryTests
 
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(definitions);
 
         // Act
@@ -57,7 +60,8 @@ public class ModuleRegistryTests
         // Assert
         _mockLoader.Verify(l => l.LoadModuleDefinitionsAsync(
             It.IsAny<IEnumerable<string>>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IEnumerable<string>>()), Times.Once);
     }
 
     [Fact]
@@ -82,7 +86,8 @@ public class ModuleRegistryTests
 
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(new List<ModuleDefinition> { definition1, definition2 });
 
         await _registry.InitializeAsync(CancellationToken.None);
@@ -110,7 +115,8 @@ public class ModuleRegistryTests
 
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(new List<ModuleDefinition> { definition });
 
         await _registry.InitializeAsync(CancellationToken.None);
@@ -129,7 +135,8 @@ public class ModuleRegistryTests
         // Arrange
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(new List<ModuleDefinition>());
 
         await _registry.InitializeAsync(CancellationToken.None);
@@ -158,7 +165,8 @@ public class ModuleRegistryTests
         // Arrange
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IEnumerable<string>>()))
             .ReturnsAsync(new List<ModuleDefinition>());
 
         // Act
@@ -169,7 +177,8 @@ public class ModuleRegistryTests
         // Assert
         _mockLoader.Verify(l => l.LoadModuleDefinitionsAsync(
             It.IsAny<IEnumerable<string>>(),
-            It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IEnumerable<string>>()), Times.AtLeastOnce);
     }
 
     [Fact]
@@ -181,7 +190,8 @@ public class ModuleRegistryTests
 
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IEnumerable<string>>()))
             .ThrowsAsync(new OperationCanceledException());
 
         // Act

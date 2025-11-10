@@ -18,7 +18,13 @@ public class SessionManagerTests
     public SessionManagerTests()
     {
         _mockRegistry = new Mock<IModuleRegistry>();
-        _sessionManager = new SessionManager(_mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        _sessionManager = new SessionManager(
+            _mockRegistry.Object, 
+            NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5),  // validation timeout
+            TimeSpan.FromSeconds(30), // startup timeout
+            TimeSpan.FromSeconds(10)  // shutdown timeout
+        );
     }
 
     [Fact]

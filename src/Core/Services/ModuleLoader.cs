@@ -19,12 +19,15 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
     };
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(IEnumerable<string> searchPaths,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(
+        IEnumerable<string> searchPaths,
+        CancellationToken cancellationToken,
+        IEnumerable<string>? allowedSymlinks = null)
     {
         logger.LogInformation("Starting module definition discovery from 'module.json' files...");
         var definitions = new List<ModuleDefinition>();
         var currentPlatform = GetCurrentPlatform();
+        var allowedSymlinkSet = allowedSymlinks?.Select(Path.GetFullPath).ToHashSet() ?? new HashSet<string>();
 
         foreach (var path in searchPaths)
         {
@@ -33,9 +36,17 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             var dirInfo = new DirectoryInfo(path);
             if (dirInfo.LinkTarget != null)
             {
-                logger.LogWarning("Module directory '{ModuleDir}' is a symbolic link. Skipping for security reasons",
-                    path);
-                continue;
+                var fullPath = Path.GetFullPath(path);
+                if (!allowedSymlinkSet.Contains(fullPath))
+                {
+                    logger.LogWarning(
+                        "Module directory '{ModuleDir}' is a symbolic link not in whitelist. Skipping for security reasons. " +
+                        "Add to Modules:AllowedSymlinks in appsettings.json if this is a trusted development path.",
+                        path);
+                    continue;
+                }
+                
+                logger.LogInformation("Allowing whitelisted symlink: {Path}", path);
             }
 
             if (!Directory.Exists(path))

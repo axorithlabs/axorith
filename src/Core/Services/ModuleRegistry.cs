@@ -18,6 +18,7 @@ public class ModuleRegistry : IModuleRegistry, IDisposable
     private readonly ILifetimeScope _rootScope;
     private readonly IModuleLoader _moduleLoader;
     private readonly IEnumerable<string> _searchPaths;
+    private readonly IEnumerable<string> _allowedSymlinks;
     private readonly ILogger<ModuleRegistry> _logger;
 
     private IReadOnlyDictionary<Guid, ModuleDefinition>
@@ -31,16 +32,19 @@ public class ModuleRegistry : IModuleRegistry, IDisposable
     /// <param name="rootScope">The root Autofac lifetime scope.</param>
     /// <param name="moduleLoader">The module loader for discovering module assemblies.</param>
     /// <param name="searchPaths">The resolved search paths from configuration.</param>
+    /// <param name="allowedSymlinks">Whitelist of allowed symlink paths.</param>
     /// <param name="logger">The logger instance.</param>
     public ModuleRegistry(
         ILifetimeScope rootScope,
         IModuleLoader moduleLoader,
         IEnumerable<string> searchPaths,
+        IEnumerable<string> allowedSymlinks,
         ILogger<ModuleRegistry> logger)
     {
         _rootScope = rootScope ?? throw new ArgumentNullException(nameof(rootScope));
         _moduleLoader = moduleLoader ?? throw new ArgumentNullException(nameof(moduleLoader));
         _searchPaths = searchPaths ?? throw new ArgumentNullException(nameof(searchPaths));
+        _allowedSymlinks = allowedSymlinks ?? throw new ArgumentNullException(nameof(allowedSymlinks));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -54,7 +58,7 @@ public class ModuleRegistry : IModuleRegistry, IDisposable
             string.Join(", ", _searchPaths));
 
         var definitionsList =
-            await _moduleLoader.LoadModuleDefinitionsAsync(_searchPaths, cancellationToken)
+            await _moduleLoader.LoadModuleDefinitionsAsync(_searchPaths, cancellationToken, _allowedSymlinks)
                 .ConfigureAwait(false);
 
         _definitions = definitionsList.ToDictionary(d => d.Id);
@@ -69,12 +73,17 @@ public class ModuleRegistry : IModuleRegistry, IDisposable
     public void Dispose()
     {
         _logger.LogInformation("Disposing ModuleRegistry and unloading all module contexts...");
+        
+        var unloadedContexts = new List<(string Name, WeakReference WeakRef)>();
+        
         foreach (var definition in _definitions.Values)
             try
             {
                 if (definition.LoadContext?.IsCollectible != true) continue;
 
+                var weakRef = new WeakReference(definition.LoadContext);
                 definition.LoadContext.Unload();
+                unloadedContexts.Add((definition.Name, weakRef));
                 _logger.LogDebug("Unloaded assembly context for module '{ModuleName}'", definition.Name);
             }
             catch (Exception ex)
@@ -83,6 +92,35 @@ public class ModuleRegistry : IModuleRegistry, IDisposable
             }
 
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
+        
+        // Force garbage collection to ensure finalizers run and native resources are released
+        if (unloadedContexts.Count > 0)
+        {
+            _logger.LogDebug("Running GC to finalize {Count} unloaded contexts", unloadedContexts.Count);
+            
+            for (int i = 0; i < 10; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                
+                // Check if all contexts are collected
+                var stillAlive = unloadedContexts.Count(c => c.WeakRef.IsAlive);
+                if (stillAlive == 0)
+                {
+                    _logger.LogDebug("All assembly contexts collected after {Iterations} GC iterations", i + 1);
+                    break;
+                }
+                
+                if (i == 9 && stillAlive > 0)
+                {
+                    _logger.LogWarning("{Count} assembly contexts still alive after 10 GC iterations - potential memory leak", stillAlive);
+                    foreach (var context in unloadedContexts.Where(c => c.WeakRef.IsAlive))
+                    {
+                        _logger.LogWarning("AssemblyLoadContext '{Name}' not collected", context.Name);
+                    }
+                }
+            }
+        }
     }
 
     /// <inheritdoc />

@@ -1,44 +1,35 @@
-﻿using System.Runtime.Versioning;
+using System.Runtime.Versioning;
 using Microsoft.Win32;
 
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-///     Manages the registration of the native messaging host for browsers on Windows.
+///     Manages native messaging host registration for browser extensions (Windows only).
 /// </summary>
-public static class NativeHostManager
+[SupportedOSPlatform("windows")]
+internal static class NativeHostManager
 {
-    private const string FirefoxRegistryKey = @"Software\Mozilla\NativeMessagingHosts\";
-    // private const string ChromeRegistryKey = @"Software\Google\Chrome\NativeMessagingHosts\";
+    public const string NativeMessagingHostName = "axorith-nm-pipe";
 
     /// <summary>
-    ///     Ensures that the native messaging host is correctly registered for Firefox.
-    ///     This method is safe to call on every application startup.
+    ///     Ensures the native messaging host is registered in the Windows registry for Firefox.
     /// </summary>
-    /// <param name="hostName">The name of the host (e.g., "axorith"). Must match the name in the extension.</param>
-    /// <param name="manifestPath">The full, absolute path to the host's manifest .json file.</param>
-    /// <exception cref="InvalidOperationException">Thrown if registration fails.</exception>
-    [SupportedOSPlatform("windows")]
-    public static void EnsureFirefoxHostRegistered(string hostName, string manifestPath)
+    public static void EnsureFirefoxHostRegistered(string pipeName, string manifestPath)
     {
-        if (!File.Exists(manifestPath))
-            throw new FileNotFoundException("Native messaging host manifest file not found.", manifestPath);
-
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(FirefoxRegistryKey + hostName);
-
+            var keyPath = $@"Software\Mozilla\NativeMessagingHosts\{pipeName}";
+            
+            using var key = Registry.CurrentUser.CreateSubKey(keyPath, writable: true);
             if (key == null)
-                throw new InvalidOperationException($"Failed to create or open registry key for host '{hostName}'.");
+                throw new InvalidOperationException($"Failed to create registry key: {keyPath}");
 
-            var currentValue = key.GetValue(null) as string;
-            if (currentValue != manifestPath) key.SetValue(null, manifestPath);
+            key.SetValue("", manifestPath, RegistryValueKind.String);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            throw new InvalidOperationException(
-                $"Failed to register native messaging host for Firefox. Please check permissions. Inner exception: {ex.Message}",
-                ex);
+            // Silent failure - extension will still work if already registered
+            throw;
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <AssemblyName>Axorith.Core</AssemblyName>
         <RootNamespace>Axorith.Core</RootNamespace>
@@ -6,9 +6,14 @@
         <Description>Core system for Axorith OS.</Description>
     </PropertyGroup>
 
+    <!-- Expose internal types to test assembly -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Core.Tests" />
+    </ItemGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
-        <ProjectReference Include="..\Shared\Platform\Windows\Axorith.Shared.Platform.Windows.csproj" />
+        <ProjectReference Include="..\Shared\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\Shared\Utils\Axorith.Shared.Utils.csproj" />
         <ProjectReference Include="..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
     </ItemGroup>

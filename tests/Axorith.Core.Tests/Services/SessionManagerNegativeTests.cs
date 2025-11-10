@@ -20,7 +20,13 @@ public class SessionManagerNegativeTests
     public SessionManagerNegativeTests()
     {
         _mockRegistry = new Mock<IModuleRegistry>();
-        _sessionManager = new SessionManager(_mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        _sessionManager = new SessionManager(
+            _mockRegistry.Object, 
+            NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(10)
+        );
     }
 
     [Fact]

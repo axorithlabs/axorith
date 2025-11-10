@@ -14,6 +14,7 @@ namespace Axorith.Host.Services;
 public class SessionsServiceImpl(
     ISessionManager sessionManager,
     IPresetManager presetManager,
+    IModuleRegistry moduleRegistry,
     SessionEventBroadcaster eventBroadcaster,
     ILogger<SessionsServiceImpl> logger)
     : SessionsService.SessionsServiceBase
@@ -23,6 +24,9 @@ public class SessionsServiceImpl(
 
     private readonly IPresetManager _presetManager =
         presetManager ?? throw new ArgumentNullException(nameof(presetManager));
+    
+    private readonly IModuleRegistry _moduleRegistry =
+        moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
 
     private readonly SessionEventBroadcaster _eventBroadcaster =
         eventBroadcaster ?? throw new ArgumentNullException(nameof(eventBroadcaster));
@@ -46,7 +50,68 @@ public class SessionsServiceImpl(
             {
                 state.PresetId = activePreset.Id.ToString();
                 state.PresetName = activePreset.Name;
-                // TODO: Add module states when SessionManager exposes active modules
+                state.StartedAt = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow);
+                
+                // Populate module states from active session
+                foreach (var configuredModule in activePreset.Modules)
+                {
+                    var instance = _sessionManager.GetActiveModuleInstance(configuredModule.ModuleId);
+                    if (instance != null)
+                    {
+                        // Get module definition from registry
+                        var definition = _moduleRegistry.GetDefinitionById(configuredModule.ModuleId);
+                        
+                        var moduleState = new ModuleInstanceState
+                        {
+                            InstanceId = configuredModule.InstanceId.ToString(),
+                            ModuleName = definition?.Name ?? "Unknown",
+                            CustomName = configuredModule.CustomName ?? string.Empty,
+                            Status = ModuleStatus.Running
+                        };
+                        
+                        // Add settings (convert ISetting to proto Setting)
+                        foreach (var setting in instance.GetSettings())
+                        {
+                            var protoSetting = new Setting
+                            {
+                                Key = setting.Key,
+                                Label = setting.GetCurrentLabel(),
+                                Description = setting.Description ?? string.Empty,
+                                ControlType = (Contracts.SettingControlType)((int)setting.ControlType),
+                                Persistence = (Contracts.SettingPersistence)((int)setting.Persistence),
+                                IsReadOnly = setting.GetCurrentReadOnly(),
+                                IsVisible = setting.GetCurrentVisibility(),
+                                ValueType = setting.ValueType.Name,
+                                StringValue = setting.GetValueAsString() ?? string.Empty
+                            };
+                            
+                            moduleState.Settings.Add(protoSetting);
+                        }
+                        
+                        // Add actions (convert IAction to proto Action)
+                        foreach (var action in instance.GetActions())
+                        {
+                            var protoAction = new Contracts.Action
+                            {
+                                Key = action.Key
+                            };
+                            
+                            // Get current label from Observable
+                            var currentLabel = string.Empty;
+                            action.Label.Subscribe(l => currentLabel = l).Dispose();
+                            protoAction.Label = currentLabel;
+                            
+                            // Get current enabled state from Observable
+                            var currentEnabled = false;
+                            action.IsEnabled.Subscribe(e => currentEnabled = e).Dispose();
+                            protoAction.IsEnabled = currentEnabled;
+                            
+                            moduleState.Actions.Add(protoAction);
+                        }
+                        
+                        state.ModuleStates.Add(moduleState);
+                    }
+                }
             }
 
             _logger.LogDebug("Session active: {IsActive}", state.IsActive);

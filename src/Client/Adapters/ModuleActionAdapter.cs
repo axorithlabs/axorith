@@ -58,4 +58,23 @@ internal class ModuleActionAdapter : IAction
             }
         });
     }
+
+    public async Task InvokeAsync()
+    {
+        // Invoke action via gRPC and wait for completion
+        // Used for actions that require async completion (e.g., OAuth login)
+        try
+        {
+            var result = await _modulesApi.InvokeActionAsync(_moduleDefinitionId, Key);
+            if (result.Success)
+                _invokedSubject.OnNext(Unit.Default);
+            else
+                Debug.WriteLine($"Action invocation failed: {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Action invocation error: {ex.Message}");
+            throw;
+        }
+    }
 }

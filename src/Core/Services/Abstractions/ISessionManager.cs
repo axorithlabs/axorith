@@ -1,4 +1,5 @@
 using Axorith.Core.Models;
+using Axorith.Sdk;
 
 namespace Axorith.Core.Services.Abstractions;
 
@@ -40,4 +41,20 @@ public interface ISessionManager : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to observe.</param>
     Task StopCurrentSessionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Gets the active instance of a module by its module ID.
+    ///     Returns null if the session is not running or the module is not active.
+    /// </summary>
+    /// <param name="moduleId">The unique identifier of the module definition.</param>
+    /// <returns>The active module instance, or null if not found.</returns>
+    IModule? GetActiveModuleInstance(Guid moduleId);
+
+    /// <summary>
+    ///     Gets the active instance of a module by its instance ID (from preset configuration).
+    ///     Returns null if the session is not running or the module is not active.
+    /// </summary>
+    /// <param name="instanceId">The unique identifier of the configured module instance.</param>
+    /// <returns>The active module instance, or null if not found.</returns>
+    IModule? GetActiveModuleInstanceByInstanceId(Guid instanceId);
 }

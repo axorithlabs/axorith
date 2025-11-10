@@ -12,6 +12,7 @@ public sealed class Action : IAction
     private readonly BehaviorSubject<string> _label;
     private readonly BehaviorSubject<bool> _isEnabled;
     private readonly Subject<Unit> _invoked = new();
+    private Func<Task>? _asyncHandler;
 
     /// <summary>
     ///     Gets the unique identifier for this action.
@@ -70,6 +71,31 @@ public sealed class Action : IAction
     public void Invoke()
     {
         if (_isEnabled.Value) _invoked.OnNext(Unit.Default);
+    }
+
+    /// <summary>
+    ///     Invokes the action asynchronously and waits for completion.
+    ///     If an async handler is registered, waits for it to complete.
+    ///     Otherwise, invokes synchronously and returns immediately.
+    /// </summary>
+    public async Task InvokeAsync()
+    {
+        if (!_isEnabled.Value) return;
+
+        _invoked.OnNext(Unit.Default);
+
+        if (_asyncHandler != null)
+            await _asyncHandler().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Registers an async handler that will be executed when InvokeAsync() is called.
+    ///     This is used for long-running operations like OAuth login.
+    /// </summary>
+    /// <param name="handler">The async task to execute on invocation.</param>
+    public void OnInvokeAsync(Func<Task> handler)
+    {
+        _asyncHandler = handler;
     }
 
     /// <summary>

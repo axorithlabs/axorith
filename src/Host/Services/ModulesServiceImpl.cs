@@ -13,6 +13,7 @@ namespace Axorith.Host.Services;
 public class ModulesServiceImpl : ModulesService.ModulesServiceBase
 {
     private readonly IModuleRegistry _moduleRegistry;
+    private readonly ISessionManager _sessionManager;
     private readonly SettingUpdateBroadcaster _settingBroadcaster;
     private readonly ILogger<ModulesServiceImpl> _logger;
 
@@ -20,6 +21,7 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
         SettingUpdateBroadcaster settingBroadcaster, ILogger<ModulesServiceImpl> logger)
     {
         _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
+        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _settingBroadcaster = settingBroadcaster ?? throw new ArgumentNullException(nameof(settingBroadcaster));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -113,14 +115,14 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
         }
     }
 
-    public override Task<OperationResult> InvokeAction(InvokeActionRequest request, ServerCallContext context)
+    public override async Task<OperationResult> InvokeAction(InvokeActionRequest request, ServerCallContext context)
     {
         try
         {
             // Parse as module definition ID for design-time actions (e.g., OAuth login during preset editing)
             if (!Guid.TryParse(request.ModuleInstanceId, out var moduleId))
-                return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module ID",
-                    [$"Could not parse: {request.ModuleInstanceId}"]));
+                return SessionMapper.CreateResult(false, "Invalid module ID",
+                    [$"Could not parse: {request.ModuleInstanceId}"]);
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
@@ -131,33 +133,31 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
             // This allows actions like OAuth login to work while editing presets
             var (module, scope) = _moduleRegistry.CreateInstance(moduleId);
             if (module == null)
-                return Task.FromResult(SessionMapper.CreateResult(false, "Module not found",
-                    [$"Module with ID {moduleId} could not be instantiated"]));
+                return SessionMapper.CreateResult(false, "Module not found",
+                    [$"Module with ID {moduleId} could not be instantiated"]);
 
             try
             {
                 // Find the action
                 var action = module.GetActions().FirstOrDefault(a => a.Key == request.ActionKey);
                 if (action == null)
-                    return Task.FromResult(SessionMapper.CreateResult(false, "Action not found",
-                        [$"Action '{request.ActionKey}' not found in module"]));
+                    return SessionMapper.CreateResult(false, "Action not found",
+                        [$"Action '{request.ActionKey}' not found in module"]);
 
-                // Invoke the action
-                action.Invoke();
+                // Invoke the action asynchronously and wait for completion
+                // This ensures OAuth login and other long-running actions complete before disposal
+                _logger.LogDebug("Invoking action {ActionKey} asynchronously", request.ActionKey);
+                await action.InvokeAsync();
 
-                _logger.LogInformation("Action {ActionKey} invoked successfully", request.ActionKey);
-                return Task.FromResult(SessionMapper.CreateResult(true, "Action invoked successfully"));
+                _logger.LogInformation("Action {ActionKey} completed successfully", request.ActionKey);
+                return SessionMapper.CreateResult(true, "Action completed successfully");
             }
             finally
             {
                 // Cleanup: Dispose temporary instance after action completes
-                // Note: This is fire-and-forget - action may complete asynchronously
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(5000); // Grace period for async actions
-                    module.Dispose();
-                    scope?.Dispose();
-                });
+                module.Dispose();
+                scope?.Dispose();
+                _logger.LogDebug("Module instance disposed after action completion");
             }
         }
         catch (Exception ex)
@@ -180,12 +180,51 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
             _logger.LogDebug("UpdateSetting called: {InstanceId}.{SettingKey}",
                 instanceId, request.SettingKey);
 
-            // NOTE: Current SessionManager doesn't expose active modules
-            // This would require refactoring to access module instances and their settings
-            // For MVP, settings are updated in preset configuration, not on running modules
+            // Extract value from oneof
+            string? stringValue = request.ValueCase switch
+            {
+                UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
+                UpdateSettingRequest.ValueOneofCase.BoolValue => request.BoolValue.ToString(),
+                UpdateSettingRequest.ValueOneofCase.NumberValue => request.NumberValue.ToString(),
+                UpdateSettingRequest.ValueOneofCase.IntValue => request.IntValue.ToString(),
+                _ => null
+            };
 
-            // Broadcast the update to connected clients (even though we couldn't apply it)
-            object? value = request.ValueCase switch
+            // Try to apply setting to running module instance
+            var activeModule = _sessionManager.GetActiveModuleInstanceByInstanceId(instanceId);
+            if (activeModule != null)
+            {
+                var setting = activeModule.GetSettings().FirstOrDefault(s => s.Key == request.SettingKey);
+                if (setting != null)
+                {
+                    setting.SetValueFromString(stringValue);
+                    _logger.LogInformation("Setting {SettingKey} updated on running module {InstanceId}",
+                        request.SettingKey, instanceId);
+
+                    // Broadcast the update to connected clients
+                    object? broadcastValue = request.ValueCase switch
+                    {
+                        UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
+                        UpdateSettingRequest.ValueOneofCase.BoolValue => request.BoolValue,
+                        UpdateSettingRequest.ValueOneofCase.NumberValue => request.NumberValue,
+                        UpdateSettingRequest.ValueOneofCase.IntValue => request.IntValue,
+                        _ => null
+                    };
+
+                    _ = _settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey,
+                        SettingProperty.Value, broadcastValue);
+
+                    return Task.FromResult(SessionMapper.CreateResult(true, "Setting updated successfully"));
+                }
+
+                _logger.LogWarning("Setting {SettingKey} not found in module {InstanceId}",
+                    request.SettingKey, instanceId);
+                return Task.FromResult(SessionMapper.CreateResult(false, "Setting not found in module",
+                    [$"Setting '{request.SettingKey}' does not exist in module"]));
+            }
+
+            // Module not running - only broadcast (for design-time UI updates)
+            object? fallbackValue = request.ValueCase switch
             {
                 UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
                 UpdateSettingRequest.ValueOneofCase.BoolValue => request.BoolValue,
@@ -195,14 +234,10 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
             };
 
             _ = _settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey,
-                SettingProperty.Value, value);
+                SettingProperty.Value, fallbackValue);
 
-            var warningMessage = "Setting update broadcasted but not applied to running module. " +
-                                 "SessionManager needs to expose active module instances.";
-
-            _logger.LogWarning(warningMessage);
-            return Task.FromResult(SessionMapper.CreateResult(true, warningMessage,
-                warnings: [warningMessage]));
+            _logger.LogDebug("Setting update broadcasted (module not running)");
+            return Task.FromResult(SessionMapper.CreateResult(true, "Setting update broadcasted (module not running)"));
         }
         catch (Exception ex)
         {

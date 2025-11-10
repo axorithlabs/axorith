@@ -119,14 +119,22 @@ public class PresetManager : IPresetManager
         {
             Directory.CreateDirectory(_presetsDirectory);
 
-            // Write to temporary file first to ensure atomic operation
-            await using (var stream = File.Create(tempFilePath))
+            // Write to temporary file first with exclusive access to prevent concurrent writes
+            // FileShare.None ensures no other process can access this file while we're writing
+            await using (var stream = new FileStream(
+                tempFilePath, 
+                FileMode.Create, 
+                FileAccess.Write, 
+                FileShare.None,  // Exclusive access - no other process can read/write
+                bufferSize: 4096,
+                useAsync: true))
             {
                 await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
                     .ConfigureAwait(false);
             }
 
             // Atomic rename: if this succeeds, the file is guaranteed to be complete
+            // This operation is atomic on Windows and POSIX systems
             File.Move(tempFilePath, filePath, overwrite: true);
             _logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }

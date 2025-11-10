@@ -8,6 +8,7 @@ public class HostConfiguration
     public GrpcConfiguration Grpc { get; set; } = new();
     public ModulesConfiguration Modules { get; set; } = new();
     public PersistenceConfiguration Persistence { get; set; } = new();
+    public SessionConfiguration Session { get; set; } = new();
 }
 
 public class GrpcConfiguration
@@ -23,6 +24,13 @@ public class ModulesConfiguration
 {
     public List<string> SearchPaths { get; set; } = [];
     public bool EnableHotReload { get; set; }
+    
+    /// <summary>
+    ///     Whitelist of allowed symlink paths for development.
+    ///     Only these symlinked directories will be scanned for modules.
+    ///     Empty list means no symlinks are allowed (production default).
+    /// </summary>
+    public List<string> AllowedSymlinks { get; set; } = [];
 
     /// <summary>
     ///     Resolves environment variables in all search paths and returns expanded paths.
@@ -85,4 +93,26 @@ public class PersistenceConfiguration
         var expandedPath = Environment.ExpandEnvironmentVariables(LogsPath);
         return Path.GetFullPath(expandedPath);  // Normalize path
     }
+}
+
+public class SessionConfiguration
+{
+    /// <summary>
+    ///     Timeout in seconds for module settings validation during session startup.
+    ///     Default: 5 seconds.
+    /// </summary>
+    public int ValidationTimeoutSeconds { get; set; } = 5;
+
+    /// <summary>
+    ///     Timeout in seconds for module startup (OnSessionStartAsync) during session initialization.
+    ///     Increase this for modules with slow initialization (e.g., OAuth login).
+    ///     Default: 30 seconds.
+    /// </summary>
+    public int StartupTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     Timeout in seconds for module cleanup (OnSessionEndAsync) during session shutdown.
+    ///     Default: 10 seconds.
+    /// </summary>
+    public int ShutdownTimeoutSeconds { get; set; } = 10;
 }

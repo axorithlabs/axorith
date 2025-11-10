@@ -232,19 +232,47 @@ public class App : Application
         {
             var serverAddress = clientConfig.Host.GetEndpointUrl();
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                loadingViewModel.Message = "Connecting to Axorith.Host...";
-            });
-
             logger.LogInformation("Connecting to Host at {Address}...", serverAddress);
 
             var connection = new GrpcCoreConnection(
                 serverAddress,
                 loggerFactory.CreateLogger<GrpcCoreConnection>());
 
-            await connection.ConnectAsync();
-            logger.LogInformation("Connected successfully to Host");
+            // Retry connection with exponential backoff
+            const int maxRetries = 5;
+            Exception? lastException = null;
+            
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        loadingViewModel.Message = attempt == 1 
+                            ? "Connecting to Axorith.Host..." 
+                            : $"Connecting to Axorith.Host (attempt {attempt}/{maxRetries})...";
+                    });
+
+                    await connection.ConnectAsync();
+                    logger.LogInformation("Connected successfully to Host on attempt {Attempt}", attempt);
+                    break; // Success - exit retry loop
+                }
+                catch (Exception ex) when (attempt < maxRetries)
+                {
+                    lastException = ex;
+                    var delayMs = (int)Math.Pow(2, attempt - 1) * 1000; // 1s, 2s, 4s, 8s, 16s
+                    logger.LogWarning(ex, "Connection attempt {Attempt}/{MaxRetries} failed, retrying in {DelayMs}ms", 
+                        attempt, maxRetries, delayMs);
+                    await Task.Delay(delayMs);
+                }
+            }
+
+            // If all retries failed, throw the last exception
+            if (lastException != null)
+            {
+                logger.LogError(lastException, "All {MaxRetries} connection attempts failed", maxRetries);
+                throw new InvalidOperationException($"Failed to connect to Host after {maxRetries} attempts", lastException);
+            }
 
             // Register real services
             var newServices = new ServiceCollection();
@@ -261,7 +289,11 @@ public class App : Application
             newServices.AddTransient<MainViewModel>();
             newServices.AddTransient<SessionEditorViewModel>();
 
+            // Dispose old provider to prevent memory leak
+            var oldProvider = Services as IDisposable;
             Services = newServices.BuildServiceProvider();
+            oldProvider?.Dispose();
+            logger.LogInformation("ServiceProvider recreated (old provider disposed)");
 
             await Dispatcher.UIThread.InvokeAsync(() => { loadingViewModel.Message = "Loading presets..."; });
 

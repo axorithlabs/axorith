@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <AssemblyName>Axorith.Module.ApplicationLauncher.Windows</AssemblyName>
         <RootNamespace>Axorith.Module.ApplicationLauncher.Windows</RootNamespace>
@@ -10,6 +10,6 @@
         <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
         <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
         <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
-        <ProjectReference Include="..\..\Shared\Platform\Windows\Axorith.Shared.Platform.Windows.csproj" />
+        <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
     </ItemGroup>
 </Project>

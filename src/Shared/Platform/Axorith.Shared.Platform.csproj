@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Shared.Platform</AssemblyName>
+        <RootNamespace>Axorith.Shared.Platform</RootNamespace>
+        
+        <Description>Platform-specific implementations for Axorith (Windows, Linux, macOS)</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Windows-specific -->
+        <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" Condition="'$(OS)' == 'Windows_NT'" />
+        
+        <!-- Logging -->
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    </ItemGroup>
+</Project>

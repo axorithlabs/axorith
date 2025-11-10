@@ -74,11 +74,13 @@ public class HostManagementServiceImpl(
     {
         var uptime = (long)(DateTime.UtcNow - s_startTime).TotalSeconds;
 
+        var activeModuleCount = sessionManager.ActiveSession?.Modules.Count ?? 0;
+
         var response = new HostStatusResponse
         {
             Version = typeof(HostManagementServiceImpl).Assembly.GetName().Version?.ToString() ?? "0.0.1",
             UptimeSeconds = uptime,
-            ActiveModulesCount = 0, // TODO: Get active module count from SessionManager
+            ActiveModulesCount = activeModuleCount,
             IsSessionRunning = sessionManager.IsSessionRunning,
             CurrentPresetId = sessionManager.ActiveSession?.Id.ToString() ?? string.Empty
         };

@@ -29,7 +29,15 @@ public interface IAction
     IObservable<Unit> Invoked { get; }
 
     /// <summary>
-    ///     Programmatically triggers the action invocation.
+    ///     Programmatically triggers the action invocation synchronously (fire-and-forget).
+    ///     Use InvokeAsync for actions that require async completion (e.g., OAuth login).
     /// </summary>
     void Invoke();
+
+    /// <summary>
+    ///     Programmatically triggers the action invocation and waits for completion.
+    ///     Returns a Task that completes when the action handler finishes execution.
+    ///     For actions without async work, this returns a completed Task immediately.
+    /// </summary>
+    Task InvokeAsync();
 }
