@@ -33,6 +33,24 @@ public interface IModulesApi
         CancellationToken ct = default);
 
     /// <summary>
+    ///     Starts a design-time edit session for the specified module instance.
+    ///     Initializes a sandbox on the Host with the provided initial values snapshot.
+    /// </summary>
+    Task<OperationResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
+        IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Ends a design-time edit session and disposes the sandbox on the Host.
+    /// </summary>
+    Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default);
+
+    /// <summary>
+    ///     Requests the Host to re-broadcast current sandbox reactive state for this module instance.
+    ///     Useful right after loading the settings to apply visibility/labels/read-only.
+    /// </summary>
+    Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default);
+
+    /// <summary>
     ///     Observable stream of setting updates from running modules.
     ///     Broadcasts reactive changes (label, visibility, choices, etc.).
     /// </summary>

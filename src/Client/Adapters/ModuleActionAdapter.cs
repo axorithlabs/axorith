@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -15,18 +14,18 @@ internal class ModuleActionAdapter : IAction
 {
     private readonly Subject<Unit> _invokedSubject;
     private readonly IModulesApi _modulesApi;
-    private readonly Guid _moduleDefinitionId;
+    private readonly Guid _moduleInstanceId;
 
     public string Key { get; }
     public IObservable<string> Label { get; }
     public IObservable<bool> IsEnabled { get; }
     public IObservable<Unit> Invoked { get; }
 
-    public ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid moduleDefinitionId)
+    public ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid moduleInstanceId)
     {
         Key = action.Key;
         _modulesApi = modulesApi ?? throw new ArgumentNullException(nameof(modulesApi));
-        _moduleDefinitionId = moduleDefinitionId;
+        _moduleInstanceId = moduleInstanceId;
 
         var labelSubject = new BehaviorSubject<string>(action.Label);
         var enabledSubject = new BehaviorSubject<bool>(action.IsEnabled);
@@ -45,16 +44,13 @@ internal class ModuleActionAdapter : IAction
         {
             try
             {
-                var result = await _modulesApi.InvokeActionAsync(_moduleDefinitionId, Key);
+                var result = await _modulesApi.InvokeActionAsync(_moduleInstanceId, Key);
                 if (result.Success)
                     _invokedSubject.OnNext(Unit.Default);
-                else
-                    // Log error but don't crash UI
-                    Debug.WriteLine($"Action invocation failed: {result.Message}");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"Action invocation error: {ex.Message}");
+                // ignored
             }
         });
     }
@@ -63,18 +59,8 @@ internal class ModuleActionAdapter : IAction
     {
         // Invoke action via gRPC and wait for completion
         // Used for actions that require async completion (e.g., OAuth login)
-        try
-        {
-            var result = await _modulesApi.InvokeActionAsync(_moduleDefinitionId, Key);
-            if (result.Success)
-                _invokedSubject.OnNext(Unit.Default);
-            else
-                Debug.WriteLine($"Action invocation failed: {result.Message}");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Action invocation error: {ex.Message}");
-            throw;
-        }
+        var result = await _modulesApi.InvokeActionAsync(_moduleInstanceId, Key);
+        if (result.Success)
+            _invokedSubject.OnNext(Unit.Default);
     }
 }

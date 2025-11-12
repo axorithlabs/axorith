@@ -62,7 +62,7 @@ internal class ModuleSettingAdapter : ISetting
         IsVisible = _visibilitySubject.AsObservable();
         IsReadOnly = _readOnlySubject.AsObservable();
         ValueAsObject = _valueSubject.AsObservable();
-        Choices = setting.Choices.Count > 0 ? _choicesSubject.AsObservable() : null;
+        Choices = controlType == SettingControlType.Choice ? _choicesSubject.AsObservable() : null;
     }
 
     public object? GetCurrentValueAsObject()
@@ -114,6 +114,38 @@ internal class ModuleSettingAdapter : ISetting
     public IReadOnlyList<KeyValuePair<string, string>> GetCurrentChoices()
     {
         return _choicesSubject.Value;
+    }
+
+    /// <summary>
+    /// Updates the label of the setting (for reactive UI updates from host).
+    /// </summary>
+    public void SetLabel(string label)
+    {
+        _labelSubject.OnNext(label);
+    }
+
+    /// <summary>
+    /// Updates the visibility of the setting (for reactive UI updates from host).
+    /// </summary>
+    public void SetVisibility(bool isVisible)
+    {
+        _visibilitySubject.OnNext(isVisible);
+    }
+
+    /// <summary>
+    /// Updates the read-only state of the setting (for reactive UI updates from host).
+    /// </summary>
+    public void SetReadOnly(bool isReadOnly)
+    {
+        _readOnlySubject.OnNext(isReadOnly);
+    }
+
+    /// <summary>
+    /// Updates the choices for choice-based settings (for reactive UI updates from host).
+    /// </summary>
+    public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> choices)
+    {
+        _choicesSubject.OnNext(choices);
     }
 
     private static Type ParseValueType(string typeName)

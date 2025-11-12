@@ -26,6 +26,9 @@ public class Module : IModule
     private readonly Setting<string> _processingMode;
     private readonly Setting<string> _inputFile;
     private readonly Setting<string> _outputDirectory;
+    // Reactive demo settings
+    private readonly Setting<bool> _showNotes;
+    private readonly Setting<string> _notes;
 
     public Module(IModuleLogger logger,
         IHttpClientFactory httpClientFactory,
@@ -93,6 +96,25 @@ public class Module : IModule
             defaultValue: Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         );
 
+        // Reactive UI demo: checkbox controls textarea visibility
+        _showNotes = Setting.AsCheckbox(
+            key: "ShowNotes",
+            label: "Show Notes",
+            description: "Toggle to show/hide the Notes field.",
+            defaultValue: false
+        );
+
+        _notes = Setting.AsTextArea(
+            key: "Notes",
+            label: "Notes",
+            defaultValue: string.Empty,
+            description: "Optional notes to validate UI reactivity.",
+            isVisible: false
+        );
+
+        // Subscription: when ShowNotes changes, toggle Notes visibility
+        _showNotes.Value.Subscribe(visible => _notes.SetVisibility(visible));
+
         // Load secrets from SecureStorage in constructor
         var userSecret = _secureStorage.RetrieveSecret(_userSecret.Key);
         if (!string.IsNullOrEmpty(userSecret))
@@ -115,7 +137,9 @@ public class Module : IModule
             _userSecret,
             _processingMode,
             _inputFile,
-            _outputDirectory
+            _outputDirectory,
+            _showNotes,
+            _notes
         ];
     }
 

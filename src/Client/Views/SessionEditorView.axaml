@@ -192,7 +192,7 @@
                                     <ItemsControl ItemsSource="{Binding Settings}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:SettingViewModel">
-                                                <StackPanel Margin="0,12">
+                                                <StackPanel Margin="0,12" IsVisible="{Binding IsVisible}">
                                                     <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" TextWrapping="Wrap"/>
                                                     <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                                                     <ContentControl Content="{Binding}" 

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Http;
@@ -97,7 +96,7 @@ public sealed class AxorithHost : IDisposable, IAsyncDisposable
                     {
                         var loggerFactory = ctx.Resolve<ILoggerFactory>();
                         var logger = loggerFactory.CreateLogger("ISecureStorageService");
-                        return Axorith.Shared.Platform.PlatformServices.CreateSecureStorage(logger);
+                        return Shared.Platform.PlatformServices.CreateSecureStorage(logger);
                     }).As<ISecureStorageService>().SingleInstance();
 
                     // Core Services

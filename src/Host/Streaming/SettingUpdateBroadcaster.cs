@@ -18,6 +18,7 @@ public class SettingUpdateBroadcaster : IDisposable
     private readonly ILogger<SettingUpdateBroadcaster> _logger;
     private readonly ConcurrentDictionary<string, IServerStreamWriter<SettingUpdate>> _subscribers = new();
     private readonly ConcurrentDictionary<string, IDisposable> _settingSubscriptions = new();
+    private readonly ConcurrentDictionary<string, string> _lastChoicesFingerprint = new();
     private bool _disposed;
 
     public SettingUpdateBroadcaster(ISessionManager sessionManager, ILogger<SettingUpdateBroadcaster> logger)
@@ -30,6 +31,28 @@ public class SettingUpdateBroadcaster : IDisposable
         _sessionManager.SessionStopped += OnSessionStopped;
 
         _logger.LogInformation("SettingUpdateBroadcaster initialized");
+    }
+
+    /// <summary>
+    ///     Unsubscribes and removes all tracked subscriptions for a specific module instance.
+    /// </summary>
+    public void UnsubscribeModuleInstance(Guid moduleInstanceId)
+    {
+        var prefix = moduleInstanceId.ToString();
+        var toRemove = new List<string>();
+        foreach (var (key, sub) in _settingSubscriptions)
+        {
+            if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                try { sub.Dispose(); } catch { /* ignore */ }
+                toRemove.Add(key);
+            }
+        }
+        foreach (var k in toRemove) _settingSubscriptions.TryRemove(k, out _);
+
+        // Clear cached choices fingerprints for this module instance
+        var choiceKeys = _lastChoicesFingerprint.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var ck in choiceKeys) _lastChoicesFingerprint.TryRemove(ck, out _);
     }
 
     /// <summary>
@@ -69,22 +92,50 @@ public class SettingUpdateBroadcaster : IDisposable
 
     private void OnSessionStarted(Guid presetId)
     {
-        // NOTE: In current architecture, we don't have direct access to module instances from SessionManager
-        // This would require refactoring SessionManager to expose ActiveModules
-        // For MVP, setting updates will be sent via explicit UpdateSetting gRPC calls
-        // Future enhancement: Subscribe to all module setting observables here
+        _logger.LogDebug("Session started: {PresetId}, subscribing to all module settings", presetId);
 
-        _logger.LogDebug("Session started: {PresetId}, setting subscriptions not yet implemented", presetId);
+        var activePreset = _sessionManager.ActiveSession;
+        if (activePreset == null)
+        {
+            _logger.LogWarning("Session started event fired but ActiveSession is null");
+            return;
+        }
+
+        // Iterate through all configured modules in the active preset
+        foreach (var configuredModule in activePreset.Modules)
+        {
+            // Get the live module instance by InstanceId (not ModuleId!)
+            var moduleInstance = _sessionManager.GetActiveModuleInstanceByInstanceId(configuredModule.InstanceId);
+            if (moduleInstance == null)
+            {
+                _logger.LogWarning("Module instance not found for InstanceId: {InstanceId}", configuredModule.InstanceId);
+                continue;
+            }
+
+            // Subscribe to all settings of this module
+            var settings = moduleInstance.GetSettings();
+            foreach (var setting in settings)
+            {
+                SubscribeToSetting(configuredModule.InstanceId, setting);
+            }
+
+            _logger.LogDebug("Subscribed to {SettingCount} settings for module {ModuleName} (InstanceId: {InstanceId})",
+                settings.Count, configuredModule.CustomName ?? "Unknown", configuredModule.InstanceId);
+        }
+
+        _logger.LogInformation("Successfully subscribed to settings for {ModuleCount} modules", activePreset.Modules.Count);
     }
 
     private void OnSessionStopped(Guid presetId)
     {
         // Dispose all setting subscriptions
+        var cleared = _settingSubscriptions.Count;
         foreach (var (_, subscription) in _settingSubscriptions) subscription.Dispose();
         _settingSubscriptions.Clear();
+        _lastChoicesFingerprint.Clear();
 
         _logger.LogDebug("Session stopped: {PresetId}, cleared {Count} setting subscriptions",
-            presetId, _settingSubscriptions.Count);
+            presetId, cleared);
     }
 
     /// <summary>
@@ -96,14 +147,34 @@ public class SettingUpdateBroadcaster : IDisposable
         if (_disposed || _subscribers.IsEmpty)
             return;
 
+        // Choices caching: skip duplicate broadcasts with same fingerprint
+        if (property == SettingProperty.Choices && value is IReadOnlyList<KeyValuePair<string, string>> choicesList)
+        {
+            var fingerprint = string.Join("\n", choicesList.Select(kv => kv.Key + "\u0001" + kv.Value));
+            var cacheKey = $"{moduleInstanceId}:{settingKey}:choices";
+            if (_lastChoicesFingerprint.TryGetValue(cacheKey, out var prev) && prev == fingerprint)
+                return;
+            _lastChoicesFingerprint[cacheKey] = fingerprint;
+        }
+
         var update = SettingMapper.CreateUpdate(moduleInstanceId, settingKey, property, value);
 
-        _logger.LogDebug("Broadcasting setting update: {ModuleId}.{Key}.{Property}",
-            moduleInstanceId, settingKey, property);
+        _logger.LogDebug("Broadcast setting update: {ModuleId}.{Key}.{Property} = {Value}",
+            moduleInstanceId, settingKey, property, value);
 
         var tasks = new List<Task>();
 
-        foreach (var (subscriberId, stream) in _subscribers)
+        foreach (var (subscriberKey, stream) in _subscribers)
+        {
+            // Key may be 'subscriberId' or 'subscriberId:moduleInstanceId'
+            string? filter = null;
+            var sepIndex = subscriberKey.IndexOf(':');
+            if (sepIndex > 0 && sepIndex < subscriberKey.Length - 1)
+                filter = subscriberKey[(sepIndex + 1)..];
+
+            if (filter != null && !string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase))
+                continue;
+
             tasks.Add(Task.Run(async () =>
             {
                 try
@@ -114,10 +185,11 @@ public class SettingUpdateBroadcaster : IDisposable
                 {
                     _logger.LogWarning(ex,
                         "Failed to send setting update to subscriber {SubscriberId}, removing",
-                        subscriberId);
-                    _subscribers.TryRemove(subscriberId, out _);
+                        subscriberKey);
+                    _subscribers.TryRemove(subscriberKey, out _);
                 }
             }));
+        }
 
         try
         {
@@ -152,6 +224,7 @@ public class SettingUpdateBroadcaster : IDisposable
         // Subscribe to Label changes
         var labelSub = setting.Label
             .Skip(1)
+            .DistinctUntilChanged()
             .Subscribe(label =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Label, label);
@@ -162,6 +235,7 @@ public class SettingUpdateBroadcaster : IDisposable
         // Subscribe to Visibility changes
         var visSub = setting.IsVisible
             .Skip(1)
+            .DistinctUntilChanged()
             .Subscribe(visible =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Visibility, visible);
@@ -172,6 +246,7 @@ public class SettingUpdateBroadcaster : IDisposable
         // Subscribe to ReadOnly changes
         var readOnlySub = setting.IsReadOnly
             .Skip(1)
+            .DistinctUntilChanged()
             .Subscribe(readOnly =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.ReadOnly, readOnly);
@@ -184,6 +259,7 @@ public class SettingUpdateBroadcaster : IDisposable
         {
             var choicesSub = setting.Choices
                 .Skip(1)
+                .Throttle(TimeSpan.FromMilliseconds(200))
                 .Subscribe(choices =>
                 {
                     _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Choices, choices);

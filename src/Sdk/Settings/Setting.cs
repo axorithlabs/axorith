@@ -403,10 +403,10 @@ public class Setting<T> : ISetting
         bool isVisible, bool isReadOnly, SettingPersistence persistence, Func<T, string> serializer,
         Func<string?, T> deserializer)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key, nameof(key));
-        ArgumentException.ThrowIfNullOrWhiteSpace(label, nameof(label));
-        ArgumentNullException.ThrowIfNull(serializer, nameof(serializer));
-        ArgumentNullException.ThrowIfNull(deserializer, nameof(deserializer));
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
+        ArgumentNullException.ThrowIfNull(serializer);
+        ArgumentNullException.ThrowIfNull(deserializer);
 
         Key = key;
         Description = description;
@@ -423,7 +423,7 @@ public class Setting<T> : ISetting
 
     internal void InitializeChoices(IReadOnlyList<KeyValuePair<string, string>> initialChoices)
     {
-        ArgumentNullException.ThrowIfNull(initialChoices, nameof(initialChoices));
+        ArgumentNullException.ThrowIfNull(initialChoices);
         _choices = new BehaviorSubject<IReadOnlyList<KeyValuePair<string, string>>>(initialChoices);
     }
 
@@ -448,7 +448,7 @@ public class Setting<T> : ISetting
     /// </summary>
     public void SetLabel(string newLabel)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(newLabel, nameof(newLabel));
+        ArgumentException.ThrowIfNullOrWhiteSpace(newLabel);
         _label.OnNext(newLabel);
     }
 
@@ -457,7 +457,7 @@ public class Setting<T> : ISetting
     /// </summary>
     public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> newChoices)
     {
-        ArgumentNullException.ThrowIfNull(newChoices, nameof(newChoices));
+        ArgumentNullException.ThrowIfNull(newChoices);
         // Allow empty lists to support clearing dropdowns or error states
         _choices?.OnNext(newChoices);
     }

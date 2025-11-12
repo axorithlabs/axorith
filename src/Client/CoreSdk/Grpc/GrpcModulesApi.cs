@@ -53,6 +53,84 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
         }).ConfigureAwait(false);
     }
 
+    public async Task<OperationResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
+        IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default)
+    {
+        return await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var request = new BeginEditRequest
+            {
+                ModuleId = moduleId.ToString(),
+                ModuleInstanceId = moduleInstanceId.ToString()
+            };
+
+            foreach (var (key, val) in initialValues)
+            {
+                var sv = new SettingValue { Key = key };
+                switch (val)
+                {
+                    case string s:
+                        sv.StringValue = s;
+                        break;
+                    case bool b:
+                        sv.BoolValue = b;
+                        break;
+                    case int i:
+                        sv.IntValue = i;
+                        break;
+                    case double d:
+                        sv.NumberValue = d;
+                        break;
+                    case decimal dec:
+                        sv.NumberValue = (double)dec;
+                        break;
+                    case null:
+                        sv.StringValue = string.Empty;
+                        break;
+                    default:
+                        sv.StringValue = val.ToString() ?? string.Empty;
+                        break;
+                }
+                request.InitialValues.Add(sv);
+            }
+
+            var response = await _client.BeginEditAsync(request, cancellationToken: ct).ConfigureAwait(false);
+            return new OperationResult(response.Success, response.Message,
+                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
+    {
+        return await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await _client.EndEditAsync(new EndEditRequest
+            {
+                ModuleInstanceId = moduleInstanceId.ToString()
+            }, cancellationToken: ct).ConfigureAwait(false);
+
+            return new OperationResult(response.Success, response.Message,
+                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
+    {
+        return await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await _client.SyncEditAsync(new SyncEditRequest
+            {
+                ModuleInstanceId = moduleInstanceId.ToString()
+            }, cancellationToken: ct).ConfigureAwait(false);
+
+            return new OperationResult(response.Success, response.Message,
+                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        }).ConfigureAwait(false);
+    }
+
     public async Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default)
     {
         return await _retryPolicy.ExecuteAsync(async () =>
@@ -177,7 +255,7 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
         while (!ct.IsCancellationRequested)
             try
             {
-                _logger.LogInformation("Starting setting updates stream...");
+                _logger.LogDebug("Starting setting updates stream...");
 
                 using var call = _client.StreamSettingUpdates(
                     new StreamSettingUpdatesRequest(),
@@ -212,12 +290,12 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
             {
-                _logger.LogInformation("Setting updates stream cancelled");
+                _logger.LogDebug("Setting updates stream cancelled");
                 break;
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("Setting updates stream cancelled");
+                _logger.LogDebug("Setting updates stream cancelled");
                 break;
             }
             catch (Exception ex)

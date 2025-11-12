@@ -7,7 +7,6 @@ using Avalonia.Threading;
 using Axorith.Contracts;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Json;
 using Serilog;
 
 namespace Axorith.Service;
@@ -18,7 +17,7 @@ internal class Program
     private static void Main(string[] args)
     {
         // Load configuration from appsettings.json
-        var configBuilder = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+        var configBuilder = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
         var config = configBuilder.Build();

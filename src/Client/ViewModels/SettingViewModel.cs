@@ -1,7 +1,9 @@
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Windows.Input;
+using Axorith.Client.CoreSdk;
 using Axorith.Sdk.Settings;
 using ReactiveUI;
 
@@ -14,6 +16,9 @@ namespace Axorith.Client.ViewModels;
 public class SettingViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
+    private readonly Guid _moduleInstanceId;
+    private readonly IModulesApi _modulesApi;
+    private readonly Subject<object?> _numberUpdates = new();
 
     /// <summary>
     ///     Gets the underlying reactive setting definition from the SDK.
@@ -49,13 +54,21 @@ public class SettingViewModel : ReactiveObject, IDisposable
     public string StringValue
     {
         get => Setting.GetCurrentValueAsObject() as string ?? string.Empty;
-        set => Setting.SetValueFromString(value);
+        set
+        {
+            // Send to server, update will come back via broadcast
+            _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
+        }
     }
 
     public bool BoolValue
     {
         get => Setting.GetCurrentValueAsObject() as bool? ?? false;
-        set => Setting.SetValueFromObject(value);
+        set
+        {
+            // Send to server, update will come back via broadcast
+            _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
+        }
     }
 
     public decimal DecimalValue
@@ -81,10 +94,12 @@ public class SettingViewModel : ReactiveObject, IDisposable
         set
         {
             // For int settings, round the value
-            if (Setting.ValueType == typeof(int))
-                Setting.SetValueFromObject((int)Math.Round(value));
-            else
-                Setting.SetValueFromObject(value);
+            object boxedValue = Setting.ValueType == typeof(int)
+                ? (int)Math.Round(value)
+                : value;
+
+            // Debounced send to server, update will come back via broadcast
+            _numberUpdates.OnNext(boxedValue);
         }
     }
 
@@ -99,7 +114,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
     public IReadOnlyList<KeyValuePair<string, string>> Choices
     {
         get => _choices;
-        private set => this.RaiseAndSetIfChanged(ref _choices, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _choices, value);
+            this.RaisePropertyChanged(nameof(SelectedChoice));
+        }
     }
 
     public decimal NumberIncrement => Setting.ValueType == typeof(int) ? 1 : 0.1m;
@@ -111,11 +130,19 @@ public class SettingViewModel : ReactiveObject, IDisposable
         get
         {
             var currentValue = StringValue;
-            return Choices.FirstOrDefault(c => c.Key == currentValue);
+            foreach (var c in Choices)
+                if (c.Key == currentValue)
+                    return c;
+            return null;
         }
         set
         {
-            if (value.HasValue) StringValue = value.Value.Key;
+            if (value.HasValue)
+            {
+                StringValue = value.Value.Key;
+                this.RaisePropertyChanged(nameof(StringValue));
+                this.RaisePropertyChanged(nameof(SelectedChoice));
+            }
         }
     }
 
@@ -124,9 +151,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand ClickCommand { get; }
 
-    public SettingViewModel(ISetting setting)
+    public SettingViewModel(ISetting setting, Guid moduleInstanceId, IModulesApi modulesApi)
     {
         Setting = setting;
+        _moduleInstanceId = moduleInstanceId;
+        _modulesApi = modulesApi;
 
         ClickCommand = ReactiveCommand.Create(() => { BoolValue = true; });
 
@@ -177,6 +206,13 @@ public class SettingViewModel : ReactiveObject, IDisposable
             {
                 /* Ignore errors after module disposal */
             })
+            .DisposeWith(_disposables);
+
+        // Debounce numeric updates to avoid flooding server during slider typing/drags
+        _numberUpdates
+            .Throttle(TimeSpan.FromMilliseconds(75))
+            .ObserveOn(RxApp.TaskpoolScheduler)
+            .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
             .DisposeWith(_disposables);
     }
 

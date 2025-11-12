@@ -26,19 +26,19 @@ public static class PlatformServices
             {
                 return new Windows.WindowsSecureStorage(logger);
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                return new Unix.UnixSecureStorage(logger, UnixPlatform.Linux);
+                return new Linux.LinuxSecureStorage(logger);
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                return new Unix.UnixSecureStorage(logger, UnixPlatform.MacOS);
+                return new MacOS.MacOSSecureStorage(logger);
             }
-            else
-            {
-                throw new PlatformNotSupportedException(
-                    $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
-            }
+
+            throw new PlatformNotSupportedException(
+                $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
         });
 
         // Register other platform-specific services here as needed
@@ -57,19 +57,19 @@ public static class PlatformServices
         {
             return new Windows.WindowsSecureStorage(logger);
         }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            return new Unix.UnixSecureStorage(logger, UnixPlatform.Linux);
+            return new Linux.LinuxSecureStorage(logger);
         }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            return new Unix.UnixSecureStorage(logger, UnixPlatform.MacOS);
+            return new MacOS.MacOSSecureStorage(logger);
         }
-        else
-        {
-            throw new PlatformNotSupportedException(
-                $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
-        }
+
+        throw new PlatformNotSupportedException(
+            $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
 
     /// <summary>
@@ -86,13 +86,4 @@ public static class PlatformServices
         
         return "Unknown";
     }
-}
-
-/// <summary>
-///     Unix platform variants for specialized behavior
-/// </summary>
-internal enum UnixPlatform
-{
-    Linux,
-    MacOS
 }

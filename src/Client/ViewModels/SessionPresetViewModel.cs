@@ -30,7 +30,7 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
             .Select(m =>
             {
                 var def = availableModules.FirstOrDefault(md => md.Id == m.ModuleId);
-                return def != null ? new ConfiguredModuleViewModel(def, m, availableModules, modulesApi) : null;
+                return def != null ? new ConfiguredModuleViewModel(def, m, modulesApi) : null;
             })
             .Where(vm => vm != null);
 

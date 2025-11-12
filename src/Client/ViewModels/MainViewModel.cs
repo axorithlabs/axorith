@@ -2,11 +2,6 @@ using System.Collections.ObjectModel;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Layout;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Microsoft.Extensions.DependencyInjection;
@@ -215,77 +210,6 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
     {
-        // Show confirmation dialog
-        var window = Application.Current?.ApplicationLifetime is
-            IClassicDesktopStyleApplicationLifetime desktop
-            ? desktop.MainWindow
-            : null;
-
-        if (window == null)
-        {
-            SessionStatus = "Cannot show confirmation dialog - window not available.";
-            return;
-        }
-
-        Window? dialog = null;
-        var dialog1 = dialog;
-        var dialog2 = dialog;
-        dialog = new Window
-        {
-            Title = "Delete Preset",
-            Width = 400,
-            Height = 200,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Content = new StackPanel
-            {
-                Margin = new Thickness(20),
-                Spacing = 15,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = $"Delete preset '{presetVm.Name}'?",
-                        FontSize = 16,
-                        FontWeight = FontWeight.Bold,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    },
-                    new TextBlock
-                    {
-                        Text = "This action cannot be undone.",
-                        Opacity = 0.7,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Margin = new Thickness(0, 0, 0, 10)
-                    },
-                    new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Spacing = 10,
-                        Children =
-                        {
-                            new Button
-                            {
-                                Content = "Delete",
-                                Width = 100,
-                                Command = ReactiveCommand.Create(() => dialog1!.Close(true))
-                            },
-                            new Button
-                            {
-                                Content = "Cancel",
-                                Width = 100,
-                                Command = ReactiveCommand.Create(() => dialog2!.Close(false))
-                            }
-                        }
-                    }
-                }
-            }
-        };
-
-        var result = await dialog.ShowDialog<bool>(window);
-
-        if (!result) return;
-
         try
         {
             await _presetsApi.DeletePresetAsync(presetVm.Id);

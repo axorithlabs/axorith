@@ -42,9 +42,9 @@ public class DiagnosticsServiceImplTests
             peer: "127.0.0.1",
             authContext: null,
             contextPropagationToken: null,
-            writeHeadersFunc: (metadata) => Task.CompletedTask,
+            writeHeadersFunc: _ => Task.CompletedTask,
             writeOptionsGetter: () => new Grpc.Core.WriteOptions(),
-            writeOptionsSetter: (writeOptions) => { }
+            writeOptionsSetter: _ => { }
         );
     }
 

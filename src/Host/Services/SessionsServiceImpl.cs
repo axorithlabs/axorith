@@ -55,7 +55,9 @@ public class SessionsServiceImpl(
                 // Populate module states from active session
                 foreach (var configuredModule in activePreset.Modules)
                 {
-                    var instance = _sessionManager.GetActiveModuleInstance(configuredModule.ModuleId);
+                    // Prefer exact match by InstanceId; fallback to ModuleId for backward compatibility
+                    var instance = _sessionManager.GetActiveModuleInstanceByInstanceId(configuredModule.InstanceId)
+                                   ?? _sessionManager.GetActiveModuleInstance(configuredModule.ModuleId);
                     if (instance != null)
                     {
                         // Get module definition from registry
@@ -77,8 +79,8 @@ public class SessionsServiceImpl(
                                 Key = setting.Key,
                                 Label = setting.GetCurrentLabel(),
                                 Description = setting.Description ?? string.Empty,
-                                ControlType = (Contracts.SettingControlType)((int)setting.ControlType),
-                                Persistence = (Contracts.SettingPersistence)((int)setting.Persistence),
+                                ControlType = (SettingControlType)((int)setting.ControlType),
+                                Persistence = (SettingPersistence)((int)setting.Persistence),
                                 IsReadOnly = setting.GetCurrentReadOnly(),
                                 IsVisible = setting.GetCurrentVisibility(),
                                 ValueType = setting.ValueType.Name,

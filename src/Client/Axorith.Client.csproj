@@ -20,15 +20,15 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="11.3.7" />
-        <PackageReference Include="Avalonia.Desktop" Version="11.3.7" />
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.7" />
-        <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.0" />
+        <PackageReference Include="Avalonia" Version="11.3.8" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.3.8" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.8" />
+        <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8" />
         <PackageReference Include="System.Reactive" Version="6.1.0" />
         <PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
         <PackageReference Include="Polly" Version="8.6.4" />
-        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.7" />
-        <PackageReference Include="Xaml.Behaviors.Avalonia" Version="11.3.6.5" />
+        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.8" />
+        <PackageReference Include="Xaml.Behaviors.Avalonia" Version="11.3.6.6" />
     </ItemGroup>
 
     <ItemGroup>

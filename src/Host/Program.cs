@@ -1,5 +1,4 @@
 using System.Net;
-using System.Runtime.InteropServices;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Http;
@@ -10,7 +9,6 @@ using Axorith.Host;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
-using Axorith.Shared.Platform.Windows;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Serilog;
 using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
@@ -217,6 +215,10 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .SingleInstance();
 
     builder.RegisterType<SettingUpdateBroadcaster>()
+        .AsSelf()
+        .SingleInstance();
+
+    builder.RegisterType<DesignTimeSandboxManager>()
         .AsSelf()
         .SingleInstance();
 }

@@ -4,7 +4,6 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Axorith.Core.Services;
 

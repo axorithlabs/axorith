@@ -184,7 +184,7 @@ public class SessionEditorViewModel : ReactiveObject
         {
             var moduleDef = _availableModules.FirstOrDefault(m => m.Id == configured.ModuleId);
             if (moduleDef != null)
-                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _availableModules,
+                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured,
                     _modulesApi));
         }
     }
@@ -204,7 +204,7 @@ public class SessionEditorViewModel : ReactiveObject
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
         _preset.Modules.Add(newConfiguredModule);
 
-        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _availableModules, _modulesApi);
+        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi);
         ConfiguredModules.Add(newVm);
 
         SelectedModule = newVm;

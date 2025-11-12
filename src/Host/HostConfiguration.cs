@@ -9,6 +9,13 @@ public class HostConfiguration
     public ModulesConfiguration Modules { get; set; } = new();
     public PersistenceConfiguration Persistence { get; set; } = new();
     public SessionConfiguration Session { get; set; } = new();
+    public DesignTimeConfiguration DesignTime { get; set; } = new();
+}
+
+public class DesignTimeConfiguration
+{
+    public int SandboxIdleTtlSeconds { get; set; } = 300;
+    public int MaxSandboxes { get; set; } = 5;
 }
 
 public class GrpcConfiguration
