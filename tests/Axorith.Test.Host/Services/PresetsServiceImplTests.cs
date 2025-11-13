@@ -8,7 +8,6 @@ using Grpc.Core.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
-using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 
 namespace Axorith.Test.Host.Services;
 
@@ -23,7 +22,7 @@ public class PresetsServiceImplTests
     public PresetsServiceImplTests()
     {
         _mockPresetManager = new Mock<IPresetManager>();
-        
+
         _service = new PresetsServiceImpl(
             _mockPresetManager.Object,
             NullLogger<PresetsServiceImpl>.Instance
@@ -36,7 +35,7 @@ public class PresetsServiceImplTests
             method: "test",
             host: "localhost",
             deadline: DateTime.UtcNow.AddMinutes(5),
-            requestHeaders: new Metadata(),
+            requestHeaders: [],
             cancellationToken: CancellationToken.None,
             peer: "127.0.0.1",
             authContext: null,
@@ -73,9 +72,9 @@ public class PresetsServiceImplTests
         // Arrange
         var presets = new List<SessionPreset>
         {
-            new SessionPreset { Id = Guid.NewGuid(), Name = "Preset 1", Modules = [] },
-            new SessionPreset { Id = Guid.NewGuid(), Name = "Preset 2", Modules = [] },
-            new SessionPreset { Id = Guid.NewGuid(), Name = "Preset 3", Modules = [] }
+            new() { Id = Guid.NewGuid(), Name = "Preset 1", Modules = [] },
+            new() { Id = Guid.NewGuid(), Name = "Preset 2", Modules = [] },
+            new() { Id = Guid.NewGuid(), Name = "Preset 3", Modules = [] }
         };
 
         _mockPresetManager.Setup(m => m.LoadAllPresetsAsync(It.IsAny<CancellationToken>()))
@@ -107,7 +106,7 @@ public class PresetsServiceImplTests
         {
             Id = presetId,
             Name = "Test Preset",
-            Modules = new List<ConfiguredModule>()
+            Modules = []
         };
 
         // GetPreset uses LoadAllPresetsAsync internally
@@ -145,7 +144,7 @@ public class PresetsServiceImplTests
     {
         // Arrange
         var presetId = Guid.NewGuid();
-        
+
         // Return empty list - preset not found
         _mockPresetManager.Setup(m => m.LoadAllPresetsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<SessionPreset>());
@@ -188,7 +187,8 @@ public class PresetsServiceImplTests
         // Assert
         response.Should().NotBeNull();
         response.Name.Should().Be("New Preset");
-        _mockPresetManager.Verify(m => m.SavePresetAsync(It.IsAny<SessionPreset>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockPresetManager.Verify(m => m.SavePresetAsync(It.IsAny<SessionPreset>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

@@ -2,11 +2,6 @@ using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Layout;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Core.Models;
@@ -41,31 +36,21 @@ public class SessionEditorViewModel : ReactiveObject
         }
     }
 
-    /// <summary>
-    ///     Gets or sets the name of the preset being edited.
-    /// </summary>
-    private string _name = string.Empty;
-
     public string Name
     {
-        get => _name;
-        set => this.RaiseAndSetIfChanged(ref _name, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     /// <summary>
     ///     Gets the collection of modules that are configured for the current preset.
     /// </summary>
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
-    /// <summary>
-    ///     Gets or sets the currently selected module in the list of configured modules.
-    /// </summary>
-    private ConfiguredModuleViewModel? _selectedModule;
-
     public ConfiguredModuleViewModel? SelectedModule
     {
-        get => _selectedModule;
-        set => this.RaiseAndSetIfChanged(ref _selectedModule, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -73,15 +58,10 @@ public class SessionEditorViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<ModuleDefinition> AvailableModulesToAdd { get; } = [];
 
-    /// <summary>
-    ///     Gets or sets the module definition selected in the ComboBox, ready to be added.
-    /// </summary>
-    private ModuleDefinition? _moduleToAdd;
-
     public ModuleDefinition? ModuleToAdd
     {
-        get => _moduleToAdd;
-        set => this.RaiseAndSetIfChanged(ref _moduleToAdd, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -118,9 +98,9 @@ public class SessionEditorViewModel : ReactiveObject
         IServiceProvider serviceProvider)
     {
         _shell = shell;
-        _modulesApi = modulesApi ?? throw new ArgumentNullException(nameof(modulesApi));
-        _presetsApi = presetsApi ?? throw new ArgumentNullException(nameof(presetsApi));
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _modulesApi = modulesApi;
+        _presetsApi = presetsApi;
+        _serviceProvider = serviceProvider;
 
         var canSave = this.WhenAnyValue(vm => vm.Name).Select(name => !string.IsNullOrWhiteSpace(name));
         SaveAndCloseCommand = ReactiveCommand.CreateFromTask(SaveAndCloseAsync, canSave);
@@ -158,13 +138,11 @@ public class SessionEditorViewModel : ReactiveObject
                 _availableModules = modules;
                 UpdateAvailableModules();
 
-                // Re-populate configured modules once definitions are available
                 LoadFromPreset();
             });
         }
         catch (Exception)
         {
-            // Surface error via shell status (optional) – fallback to no modules
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 _availableModules = [];
@@ -213,17 +191,11 @@ public class SessionEditorViewModel : ReactiveObject
 
     private async Task SaveAndCloseAsync()
     {
-        // Validate preset name
         if (string.IsNullOrWhiteSpace(Name))
-        {
-            await ShowErrorDialogAsync("Preset name is required.", "Please enter a name for this preset.");
+            // TODO:
             return;
-        }
 
-        // Save all module settings to models
         foreach (var moduleVm in ConfiguredModules) moduleVm.SaveChangesToModel();
-
-        // Module validation happens when session starts, not here
 
         _preset.Name = Name;
 
@@ -237,65 +209,11 @@ public class SessionEditorViewModel : ReactiveObject
 
             Cancel();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await ShowErrorDialogAsync("Save Failed", $"Failed to save preset: {ex.Message}");
+            // TODO:
+            // ("Save Failed", $"Failed to save preset: {ex.Message}");
         }
-    }
-
-    private async Task ShowErrorDialogAsync(string title, string message)
-    {
-        var window = Application.Current?.ApplicationLifetime is
-            IClassicDesktopStyleApplicationLifetime desktop
-            ? desktop.MainWindow
-            : null;
-
-        if (window == null) return;
-
-        Window? dialog = null;
-        var dialog1 = dialog;
-        dialog = new Window
-        {
-            Title = title,
-            Width = 450,
-            Height = 250,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Content = new StackPanel
-            {
-                Margin = new Thickness(20),
-                Spacing = 15,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = title,
-                        FontSize = 18,
-                        FontWeight = FontWeight.Bold,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Foreground = new SolidColorBrush(Colors.OrangeRed)
-                    },
-                    new TextBlock
-                    {
-                        Text = message,
-                        TextWrapping = TextWrapping.Wrap,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        TextAlignment = TextAlignment.Center,
-                        Margin = new Thickness(0, 0, 0, 10),
-                        MaxWidth = 400
-                    },
-                    new Button
-                    {
-                        Content = "OK",
-                        Width = 100,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Command = ReactiveCommand.Create(() => dialog1!.Close())
-                    }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(window);
     }
 
     private void Cancel()

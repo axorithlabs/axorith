@@ -1,7 +1,10 @@
+using System.Runtime.InteropServices;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Platform.Linux;
+using Axorith.Shared.Platform.MacOS;
+using Axorith.Shared.Platform.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Runtime.InteropServices;
 
 namespace Axorith.Shared.Platform;
 
@@ -22,20 +25,11 @@ public static class PlatformServices
         {
             var logger = provider.GetRequiredService<ILogger<ISecureStorageService>>();
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return new Windows.WindowsSecureStorage(logger);
-            }
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsSecureStorage(logger);
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return new Linux.LinuxSecureStorage(logger);
-            }
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return new LinuxSecureStorage(logger);
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                return new MacOS.MacOSSecureStorage(logger);
-            }
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return new MacOsSecureStorage(logger);
 
             throw new PlatformNotSupportedException(
                 $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
@@ -53,37 +47,13 @@ public static class PlatformServices
     /// </summary>
     public static ISecureStorageService CreateSecureStorage(ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new Windows.WindowsSecureStorage(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsSecureStorage(logger);
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return new Linux.LinuxSecureStorage(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return new LinuxSecureStorage(logger);
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return new MacOS.MacOSSecureStorage(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return new MacOsSecureStorage(logger);
 
         throw new PlatformNotSupportedException(
             $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
-    }
-
-    /// <summary>
-    ///     Gets the current platform name for logging/diagnostics.
-    /// </summary>
-    public static string GetPlatformName()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return "Windows";
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            return "Linux";
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return "macOS";
-        
-        return "Unknown";
     }
 }

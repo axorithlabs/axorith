@@ -10,14 +10,14 @@ namespace Axorith.Shared.Platform.MacOS;
 ///     macOS-specific secure storage implementation using Keychain Services.
 /// </summary>
 [SupportedOSPlatform("macos")]
-internal class MacOSSecureStorage : ISecureStorageService
+internal class MacOsSecureStorage : ISecureStorageService
 {
     private readonly ILogger _logger;
     private const string ServiceName = "Axorith";
 
-    public MacOSSecureStorage(ILogger logger)
+    public MacOsSecureStorage(ILogger logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _logger = logger;
         _logger.LogInformation("Initialized macOS Keychain secure storage");
     }
 
@@ -30,23 +30,21 @@ internal class MacOSSecureStorage : ISecureStorageService
 
         try
         {
-            // Delete existing item first (if any)
             DeleteSecret(key);
 
-            // Add new item to Keychain
             var secretBytes = Encoding.UTF8.GetBytes(secret);
             var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
             var accountBytes = Encoding.UTF8.GetBytes(key);
 
             var status = SecKeychainAddGenericPassword(
-                IntPtr.Zero,                    // default keychain
+                IntPtr.Zero,
                 (uint)serviceBytes.Length,
                 serviceBytes,
                 (uint)accountBytes.Length,
                 accountBytes,
                 (uint)secretBytes.Length,
                 secretBytes,
-                IntPtr.Zero                     // don't need item reference
+                IntPtr.Zero
             );
 
             if (status != 0)
@@ -70,19 +68,16 @@ internal class MacOSSecureStorage : ISecureStorageService
         {
             var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
             var accountBytes = Encoding.UTF8.GetBytes(key);
-            IntPtr passwordData = IntPtr.Zero;
-            uint passwordLength = 0;
-            IntPtr itemRef = IntPtr.Zero;
 
             var status = SecKeychainFindGenericPassword(
-                IntPtr.Zero,                    // default keychain
+                IntPtr.Zero, // default keychain
                 (uint)serviceBytes.Length,
                 serviceBytes,
                 (uint)accountBytes.Length,
                 accountBytes,
-                out passwordLength,
-                out passwordData,
-                out itemRef                     // don't need item reference but must pass out
+                out var passwordLength,
+                out var passwordData,
+                out _ // don't need item reference but must pass out
             );
 
             if (status == -25300) // errSecItemNotFound
@@ -126,7 +121,6 @@ internal class MacOSSecureStorage : ISecureStorageService
         {
             var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
             var accountBytes = Encoding.UTF8.GetBytes(key);
-            IntPtr itemRef = IntPtr.Zero;
 
             var status = SecKeychainFindGenericPassword(
                 IntPtr.Zero,
@@ -136,7 +130,7 @@ internal class MacOSSecureStorage : ISecureStorageService
                 accountBytes,
                 IntPtr.Zero,
                 IntPtr.Zero,
-                out itemRef
+                out var itemRef
             );
 
             if (status == -25300) // errSecItemNotFound
@@ -165,8 +159,6 @@ internal class MacOSSecureStorage : ISecureStorageService
             throw;
         }
     }
-
-    #region Native Interop
 
     private const string SecurityFramework = "/System/Library/Frameworks/Security.framework/Security";
 
@@ -214,6 +206,4 @@ internal class MacOSSecureStorage : ISecureStorageService
 
     [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
     private static extern void CFRelease(IntPtr cf);
-
-    #endregion
 }

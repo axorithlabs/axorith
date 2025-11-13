@@ -19,10 +19,9 @@ public class SessionEventBroadcaster : IDisposable
 
     public SessionEventBroadcaster(ISessionManager sessionManager, ILogger<SessionEventBroadcaster> logger)
     {
-        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _sessionManager = sessionManager;
+        _logger = logger;
 
-        // Subscribe to SessionManager events
         _sessionManager.SessionStarted += OnSessionStarted;
         _sessionManager.SessionStopped += OnSessionStopped;
 
@@ -49,7 +48,6 @@ public class SessionEventBroadcaster : IDisposable
 
         try
         {
-            // Keep connection alive until cancellation
             await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)

@@ -55,6 +55,12 @@ public interface IModulesApi
     ///     Broadcasts reactive changes (label, visibility, choices, etc.).
     /// </summary>
     IObservable<SettingUpdate> SettingUpdates { get; }
+
+    /// <summary>
+    ///     Starts a filtered gRPC stream for setting updates of a specific module instance.
+    ///     Returns a handle that must be disposed to stop the stream.
+    /// </summary>
+    IDisposable SubscribeToSettingUpdates(Guid moduleInstanceId);
 }
 
 /// <summary>

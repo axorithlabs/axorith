@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Text;
 using Axorith.Sdk.Services;
 using Microsoft.Extensions.Logging;
@@ -20,11 +21,10 @@ internal class LinuxSecureStorage : ISecureStorageService
 
     public LinuxSecureStorage(ILogger logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
-        // Check if secret-tool is available
+        _logger = logger;
+
         _useSecretService = IsSecretServiceAvailable();
-        
+
         if (_useSecretService)
         {
             _logger.LogInformation("Using Linux Secret Service for secure storage");
@@ -37,20 +37,22 @@ internal class LinuxSecureStorage : ISecureStorageService
                 "Axorith", "secrets"
             );
             Directory.CreateDirectory(_storageDir);
-            
+
             // Set restrictive permissions (owner only)
             if (OperatingSystem.IsLinux())
-            {
                 try
                 {
-                    var dirInfo = new UnixDirectoryInfo(_storageDir);
-                    dirInfo.FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+                    // TODO: 
+                    var dirInfo = new UnixDirectoryInfo(_storageDir)
+                    {
+                        FileAccessPermissions =
+                            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                    };
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to set directory permissions");
                 }
-            }
         }
     }
 
@@ -64,13 +66,9 @@ internal class LinuxSecureStorage : ISecureStorageService
         try
         {
             if (_useSecretService)
-            {
                 StoreSecretViaSecretService(key, secret);
-            }
             else
-            {
                 StoreSecretViaFile(key, secret);
-            }
 
             _logger.LogDebug("Stored secret for key: {Key}", key);
         }
@@ -88,7 +86,7 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         try
         {
-            string? result = _useSecretService 
+            var result = _useSecretService
                 ? RetrieveSecretViaSecretService(key)
                 : RetrieveSecretViaFile(key);
 
@@ -112,13 +110,9 @@ internal class LinuxSecureStorage : ISecureStorageService
         try
         {
             if (_useSecretService)
-            {
                 DeleteSecretViaSecretService(key);
-            }
             else
-            {
                 DeleteSecretViaFile(key);
-            }
 
             _logger.LogDebug("Deleted secret for key: {Key}", key);
         }
@@ -128,8 +122,6 @@ internal class LinuxSecureStorage : ISecureStorageService
             throw;
         }
     }
-
-    #region Secret Service Implementation
 
     private static bool IsSecretServiceAvailable()
     {
@@ -154,7 +146,7 @@ internal class LinuxSecureStorage : ISecureStorageService
         }
     }
 
-    private void StoreSecretViaSecretService(string key, string secret)
+    private static void StoreSecretViaSecretService(string key, string secret)
     {
         var psi = new ProcessStartInfo
         {
@@ -181,7 +173,7 @@ internal class LinuxSecureStorage : ISecureStorageService
         }
     }
 
-    private string? RetrieveSecretViaSecretService(string key)
+    private static string? RetrieveSecretViaSecretService(string key)
     {
         var psi = new ProcessStartInfo
         {
@@ -200,20 +192,22 @@ internal class LinuxSecureStorage : ISecureStorageService
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit(5000);
 
-        // Exit code 1 means not found
-        if (process.ExitCode == 1)
-            return null;
-
-        if (process.ExitCode != 0)
+        switch (process.ExitCode)
         {
-            var error = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"secret-tool failed: {error}");
+            // Exit code 1 means not found
+            case 1:
+                return null;
+            case 0:
+                return string.IsNullOrWhiteSpace(output) ? null : output.TrimEnd('\n');
+            default:
+            {
+                var error = process.StandardError.ReadToEnd();
+                throw new InvalidOperationException($"secret-tool failed: {error}");
+            }
         }
-
-        return string.IsNullOrWhiteSpace(output) ? null : output.TrimEnd('\n');
     }
 
-    private void DeleteSecretViaSecretService(string key)
+    private static void DeleteSecretViaSecretService(string key)
     {
         var psi = new ProcessStartInfo
         {
@@ -231,16 +225,11 @@ internal class LinuxSecureStorage : ISecureStorageService
         process.WaitForExit(5000);
 
         // Exit code 1 means not found (which is OK for delete)
-        if (process.ExitCode != 0 && process.ExitCode != 1)
-        {
-            var error = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"secret-tool failed: {error}");
-        }
+        if (process.ExitCode is 0 or 1) return;
+
+        var error = process.StandardError.ReadToEnd();
+        throw new InvalidOperationException($"secret-tool failed: {error}");
     }
-
-    #endregion
-
-    #region File-based Fallback Implementation
 
     private void StoreSecretViaFile(string key, string secret)
     {
@@ -258,17 +247,18 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         // Set restrictive file permissions
         if (OperatingSystem.IsLinux())
-        {
             try
             {
-                var fileInfo = new UnixFileInfo(filePath);
-                fileInfo.FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+                // TODO
+                var fileInfo = new UnixFileInfo(filePath)
+                {
+                    FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                };
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to set file permissions for {File}", filePath);
             }
-        }
     }
 
     private string? RetrieveSecretViaFile(string key)
@@ -304,7 +294,7 @@ internal class LinuxSecureStorage : ISecureStorageService
     private static string GetSecretFileName(string key)
     {
         // Use SHA256 hash of key as filename for security
-        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var sha = SHA256.Create();
         var hashBytes = sha.ComputeHash(Encoding.UTF8.GetBytes(key));
         return Convert.ToHexString(hashBytes).ToLowerInvariant() + ".dat";
     }
@@ -313,34 +303,24 @@ internal class LinuxSecureStorage : ISecureStorageService
     {
         // Create machine-specific encryption key
         var machineId = Environment.MachineName + Environment.UserName;
-        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var sha = SHA256.Create();
         return sha.ComputeHash(Encoding.UTF8.GetBytes(machineId));
     }
 
     private static byte[] XorEncrypt(byte[] data, byte[] key)
     {
         var result = new byte[data.Length];
-        for (int i = 0; i < data.Length; i++)
-        {
-            result[i] = (byte)(data[i] ^ key[i % key.Length]);
-        }
+        for (var i = 0; i < data.Length; i++) result[i] = (byte)(data[i] ^ key[i % key.Length]);
         return result;
     }
-
-    #endregion
 }
 
 /// <summary>
 ///     Helper class for Unix file permissions
 /// </summary>
-file class UnixFileInfo
+file class UnixFileInfo(string path)
 {
-    private readonly FileInfo _fileInfo;
-
-    public UnixFileInfo(string path)
-    {
-        _fileInfo = new FileInfo(path);
-    }
+    private readonly FileInfo _fileInfo = new(path);
 
     public UnixFileMode FileAccessPermissions
     {
@@ -363,14 +343,9 @@ file class UnixFileInfo
 /// <summary>
 ///     Helper class for Unix directory permissions
 /// </summary>
-file class UnixDirectoryInfo
+file class UnixDirectoryInfo(string path)
 {
-    private readonly DirectoryInfo _dirInfo;
-
-    public UnixDirectoryInfo(string path)
-    {
-        _dirInfo = new DirectoryInfo(path);
-    }
+    private readonly DirectoryInfo _dirInfo = new(path);
 
     public UnixFileMode FileAccessPermissions
     {

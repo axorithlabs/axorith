@@ -63,7 +63,8 @@ public class ModuleSettingDefinitionTests
         );
 
         // Act
-        var (key, label, description, controlType, persistence, isVisible, isReadOnly, valueTypeName, rawValue, choices) = definition;
+        var (key, label, description, controlType, persistence, isVisible, isReadOnly, valueTypeName, rawValue, choices
+            ) = definition;
 
         // Assert
         key.Should().Be("key");

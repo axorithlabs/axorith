@@ -8,15 +8,13 @@ namespace Axorith.Client.ViewModels;
 /// </summary>
 public class ShellViewModel : ReactiveObject
 {
-    private ReactiveObject? _content;
-
     /// <summary>
     ///     Gets or sets the current ViewModel to be displayed in the main content area of the window.
     /// </summary>
     public ReactiveObject? Content
     {
-        get => _content;
-        set => this.RaiseAndSetIfChanged(ref _content, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>

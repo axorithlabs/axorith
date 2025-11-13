@@ -21,7 +21,7 @@ public class SessionManagerNegativeTests
     {
         _mockRegistry = new Mock<IModuleRegistry>();
         _sessionManager = new SessionManager(
-            _mockRegistry.Object, 
+            _mockRegistry.Object,
             NullLogger<SessionManager>.Instance,
             TimeSpan.FromSeconds(5),
             TimeSpan.FromSeconds(30),
@@ -289,7 +289,7 @@ public class SessionManagerNegativeTests
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
-    private Mock<IModule> CreateMockModule()
+    private static Mock<IModule> CreateMockModule()
     {
         var mock = new Mock<IModule>();
 
@@ -307,7 +307,7 @@ public class SessionManagerNegativeTests
         return mock;
     }
 
-    private ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
+    private static ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
     {
         return new ModuleDefinition
         {
@@ -318,7 +318,8 @@ public class SessionManagerNegativeTests
         };
     }
 
-    private (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module, ModuleDefinition definition)
+    private static (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module,
+        ModuleDefinition definition)
     {
         var root = new ContainerBuilder().Build();
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());

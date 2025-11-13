@@ -18,39 +18,31 @@ public class MainViewModel : ReactiveObject, IDisposable
     private readonly IPresetsApi _presetsApi;
     private readonly ISessionsApi _sessionsApi;
     private readonly IServiceProvider _serviceProvider;
-    private readonly CompositeDisposable _disposables = new();
-
-    private SessionPresetViewModel? _selectedPreset;
+    private readonly CompositeDisposable _disposables = [];
 
     /// <summary>
     ///     The currently selected session preset in the list.
     /// </summary>
     public SessionPresetViewModel? SelectedPreset
     {
-        get => _selectedPreset;
-        set => this.RaiseAndSetIfChanged(ref _selectedPreset, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
-
-    private Guid? _activeSessionPresetId;
 
     public Guid? ActiveSessionPresetId
     {
-        get => _activeSessionPresetId;
-        private set => this.RaiseAndSetIfChanged(ref _activeSessionPresetId, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
-
-    private string _sessionStatus = "No session is active.";
 
     /// <summary>
     ///     A user-friendly string describing the current session status.
     /// </summary>
     public string SessionStatus
     {
-        get => _sessionStatus;
-        set => this.RaiseAndSetIfChanged(ref _sessionStatus, value);
-    }
-
-    private bool _isSessionActive;
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "No session is active.";
 
     /// <summary>
     ///     Gets a value indicating whether a session is currently active.
@@ -58,8 +50,8 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public bool IsSessionActive
     {
-        get => _isSessionActive;
-        private set => this.RaiseAndSetIfChanged(ref _isSessionActive, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>

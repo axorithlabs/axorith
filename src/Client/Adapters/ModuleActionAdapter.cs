@@ -24,7 +24,7 @@ internal class ModuleActionAdapter : IAction
     public ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid moduleInstanceId)
     {
         Key = action.Key;
-        _modulesApi = modulesApi ?? throw new ArgumentNullException(nameof(modulesApi));
+        _modulesApi = modulesApi;
         _moduleInstanceId = moduleInstanceId;
 
         var labelSubject = new BehaviorSubject<string>(action.Label);

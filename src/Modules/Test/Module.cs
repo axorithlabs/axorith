@@ -26,7 +26,6 @@ public class Module : IModule
     private readonly Setting<string> _processingMode;
     private readonly Setting<string> _inputFile;
     private readonly Setting<string> _outputDirectory;
-    // Reactive demo settings
     private readonly Setting<bool> _showNotes;
     private readonly Setting<string> _notes;
 
@@ -96,7 +95,6 @@ public class Module : IModule
             defaultValue: Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         );
 
-        // Reactive UI demo: checkbox controls textarea visibility
         _showNotes = Setting.AsCheckbox(
             key: "ShowNotes",
             label: "Show Notes",
@@ -112,16 +110,14 @@ public class Module : IModule
             isVisible: false
         );
 
-        // Subscription: when ShowNotes changes, toggle Notes visibility
         _showNotes.Value.Subscribe(visible => _notes.SetVisibility(visible));
 
-        // Load secrets from SecureStorage in constructor
         var userSecret = _secureStorage.RetrieveSecret(_userSecret.Key);
-        if (!string.IsNullOrEmpty(userSecret))
-        {
-            _userSecret.SetValue(userSecret);
-            _logger.LogDebug("Loaded secret '{Key}' from SecureStorage", _userSecret.Key);
-        }
+
+        if (string.IsNullOrEmpty(userSecret)) return;
+
+        _userSecret.SetValue(userSecret);
+        _logger.LogDebug("Loaded secret '{Key}' from SecureStorage", _userSecret.Key);
     }
 
     private IDisposable? _subscription;
@@ -226,7 +222,6 @@ public class Module : IModule
 
         _logger.LogInfo("token {token}", token);
 
-        // --- Event Aggregator Test ---
         _logger.LogInfo("Subscribing to TestEvent...");
         _subscription = _eventAggregator.Subscribe<TestEvent>(HandleTestEvent);
 
@@ -240,11 +235,11 @@ public class Module : IModule
     {
         // Save secrets before shutdown
         var userSecret = _userSecret.GetCurrentValue();
-        if (!string.IsNullOrEmpty(userSecret))
-        {
-            _secureStorage.StoreSecret(_userSecret.Key, userSecret);
-            _logger.LogDebug("Persisted secret '{Key}' to SecureStorage", _userSecret.Key);
-        }
+
+        if (string.IsNullOrEmpty(userSecret)) return Task.CompletedTask;
+
+        _secureStorage.StoreSecret(_userSecret.Key, userSecret);
+        _logger.LogDebug("Persisted secret '{Key}' to SecureStorage", _userSecret.Key);
 
         return Task.CompletedTask;
     }

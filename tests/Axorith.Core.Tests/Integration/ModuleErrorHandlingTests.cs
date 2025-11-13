@@ -38,7 +38,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -93,7 +94,7 @@ public class ModuleErrorHandlingTests
         // Act - first attempt fails, second succeeds
         // Note: Current implementation doesn't retry automatically,
         // but module should allow retry after fix
-        initializeCallCount.Should().BeGreaterOrEqualTo(0);
+        initializeCallCount.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -127,7 +128,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -138,7 +140,7 @@ public class ModuleErrorHandlingTests
                 new ConfiguredModule
                 {
                     ModuleId = moduleId,
-                    Settings = new Dictionary<string, string>() // Empty - should fail validation
+                    Settings = [] // Empty - should fail validation
                 }
             ]
         };
@@ -178,7 +180,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -232,7 +235,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {

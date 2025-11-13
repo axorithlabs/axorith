@@ -13,7 +13,7 @@ public class HostManagementServiceImpl(
     IHostApplicationLifetime lifetime,
     ILogger<HostManagementServiceImpl> logger) : HostManagement.HostManagementBase
 {
-    private static readonly DateTime s_startTime = DateTime.UtcNow;
+    private static readonly DateTime SStartTime = DateTime.UtcNow;
 
     public override Task<ShutdownResponse> RequestShutdown(ShutdownRequest request, ServerCallContext context)
     {
@@ -21,7 +21,6 @@ public class HostManagementServiceImpl(
 
         try
         {
-            // Check if session is running
             if (sessionManager.IsSessionRunning)
             {
                 logger.LogInformation("Stopping active session before shutdown...");
@@ -72,7 +71,7 @@ public class HostManagementServiceImpl(
 
     public override Task<HostStatusResponse> GetStatus(Empty request, ServerCallContext context)
     {
-        var uptime = (long)(DateTime.UtcNow - s_startTime).TotalSeconds;
+        var uptime = (long)(DateTime.UtcNow - SStartTime).TotalSeconds;
 
         var activeModuleCount = sessionManager.ActiveSession?.Modules.Count ?? 0;
 

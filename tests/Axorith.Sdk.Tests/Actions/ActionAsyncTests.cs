@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FluentAssertions;
 using Action = Axorith.Sdk.Actions.Action;
 
@@ -44,7 +45,7 @@ public class ActionAsyncTests
     {
         // Arrange
         var action = Action.Create("key", "Label", isEnabled: true);
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
 
         // Act
         await action.InvokeAsync();
@@ -87,7 +88,7 @@ public class ActionAsyncTests
             executionTime = 200;
         });
 
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
 
         // Act
         await action.InvokeAsync();
@@ -140,7 +141,7 @@ public class ActionAsyncTests
         });
 
         // Act
-        Func<Task> act = async () => await action.InvokeAsync();
+        var act = async () => await action.InvokeAsync();
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -189,7 +190,7 @@ public class ActionAsyncTests
         });
 
         action.SetEnabled(false);
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
 
         // Act
         await action.InvokeAsync();
@@ -222,7 +223,7 @@ public class ActionAsyncTests
         cts.Cancel();
 
         // Assert
-        Func<Task> act = async () => await invokeTask;
+        var act = async () => await invokeTask;
         await act.Should().ThrowAsync<OperationCanceledException>();
         handlerStarted.Should().BeTrue();
         handlerCompleted.Should().BeFalse();
@@ -258,7 +259,7 @@ public class ActionAsyncTests
 
         // Act
         action.OnInvokeAsync(null!);
-        Func<Task> act = async () => await action.InvokeAsync();
+        var act = async () => await action.InvokeAsync();
 
         // Assert
         await act.Should().NotThrowAsync();

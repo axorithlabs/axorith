@@ -10,7 +10,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
-
 using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 
 namespace Axorith.Test.Host.Services;
@@ -39,7 +38,7 @@ public class HostManagementServiceImplTests
             method: "TestMethod",
             host: "localhost",
             deadline: DateTime.UtcNow.AddMinutes(5),
-            requestHeaders: new Metadata(),
+            requestHeaders: [],
             cancellationToken: CancellationToken.None,
             peer: "127.0.0.1",
             authContext: null,
@@ -68,7 +67,7 @@ public class HostManagementServiceImplTests
         response.Should().NotBeNull();
         response.Accepted.Should().BeTrue();
         response.Message.Should().Contain("Shutdown initiated");
-        
+
         _mockLifetime.Verify(l => l.StopApplication(), Times.Once);
     }
 
@@ -90,7 +89,7 @@ public class HostManagementServiceImplTests
         response.Should().NotBeNull();
         response.Accepted.Should().BeTrue();
         response.Message.Should().Contain("Stopping session");
-        
+
         // Note: StopApplication is called async in background task
         // We can't easily verify it without waiting
     }
@@ -136,7 +135,7 @@ public class HostManagementServiceImplTests
         response.ActiveModulesCount.Should().Be(0);
         response.CurrentPresetId.Should().BeEmpty();
         response.Version.Should().NotBeNullOrEmpty();
-        response.UptimeSeconds.Should().BeGreaterOrEqualTo(0);
+        response.UptimeSeconds.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -148,11 +147,11 @@ public class HostManagementServiceImplTests
         {
             Id = presetId,
             Name = "Test Session",
-            Modules = new List<ConfiguredModule>
-            {
+            Modules =
+            [
                 new ConfiguredModule { ModuleId = Guid.NewGuid(), InstanceId = Guid.NewGuid() },
                 new ConfiguredModule { ModuleId = Guid.NewGuid(), InstanceId = Guid.NewGuid() }
-            }
+            ]
         };
 
         _mockSessionManager.Setup(m => m.IsSessionRunning).Returns(true);
@@ -170,7 +169,7 @@ public class HostManagementServiceImplTests
         response.ActiveModulesCount.Should().Be(2);
         response.CurrentPresetId.Should().Be(presetId.ToString());
         response.Version.Should().NotBeNullOrEmpty();
-        response.UptimeSeconds.Should().BeGreaterOrEqualTo(0);
+        response.UptimeSeconds.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -189,8 +188,8 @@ public class HostManagementServiceImplTests
         var response2 = await _service.GetStatus(request, context);
 
         // Assert
-        response1.UptimeSeconds.Should().BeGreaterOrEqualTo(0);
-        response2.UptimeSeconds.Should().BeGreaterOrEqualTo(response1.UptimeSeconds);
+        response1.UptimeSeconds.Should().BeGreaterThanOrEqualTo(0);
+        response2.UptimeSeconds.Should().BeGreaterThanOrEqualTo(response1.UptimeSeconds);
     }
 
     #endregion

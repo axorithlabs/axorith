@@ -10,7 +10,7 @@ internal static class Program
     public static void Main(string[] args)
     {
         var app = BuildAvaloniaApp();
-        
+
         // Tray icon is always visible, but --tray hides window on startup
         // Use OnExplicitShutdown to prevent closing app when window is closed
         app.StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);

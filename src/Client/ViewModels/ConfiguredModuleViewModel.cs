@@ -18,7 +18,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
     private readonly IModulesApi _modulesApi;
     private readonly IDisposable _settingUpdatesSubscription;
-    private bool _isLoading;
+    private readonly IDisposable? _settingStreamHandle;
 
     public ModuleDefinition Definition { get; }
     public ConfiguredModule Model { get; }
@@ -37,8 +37,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     public bool IsLoading
     {
-        get => _isLoading;
-        private set => this.RaiseAndSetIfChanged(ref _isLoading, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     public ObservableCollection<SettingViewModel> Settings { get; } = [];
@@ -48,7 +48,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     {
         Definition = definition;
         Model = model;
-        _modulesApi = modulesApi ?? throw new ArgumentNullException(nameof(modulesApi));
+        _modulesApi = modulesApi;
 
         // Subscribe to reactive setting updates from running modules
         // NOTE: Reactive updates (like visibility changes) only work when session is ACTIVE
@@ -57,6 +57,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             .Where(update => update.ModuleInstanceId == Model.InstanceId)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(HandleSettingUpdate);
+
+        _settingStreamHandle = _modulesApi.SubscribeToSettingUpdates(Model.InstanceId);
 
         _ = LoadSettingsAndActionsAsync();
     }
@@ -72,7 +74,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 initialSnapshot[kv.Key] = kv.Value;
             try
             {
-                await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot).ConfigureAwait(false);
+                await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
+                    .ConfigureAwait(false);
             }
             catch
             {
@@ -86,16 +89,14 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 Settings.Clear();
                 Actions.Clear();
 
-                // Populate settings with saved values
                 foreach (var setting in settingsInfo.Settings)
                 {
-                    var savedValue = Model.Settings.TryGetValue(setting.Key, out var value) ? value : null;
+                    var savedValue = Model.Settings.GetValueOrDefault(setting.Key);
                     var adaptedSetting = new ModuleSettingAdapter(setting, savedValue);
                     var vm = new SettingViewModel(adaptedSetting, Model.InstanceId, _modulesApi);
                     Settings.Add(vm);
                 }
 
-                // Populate actions
                 foreach (var action in settingsInfo.Actions)
                 {
                     var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
@@ -126,16 +127,11 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     private void HandleSettingUpdate(SettingUpdate update)
     {
-        // Find the setting ViewModel that matches the updated setting key
         var settingVm = Settings.FirstOrDefault(s => s.Setting.Key == update.SettingKey);
-        if (settingVm == null)
+
+        if (settingVm?.Setting is not ModuleSettingAdapter adapter)
             return;
 
-        // Cast to ModuleSettingAdapter to access update methods
-        if (settingVm.Setting is not ModuleSettingAdapter adapter)
-            return;
-
-        // Apply the update based on the property that changed
         switch (update.Property)
         {
             case SettingProperty.Value:
@@ -177,8 +173,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
-        // Unsubscribe from setting updates stream
         _settingUpdatesSubscription.Dispose();
+        _settingStreamHandle?.Dispose();
 
         foreach (var setting in Settings)
             setting.Dispose();
@@ -190,10 +186,12 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         try
         {
-            // End design-time sandbox on Host
             _ = _modulesApi.EndEditAsync(Model.InstanceId);
         }
-        catch { /* ignore */ }
+        catch
+        {
+            /* ignore */
+        }
 
         GC.SuppressFinalize(this);
     }

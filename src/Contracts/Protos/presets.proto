@@ -16,7 +16,7 @@ service PresetsService {
 }
 
 message ListPresetsRequest {
-  // Empty for MVP, can add filters later
+  // TODO
 }
 
 message ListPresetsResponse {

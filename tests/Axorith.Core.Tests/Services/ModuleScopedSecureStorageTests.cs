@@ -23,7 +23,7 @@ public class ModuleScopedSecureStorageTests
             Id = Guid.Parse("12345678-1234-1234-1234-123456789012"),
             Name = "Test Module"
         };
-        
+
         _scopedStorage = new ModuleScopedSecureStorage(_mockStorage.Object, _moduleDefinition);
     }
 
@@ -137,7 +137,7 @@ public class ModuleScopedSecureStorageTests
         var key = "TestKey";
         var secret = "test-secret-value";
         var scopedKey = $"{_moduleDefinition.Id}:{key}";
-        
+
         _mockStorage.Setup(s => s.RetrieveSecret(scopedKey)).Returns(secret);
 
         // Act

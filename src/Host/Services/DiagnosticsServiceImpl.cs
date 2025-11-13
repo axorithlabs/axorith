@@ -15,15 +15,6 @@ public class DiagnosticsServiceImpl(
     ILogger<DiagnosticsServiceImpl> logger)
     : DiagnosticsService.DiagnosticsServiceBase
 {
-    private readonly ISessionManager _sessionManager =
-        sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-
-    private readonly IModuleRegistry _moduleRegistry =
-        moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
-
-    private readonly ILogger<DiagnosticsServiceImpl>
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
     private readonly DateTimeOffset _startTime = DateTimeOffset.UtcNow;
 
     public override Task<HealthCheckResponse> GetHealth(HealthCheckRequest request, ServerCallContext context)
@@ -34,24 +25,21 @@ public class DiagnosticsServiceImpl(
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                 .InformationalVersion ?? "0.0.1-alpha";
 
-            var activeSessions = _sessionManager.ActiveSession != null ? 1 : 0;
+            var activeSessions = sessionManager.ActiveSession != null ? 1 : 0;
             int loadedModules;
             try
             {
-                loadedModules = _moduleRegistry.GetAllDefinitions().Count;
+                loadedModules = moduleRegistry.GetAllDefinitions().Count;
             }
             catch (InvalidOperationException ex)
             {
                 // ModuleRegistry not initialized yet – treat as 0 modules but overall Healthy so the host is considered ready
-                _logger.LogWarning(ex, "ModuleRegistry not initialized during health check");
+                logger.LogWarning(ex, "ModuleRegistry not initialized during health check");
                 loadedModules = 0;
             }
 
             // Determine health status
-            var status = HealthStatus.Healthy;
-
-            // Could add more sophisticated health checks here
-            // e.g., check if modules are loading correctly, sessions are responsive, etc.
+            const HealthStatus status = HealthStatus.Healthy;
 
             var response = new HealthCheckResponse
             {
@@ -62,14 +50,14 @@ public class DiagnosticsServiceImpl(
                 LoadedModules = loadedModules
             };
 
-            _logger.LogDebug("Health check: {Status}, Modules: {Count}, Sessions: {Sessions}",
+            logger.LogDebug("Health check: {Status}, Modules: {Count}, Sessions: {Sessions}",
                 status, loadedModules, activeSessions);
 
             return Task.FromResult(response);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during health check");
+            logger.LogError(ex, "Error during health check");
             throw new RpcException(new Status(StatusCode.Internal, "Health check failed", ex));
         }
     }

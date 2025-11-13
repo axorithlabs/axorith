@@ -456,7 +456,7 @@ public class SetValueFromStringTests
         // Act
         setting.SetValueFromString("12345");
         var stringValue = setting.GetValueAsString();
-        
+
         ISetting setting2 = Setting.AsInt("key2", "Label", 0);
         setting2.SetValueFromString(stringValue);
 
@@ -490,7 +490,7 @@ public class SetValueFromStringTests
         var tasks = new List<Task>();
 
         // Act
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < 100; i++)
         {
             var value = i;
             tasks.Add(Task.Run(() => setting.SetValueFromString(value.ToString())));

@@ -10,34 +10,23 @@ namespace Axorith.Host.Services;
 ///     gRPC service implementation for module management.
 ///     Wraps Core IModuleRegistry and provides setting update streaming.
 /// </summary>
-public class ModulesServiceImpl : ModulesService.ModulesServiceBase
+public class ModulesServiceImpl(
+    IModuleRegistry moduleRegistry,
+    ISessionManager sessionManager,
+    SettingUpdateBroadcaster settingBroadcaster,
+    DesignTimeSandboxManager sandboxManager,
+    ILogger<ModulesServiceImpl> logger)
+    : ModulesService.ModulesServiceBase
 {
-    private readonly IModuleRegistry _moduleRegistry;
-    private readonly ISessionManager _sessionManager;
-    private readonly SettingUpdateBroadcaster _settingBroadcaster;
-    private readonly ILogger<ModulesServiceImpl> _logger;
-    private readonly IPresetManager _presetManager;
-    private readonly DesignTimeSandboxManager _sandboxManager;
-
-    public ModulesServiceImpl(IModuleRegistry moduleRegistry, ISessionManager sessionManager,
-        SettingUpdateBroadcaster settingBroadcaster, IPresetManager presetManager, DesignTimeSandboxManager sandboxManager, ILogger<ModulesServiceImpl> logger)
-    {
-        _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
-        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-        _settingBroadcaster = settingBroadcaster ?? throw new ArgumentNullException(nameof(settingBroadcaster));
-        _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
-        _sandboxManager = sandboxManager ?? throw new ArgumentNullException(nameof(sandboxManager));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
     public override Task<OperationResult> SyncEdit(SyncEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID", [$"Could not parse: {request.ModuleInstanceId}"]));
+            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
+                [$"Could not parse: {request.ModuleInstanceId}"]));
 
         try
         {
-            _sandboxManager.ReBroadcast(instanceId);
+            sandboxManager.ReBroadcast(instanceId);
             return Task.FromResult(SessionMapper.CreateResult(true, "Design-time state synchronized"));
         }
         catch (InvalidOperationException)
@@ -47,7 +36,7 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to synchronize design-time state for {InstanceId}", instanceId);
+            logger.LogWarning(ex, "Failed to synchronize design-time state for {InstanceId}", instanceId);
             return Task.FromResult(SessionMapper.CreateResult(false, "Failed to synchronize design-time state"));
         }
     }
@@ -56,19 +45,19 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
     {
         try
         {
-            _logger.LogDebug("ListModules called");
+            logger.LogDebug("ListModules called");
 
-            var modules = _moduleRegistry.GetAllDefinitions();
+            var modules = moduleRegistry.GetAllDefinitions();
 
             var response = new ListModulesResponse();
             response.Modules.AddRange(modules.Select(ModuleMapper.ToMessage));
 
-            _logger.LogInformation("Returned {Count} module definitions", modules.Count);
+            logger.LogInformation("Returned {Count} module definitions", modules.Count);
             return Task.FromResult(response);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error listing modules");
+            logger.LogError(ex, "Error listing modules");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to list modules", ex));
         }
     }
@@ -82,21 +71,19 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid module ID: {request.ModuleId}"));
 
-            _logger.LogDebug("GetModuleSettings called for module {ModuleId}", moduleId);
+            logger.LogDebug("GetModuleSettings called for module {ModuleId}", moduleId);
 
-            var definition = _moduleRegistry.GetDefinitionById(moduleId);
+            var definition = moduleRegistry.GetDefinitionById(moduleId);
             if (definition?.ModuleType == null)
                 throw new RpcException(new Status(StatusCode.NotFound, $"Module not found: {moduleId}"));
 
-            // Create a temporary module instance to get its settings and actions
-            var (module, scope) = _moduleRegistry.CreateInstance(moduleId);
+            var (module, scope) = moduleRegistry.CreateInstance(moduleId);
             if (module == null)
                 throw new RpcException(new Status(StatusCode.Internal,
                     $"Failed to create module instance: {moduleId}"));
 
             try
             {
-                // Initialize module to load dynamic choices (devices, playlists, etc.)
                 try
                 {
                     using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -104,21 +91,18 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
                 }
                 catch (Exception initEx)
                 {
-                    // Non-fatal - module can still function without initialization
-                    _logger.LogWarning(initEx, "Module initialization failed during GetModuleSettings");
+                    logger.LogWarning(initEx, "Module initialization failed during GetModuleSettings");
                 }
 
                 var response = new GetModuleSettingsResponse();
 
-                // Map settings (now with updated choices from InitializeAsync)
                 var settings = module.GetSettings();
                 foreach (var setting in settings) response.Settings.Add(SettingMapper.ToMessage(setting));
 
-                // Map actions
                 var actions = module.GetActions();
                 foreach (var action in actions) response.Actions.Add(ActionMapper.ToMessage(action));
 
-                _logger.LogInformation(
+                logger.LogInformation(
                     "Returned {SettingCount} settings and {ActionCount} actions for module {ModuleId}",
                     response.Settings.Count, response.Actions.Count, moduleId);
 
@@ -136,7 +120,7 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting module settings");
+            logger.LogError(ex, "Error getting module settings");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to get module settings", ex));
         }
     }
@@ -145,50 +129,45 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
     {
         try
         {
-            // Parse as module definition ID for design-time actions (e.g., OAuth login during preset editing)
             if (!Guid.TryParse(request.ModuleInstanceId, out var moduleId))
                 return SessionMapper.CreateResult(false, "Invalid module ID",
                     [$"Could not parse: {request.ModuleInstanceId}"]);
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
-            _logger.LogInformation("InvokeAction called: ModuleId={ModuleId}, ActionKey={ActionKey}",
+            logger.LogInformation("InvokeAction called: ModuleId={ModuleId}, ActionKey={ActionKey}",
                 moduleId, request.ActionKey);
 
             // Create temporary module instance for design-time actions
             // This allows actions like OAuth login to work while editing presets
-            var (module, scope) = _moduleRegistry.CreateInstance(moduleId);
+            var (module, scope) = moduleRegistry.CreateInstance(moduleId);
             if (module == null)
                 return SessionMapper.CreateResult(false, "Module not found",
                     [$"Module with ID {moduleId} could not be instantiated"]);
 
             try
             {
-                // Find the action
                 var action = module.GetActions().FirstOrDefault(a => a.Key == request.ActionKey);
                 if (action == null)
                     return SessionMapper.CreateResult(false, "Action not found",
                         [$"Action '{request.ActionKey}' not found in module"]);
 
-                // Invoke the action asynchronously and wait for completion
-                // This ensures OAuth login and other long-running actions complete before disposal
-                _logger.LogDebug("Invoking action {ActionKey} asynchronously", request.ActionKey);
+                logger.LogDebug("Invoking action {ActionKey} asynchronously", request.ActionKey);
                 await action.InvokeAsync();
 
-                _logger.LogInformation("Action {ActionKey} completed successfully", request.ActionKey);
+                logger.LogInformation("Action {ActionKey} completed successfully", request.ActionKey);
                 return SessionMapper.CreateResult(true, "Action completed successfully");
             }
             finally
             {
-                // Cleanup: Dispose temporary instance after action completes
                 module.Dispose();
                 scope?.Dispose();
-                _logger.LogDebug("Module instance disposed after action completion");
+                logger.LogDebug("Module instance disposed after action completion");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error invoking action");
+            logger.LogError(ex, "Error invoking action");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke action", ex));
         }
     }
@@ -203,11 +182,10 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.SettingKey);
 
-            _logger.LogDebug("UpdateSetting called: {InstanceId}.{SettingKey}",
+            logger.LogDebug("UpdateSetting called: {InstanceId}.{SettingKey}",
                 instanceId, request.SettingKey);
 
-            // Extract value from oneof
-            string? stringValue = request.ValueCase switch
+            var stringValue = request.ValueCase switch
             {
                 UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
                 UpdateSettingRequest.ValueOneofCase.BoolValue => request.BoolValue.ToString(),
@@ -216,18 +194,16 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
                 _ => null
             };
 
-            // Try to apply setting to running module instance
-            var activeModule = _sessionManager.GetActiveModuleInstanceByInstanceId(instanceId);
+            var activeModule = sessionManager.GetActiveModuleInstanceByInstanceId(instanceId);
             if (activeModule != null)
             {
                 var setting = activeModule.GetSettings().FirstOrDefault(s => s.Key == request.SettingKey);
                 if (setting != null)
                 {
                     setting.SetValueFromString(stringValue);
-                    _logger.LogInformation("Setting {SettingKey} updated on running module {InstanceId}",
+                    logger.LogInformation("Setting {SettingKey} updated on running module {InstanceId}",
                         request.SettingKey, instanceId);
 
-                    // Broadcast the update to connected clients
                     object? broadcastValue = request.ValueCase switch
                     {
                         UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
@@ -237,27 +213,25 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
                         _ => null
                     };
 
-                    _ = _settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey,
+                    _ = settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey,
                         SettingProperty.Value, broadcastValue);
 
                     return Task.FromResult(SessionMapper.CreateResult(true, "Setting updated successfully"));
                 }
 
-                _logger.LogWarning("Setting {SettingKey} not found in module {InstanceId}",
+                logger.LogWarning("Setting {SettingKey} not found in module {InstanceId}",
                     request.SettingKey, instanceId);
                 return Task.FromResult(SessionMapper.CreateResult(false, "Setting not found in module",
                     [$"Setting '{request.SettingKey}' does not exist in module"]));
             }
 
-            // Module not running - design-time: apply via sandbox
             try
             {
-                _sandboxManager.Apply(instanceId, request.SettingKey, stringValue);
+                sandboxManager.Apply(instanceId, request.SettingKey, stringValue);
                 return Task.FromResult(SessionMapper.CreateResult(true, "Setting applied in design-time sandbox"));
             }
             catch (InvalidOperationException)
             {
-                // Sandbox was not started (BeginEdit not called yet or already disposed). Fallback: broadcast VALUE only.
                 object? broadcastValue = request.ValueCase switch
                 {
                     UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
@@ -266,28 +240,30 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
                     UpdateSettingRequest.ValueOneofCase.IntValue => request.IntValue,
                     _ => null
                 };
-                _ = _settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey, SettingProperty.Value, broadcastValue);
+                _ = settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey, SettingProperty.Value,
+                    broadcastValue);
                 return Task.FromResult(SessionMapper.CreateResult(true, "Setting broadcasted (no sandbox)"));
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating setting");
+            logger.LogError(ex, "Error updating setting");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to update setting", ex));
         }
     }
-    
+
     public override async Task<OperationResult> BeginEdit(BeginEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleId, out var moduleId))
             return SessionMapper.CreateResult(false, "Invalid module ID", [$"Could not parse: {request.ModuleId}"]);
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-            return SessionMapper.CreateResult(false, "Invalid module instance ID", [$"Could not parse: {request.ModuleInstanceId}"]);
+            return SessionMapper.CreateResult(false, "Invalid module instance ID",
+                [$"Could not parse: {request.ModuleInstanceId}"]);
 
         var snapshot = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var sv in request.InitialValues)
         {
-            string? str = sv.ValueCase switch
+            var str = sv.ValueCase switch
             {
                 SettingValue.ValueOneofCase.StringValue => sv.StringValue,
                 SettingValue.ValueOneofCase.BoolValue => sv.BoolValue.ToString(),
@@ -298,15 +274,17 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
             snapshot[sv.Key] = str;
         }
 
-        await _sandboxManager.EnsureAsync(instanceId, moduleId, snapshot, context.CancellationToken).ConfigureAwait(false);
+        await sandboxManager.EnsureAsync(instanceId, moduleId, snapshot, context.CancellationToken)
+            .ConfigureAwait(false);
         return SessionMapper.CreateResult(true, "Design-time edit started");
     }
 
     public override Task<OperationResult> EndEdit(EndEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID", [$"Could not parse: {request.ModuleInstanceId}"]));
-        _sandboxManager.DisposeSandbox(instanceId);
+            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
+                [$"Could not parse: {request.ModuleInstanceId}"]));
+        sandboxManager.DisposeSandbox(instanceId);
         return Task.FromResult(SessionMapper.CreateResult(true, "Design-time edit ended"));
     }
 
@@ -321,20 +299,20 @@ public class ModulesServiceImpl : ModulesService.ModulesServiceBase
                 ? "all"
                 : request.ModuleInstanceId;
 
-            _logger.LogInformation("Client {SubscriberId} started streaming setting updates (filter: {Filter})",
+            logger.LogInformation("Client {SubscriberId} started streaming setting updates (filter: {Filter})",
                 subscriberId, filter);
 
-            await _settingBroadcaster.SubscribeAsync(subscriberId, request.ModuleInstanceId,
+            await settingBroadcaster.SubscribeAsync(subscriberId, request.ModuleInstanceId,
                     responseStream, context.CancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Client {SubscriberId} setting update stream cancelled", subscriberId);
+            logger.LogInformation("Client {SubscriberId} setting update stream cancelled", subscriberId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error streaming setting updates for {SubscriberId}", subscriberId);
+            logger.LogError(ex, "Error streaming setting updates for {SubscriberId}", subscriberId);
             throw;
         }
     }

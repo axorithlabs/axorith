@@ -25,50 +25,38 @@ public class SettingViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ISetting Setting { get; }
 
-    private string _label = string.Empty;
-
     public string Label
     {
-        get => _label;
-        private set => this.RaiseAndSetIfChanged(ref _label, value);
-    }
-
-    private bool _isVisible = true;
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     public bool IsVisible
     {
-        get => _isVisible;
-        private set => this.RaiseAndSetIfChanged(ref _isVisible, value);
-    }
-
-    private bool _isReadOnly;
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = true;
 
     public bool IsReadOnly
     {
-        get => _isReadOnly;
-        private set => this.RaiseAndSetIfChanged(ref _isReadOnly, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
-
-    // --- Value Properties for UI Binding ---
 
     public string StringValue
     {
         get => Setting.GetCurrentValueAsObject() as string ?? string.Empty;
-        set
-        {
+        set =>
             // Send to server, update will come back via broadcast
             _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
-        }
     }
 
     public bool BoolValue
     {
         get => Setting.GetCurrentValueAsObject() as bool? ?? false;
-        set
-        {
+        set =>
             // Send to server, update will come back via broadcast
             _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
-        }
     }
 
     public decimal DecimalValue
@@ -77,10 +65,8 @@ public class SettingViewModel : ReactiveObject, IDisposable
         {
             var value = Setting.GetCurrentValueAsObject();
             if (value == null)
-                // Return 0 as safe default for empty values
                 return 0;
 
-            // Handle different numeric types
             return value switch
             {
                 decimal d => d,
@@ -93,33 +79,28 @@ public class SettingViewModel : ReactiveObject, IDisposable
         }
         set
         {
-            // For int settings, round the value
             object boxedValue = Setting.ValueType == typeof(int)
                 ? (int)Math.Round(value)
                 : value;
 
-            // Debounced send to server, update will come back via broadcast
             _numberUpdates.OnNext(boxedValue);
         }
     }
 
-    // Helper to support TimeSpan serialization via seconds when saving
     public static TimeSpan TimeSpanFromDecimal(decimal value)
     {
         return TimeSpan.FromSeconds((double)value);
     }
 
-    private IReadOnlyList<KeyValuePair<string, string>> _choices = [];
-
     public IReadOnlyList<KeyValuePair<string, string>> Choices
     {
-        get => _choices;
+        get;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _choices, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(SelectedChoice));
         }
-    }
+    } = [];
 
     public decimal NumberIncrement => Setting.ValueType == typeof(int) ? 1 : 0.1m;
 
@@ -141,7 +122,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             {
                 StringValue = value.Value.Key;
                 this.RaisePropertyChanged(nameof(StringValue));
-                this.RaisePropertyChanged(nameof(SelectedChoice));
+                this.RaisePropertyChanged();
             }
         }
     }
@@ -159,30 +140,25 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
         ClickCommand = ReactiveCommand.Create(() => { BoolValue = true; });
 
-        // Subscribe to label updates
         setting.Label
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(newLabel => Label = newLabel)
             .DisposeWith(_disposables);
 
-        // Subscribe to visibility updates
         setting.IsVisible
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(visible => IsVisible = visible)
             .DisposeWith(_disposables);
 
-        // Subscribe to readonly updates
         setting.IsReadOnly
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(readOnly => IsReadOnly = readOnly)
             .DisposeWith(_disposables);
 
-        // Subscribe to value changes and raise property changed for appropriate properties
         setting.ValueAsObject
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ =>
             {
-                // Notify all value properties - the UI will decide which one to use
                 this.RaisePropertyChanged(nameof(StringValue));
                 this.RaisePropertyChanged(nameof(BoolValue));
                 this.RaisePropertyChanged(nameof(DecimalValue));
@@ -199,7 +175,6 @@ public class SettingViewModel : ReactiveObject, IDisposable
         this.RaisePropertyChanged(nameof(DecimalValue));
         this.RaisePropertyChanged(nameof(SelectedChoice));
 
-        // Subscribe to choice updates if this is a Choice setting.
         Setting.Choices?
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(c => Choices = c, _ =>
@@ -208,7 +183,6 @@ public class SettingViewModel : ReactiveObject, IDisposable
             })
             .DisposeWith(_disposables);
 
-        // Debounce numeric updates to avoid flooding server during slider typing/drags
         _numberUpdates
             .Throttle(TimeSpan.FromMilliseconds(75))
             .ObserveOn(RxApp.TaskpoolScheduler)

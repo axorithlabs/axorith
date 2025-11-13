@@ -13,11 +13,6 @@ namespace Axorith.Host.Services;
 public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsServiceImpl> logger)
     : PresetsService.PresetsServiceBase
 {
-    private readonly IPresetManager _presetManager =
-        presetManager ?? throw new ArgumentNullException(nameof(presetManager));
-
-    private readonly ILogger<PresetsServiceImpl> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
     /// <summary>
     ///     Retrieves all session presets from persistent storage.
     /// </summary>
@@ -28,20 +23,18 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
     {
         try
         {
-            _logger.LogDebug("ListPresets called");
-
-            var presets = await _presetManager.LoadAllPresetsAsync(context.CancellationToken)
+            var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
                 .ConfigureAwait(false);
 
             var response = new ListPresetsResponse();
             response.Presets.AddRange(presets.Select(PresetMapper.ToSummary));
 
-            _logger.LogInformation("Returned {Count} presets", presets.Count);
+            logger.LogInformation("Returned {Count} presets", presets.Count);
             return response;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error listing presets");
+            logger.LogError(ex, "Error listing presets");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to list presets", ex));
         }
     }
@@ -54,9 +47,9 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid preset ID: {request.PresetId}"));
 
-            _logger.LogDebug("GetPreset called for {PresetId}", presetId);
+            logger.LogDebug("GetPreset called for {PresetId}", presetId);
 
-            var presets = await _presetManager.LoadAllPresetsAsync(context.CancellationToken)
+            var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
                 .ConfigureAwait(false);
 
             var preset = presets.FirstOrDefault(p => p.Id == presetId);
@@ -66,7 +59,7 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
                     $"Preset not found: {presetId}"));
 
             var message = PresetMapper.ToMessage(preset);
-            _logger.LogInformation("Returned preset: {PresetName}", preset.Name);
+            logger.LogInformation("Returned preset: {PresetName}", preset.Name);
             return message;
         }
         catch (RpcException)
@@ -75,7 +68,7 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting preset {PresetId}", request.PresetId);
+            logger.LogError(ex, "Error getting preset {PresetId}", request.PresetId);
             throw new RpcException(new Status(StatusCode.Internal, "Failed to get preset", ex));
         }
     }
@@ -87,23 +80,20 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
             if (request.Preset == null)
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
 
-            _logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
+            logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
 
             var preset = PresetMapper.ToModel(request.Preset);
 
-            // Generate new ID if not provided or invalid
             if (preset.Id == Guid.Empty) preset.Id = Guid.NewGuid();
 
-            // Generate instance IDs for modules if not provided
-            foreach (var module in preset.Modules)
-                if (module.InstanceId == Guid.Empty)
-                    module.InstanceId = Guid.NewGuid();
+            foreach (var module in preset.Modules.Where(module => module.InstanceId == Guid.Empty))
+                module.InstanceId = Guid.NewGuid();
 
-            await _presetManager.SavePresetAsync(preset, context.CancellationToken)
+            await presetManager.SavePresetAsync(preset, context.CancellationToken)
                 .ConfigureAwait(false);
 
             var response = PresetMapper.ToMessage(preset);
-            _logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
+            logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
             return response;
         }
         catch (RpcException)
@@ -112,7 +102,7 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating preset");
+            logger.LogError(ex, "Error creating preset");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to create preset", ex));
         }
     }
@@ -128,15 +118,15 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid preset ID: {request.Preset.Id}"));
 
-            _logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
+            logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
 
             var preset = PresetMapper.ToModel(request.Preset);
 
-            await _presetManager.SavePresetAsync(preset, context.CancellationToken)
+            await presetManager.SavePresetAsync(preset, context.CancellationToken)
                 .ConfigureAwait(false);
 
             var response = PresetMapper.ToMessage(preset);
-            _logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
+            logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
             return response;
         }
         catch (RpcException)
@@ -145,7 +135,7 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating preset {PresetId}", request.Preset?.Id);
+            logger.LogError(ex, "Error updating preset {PresetId}", request.Preset?.Id);
             throw new RpcException(new Status(StatusCode.Internal, "Failed to update preset", ex));
         }
     }
@@ -158,12 +148,12 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid preset ID: {request.PresetId}"));
 
-            _logger.LogDebug("DeletePreset called for {PresetId}", presetId);
+            logger.LogDebug("DeletePreset called for {PresetId}", presetId);
 
-            await _presetManager.DeletePresetAsync(presetId, context.CancellationToken)
+            await presetManager.DeletePresetAsync(presetId, context.CancellationToken)
                 .ConfigureAwait(false);
 
-            _logger.LogInformation("Deleted preset: {PresetId}", presetId);
+            logger.LogInformation("Deleted preset: {PresetId}", presetId);
             return new Empty();
         }
         catch (RpcException)
@@ -172,7 +162,7 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting preset {PresetId}", request.PresetId);
+            logger.LogError(ex, "Error deleting preset {PresetId}", request.PresetId);
             throw new RpcException(new Status(StatusCode.Internal, "Failed to delete preset", ex));
         }
     }

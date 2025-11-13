@@ -6,18 +6,14 @@ package axorith;
 
 import "google/protobuf/empty.proto";
 
-// Service for host lifecycle management
 service HostManagement {
-  // Request graceful shutdown of the host
   rpc RequestShutdown(ShutdownRequest) returns (ShutdownResponse);
-  
-  // Get current host status
   rpc GetStatus(google.protobuf.Empty) returns (HostStatusResponse);
 }
 
 message ShutdownRequest {
   string reason = 1;
-  int32 timeout_seconds = 2; // Max time to wait before force shutdown
+  int32 timeout_seconds = 2;
 }
 
 message ShutdownResponse {

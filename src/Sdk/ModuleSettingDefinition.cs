@@ -15,4 +15,5 @@ public record ModuleSettingDefinition(
     bool IsReadOnly,
     string ValueTypeName,
     string RawValue,
-    IReadOnlyList<KeyValuePair<string, string>> Choices);
+    IReadOnlyList<KeyValuePair<string, string>> Choices
+);

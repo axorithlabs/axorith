@@ -101,7 +101,7 @@ public class ValidationStatusTests
 
         // Assert
         result.Should().BeFalse();
-        status.Should().Be(default(ValidationStatus));
+        status.Should().Be(default);
     }
 
     [Fact]

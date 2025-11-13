@@ -1,4 +1,3 @@
-using Axorith.Sdk;
 using ModuleDefinition = Axorith.Contracts.ModuleDefinition;
 
 namespace Axorith.Host.Mappers;
@@ -25,27 +24,5 @@ public static class ModuleMapper
             message.Platforms.Add(platform.ToString());
 
         return message;
-    }
-
-    public static Sdk.ModuleDefinition ToModel(ModuleDefinition message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-
-        if (!Guid.TryParse(message.Id, out var id))
-            throw new ArgumentException($"Invalid module Id: {message.Id}", nameof(message));
-
-        var platforms = message.Platforms
-            .Select(p => Enum.TryParse<Platform>(p, out var platform) ? platform : Platform.Windows)
-            .ToArray();
-
-        return new Sdk.ModuleDefinition
-        {
-            Id = id,
-            Name = message.Name,
-            Description = message.Description,
-            Category = message.Category,
-            Platforms = platforms,
-            AssemblyFileName = message.Assembly
-        };
     }
 }

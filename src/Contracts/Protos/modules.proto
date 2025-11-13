@@ -12,14 +12,13 @@ service ModulesService {
   rpc InvokeAction(InvokeActionRequest) returns (OperationResult);
   rpc UpdateSetting(UpdateSettingRequest) returns (OperationResult);
   rpc StreamSettingUpdates(StreamSettingUpdatesRequest) returns (stream SettingUpdate);
-  // Design-time editing session management
   rpc BeginEdit(BeginEditRequest) returns (OperationResult);
   rpc EndEdit(EndEditRequest) returns (OperationResult);
   rpc SyncEdit(SyncEditRequest) returns (OperationResult);
 }
 
 message ListModulesRequest {
-  // Empty for MVP - returns all loaded modules
+  // TODO
 }
 
 message ListModulesResponse {
@@ -52,24 +51,20 @@ message UpdateSettingRequest {
   }
 }
 
-// Design-time editing: initialize a sandbox for a module instance
 message BeginEditRequest {
   string module_id = 1;
   string module_instance_id = 2;
   repeated SettingValue initial_values = 3;
 }
 
-// Design-time editing: tear down the sandbox for a module instance
 message EndEditRequest {
   string module_instance_id = 1;
 }
 
-// Ask Host to re-broadcast current sandbox state for the module instance
 message SyncEditRequest {
   string module_instance_id = 1;
 }
 
-// Generic setting key/value used for snapshots
 message SettingValue {
   string key = 1;
   oneof value {
@@ -82,6 +77,7 @@ message SettingValue {
 
 message StreamSettingUpdatesRequest {
   // Subscribe to all setting updates
-  // In future can filter by module instance
+  // TODO:
+  // In future can filter by module instanc.
   string module_instance_id = 1;
 }

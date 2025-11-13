@@ -39,7 +39,7 @@ public class GrpcCoreConnection : ICoreConnection
         ArgumentException.ThrowIfNullOrWhiteSpace(serverAddress);
 
         _serverAddress = serverAddress;
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _logger = logger;
         _stateSubject = new BehaviorSubject<ConnectionState>(ConnectionState.Disconnected);
 
         // Configure Polly retry policy for transient failures

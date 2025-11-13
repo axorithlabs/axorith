@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using FluentAssertions;
 
 namespace Axorith.Sdk.Tests;
@@ -209,13 +210,10 @@ public class ValidationResultTests
     public void Success_CalledMultipleTimesInParallel_ShouldReturnSameInstance()
     {
         // Arrange
-        var results = new System.Collections.Concurrent.ConcurrentBag<ValidationResult>();
+        var results = new ConcurrentBag<ValidationResult>();
 
         // Act - access from multiple threads
-        Parallel.For(0, 100, _ =>
-        {
-            results.Add(ValidationResult.Success);
-        });
+        Parallel.For(0, 100, _ => { results.Add(ValidationResult.Success); });
 
         // Assert - all should be the same instance
         results.Should().AllSatisfy(r => r.Should().BeSameAs(ValidationResult.Success));
@@ -225,13 +223,10 @@ public class ValidationResultTests
     public void Fail_CalledInParallel_ShouldNotThrow()
     {
         // Arrange
-        var results = new System.Collections.Concurrent.ConcurrentBag<ValidationResult>();
+        var results = new ConcurrentBag<ValidationResult>();
 
         // Act
-        var act = () => Parallel.For(0, 100, i =>
-        {
-            results.Add(ValidationResult.Fail($"Error {i}"));
-        });
+        var act = () => Parallel.For(0, 100, i => { results.Add(ValidationResult.Fail($"Error {i}")); });
 
         // Assert
         act.Should().NotThrow();

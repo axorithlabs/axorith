@@ -7,17 +7,23 @@ namespace Axorith.Sdk.Actions;
 /// <summary>
 ///     Default implementation and factory for module actions.
 /// </summary>
-public sealed class Action : IAction
+/// <remarks>
+///     Initializes a new instance of the <see cref="Action" /> class.
+/// </remarks>
+/// <param name="key">The unique identifier for this action.</param>
+/// <param name="label">The display label for the action button.</param>
+/// <param name="isEnabled">Whether the action is initially enabled.</param>
+public sealed class Action(string key, string label, bool isEnabled = true) : IAction
 {
-    private readonly BehaviorSubject<string> _label;
-    private readonly BehaviorSubject<bool> _isEnabled;
+    private readonly BehaviorSubject<string> _label = new(label);
+    private readonly BehaviorSubject<bool> _isEnabled = new(isEnabled);
     private readonly Subject<Unit> _invoked = new();
     private Func<Task>? _asyncHandler;
 
     /// <summary>
     ///     Gets the unique identifier for this action.
     /// </summary>
-    public string Key { get; }
+    public string Key { get; } = key;
 
     /// <summary>
     ///     Gets an observable stream that emits the current label text for this action.
@@ -33,19 +39,6 @@ public sealed class Action : IAction
     ///     Gets an observable stream that emits a signal each time this action is invoked.
     /// </summary>
     public IObservable<Unit> Invoked => _invoked.AsObservable();
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="Action" /> class.
-    /// </summary>
-    /// <param name="key">The unique identifier for this action.</param>
-    /// <param name="label">The display label for the action button.</param>
-    /// <param name="isEnabled">Whether the action is initially enabled.</param>
-    public Action(string key, string label, bool isEnabled = true)
-    {
-        Key = key;
-        _label = new BehaviorSubject<string>(label);
-        _isEnabled = new BehaviorSubject<bool>(isEnabled);
-    }
 
     /// <summary>
     ///     Updates the action's display label dynamically.

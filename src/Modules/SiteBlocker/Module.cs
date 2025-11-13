@@ -20,7 +20,7 @@ public class Module : IModule
 
     private readonly Setting<string> _blockedSites;
 
-    private string _pipeName = "axorith-nm-pipe";
+    private readonly string _pipeName = "axorith-nm-pipe";
     private List<string> _activeBlockedSites = [];
 
     public Module(IModuleLogger logger)
@@ -35,12 +35,12 @@ public class Module : IModule
         );
 
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
-        
+
         try
         {
             var manifestPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
                 "../Axorith.Shim/axorith.json"));
-            
+
             if (File.Exists(manifestPath))
             {
                 _pipeName = PublicApi.GetNativeMessagingHostName();

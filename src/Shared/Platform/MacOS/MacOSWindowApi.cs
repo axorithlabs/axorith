@@ -7,22 +7,23 @@ namespace Axorith.Shared.Platform.MacOS;
 ///     macOS-specific window management API using AppKit/Cocoa.
 /// </summary>
 [SupportedOSPlatform("macos")]
-internal static class MacOSWindowApi
+internal static class MacOsWindowApi
 {
     /// <summary>
     ///     Waits for a process to create its main window.
     /// </summary>
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000, CancellationToken cancellationToken = default)
+    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
+        CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.Now;
-        
+
         while (!HasWindow(process))
         {
             if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
 
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             await Task.Delay(100, cancellationToken);
         }
     }
@@ -34,12 +35,12 @@ internal static class MacOSWindowApi
     {
         // macOS uses display arrangement from System Preferences
         // We'll use AppleScript to move windows between displays
-        
-        var script = $@"
+
+        var script = @"
 tell application ""System Events""
     set frontProcess to first process whose frontmost is true
     tell frontProcess
-        set position of window 1 to {{100, 100}}
+        set position of window 1 to {100, 100}
     end tell
 end tell";
 
@@ -55,7 +56,7 @@ end tell";
         {
             // Use lsappinfo to check if app has windows
             var output = ExecuteCommand("lsappinfo", $"info -only name {process.Id}");
-            return !string.IsNullOrWhiteSpace(output) && output.Contains("\"");
+            return !string.IsNullOrWhiteSpace(output) && output.Contains('"');
         }
         catch
         {

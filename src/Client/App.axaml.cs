@@ -169,10 +169,7 @@ public class App : Application
         };
 
         var showItem = new NativeMenuItem("Show");
-        showItem.Click += (_, _) =>
-        {
-            ShowWindow(logger);
-        };
+        showItem.Click += (_, _) => { ShowWindow(logger); };
 
         var exitItem = new NativeMenuItem("Exit");
         exitItem.Click += (_, _) =>
@@ -194,10 +191,7 @@ public class App : Application
         _trayIcon.Menu = menu;
 
         // Handle double-click on tray icon
-        _trayIcon.Clicked += (_, _) =>
-        {
-            ShowWindow(logger);
-        };
+        _trayIcon.Clicked += (_, _) => { ShowWindow(logger); };
 
         var trayIcons = new TrayIcons { _trayIcon };
         SetValue(TrayIcon.IconsProperty, trayIcons);
@@ -241,15 +235,14 @@ public class App : Application
             // Retry connection with exponential backoff
             const int maxRetries = 5;
             Exception? lastException = null;
-            
-            for (int attempt = 1; attempt <= maxRetries; attempt++)
-            {
+
+            for (var attempt = 1; attempt <= maxRetries; attempt++)
                 try
                 {
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        loadingViewModel.Message = attempt == 1 
-                            ? "Connecting to Axorith.Host..." 
+                        loadingViewModel.Message = attempt == 1
+                            ? "Connecting to Axorith.Host..."
                             : $"Connecting to Axorith.Host (attempt {attempt}/{maxRetries})...";
                     });
 
@@ -261,17 +254,17 @@ public class App : Application
                 {
                     lastException = ex;
                     var delayMs = (int)Math.Pow(2, attempt - 1) * 1000; // 1s, 2s, 4s, 8s, 16s
-                    logger.LogWarning(ex, "Connection attempt {Attempt}/{MaxRetries} failed, retrying in {DelayMs}ms", 
+                    logger.LogWarning(ex, "Connection attempt {Attempt}/{MaxRetries} failed, retrying in {DelayMs}ms",
                         attempt, maxRetries, delayMs);
                     await Task.Delay(delayMs);
                 }
-            }
 
             // If all retries failed, throw the last exception
             if (lastException != null)
             {
                 logger.LogError(lastException, "All {MaxRetries} connection attempts failed", maxRetries);
-                throw new InvalidOperationException($"Failed to connect to Host after {maxRetries} attempts", lastException);
+                throw new InvalidOperationException($"Failed to connect to Host after {maxRetries} attempts",
+                    lastException);
             }
 
             // Register real services

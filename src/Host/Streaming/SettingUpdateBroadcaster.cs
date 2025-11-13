@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
 using System.Reactive.Linq;
+using System.Threading.Channels;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
 using Axorith.Sdk.Settings;
 using Grpc.Core;
+using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Streaming;
 
@@ -16,15 +18,31 @@ public class SettingUpdateBroadcaster : IDisposable
 {
     private readonly ISessionManager _sessionManager;
     private readonly ILogger<SettingUpdateBroadcaster> _logger;
-    private readonly ConcurrentDictionary<string, IServerStreamWriter<SettingUpdate>> _subscribers = new();
+
+    private sealed class Subscriber
+    {
+        public required IServerStreamWriter<SettingUpdate> Stream { get; init; }
+        public required Channel<SettingUpdate> Queue { get; init; }
+        public required CancellationTokenSource Cts { get; init; }
+        public required Task Loop { get; init; }
+    }
+
+    private readonly ConcurrentDictionary<string, Subscriber> _subscribers = new();
     private readonly ConcurrentDictionary<string, IDisposable> _settingSubscriptions = new();
     private readonly ConcurrentDictionary<string, string> _lastChoicesFingerprint = new();
     private bool _disposed;
 
-    public SettingUpdateBroadcaster(ISessionManager sessionManager, ILogger<SettingUpdateBroadcaster> logger)
+    private readonly int _choicesThrottleMs;
+    private readonly int _valueBatchWindowMs;
+
+    public SettingUpdateBroadcaster(ISessionManager sessionManager, ILogger<SettingUpdateBroadcaster> logger,
+        IOptions<HostConfiguration>? options)
     {
-        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _sessionManager = sessionManager;
+        _logger = logger;
+        var streaming = options?.Value.Streaming;
+        _choicesThrottleMs = Math.Clamp(streaming?.ChoicesThrottleMs ?? 200, 0, 10_000);
+        _valueBatchWindowMs = Math.Clamp(streaming?.ValueBatchWindowMs ?? 16, 0, 1000);
 
         // Subscribe to session lifecycle to manage setting subscriptions
         _sessionManager.SessionStarted += OnSessionStarted;
@@ -42,16 +60,24 @@ public class SettingUpdateBroadcaster : IDisposable
         var toRemove = new List<string>();
         foreach (var (key, sub) in _settingSubscriptions)
         {
-            if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
             {
-                try { sub.Dispose(); } catch { /* ignore */ }
-                toRemove.Add(key);
+                sub.Dispose();
             }
+            catch
+            {
+                /* ignore */
+            }
+
+            toRemove.Add(key);
         }
+
         foreach (var k in toRemove) _settingSubscriptions.TryRemove(k, out _);
 
-        // Clear cached choices fingerprints for this module instance
-        var choiceKeys = _lastChoicesFingerprint.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+        var choiceKeys = _lastChoicesFingerprint.Keys
+            .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
         foreach (var ck in choiceKeys) _lastChoicesFingerprint.TryRemove(ck, out _);
     }
 
@@ -70,15 +96,71 @@ public class SettingUpdateBroadcaster : IDisposable
 
         var key = string.IsNullOrWhiteSpace(moduleInstanceId) ? subscriberId : $"{subscriberId}:{moduleInstanceId}";
 
-        if (!_subscribers.TryAdd(key, stream))
+        // Create bounded channel with drop-oldest policy to avoid backpressure explosions
+        var channel = Channel.CreateBounded<SettingUpdate>(new BoundedChannelOptions(1024)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+        // Dedicated writer loop per subscriber
+        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var loopTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (await channel.Reader.WaitToReadAsync(linkedCts.Token).ConfigureAwait(false))
+                while (channel.Reader.TryRead(out var update))
+                    try
+                    {
+                        await stream.WriteAsync(update, linkedCts.Token).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to send setting update to subscriber {SubscriberId}, removing",
+                            key);
+                        await linkedCts.CancelAsync().ConfigureAwait(false);
+                        return;
+                    }
+            }
+            catch (OperationCanceledException)
+            {
+                // normal shutdown
+            }
+            finally
+            {
+                channel.Writer.TryComplete();
+            }
+        }, linkedCts.Token);
+
+        var subscriber = new Subscriber
+        {
+            Stream = stream,
+            Queue = channel,
+            Cts = linkedCts,
+            Loop = loopTask
+        };
+
+        if (!_subscribers.TryAdd(key, subscriber))
         {
             _logger.LogWarning("Client {Key} already subscribed, replacing stream", key);
-            _subscribers[key] = stream;
+            if (_subscribers.TryRemove(key, out var old))
+                try
+                {
+                    await old.Cts.CancelAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // ignored
+                }
+
+            _subscribers[key] = subscriber;
         }
 
         try
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+            await Task.Delay(Timeout.InfiniteTimeSpan, linkedCts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -86,7 +168,15 @@ public class SettingUpdateBroadcaster : IDisposable
         }
         finally
         {
-            _subscribers.TryRemove(key, out _);
+            if (_subscribers.TryRemove(key, out var sub))
+                try
+                {
+                    await sub.Cts.CancelAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // ignored
+                }
         }
     }
 
@@ -108,22 +198,21 @@ public class SettingUpdateBroadcaster : IDisposable
             var moduleInstance = _sessionManager.GetActiveModuleInstanceByInstanceId(configuredModule.InstanceId);
             if (moduleInstance == null)
             {
-                _logger.LogWarning("Module instance not found for InstanceId: {InstanceId}", configuredModule.InstanceId);
+                _logger.LogWarning("Module instance not found for InstanceId: {InstanceId}",
+                    configuredModule.InstanceId);
                 continue;
             }
 
             // Subscribe to all settings of this module
             var settings = moduleInstance.GetSettings();
-            foreach (var setting in settings)
-            {
-                SubscribeToSetting(configuredModule.InstanceId, setting);
-            }
+            foreach (var setting in settings) SubscribeToSetting(configuredModule.InstanceId, setting);
 
             _logger.LogDebug("Subscribed to {SettingCount} settings for module {ModuleName} (InstanceId: {InstanceId})",
                 settings.Count, configuredModule.CustomName ?? "Unknown", configuredModule.InstanceId);
         }
 
-        _logger.LogInformation("Successfully subscribed to settings for {ModuleCount} modules", activePreset.Modules.Count);
+        _logger.LogInformation("Successfully subscribed to settings for {ModuleCount} modules",
+            activePreset.Modules.Count);
     }
 
     private void OnSessionStopped(Guid presetId)
@@ -141,11 +230,11 @@ public class SettingUpdateBroadcaster : IDisposable
     /// <summary>
     ///     Manually broadcasts a setting update (used when setting updated via gRPC).
     /// </summary>
-    public async Task BroadcastUpdateAsync(Guid moduleInstanceId, string settingKey,
+    public Task BroadcastUpdateAsync(Guid moduleInstanceId, string settingKey,
         SettingProperty property, object? value)
     {
         if (_disposed || _subscribers.IsEmpty)
-            return;
+            return Task.CompletedTask;
 
         // Choices caching: skip duplicate broadcasts with same fingerprint
         if (property == SettingProperty.Choices && value is IReadOnlyList<KeyValuePair<string, string>> choicesList)
@@ -153,7 +242,7 @@ public class SettingUpdateBroadcaster : IDisposable
             var fingerprint = string.Join("\n", choicesList.Select(kv => kv.Key + "\u0001" + kv.Value));
             var cacheKey = $"{moduleInstanceId}:{settingKey}:choices";
             if (_lastChoicesFingerprint.TryGetValue(cacheKey, out var prev) && prev == fingerprint)
-                return;
+                return Task.CompletedTask;
             _lastChoicesFingerprint[cacheKey] = fingerprint;
         }
 
@@ -162,9 +251,7 @@ public class SettingUpdateBroadcaster : IDisposable
         _logger.LogDebug("Broadcast setting update: {ModuleId}.{Key}.{Property} = {Value}",
             moduleInstanceId, settingKey, property, value);
 
-        var tasks = new List<Task>();
-
-        foreach (var (subscriberKey, stream) in _subscribers)
+        foreach (var (subscriberKey, sub) in _subscribers)
         {
             // Key may be 'subscriberId' or 'subscriberId:moduleInstanceId'
             string? filter = null;
@@ -172,33 +259,15 @@ public class SettingUpdateBroadcaster : IDisposable
             if (sepIndex > 0 && sepIndex < subscriberKey.Length - 1)
                 filter = subscriberKey[(sepIndex + 1)..];
 
-            if (filter != null && !string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase))
+            if (filter != null &&
+                !string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            tasks.Add(Task.Run(async () =>
-            {
-                try
-                {
-                    await stream.WriteAsync(update).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex,
-                        "Failed to send setting update to subscriber {SubscriberId}, removing",
-                        subscriberKey);
-                    _subscribers.TryRemove(subscriberKey, out _);
-                }
-            }));
+            if (!sub.Queue.Writer.TryWrite(update))
+                _logger.LogDebug("Subscriber queue full for {SubscriberId}, dropping oldest", subscriberKey);
         }
 
-        try
-        {
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Individual exceptions already logged
-        }
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -211,9 +280,9 @@ public class SettingUpdateBroadcaster : IDisposable
 
         var keyPrefix = $"{moduleInstanceId}:{setting.Key}";
 
-        // Subscribe to Value changes
         var valueSub = setting.ValueAsObject
-            .Skip(1) // Skip initial value
+            .Skip(1)
+            .Throttle(TimeSpan.FromMilliseconds(_valueBatchWindowMs))
             .Subscribe(value =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Value, value);
@@ -221,7 +290,6 @@ public class SettingUpdateBroadcaster : IDisposable
 
         _settingSubscriptions[$"{keyPrefix}:value"] = valueSub;
 
-        // Subscribe to Label changes
         var labelSub = setting.Label
             .Skip(1)
             .DistinctUntilChanged()
@@ -232,7 +300,6 @@ public class SettingUpdateBroadcaster : IDisposable
 
         _settingSubscriptions[$"{keyPrefix}:label"] = labelSub;
 
-        // Subscribe to Visibility changes
         var visSub = setting.IsVisible
             .Skip(1)
             .DistinctUntilChanged()
@@ -243,7 +310,6 @@ public class SettingUpdateBroadcaster : IDisposable
 
         _settingSubscriptions[$"{keyPrefix}:visibility"] = visSub;
 
-        // Subscribe to ReadOnly changes
         var readOnlySub = setting.IsReadOnly
             .Skip(1)
             .DistinctUntilChanged()
@@ -254,12 +320,11 @@ public class SettingUpdateBroadcaster : IDisposable
 
         _settingSubscriptions[$"{keyPrefix}:readonly"] = readOnlySub;
 
-        // Subscribe to Choices changes (if applicable)
         if (setting.Choices != null)
         {
             var choicesSub = setting.Choices
                 .Skip(1)
-                .Throttle(TimeSpan.FromMilliseconds(200))
+                .Throttle(TimeSpan.FromMilliseconds(_choicesThrottleMs))
                 .Subscribe(choices =>
                 {
                     _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Choices, choices);

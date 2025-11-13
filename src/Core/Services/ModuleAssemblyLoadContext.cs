@@ -23,8 +23,6 @@ internal class ModuleAssemblyLoadContext(string modulePath) : AssemblyLoadContex
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
     {
         var libraryPath = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
-        if (libraryPath != null) return LoadUnmanagedDllFromPath(libraryPath);
-
-        return IntPtr.Zero;
+        return libraryPath != null ? LoadUnmanagedDllFromPath(libraryPath) : IntPtr.Zero;
     }
 }

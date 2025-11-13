@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Axorith.Shared.Platform.Linux;
+using Axorith.Shared.Platform.MacOS;
+using Axorith.Shared.Platform.Windows;
 
 namespace Axorith.Shared.Platform;
 
@@ -12,24 +15,18 @@ public static class PublicApi
     /// <summary>
     ///     Waits for a process to create its main window (cross-platform).
     /// </summary>
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000, CancellationToken cancellationToken = default)
+    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
+        CancellationToken cancellationToken = default)
     {
         if (OperatingSystem.IsWindows())
-        {
-            await Windows.WindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
-        }
+            await WindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
         else if (OperatingSystem.IsLinux())
-        {
-            await Linux.LinuxWindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
-        }
+            await LinuxWindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
         else if (OperatingSystem.IsMacOS())
-        {
-            await MacOS.MacOSWindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
-        }
+            await MacOsWindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
         else
-        {
-            throw new PlatformNotSupportedException($"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
-        }
+            throw new PlatformNotSupportedException(
+                $"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
 
     /// <summary>
@@ -38,21 +35,14 @@ public static class PublicApi
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         if (OperatingSystem.IsWindows())
-        {
-            Windows.WindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
-        }
+            WindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
         else if (OperatingSystem.IsLinux())
-        {
-            Linux.LinuxWindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
-        }
+            LinuxWindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
         else if (OperatingSystem.IsMacOS())
-        {
-            MacOS.MacOSWindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
-        }
+            MacOsWindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
         else
-        {
-            throw new PlatformNotSupportedException($"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
-        }
+            throw new PlatformNotSupportedException(
+                $"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
 
     /// <summary>
@@ -63,7 +53,7 @@ public static class PublicApi
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("Native messaging host is only supported on Windows");
 
-        return Windows.NativeHostManager.NativeMessagingHostName;
+        return NativeHostManager.NATIVE_MESSAGING_HOST_NAME;
     }
 
     /// <summary>
@@ -74,7 +64,7 @@ public static class PublicApi
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("Native messaging host registration is only supported on Windows");
 
-        Windows.NativeHostManager.EnsureFirefoxHostRegistered(pipeName, manifestPath);
+        NativeHostManager.EnsureFirefoxHostRegistered(pipeName, manifestPath);
     }
 
     /// <summary>
@@ -82,10 +72,7 @@ public static class PublicApi
     /// </summary>
     public static List<Process> FindProcesses(string processNameOrPath)
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return Windows.WindowApi.FindProcesses(processNameOrPath);
-        }
+        if (OperatingSystem.IsWindows()) return WindowApi.FindProcesses(processNameOrPath);
 
         // Fallback to simple name-based search
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
@@ -95,23 +82,23 @@ public static class PublicApi
     /// <summary>
     ///     Sets window state (Normal, Minimized, Maximized) - Windows only for now.
     /// </summary>
-    public static void SetWindowState(IntPtr windowHandle, Windows.WindowState state)
+    public static void SetWindowState(IntPtr windowHandle, WindowState state)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("SetWindowState is currently only supported on Windows");
 
-        Windows.WindowApi.SetWindowState(windowHandle, state);
+        WindowApi.SetWindowState(windowHandle, state);
     }
 
     /// <summary>
     ///     Gets current window state - Windows only for now.
     /// </summary>
-    public static Windows.WindowState GetWindowState(IntPtr windowHandle)
+    public static WindowState GetWindowState(IntPtr windowHandle)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("GetWindowState is currently only supported on Windows");
 
-        return Windows.WindowApi.GetWindowState(windowHandle);
+        return WindowApi.GetWindowState(windowHandle);
     }
 
     /// <summary>
@@ -122,7 +109,7 @@ public static class PublicApi
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("SetWindowSize is currently only supported on Windows");
 
-        Windows.WindowApi.SetWindowSize(windowHandle, width, height);
+        WindowApi.SetWindowSize(windowHandle, width, height);
     }
 
     /// <summary>
@@ -133,7 +120,7 @@ public static class PublicApi
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("SetWindowPosition is currently only supported on Windows");
 
-        Windows.WindowApi.SetWindowPosition(windowHandle, x, y);
+        WindowApi.SetWindowPosition(windowHandle, x, y);
     }
 
     /// <summary>
@@ -144,7 +131,7 @@ public static class PublicApi
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("GetWindowBounds is currently only supported on Windows");
 
-        return Windows.WindowApi.GetWindowBounds(windowHandle);
+        return WindowApi.GetWindowBounds(windowHandle);
     }
 
     /// <summary>
@@ -155,7 +142,7 @@ public static class PublicApi
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("FocusWindow is currently only supported on Windows");
 
-        Windows.WindowApi.FocusWindow(windowHandle);
+        WindowApi.FocusWindow(windowHandle);
     }
 
     /// <summary>
@@ -163,10 +150,7 @@ public static class PublicApi
     /// </summary>
     public static int GetMonitorCount()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return Windows.WindowApi.GetMonitorCount();
-        }
+        if (OperatingSystem.IsWindows()) return WindowApi.GetMonitorCount();
 
         return 1; // Fallback
     }

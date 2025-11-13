@@ -15,19 +15,19 @@ internal class WindowsSecureStorage : ISecureStorageService
 {
     // Application-specific entropy for additional security layer
     // Prevents other apps from decrypting our data even under same user
-    private static readonly byte[] s_entropy = Encoding.UTF8.GetBytes("AxorithLabs.Axorith.v1");
-    
+    private static readonly byte[] SEntropy = "AxorithLabs.Axorith.v1"u8.ToArray();
+
     private readonly string _storagePath;
     private readonly ILogger _logger;
 
     public WindowsSecureStorage(ILogger logger)
     {
         _logger = logger;
-        
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         _storagePath = Path.Combine(appData, "Axorith", "secure_storage");
         Directory.CreateDirectory(_storagePath);
-        
+
         _logger.LogDebug("Windows SecureStorage initialized at: {Path}", _storagePath);
     }
 
@@ -41,11 +41,11 @@ internal class WindowsSecureStorage : ISecureStorageService
         try
         {
             var secretBytes = Encoding.UTF8.GetBytes(secret);
-            var encryptedBytes = ProtectedData.Protect(secretBytes, s_entropy, DataProtectionScope.CurrentUser);
+            var encryptedBytes = ProtectedData.Protect(secretBytes, SEntropy, DataProtectionScope.CurrentUser);
             var filePath = GetFilePathForKey(key);
-            
+
             File.WriteAllBytes(filePath, encryptedBytes);
-            
+
             _logger.LogTrace("Stored secret for key: {Key}", key);
         }
         catch (Exception ex)
@@ -70,13 +70,13 @@ internal class WindowsSecureStorage : ISecureStorageService
         try
         {
             var encryptedBytes = File.ReadAllBytes(filePath);
-            var secretBytes = ProtectedData.Unprotect(encryptedBytes, s_entropy, DataProtectionScope.CurrentUser);
+            var secretBytes = ProtectedData.Unprotect(encryptedBytes, SEntropy, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(secretBytes);
         }
         catch (CryptographicException ex)
         {
             // Graceful degradation: data corrupted or encrypted under different user
-            _logger.LogWarning(ex, 
+            _logger.LogWarning(ex,
                 "Failed to decrypt secret for key: {Key}. File: {FileName}, Size: {Size} bytes. " +
                 "Data may be corrupted or encrypted under a different user account.",
                 key, Path.GetFileName(filePath), new FileInfo(filePath).Length);

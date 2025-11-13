@@ -3,6 +3,9 @@ using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
+using Axorith.Sdk;
+using Axorith.Sdk.Actions;
+using Axorith.Sdk.Settings;
 using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Grpc.Core;
@@ -10,7 +13,6 @@ using Grpc.Core.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
-
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 
@@ -50,7 +52,7 @@ public class SessionsServiceImplTests
             method: "TestMethod",
             host: "localhost",
             deadline: DateTime.UtcNow.AddMinutes(5),
-            requestHeaders: new Metadata(),
+            requestHeaders: [],
             cancellationToken: CancellationToken.None,
             peer: "127.0.0.1",
             authContext: null,
@@ -90,7 +92,7 @@ public class SessionsServiceImplTests
         {
             Id = presetId,
             Name = "Test Session",
-            Modules = new List<ConfiguredModule>()
+            Modules = []
         };
 
         _mockSessionManager.Setup(m => m.ActiveSession).Returns(preset);
@@ -127,12 +129,12 @@ public class SessionsServiceImplTests
         {
             Id = presetId,
             Name = "Test Session",
-            Modules = new List<ConfiguredModule> { configuredModule }
+            Modules = [configuredModule]
         };
 
-        var mockModuleInstance = new Mock<Sdk.IModule>();
-        mockModuleInstance.Setup(m => m.GetSettings()).Returns(new List<Sdk.Settings.ISetting>());
-        mockModuleInstance.Setup(m => m.GetActions()).Returns(new List<Sdk.Actions.IAction>());
+        var mockModuleInstance = new Mock<IModule>();
+        mockModuleInstance.Setup(m => m.GetSettings()).Returns(new List<ISetting>());
+        mockModuleInstance.Setup(m => m.GetActions()).Returns(new List<IAction>());
 
         var moduleDefinition = new ModuleDefinition
         {
@@ -156,7 +158,7 @@ public class SessionsServiceImplTests
         response.Should().NotBeNull();
         response.IsActive.Should().BeTrue();
         response.ModuleStates.Should().HaveCount(1);
-        
+
         var moduleState = response.ModuleStates[0];
         moduleState.InstanceId.Should().Be(instanceId.ToString());
         moduleState.ModuleName.Should().Be("Test Module");
@@ -213,7 +215,7 @@ public class SessionsServiceImplTests
         {
             Id = presetId,
             Name = "Test Preset",
-            Modules = new List<ConfiguredModule>()
+            Modules = []
         };
 
         _mockPresetManager.Setup(m => m.GetPresetByIdAsync(presetId, It.IsAny<CancellationToken>()))
@@ -232,7 +234,7 @@ public class SessionsServiceImplTests
         response.Should().NotBeNull();
         response.Success.Should().BeTrue();
         response.Message.Should().Contain("started successfully");
-        
+
         _mockSessionManager.Verify(m => m.StartSessionAsync(preset, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -245,7 +247,7 @@ public class SessionsServiceImplTests
         {
             Id = presetId,
             Name = "Test Preset",
-            Modules = new List<ConfiguredModule>()
+            Modules = []
         };
 
         _mockPresetManager.Setup(m => m.GetPresetByIdAsync(presetId, It.IsAny<CancellationToken>()))
@@ -275,7 +277,7 @@ public class SessionsServiceImplTests
         {
             Id = presetId,
             Name = "Test Preset",
-            Modules = new List<ConfiguredModule>()
+            Modules = []
         };
 
         _mockPresetManager.Setup(m => m.GetPresetByIdAsync(presetId, It.IsAny<CancellationToken>()))
@@ -320,7 +322,7 @@ public class SessionsServiceImplTests
         response.Should().NotBeNull();
         response.Success.Should().BeTrue();
         response.Message.Should().Contain("stopped successfully");
-        
+
         _mockSessionManager.Verify(m => m.StopCurrentSessionAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 

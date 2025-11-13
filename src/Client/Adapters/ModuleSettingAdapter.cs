@@ -35,26 +35,21 @@ internal class ModuleSettingAdapter : ISetting
         Description = setting.Description;
         Filter = null;
 
-        // Parse control type
         if (!Enum.TryParse<SettingControlType>(setting.ControlType, out var controlType))
             controlType = SettingControlType.Text;
         ControlType = controlType;
 
-        // Parse persistence
         if (!Enum.TryParse<SettingPersistence>(setting.Persistence, out var persistence))
             persistence = SettingPersistence.Persisted;
         Persistence = persistence;
 
-        // Parse value type - handle simple type names
         ValueType = ParseValueType(setting.ValueType);
 
-        // Initialize reactive subjects
         _labelSubject = new BehaviorSubject<string>(setting.Label);
         _visibilitySubject = new BehaviorSubject<bool>(setting.IsVisible);
         _readOnlySubject = new BehaviorSubject<bool>(setting.IsReadOnly);
         _choicesSubject = new BehaviorSubject<IReadOnlyList<KeyValuePair<string, string>>>(setting.Choices);
 
-        // Parse and set initial value
         var initialValue = ParseValue(savedValue ?? setting.CurrentValue);
         _valueSubject = new BehaviorSubject<object?>(initialValue);
 
@@ -117,7 +112,7 @@ internal class ModuleSettingAdapter : ISetting
     }
 
     /// <summary>
-    /// Updates the label of the setting (for reactive UI updates from host).
+    ///     Updates the label of the setting (for reactive UI updates from host).
     /// </summary>
     public void SetLabel(string label)
     {
@@ -125,7 +120,7 @@ internal class ModuleSettingAdapter : ISetting
     }
 
     /// <summary>
-    /// Updates the visibility of the setting (for reactive UI updates from host).
+    ///     Updates the visibility of the setting (for reactive UI updates from host).
     /// </summary>
     public void SetVisibility(bool isVisible)
     {
@@ -133,7 +128,7 @@ internal class ModuleSettingAdapter : ISetting
     }
 
     /// <summary>
-    /// Updates the read-only state of the setting (for reactive UI updates from host).
+    ///     Updates the read-only state of the setting (for reactive UI updates from host).
     /// </summary>
     public void SetReadOnly(bool isReadOnly)
     {
@@ -141,7 +136,7 @@ internal class ModuleSettingAdapter : ISetting
     }
 
     /// <summary>
-    /// Updates the choices for choice-based settings (for reactive UI updates from host).
+    ///     Updates the choices for choice-based settings (for reactive UI updates from host).
     /// </summary>
     public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> choices)
     {
@@ -175,7 +170,7 @@ internal class ModuleSettingAdapter : ISetting
             if (ValueType == typeof(string))
                 return value;
             if (ValueType == typeof(bool))
-                return bool.TryParse(value, out var b) ? b : false;
+                return bool.TryParse(value, out var b) && b;
             if (ValueType == typeof(int))
                 return int.TryParse(value, out var i) ? i : 0;
             if (ValueType == typeof(decimal))

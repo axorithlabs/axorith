@@ -4,21 +4,9 @@ using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Platform.Windows;
 
 namespace Axorith.Module.ApplicationLauncher;
-
-public enum ProcessMode
-{
-    LaunchNew,
-    AttachExisting,
-    LaunchOrAttach
-}
-
-public enum LifecycleMode
-{
-    TerminateOnEnd,
-    KeepRunning
-}
 
 /// <summary>
 ///     Advanced application launcher with window management capabilities.
@@ -51,19 +39,20 @@ public class Module : IModule
             key: "ProcessMode",
             label: "Process Mode",
             defaultValue: "LaunchNew",
-            initialChoices: new[]
-            {
+            initialChoices:
+            [
                 new KeyValuePair<string, string>("LaunchNew", "Launch New Process"),
                 new KeyValuePair<string, string>("AttachExisting", "Attach to Existing"),
                 new KeyValuePair<string, string>("LaunchOrAttach", "Launch or Attach")
-            },
+            ],
             description: "How to handle the application process."
         );
 
         _applicationPath = Setting.AsFilePicker(
             key: "ApplicationPath",
             label: "Application Path",
-            description: "Path to the application executable. Used for launching new processes or finding existing ones.",
+            description:
+            "Path to the application executable. Used for launching new processes or finding existing ones.",
             defaultValue: @"C:\Windows\notepad.exe",
             filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
         );
@@ -86,12 +75,12 @@ public class Module : IModule
             key: "WindowState",
             label: "Window State",
             defaultValue: "Normal",
-            initialChoices: new[]
-            {
+            initialChoices:
+            [
                 new KeyValuePair<string, string>("Normal", "Normal"),
                 new KeyValuePair<string, string>("Maximized", "Maximized"),
                 new KeyValuePair<string, string>("Minimized", "Minimized")
-            },
+            ],
             description: "Desired window state after session starts."
         );
 
@@ -107,7 +96,7 @@ public class Module : IModule
             label: "Window Width",
             description: "Custom window width in pixels.",
             defaultValue: 1280,
-            isVisible: false  // Initially hidden until UseCustomSize is enabled
+            isVisible: false
         );
 
         _windowHeight = Setting.AsInt(
@@ -115,18 +104,18 @@ public class Module : IModule
             label: "Window Height",
             description: "Custom window height in pixels.",
             defaultValue: 720,
-            isVisible: false  // Initially hidden until UseCustomSize is enabled
+            isVisible: false
         );
 
         _lifecycleMode = Setting.AsChoice(
             key: "LifecycleMode",
             label: "Process Lifecycle",
             defaultValue: "TerminateOnEnd",
-            initialChoices: new[]
-            {
+            initialChoices:
+            [
                 new KeyValuePair<string, string>("TerminateOnEnd", "Terminate on Session End"),
                 new KeyValuePair<string, string>("KeepRunning", "Keep Running")
-            },
+            ],
             description: "What happens to the process when session ends."
         );
 
@@ -137,13 +126,11 @@ public class Module : IModule
             description: "Automatically bring the window to foreground after setup."
         );
 
-        // Setup reactive visibility in constructor (before GetSettings is called)
         SetupReactiveVisibility();
     }
 
     private void SetupReactiveVisibility()
     {
-        // React to UseCustomSize changes (respect current WindowState)
         _useCustomSize.Value.Subscribe(useCustom =>
         {
             var state = _windowState.GetCurrentValue();
@@ -157,24 +144,19 @@ public class Module : IModule
         {
             var isNormal = state == "Normal";
             var isMinimized = state == "Minimized";
-            
-            // UseCustomSize only visible for Normal state
+
             _useCustomSize.SetVisibility(isNormal);
-            
-            // BringToForeground hidden when Minimized
+
             _bringToForeground.SetVisibility(!isMinimized);
-            
-            // Width/Height visibility depends on both WindowState AND UseCustomSize
+
             var useCustom = _useCustomSize.GetCurrentValue();
             _windowWidth.SetVisibility(isNormal && useCustom);
             _windowHeight.SetVisibility(isNormal && useCustom);
         });
 
-        // React to ProcessMode changes
         _processMode.Value.Subscribe(mode =>
         {
-            // ApplicationArgs only visible when launching (not when attaching to existing)
-            var showArgs = mode == "LaunchNew" || mode == "LaunchOrAttach";
+            var showArgs = mode is "LaunchNew" or "LaunchOrAttach";
             _applicationArgs.SetVisibility(showArgs);
         });
     }
@@ -225,13 +207,12 @@ public class Module : IModule
         if (_monitorIndex.GetCurrentValue() < 0)
             return Task.FromResult(ValidationResult.Fail("'Monitor Index' must be a non-negative number."));
 
-        if (_useCustomSize.GetCurrentValue())
-        {
-            if (_windowWidth.GetCurrentValue() < 100)
-                return Task.FromResult(ValidationResult.Fail("'Window Width' must be at least 100 pixels."));
-            if (_windowHeight.GetCurrentValue() < 100)
-                return Task.FromResult(ValidationResult.Fail("'Window Height' must be at least 100 pixels."));
-        }
+        if (!_useCustomSize.GetCurrentValue()) return Task.FromResult(ValidationResult.Success);
+
+        if (_windowWidth.GetCurrentValue() < 100)
+            return Task.FromResult(ValidationResult.Fail("'Window Width' must be at least 100 pixels."));
+        if (_windowHeight.GetCurrentValue() < 100)
+            return Task.FromResult(ValidationResult.Fail("'Window Height' must be at least 100 pixels."));
 
         return Task.FromResult(ValidationResult.Success);
     }
@@ -242,7 +223,7 @@ public class Module : IModule
         var mode = _processMode.GetCurrentValue();
         var appPath = _applicationPath.GetCurrentValue();
 
-        _logger.LogInfo("ApplicationLauncher starting in {Mode} mode for {AppPath}", mode, appPath);
+        _logger.LogInfo("Starting in {Mode} mode for {AppPath}", mode, appPath);
 
         // Step 1: Get or create process
         switch (mode)
@@ -254,6 +235,7 @@ public class Module : IModule
                     _logger.LogError(null, "Failed to find existing process for {AppPath}", appPath);
                     throw new InvalidOperationException($"No running process found for {appPath}");
                 }
+
                 _attachedToExisting = true;
                 break;
 
@@ -271,9 +253,8 @@ public class Module : IModule
                     _currentProcess = await LaunchNewProcessAsync(appPath, _applicationArgs.GetCurrentValue());
                     _attachedToExisting = false;
                 }
-                break;
 
-            case "LaunchNew":
+                break;
             default:
                 _currentProcess = await LaunchNewProcessAsync(appPath, _applicationArgs.GetCurrentValue());
                 _attachedToExisting = false;
@@ -295,7 +276,7 @@ public class Module : IModule
         try
         {
             _logger.LogDebug("Launching process: {Path} {Args}", path, args);
-            
+
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -314,7 +295,7 @@ public class Module : IModule
 
             _logger.LogInfo("Process {ProcessName} (PID: {ProcessId}) launched successfully",
                 process.ProcessName, process.Id);
-            
+
             return Task.FromResult<Process?>(process);
         }
         catch (Exception ex)
@@ -329,9 +310,9 @@ public class Module : IModule
         try
         {
             _logger.LogDebug("Searching for existing process: {Path}", path);
-            
+
             var processes = PublicApi.FindProcesses(path);
-            
+
             if (processes.Count == 0)
             {
                 _logger.LogDebug("No existing process found for {Path}", path);
@@ -344,7 +325,7 @@ public class Module : IModule
 
             _logger.LogInfo("Found existing process {ProcessName} (PID: {ProcessId})",
                 selectedProcess.ProcessName, selectedProcess.Id);
-            
+
             return Task.FromResult<Process?>(selectedProcess);
         }
         catch (Exception ex)
@@ -374,8 +355,7 @@ public class Module : IModule
             var stateStr = _windowState.GetCurrentValue();
             var monitorIndex = _monitorIndex.GetCurrentValue();
             var monitorCount = PublicApi.GetMonitorCount();
-            
-            // Step 1: Move to target monitor (if needed)
+
             if (monitorIndex >= 0 && monitorIndex < monitorCount)
             {
                 _logger.LogDebug("Moving window to monitor {MonitorIndex}", monitorIndex);
@@ -384,45 +364,55 @@ public class Module : IModule
             }
             else if (monitorIndex >= monitorCount)
             {
-                _logger.LogWarning("Monitor index {MonitorIndex} is out of range (0-{MaxIndex}). Skipping monitor move.",
+                _logger.LogWarning(
+                    "Monitor index {MonitorIndex} is out of range (0-{MaxIndex}). Skipping monitor move.",
                     monitorIndex, monitorCount - 1);
             }
 
-            // Step 2: Apply window state or custom size (mutually exclusive)
-            if (stateStr == "Maximized")
+            switch (stateStr)
             {
-                _logger.LogDebug("Maximizing window");
-                PublicApi.SetWindowState(windowHandle, Shared.Platform.Windows.WindowState.Maximized);
-                await Task.Delay(200, cancellationToken);
-                if (PublicApi.GetWindowState(windowHandle) != Shared.Platform.Windows.WindowState.Maximized)
+                case "Maximized":
                 {
-                    _logger.LogDebug("Re-applying maximize state after revert");
-                    PublicApi.SetWindowState(windowHandle, Shared.Platform.Windows.WindowState.Maximized);
+                    _logger.LogDebug("Maximizing window");
+                    PublicApi.SetWindowState(windowHandle, WindowState.Maximized);
+                    await Task.Delay(100, cancellationToken);
+                    if (PublicApi.GetWindowState(windowHandle) != WindowState.Maximized)
+                    {
+                        _logger.LogDebug("Re-applying maximize state after revert");
+                        PublicApi.SetWindowState(windowHandle, WindowState.Maximized);
+                    }
+
+                    break;
+                }
+                case "Minimized":
+                {
+                    _logger.LogDebug("Minimizing window");
+                    PublicApi.SetWindowState(windowHandle, WindowState.Minimized);
+                    await Task.Delay(100, cancellationToken);
+                    if (PublicApi.GetWindowState(windowHandle) != WindowState.Minimized)
+                    {
+                        _logger.LogDebug("Re-applying minimize state after revert");
+                        PublicApi.SetWindowState(windowHandle, WindowState.Minimized);
+                    }
+
+                    break;
+                }
+                default:
+                {
+                    if (_useCustomSize.GetCurrentValue())
+                    {
+                        var width = _windowWidth.GetCurrentValue();
+                        var height = _windowHeight.GetCurrentValue();
+                        _logger.LogDebug("Setting custom window size: {Width}x{Height}", width, height);
+                        PublicApi.SetWindowSize(windowHandle, width, height);
+                    }
+
+                    break;
                 }
             }
-            else if (stateStr == "Minimized")
-            {
-                _logger.LogDebug("Minimizing window");
-                PublicApi.SetWindowState(windowHandle, Shared.Platform.Windows.WindowState.Minimized);
-                await Task.Delay(100, cancellationToken);
-                if (PublicApi.GetWindowState(windowHandle) != Shared.Platform.Windows.WindowState.Minimized)
-                {
-                    _logger.LogDebug("Re-applying minimize state after revert");
-                    PublicApi.SetWindowState(windowHandle, Shared.Platform.Windows.WindowState.Minimized);
-                }
-            }
-            else if (_useCustomSize.GetCurrentValue())
-            {
-                // Only for Normal state with custom size enabled
-                var width = _windowWidth.GetCurrentValue();
-                var height = _windowHeight.GetCurrentValue();
-                _logger.LogDebug("Setting custom window size: {Width}x{Height}", width, height);
-                PublicApi.SetWindowSize(windowHandle, width, height);
-            }
 
-            await Task.Delay(200, cancellationToken);
+            await Task.Delay(100, cancellationToken);
 
-            // Step 3: Bring to foreground if requested (not for Minimized)
             if (_bringToForeground.GetCurrentValue() && stateStr != "Minimized")
             {
                 _logger.LogDebug("Bringing window to foreground");
@@ -462,7 +452,6 @@ public class Module : IModule
             return Task.CompletedTask;
         }
 
-        // TerminateOnEnd mode
         if (_attachedToExisting)
         {
             _logger.LogWarning("Process was attached from existing. Closing main window only.");
@@ -480,10 +469,9 @@ public class Module : IModule
         {
             _logger.LogInfo("Terminating process {ProcessName} (PID: {ProcessId})",
                 _currentProcess.ProcessName, _currentProcess.Id);
-            
+
             try
             {
-                // Try graceful close first
                 if (!_currentProcess.CloseMainWindow())
                 {
                     _logger.LogDebug("CloseMainWindow failed, waiting 2 seconds before force kill");
@@ -516,18 +504,6 @@ public class Module : IModule
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
-    public Task OnActionAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
-    public Task CleanupAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
     /// <summary>
     ///     Releases the resources used by the module, specifically the running process.
     /// </summary>
@@ -535,7 +511,7 @@ public class Module : IModule
     {
         try
         {
-            if (_currentProcess != null && !_currentProcess.HasExited)
+            if (_currentProcess is { HasExited: false })
             {
                 var lifecycle = _lifecycleMode.GetCurrentValue();
                 if (lifecycle == "TerminateOnEnd" && !_attachedToExisting)

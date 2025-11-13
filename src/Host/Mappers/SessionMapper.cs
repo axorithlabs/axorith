@@ -1,5 +1,4 @@
 using Axorith.Contracts;
-using Axorith.Sdk;
 using Google.Protobuf.WellKnownTypes;
 
 namespace Axorith.Host.Mappers;
@@ -36,20 +35,5 @@ public static class SessionMapper
         if (warnings != null) result.Warnings.AddRange(warnings);
 
         return result;
-    }
-
-    public static OperationResult CreateResult(ValidationResult validationResult)
-    {
-        ArgumentNullException.ThrowIfNull(validationResult);
-
-        var success = validationResult.Status == ValidationStatus.Ok;
-        var warnings = validationResult.Status == ValidationStatus.Warning
-            ? new[] { validationResult.Message }
-            : null;
-        var errors = validationResult.Status == ValidationStatus.Error
-            ? new[] { validationResult.Message }
-            : null;
-
-        return CreateResult(success, validationResult.Message, errors, warnings);
     }
 }

@@ -4,24 +4,19 @@ using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Streaming;
 using Axorith.Sdk;
+using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Services;
 
 public sealed class DesignTimeSandboxManager : IDisposable
 {
-    private sealed class Sandbox
+    private sealed class Sandbox(IModule module, ILifetimeScope? scope)
     {
-        public IModule Module { get; }
-        public ILifetimeScope? Scope { get; }
-        public DateTime LastAccessUtc { get; set; }
+        public IModule Module { get; } = module;
+        public ILifetimeScope? Scope { get; } = scope;
+        public DateTime LastAccessUtc { get; set; } = DateTime.UtcNow;
         public bool InitDone { get; set; }
         public bool Subscribed { get; set; }
-        public Sandbox(IModule module, ILifetimeScope? scope)
-        {
-            Module = module;
-            Scope = scope;
-            LastAccessUtc = DateTime.UtcNow;
-        }
     }
 
     private readonly IModuleRegistry _moduleRegistry;
@@ -37,19 +32,21 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public DesignTimeSandboxManager(IModuleRegistry moduleRegistry,
         SettingUpdateBroadcaster broadcaster,
         ILogger<DesignTimeSandboxManager> logger,
-        Microsoft.Extensions.Options.IOptions<HostConfiguration> options)
+        IOptions<HostConfiguration>? options)
     {
         _moduleRegistry = moduleRegistry;
         _broadcaster = broadcaster;
         _logger = logger;
-        var cfg = options.Value.DesignTime;
+        var cfg = options?.Value.DesignTime;
         _idleTtl = TimeSpan.FromSeconds(Math.Clamp(cfg?.SandboxIdleTtlSeconds ?? 300, 30, 86400));
         _maxSandboxes = Math.Clamp(cfg?.MaxSandboxes ?? 5, 1, 1000);
+        var evictEvery = TimeSpan.FromSeconds(Math.Clamp(cfg?.EvictionIntervalSeconds ?? 60, 5, 3600));
 
-        _evictionTimer = new Timer(EvictIdle, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        _evictionTimer = new Timer(EvictIdle, null, evictEvery, evictEvery);
     }
 
-    public async Task EnsureAsync(Guid instanceId, Guid moduleId, IReadOnlyDictionary<string, string?> initial, CancellationToken ct)
+    public async Task EnsureAsync(Guid instanceId, Guid moduleId, IReadOnlyDictionary<string, string?> initial,
+        CancellationToken ct)
     {
         var sandbox = _sandboxes.GetOrAdd(instanceId, _ =>
         {
@@ -63,8 +60,6 @@ public sealed class DesignTimeSandboxManager : IDisposable
 
         sandbox.LastAccessUtc = DateTime.UtcNow;
         if (!sandbox.InitDone)
-        {
-            // Init module (best effort)
             try
             {
                 using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -75,7 +70,6 @@ public sealed class DesignTimeSandboxManager : IDisposable
             {
                 // ignore
             }
-        }
 
         if (!sandbox.Subscribed)
         {
@@ -103,18 +97,26 @@ public sealed class DesignTimeSandboxManager : IDisposable
             _logger.LogWarning("Setting {Key} not found for sandbox {InstanceId}", key, instanceId);
             return;
         }
+
         setting.SetValueFromString(stringValue);
     }
 
     public void DisposeSandbox(Guid instanceId)
     {
-        if (_sandboxes.TryRemove(instanceId, out var sb))
+        if (!_sandboxes.TryRemove(instanceId, out var sb)) return;
+
+        try
         {
-            try { _broadcaster.UnsubscribeModuleInstance(instanceId); } catch { /* best-effort */ }
-            sb.Module.Dispose();
-            sb.Scope?.Dispose();
-            _logger.LogInformation("Design-time sandbox disposed for {InstanceId}", instanceId);
+            _broadcaster.UnsubscribeModuleInstance(instanceId);
         }
+        catch
+        {
+            // ignored
+        }
+
+        sb.Module.Dispose();
+        sb.Scope?.Dispose();
+        _logger.LogInformation("Design-time sandbox disposed for {InstanceId}", instanceId);
     }
 
     public void ReBroadcast(Guid instanceId)
@@ -125,7 +127,6 @@ public sealed class DesignTimeSandboxManager : IDisposable
         sb.LastAccessUtc = DateTime.UtcNow;
         foreach (var setting in sb.Module.GetSettings())
         {
-            // Broadcast current reactive properties
             _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
                 SettingProperty.Visibility, setting.GetCurrentVisibility());
             _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
@@ -141,7 +142,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
         }
     }
 
-    private void ApplyAll(Sandbox sb, IReadOnlyDictionary<string, string?> initial)
+    private static void ApplyAll(Sandbox sb, IReadOnlyDictionary<string, string?> initial)
     {
         var dict = sb.Module.GetSettings().ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in initial)
@@ -169,15 +170,21 @@ public sealed class DesignTimeSandboxManager : IDisposable
     {
         var now = DateTime.UtcNow;
         foreach (var kv in _sandboxes)
-        {
             if (now - kv.Value.LastAccessUtc > _idleTtl)
                 DisposeSandbox(kv.Key);
-        }
     }
 
     public void Dispose()
     {
-        try { _evictionTimer.Dispose(); } catch { /* ignore */ }
+        try
+        {
+            _evictionTimer.Dispose();
+        }
+        catch
+        {
+            /* ignore */
+        }
+
         foreach (var id in _sandboxes.Keys.ToArray())
             DisposeSandbox(id);
         _sandboxes.Clear();

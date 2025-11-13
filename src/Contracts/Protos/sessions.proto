@@ -14,7 +14,7 @@ service SessionsService {
 }
 
 message GetSessionStateRequest {
-  // Empty for MVP - returns current session or null
+  // TODO
 }
 
 message StartSessionRequest {
@@ -22,10 +22,11 @@ message StartSessionRequest {
 }
 
 message StopSessionRequest {
-  // Empty - stops current session
+  // TODO
 }
 
 message StreamSessionEventsRequest {
   // Subscribe to all session events
   // In future can add filters
+  // TODO
 }

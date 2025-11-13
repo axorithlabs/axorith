@@ -63,44 +63,28 @@ public class TestModuleBuilder
     }
 }
 
-public class TestModule : IModule
+public class TestModule(
+    List<ISetting> settings,
+    List<IAction> actions,
+    Func<CancellationToken, Task>? onInitialize,
+    Func<CancellationToken, Task>? onSessionStart,
+    Func<Task>? onSessionEnd,
+    ValidationResult validationResult)
+    : IModule
 {
-    private readonly List<ISetting> _settings;
-    private readonly List<IAction> _actions;
-    private readonly Func<CancellationToken, Task>? _onInitialize;
-    private readonly Func<CancellationToken, Task>? _onSessionStart;
-    private readonly Func<Task>? _onSessionEnd;
-    private readonly ValidationResult _validationResult;
-
-    public TestModule(
-        List<ISetting> settings,
-        List<IAction> actions,
-        Func<CancellationToken, Task>? onInitialize,
-        Func<CancellationToken, Task>? onSessionStart,
-        Func<Task>? onSessionEnd,
-        ValidationResult validationResult)
-    {
-        _settings = settings;
-        _actions = actions;
-        _onInitialize = onInitialize;
-        _onSessionStart = onSessionStart;
-        _onSessionEnd = onSessionEnd;
-        _validationResult = validationResult;
-    }
-
     public IReadOnlyList<ISetting> GetSettings()
     {
-        return _settings;
+        return settings;
     }
 
     public IReadOnlyList<IAction> GetActions()
     {
-        return _actions;
+        return actions;
     }
 
     public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        return _onInitialize?.Invoke(cancellationToken) ?? Task.CompletedTask;
+        return onInitialize?.Invoke(cancellationToken) ?? Task.CompletedTask;
     }
 
     public object GetSettingsViewModel()
@@ -110,17 +94,17 @@ public class TestModule : IModule
 
     public Task OnSessionStartAsync(CancellationToken cancellationToken = default)
     {
-        return _onSessionStart?.Invoke(cancellationToken) ?? Task.CompletedTask;
+        return onSessionStart?.Invoke(cancellationToken) ?? Task.CompletedTask;
     }
 
     public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        return _onSessionEnd?.Invoke() ?? Task.CompletedTask;
+        return onSessionEnd?.Invoke() ?? Task.CompletedTask;
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(_validationResult);
+        return Task.FromResult(validationResult);
     }
 
     public Type? CustomSettingsViewType { get; }

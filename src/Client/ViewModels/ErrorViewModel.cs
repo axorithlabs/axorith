@@ -7,20 +7,16 @@ public class ErrorViewModel : ReactiveObject
 {
     private Func<Task>? _retryCallback;
 
-    private string _errorMessage = string.Empty;
-
     public string ErrorMessage
     {
-        get => _errorMessage;
-        set => this.RaiseAndSetIfChanged(ref _errorMessage, value);
-    }
-
-    private bool _isRetrying;
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     public bool IsRetrying
     {
-        get => _isRetrying;
-        set => this.RaiseAndSetIfChanged(ref _isRetrying, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     public ICommand? RetryCommand { get; private set; }

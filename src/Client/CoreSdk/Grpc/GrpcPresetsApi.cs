@@ -12,17 +12,11 @@ namespace Axorith.Client.CoreSdk.Grpc;
 internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncRetryPolicy retryPolicy)
     : IPresetsApi
 {
-    private readonly PresetsService.PresetsServiceClient _client =
-        client ?? throw new ArgumentNullException(nameof(client));
-
-    private readonly AsyncRetryPolicy
-        _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-
     public async Task<IReadOnlyList<PresetSummary>> ListPresetsAsync(CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.ListPresetsAsync(new ListPresetsRequest(), cancellationToken: ct)
+            var response = await client.ListPresetsAsync(new ListPresetsRequest(), cancellationToken: ct)
                 .ConfigureAwait(false);
 
             return response.Presets
@@ -37,11 +31,11 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
 
     public async Task<SessionPreset?> GetPresetAsync(Guid presetId, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
             try
             {
-                var response = await _client.GetPresetAsync(
+                var response = await client.GetPresetAsync(
                         new GetPresetRequest { PresetId = presetId.ToString() },
                         cancellationToken: ct)
                     .ConfigureAwait(false);
@@ -59,10 +53,10 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
     {
         ArgumentNullException.ThrowIfNull(preset);
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
             var message = ToMessage(preset);
-            var response = await _client.CreatePresetAsync(
+            var response = await client.CreatePresetAsync(
                     new CreatePresetRequest { Preset = message },
                     cancellationToken: ct)
                 .ConfigureAwait(false);
@@ -75,10 +69,10 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
     {
         ArgumentNullException.ThrowIfNull(preset);
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
             var message = ToMessage(preset);
-            var response = await _client.UpdatePresetAsync(
+            var response = await client.UpdatePresetAsync(
                     new UpdatePresetRequest { Preset = message },
                     cancellationToken: ct)
                 .ConfigureAwait(false);
@@ -89,9 +83,9 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
 
     public async Task DeletePresetAsync(Guid presetId, CancellationToken ct = default)
     {
-        await _retryPolicy.ExecuteAsync(async () =>
+        await retryPolicy.ExecuteAsync(async () =>
         {
-            await _client.DeletePresetAsync(
+            await client.DeletePresetAsync(
                     new DeletePresetRequest { PresetId = presetId.ToString() },
                     cancellationToken: ct)
                 .ConfigureAwait(false);

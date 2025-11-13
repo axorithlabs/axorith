@@ -8,37 +8,29 @@ namespace Axorith.Core.Services;
 /// <summary>
 ///     The concrete implementation for managing session presets using JSON files on disk.
 /// </summary>
-public class PresetManager : IPresetManager
+/// <remarks>
+///     Initializes a new instance of the <see cref="PresetManager" /> class.
+/// </remarks>
+/// <param name="presetsDirectory">The resolved presets directory path from configuration.</param>
+/// <param name="logger">The logger instance.</param>
+public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
     private const int CurrentPresetVersion = 1;
-    private readonly string _presetsDirectory;
-    private readonly ILogger<PresetManager> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="PresetManager"/> class.
-    /// </summary>
-    /// <param name="presetsDirectory">The resolved presets directory path from configuration.</param>
-    /// <param name="logger">The logger instance.</param>
-    public PresetManager(string presetsDirectory, ILogger<PresetManager> logger)
-    {
-        _presetsDirectory = presetsDirectory ?? throw new ArgumentNullException(nameof(presetsDirectory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<IReadOnlyList<SessionPreset>> LoadAllPresetsAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Loading all presets from {Directory}", _presetsDirectory);
-        Directory.CreateDirectory(_presetsDirectory);
+        logger.LogInformation("Loading all presets from {Directory}", presetsDirectory);
+        Directory.CreateDirectory(presetsDirectory);
 
         var presets = new List<SessionPreset>();
-        var presetFiles = Directory.EnumerateFiles(_presetsDirectory, "*.json");
+        var presetFiles = Directory.EnumerateFiles(presetsDirectory, "*.json");
 
         foreach (var filePath in presetFiles)
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning("Preset loading was cancelled");
+                logger.LogWarning("Preset loading was cancelled");
                 break;
             }
 
@@ -52,7 +44,7 @@ public class PresetManager : IPresetManager
                     // Migrate preset if needed
                     if (preset.Version < CurrentPresetVersion)
                     {
-                        _logger.LogInformation(
+                        logger.LogInformation(
                             "Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
                             preset.Name, preset.Version, CurrentPresetVersion);
 
@@ -68,21 +60,21 @@ public class PresetManager : IPresetManager
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to load or deserialize preset from {FilePath}", filePath);
+                logger.LogError(ex, "Failed to load or deserialize preset from {FilePath}", filePath);
             }
         }
 
-        _logger.LogInformation("Successfully loaded {Count} presets", presets.Count);
+        logger.LogInformation("Successfully loaded {Count} presets", presets.Count);
         return presets;
     }
 
     public async Task<SessionPreset?> GetPresetByIdAsync(Guid presetId, CancellationToken cancellationToken)
     {
-        var filePath = Path.Combine(_presetsDirectory, $"{presetId}.json");
+        var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
 
         if (!File.Exists(filePath))
         {
-            _logger.LogWarning("Preset file not found: {FilePath}", filePath);
+            logger.LogWarning("Preset file not found: {FilePath}", filePath);
             return null;
         }
 
@@ -94,7 +86,7 @@ public class PresetManager : IPresetManager
 
             if (preset is not { Version: < CurrentPresetVersion }) return preset;
 
-            _logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+            logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
                 preset.Name, preset.Version, CurrentPresetVersion);
             MigratePreset(preset);
             preset.Version = CurrentPresetVersion;
@@ -104,30 +96,30 @@ public class PresetManager : IPresetManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load preset {PresetId} from {FilePath}", presetId, filePath);
+            logger.LogError(ex, "Failed to load preset {PresetId} from {FilePath}", presetId, filePath);
             return null;
         }
     }
 
     public async Task SavePresetAsync(SessionPreset preset, CancellationToken cancellationToken)
     {
-        var filePath = Path.Combine(_presetsDirectory, $"{preset.Id}.json");
-        var tempFilePath = Path.Combine(_presetsDirectory, $"{preset.Id}.json.tmp");
-        _logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, filePath);
+        var filePath = Path.Combine(presetsDirectory, $"{preset.Id}.json");
+        var tempFilePath = Path.Combine(presetsDirectory, $"{preset.Id}.json.tmp");
+        logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, filePath);
 
         try
         {
-            Directory.CreateDirectory(_presetsDirectory);
+            Directory.CreateDirectory(presetsDirectory);
 
             // Write to temporary file first with exclusive access to prevent concurrent writes
             // FileShare.None ensures no other process can access this file while we're writing
             await using (var stream = new FileStream(
-                tempFilePath, 
-                FileMode.Create, 
-                FileAccess.Write, 
-                FileShare.None,  // Exclusive access - no other process can read/write
-                bufferSize: 4096,
-                useAsync: true))
+                             tempFilePath,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None, // Exclusive access - no other process can read/write
+                             bufferSize: 4096,
+                             useAsync: true))
             {
                 await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
                     .ConfigureAwait(false);
@@ -136,11 +128,11 @@ public class PresetManager : IPresetManager
             // Atomic rename: if this succeeds, the file is guaranteed to be complete
             // This operation is atomic on Windows and POSIX systems
             File.Move(tempFilePath, filePath, overwrite: true);
-            _logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
+            logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
+            logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
 
             // Clean up temporary file if it exists
             try
@@ -157,24 +149,24 @@ public class PresetManager : IPresetManager
 
     public Task DeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
     {
-        var filePath = Path.Combine(_presetsDirectory, $"{presetId}.json");
-        _logger.LogInformation("Deleting preset with ID {PresetId} from {FilePath}", presetId, filePath);
+        var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
+        logger.LogInformation("Deleting preset with ID {PresetId} from {FilePath}", presetId, filePath);
 
         try
         {
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
-                _logger.LogDebug("Preset file deleted successfully");
+                logger.LogDebug("Preset file deleted successfully");
             }
             else
             {
-                _logger.LogWarning("Attempted to delete a preset that does not exist on disk: {FilePath}", filePath);
+                logger.LogWarning("Attempted to delete a preset that does not exist on disk: {FilePath}", filePath);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete preset file {FilePath}", filePath);
+            logger.LogError(ex, "Failed to delete preset file {FilePath}", filePath);
         }
 
         return Task.CompletedTask;
@@ -193,6 +185,6 @@ public class PresetManager : IPresetManager
         //     // e.g., rename settings keys, convert data formats, etc.
         // }
 
-        _logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
+        logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
     }
 }

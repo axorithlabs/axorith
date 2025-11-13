@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Axorith.Contracts;
@@ -12,37 +14,53 @@ namespace Axorith.Client.CoreSdk.Grpc;
 /// <summary>
 ///     gRPC implementation of IModulesApi with setting update streaming.
 /// </summary>
-internal class GrpcModulesApi : IModulesApi, IDisposable
+internal class GrpcModulesApi(
+    ModulesService.ModulesServiceClient client,
+    AsyncRetryPolicy retryPolicy,
+    ILogger logger)
+    : IModulesApi, IDisposable
 {
-    private readonly ModulesService.ModulesServiceClient _client;
-    private readonly AsyncRetryPolicy _retryPolicy;
-    private readonly ILogger _logger;
-    private readonly Subject<SettingUpdate> _settingUpdatesSubject;
-    private readonly CancellationTokenSource _streamCts;
-    private readonly Task? _streamTask;
+    private readonly Subject<SettingUpdate> _settingUpdatesSubject = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _instanceStreams = new();
     private bool _disposed;
-
-    public GrpcModulesApi(ModulesService.ModulesServiceClient client, AsyncRetryPolicy retryPolicy,
-        ILogger logger)
-    {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
-        _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        _settingUpdatesSubject = new Subject<SettingUpdate>();
-        _streamCts = new CancellationTokenSource();
-
-        // Start streaming setting updates immediately
-        _streamTask = StartStreamingSettingUpdatesAsync(_streamCts.Token);
-    }
 
     public IObservable<SettingUpdate> SettingUpdates => _settingUpdatesSubject.AsObservable();
 
+    public IDisposable SubscribeToSettingUpdates(Guid moduleInstanceId)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(GrpcModulesApi));
+
+        if (_instanceStreams.TryGetValue(moduleInstanceId, out var stream))
+            return new CancellationDisposable(stream);
+
+        var cts = new CancellationTokenSource();
+        if (!_instanceStreams.TryAdd(moduleInstanceId, cts))
+            return new CancellationDisposable(_instanceStreams[moduleInstanceId]);
+
+        _ = StartStreamingSettingUpdatesAsync(moduleInstanceId, cts.Token);
+
+        return Disposable.Create(() =>
+        {
+            if (!_instanceStreams.TryRemove(moduleInstanceId, out var existing)) return;
+
+            try
+            {
+                existing.Cancel();
+                existing.Dispose();
+            }
+            catch
+            {
+                // ignored
+            }
+        });
+    }
+
     public async Task<IReadOnlyList<ModuleDefinition>> ListModulesAsync(CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.ListModulesAsync(
+            var response = await client.ListModulesAsync(
                     new ListModulesRequest(),
                     cancellationToken: ct)
                 .ConfigureAwait(false);
@@ -56,7 +74,7 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
     public async Task<OperationResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
         IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
             var request = new BeginEditRequest
             {
@@ -91,10 +109,11 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
                         sv.StringValue = val.ToString() ?? string.Empty;
                         break;
                 }
+
                 request.InitialValues.Add(sv);
             }
 
-            var response = await _client.BeginEditAsync(request, cancellationToken: ct).ConfigureAwait(false);
+            var response = await client.BeginEditAsync(request, cancellationToken: ct).ConfigureAwait(false);
             return new OperationResult(response.Success, response.Message,
                 response.Errors?.Count > 0 ? response.Errors.ToList() : null,
                 response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
@@ -103,9 +122,9 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
 
     public async Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.EndEditAsync(new EndEditRequest
+            var response = await client.EndEditAsync(new EndEditRequest
             {
                 ModuleInstanceId = moduleInstanceId.ToString()
             }, cancellationToken: ct).ConfigureAwait(false);
@@ -118,9 +137,9 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
 
     public async Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.SyncEditAsync(new SyncEditRequest
+            var response = await client.SyncEditAsync(new SyncEditRequest
             {
                 ModuleInstanceId = moduleInstanceId.ToString()
             }, cancellationToken: ct).ConfigureAwait(false);
@@ -133,9 +152,9 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
 
     public async Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.GetModuleSettingsAsync(
+            var response = await client.GetModuleSettingsAsync(
                     new GetModuleSettingsRequest { ModuleId = moduleId.ToString() },
                     cancellationToken: ct)
                 .ConfigureAwait(false);
@@ -181,9 +200,9 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.InvokeActionAsync(
+            var response = await client.InvokeActionAsync(
                     new InvokeActionRequest
                     {
                         ModuleInstanceId = moduleInstanceId.ToString(),
@@ -205,7 +224,7 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
             var request = new UpdateSettingRequest
             {
@@ -213,7 +232,6 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
                 SettingKey = settingKey
             };
 
-            // Set value based on type
             switch (value)
             {
                 case string s:
@@ -239,7 +257,7 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
                     break;
             }
 
-            var response = await _client.UpdateSettingAsync(request, cancellationToken: ct)
+            var response = await client.UpdateSettingAsync(request, cancellationToken: ct)
                 .ConfigureAwait(false);
 
             return new OperationResult(
@@ -250,20 +268,19 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
         }).ConfigureAwait(false);
     }
 
-    private async Task StartStreamingSettingUpdatesAsync(CancellationToken ct)
+    private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
             try
             {
-                _logger.LogDebug("Starting setting updates stream...");
+                logger.LogDebug("Starting setting updates stream...");
 
-                using var call = _client.StreamSettingUpdates(
-                    new StreamSettingUpdatesRequest(),
+                using var call = client.StreamSettingUpdates(
+                    new StreamSettingUpdatesRequest { ModuleInstanceId = moduleInstanceId.ToString() },
                     cancellationToken: ct);
 
                 await foreach (var update in call.ResponseStream.ReadAllAsync(ct).ConfigureAwait(false))
                 {
-                    // Convert protobuf update to CoreSdk update
                     if (!Guid.TryParse(update.ModuleInstanceId, out var instanceId))
                         continue;
 
@@ -290,17 +307,17 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
             {
-                _logger.LogDebug("Setting updates stream cancelled");
+                logger.LogDebug("Setting updates stream cancelled");
                 break;
             }
             catch (OperationCanceledException)
             {
-                _logger.LogDebug("Setting updates stream cancelled");
+                logger.LogDebug("Setting updates stream cancelled");
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Setting updates stream error, reconnecting in 5s...");
+                logger.LogWarning(ex, "Setting updates stream error, reconnecting in 5s...");
 
                 try
                 {
@@ -337,21 +354,20 @@ internal class GrpcModulesApi : IModulesApi, IDisposable
 
         _disposed = true;
 
-        _streamCts.Cancel();
-        _streamCts.Dispose();
-
         _settingUpdatesSubject.OnCompleted();
         _settingUpdatesSubject.Dispose();
 
-        if (_streamTask != null)
+        foreach (var kv in _instanceStreams)
             try
             {
-                _streamTask.Wait(TimeSpan.FromSeconds(5));
+                kv.Value.Cancel();
+                kv.Value.Dispose();
             }
             catch
             {
-                // Ignore timeout
             }
+
+        _instanceStreams.Clear();
 
         GC.SuppressFinalize(this);
     }

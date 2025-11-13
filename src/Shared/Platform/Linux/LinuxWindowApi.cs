@@ -13,17 +13,18 @@ internal static class LinuxWindowApi
     /// <summary>
     ///     Waits for a process to create its main window.
     /// </summary>
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000, CancellationToken cancellationToken = default)
+    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
+        CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.Now;
-        
+
         while (!HasWindow(process))
         {
             if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
 
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             await Task.Delay(100, cancellationToken);
         }
     }
@@ -33,20 +34,17 @@ internal static class LinuxWindowApi
     /// </summary>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
-        // Convert IntPtr to window ID (process ID for xdotool)
         var windowId = windowHandle.ToInt64();
-        
-        // Get monitor geometry
+
         var monitors = GetMonitors();
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
-            throw new ArgumentOutOfRangeException(nameof(monitorIndex), 
+            throw new ArgumentOutOfRangeException(nameof(monitorIndex),
                 $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
 
         var monitor = monitors[monitorIndex];
         var targetX = monitor.X + 50;
         var targetY = monitor.Y + 50;
 
-        // Use xdotool to move window
         ExecuteCommand("xdotool", $"windowmove {windowId} {targetX} {targetY}");
     }
 
@@ -57,7 +55,6 @@ internal static class LinuxWindowApi
     {
         try
         {
-            // Try to find window by process ID
             var output = ExecuteCommand("xdotool", $"search --pid {process.Id}");
             return !string.IsNullOrWhiteSpace(output);
         }
@@ -76,36 +73,29 @@ internal static class LinuxWindowApi
 
         try
         {
-            // Use xrandr to get monitor information
             var output = ExecuteCommand("xrandr", "--query");
             var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var line in lines)
             {
-                // Look for lines like: "HDMI-1 connected 1920x1080+1920+0"
-                if (line.Contains(" connected ") && line.Contains("+"))
+                if (!line.Contains(" connected ") || !line.Contains('+')) continue;
+                var parts = line.Split([' ', '+'], StringSplitOptions.RemoveEmptyEntries);
+                for (var i = 0; i < parts.Length - 2; i++)
                 {
-                    var parts = line.Split(new[] { ' ', '+' }, StringSplitOptions.RemoveEmptyEntries);
-                    for (int i = 0; i < parts.Length - 2; i++)
+                    if (!parts[i].Contains('x') || !int.TryParse(parts[i + 1], out var x) ||
+                        !int.TryParse(parts[i + 2], out var y)) continue;
+                    var resolution = parts[i].Split('x');
+                    if (resolution.Length != 2 ||
+                        !int.TryParse(resolution[0], out var width) ||
+                        !int.TryParse(resolution[1], out var height)) continue;
+                    monitors.Add(new MonitorInfo
                     {
-                        if (parts[i].Contains("x") && int.TryParse(parts[i + 1], out int x) && int.TryParse(parts[i + 2], out int y))
-                        {
-                            var resolution = parts[i].Split('x');
-                            if (resolution.Length == 2 && 
-                                int.TryParse(resolution[0], out int width) && 
-                                int.TryParse(resolution[1], out int height))
-                            {
-                                monitors.Add(new MonitorInfo
-                                {
-                                    X = x,
-                                    Y = y,
-                                    Width = width,
-                                    Height = height
-                                });
-                                break;
-                            }
-                        }
-                    }
+                        X = x,
+                        Y = y,
+                        Width = width,
+                        Height = height
+                    });
+                    break;
                 }
             }
         }
@@ -115,10 +105,7 @@ internal static class LinuxWindowApi
             monitors.Add(new MonitorInfo { X = 0, Y = 0, Width = 1920, Height = 1080 });
         }
 
-        return monitors.Count > 0 ? monitors : new List<MonitorInfo> 
-        { 
-            new MonitorInfo { X = 0, Y = 0, Width = 1920, Height = 1080 } 
-        };
+        return monitors.Count > 0 ? monitors : [new MonitorInfo { X = 0, Y = 0, Width = 1920, Height = 1080 }];
     }
 
     /// <summary>
@@ -143,19 +130,16 @@ internal static class LinuxWindowApi
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit(5000);
 
-        if (process.ExitCode != 0)
-        {
-            var error = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"{command} failed: {error}");
-        }
+        if (process.ExitCode == 0) return output;
 
-        return output;
+        var error = process.StandardError.ReadToEnd();
+        throw new InvalidOperationException($"{command} failed: {error}");
     }
 
     private class MonitorInfo
     {
-        public int X { get; set; }
-        public int Y { get; set; }
+        public int X { get; init; }
+        public int Y { get; init; }
         public int Width { get; set; }
         public int Height { get; set; }
     }

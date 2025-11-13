@@ -27,7 +27,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
         logger.LogInformation("Starting module definition discovery from 'module.json' files...");
         var definitions = new List<ModuleDefinition>();
         var currentPlatform = GetCurrentPlatform();
-        var allowedSymlinkSet = allowedSymlinks?.Select(Path.GetFullPath).ToHashSet() ?? new HashSet<string>();
+        var allowedSymlinkSet = allowedSymlinks?.Select(Path.GetFullPath).ToHashSet() ?? [];
 
         foreach (var path in searchPaths)
         {
@@ -45,7 +45,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                         path);
                     continue;
                 }
-                
+
                 logger.LogInformation("Allowing whitelisted symlink: {Path}", path);
             }
 

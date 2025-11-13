@@ -76,12 +76,12 @@ public class PlatformTests
         // Act
         var parsedWindows = Enum.Parse<Platform>("Windows");
         var parsedLinux = Enum.Parse<Platform>("Linux");
-        var parsedMacOS = Enum.Parse<Platform>("MacOs");
+        var parsedMacOs = Enum.Parse<Platform>("MacOs");
 
         // Assert
         parsedWindows.Should().Be(Platform.Windows);
         parsedLinux.Should().Be(Platform.Linux);
-        parsedMacOS.Should().Be(Platform.MacOs);
+        parsedMacOs.Should().Be(Platform.MacOs);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class PlatformTests
 
         // Assert
         result.Should().BeFalse();
-        platform.Should().Be(default(Platform));
+        platform.Should().Be(default);
     }
 
     [Fact]
@@ -222,9 +222,9 @@ public class PlatformTests
     public void Platform_CanBeCastToInt()
     {
         // Act
-        int windows = (int)Platform.Windows;
-        int linux = (int)Platform.Linux;
-        int macos = (int)Platform.MacOs;
+        var windows = (int)Platform.Windows;
+        var linux = (int)Platform.Linux;
+        var macos = (int)Platform.MacOs;
 
         // Assert
         windows.Should().Be(0);

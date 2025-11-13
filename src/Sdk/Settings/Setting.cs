@@ -327,7 +327,7 @@ public class Setting<T> : ISetting
     public SettingPersistence Persistence { get; }
 
     /// <inheritdoc />
-    public string? Filter { get; internal set; }
+    public string? Filter { get; internal init; }
 
     /// <inheritdoc />
     public IObservable<string> Label => _label.AsObservable();

@@ -37,19 +37,16 @@ public sealed class EventAggregator : IEventAggregator
             if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
                 try
                 {
-                    // Execute handler synchronously for predictable ordering
                     handler(eventMessage);
                 }
                 catch (Exception ex)
                 {
-                    // Silently ignore handler exceptions to not break other subscribers
                     Log.Warning(ex, "Event handler threw in EventAggregator for event type {EventType}",
                         typeof(TEvent).Name);
                 }
             else
                 deadReferences.Add(weakHandler);
 
-        // Clean up dead references if any found
         if (deadReferences.Count > 0)
             CleanupDeadReferences(eventType);
     }
@@ -58,7 +55,6 @@ public sealed class EventAggregator : IEventAggregator
     {
         if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
 
-        // Create new bag with only live references
         var liveReferences = handlers.Where(wr => wr.TryGetTarget(out _)).ToList();
         _subscriptions[eventType] = [.. liveReferences];
     }
@@ -68,7 +64,6 @@ public sealed class EventAggregator : IEventAggregator
         var eventType = typeof(TEvent);
         if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
 
-        // Filter out the handler to remove
         var filtered = handlers.Where(wh =>
             !wh.TryGetTarget(out var target) || !target.Equals(handler)
         ).ToList();

@@ -22,10 +22,12 @@ public enum WindowState
 internal static class WindowApi
 {
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy,
+        uint uFlags);
 
     [DllImport("user32.dll")]
-    private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+    private static extern bool
+        EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
 
     [DllImport("user32.dll")]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
@@ -65,30 +67,31 @@ internal static class WindowApi
         public uint Flags;
     }
 
-    private const uint SWP_NOSIZE = 0x0001;
-    private const uint SWP_NOZORDER = 0x0004;
-    private const uint SWP_NOMOVE = 0x0002;
-    
-    private const int SW_HIDE = 0;
-    private const int SW_SHOWNORMAL = 1;
-    private const int SW_SHOWMINIMIZED = 2;
-    private const int SW_SHOWMAXIMIZED = 3;
-    private const int SW_RESTORE = 9;
+    private const uint SwpNosize = 0x0001;
+    private const uint SwpNozorder = 0x0004;
+    private const uint SwpNomove = 0x0002;
+
+    private const int SwHide = 0;
+    private const int SwShownormal = 1;
+    private const int SwShowminimized = 2;
+    private const int SwShowmaximized = 3;
+    private const int SwRestore = 9;
 
     /// <summary>
     ///     Waits for a process to create its main window handle.
     /// </summary>
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000, CancellationToken cancellationToken = default)
+    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
+        CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.Now;
-        
+
         while (process.MainWindowHandle == IntPtr.Zero)
         {
             if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
 
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             process.Refresh();
             await Task.Delay(100, cancellationToken);
         }
@@ -100,23 +103,23 @@ internal static class WindowApi
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         var monitors = new List<Rect>();
-        
+
         EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
-            (IntPtr _, IntPtr _, ref Rect lprcMonitor, IntPtr _) =>
+            (_, _, ref lprcMonitor, _) =>
             {
                 monitors.Add(lprcMonitor);
                 return true;
             }, IntPtr.Zero);
 
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
-            throw new ArgumentOutOfRangeException(nameof(monitorIndex), 
+            throw new ArgumentOutOfRangeException(nameof(monitorIndex),
                 $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
 
         var targetMonitor = monitors[monitorIndex];
         var targetX = targetMonitor.Left + 50;
         var targetY = targetMonitor.Top + 50;
 
-        SetWindowPos(windowHandle, IntPtr.Zero, targetX, targetY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(windowHandle, IntPtr.Zero, targetX, targetY, 0, 0, SwpNosize | SwpNozorder);
     }
 
     /// <summary>
@@ -125,32 +128,28 @@ internal static class WindowApi
     public static List<Process> FindProcesses(string processNameOrPath)
     {
         var results = new List<Process>();
-        
+
         // Try exact process name match
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
         results.AddRange(Process.GetProcessesByName(processName));
-        
+
         // Also try by executable path
-        if (File.Exists(processNameOrPath))
-        {
-            var allProcesses = Process.GetProcesses();
-            foreach (var process in allProcesses)
+        if (!File.Exists(processNameOrPath)) return results;
+
+        var allProcesses = Process.GetProcesses();
+        foreach (var process in allProcesses)
+            try
             {
-                try
-                {
-                    if (process.MainModule?.FileName?.Equals(processNameOrPath, StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        if (!results.Any(p => p.Id == process.Id))
-                            results.Add(process);
-                    }
-                }
-                catch
-                {
-                    // Process may not be accessible, skip
-                }
+                if (process.MainModule?.FileName.Equals(processNameOrPath, StringComparison.OrdinalIgnoreCase) !=
+                    true) continue;
+                if (results.All(p => p.Id != process.Id))
+                    results.Add(process);
             }
-        }
-        
+            catch
+            {
+                // Process may not be accessible, skip
+            }
+
         return results;
     }
 
@@ -159,13 +158,13 @@ internal static class WindowApi
     /// </summary>
     public static void SetWindowState(IntPtr windowHandle, WindowState state)
     {
-        int cmdShow = state switch
+        var cmdShow = state switch
         {
-            WindowState.Normal => SW_SHOWNORMAL,
-            WindowState.Minimized => SW_SHOWMINIMIZED,
-            WindowState.Maximized => SW_SHOWMAXIMIZED,
-            WindowState.Hidden => SW_HIDE,
-            _ => SW_SHOWNORMAL
+            WindowState.Normal => SwShownormal,
+            WindowState.Minimized => SwShowminimized,
+            WindowState.Maximized => SwShowmaximized,
+            WindowState.Hidden => SwHide,
+            _ => SwShownormal
         };
 
         ShowWindow(windowHandle, cmdShow);
@@ -188,7 +187,7 @@ internal static class WindowApi
     /// </summary>
     public static void SetWindowSize(IntPtr windowHandle, int width, int height)
     {
-        SetWindowPos(windowHandle, IntPtr.Zero, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
+        SetWindowPos(windowHandle, IntPtr.Zero, 0, 0, width, height, SwpNomove | SwpNozorder);
     }
 
     /// <summary>
@@ -196,7 +195,7 @@ internal static class WindowApi
     /// </summary>
     public static void SetWindowPosition(IntPtr windowHandle, int x, int y)
     {
-        SetWindowPos(windowHandle, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetWindowPos(windowHandle, IntPtr.Zero, x, y, 0, 0, SwpNosize | SwpNozorder);
     }
 
     /// <summary>
@@ -214,13 +213,8 @@ internal static class WindowApi
     public static void FocusWindow(IntPtr windowHandle)
     {
         if (IsIconic(windowHandle))
-        {
-            ShowWindow(windowHandle, SW_RESTORE);
-        }
-        else if (IsZoomed(windowHandle))
-        {
-            ShowWindow(windowHandle, SW_SHOWMAXIMIZED);
-        }
+            ShowWindow(windowHandle, SwRestore);
+        else if (IsZoomed(windowHandle)) ShowWindow(windowHandle, SwShowmaximized);
         SetForegroundWindow(windowHandle);
     }
 
@@ -231,7 +225,7 @@ internal static class WindowApi
     {
         var monitors = new List<Rect>();
         EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
-            (IntPtr _, IntPtr _, ref Rect lprcMonitor, IntPtr _) =>
+            (_, _, ref lprcMonitor, _) =>
             {
                 monitors.Add(lprcMonitor);
                 return true;

@@ -56,11 +56,14 @@ public class WindowStateManager : IWindowStateManager
             var json = File.ReadAllText(_stateFilePath);
             var state = JsonSerializer.Deserialize<WindowState>(json);
 
-            if (state == null)
-                return;
-
-            // Validate that the position is on a visible screen
-            if (state is { X: >= 0, Y: >= 0 }) window.Position = new PixelPoint(state.X, state.Y);
+            switch (state)
+            {
+                case null:
+                    return;
+                case { X: >= 0, Y: >= 0 }:
+                    window.Position = new PixelPoint(state.X, state.Y);
+                    break;
+            }
 
             if (state is { Width: > 0, Height: > 0 })
             {
@@ -78,10 +81,10 @@ public class WindowStateManager : IWindowStateManager
 
     private class WindowState
     {
-        public int X { get; set; }
-        public int Y { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
-        public bool IsMaximized { get; set; }
+        public int X { get; init; }
+        public int Y { get; init; }
+        public double Width { get; init; }
+        public double Height { get; init; }
+        public bool IsMaximized { get; init; }
     }
 }

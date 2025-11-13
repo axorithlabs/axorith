@@ -1,18 +1,19 @@
 using Autofac;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
-using Axorith.Host.Services;
 using Axorith.Host;
-using Microsoft.Extensions.Options;
+using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
+using Axorith.Sdk.Settings;
 using FluentAssertions;
 using Grpc.Core;
 using Grpc.Core.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
-
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
 namespace Axorith.Test.Host.Services;
@@ -32,7 +33,8 @@ public class ModulesServiceImplTests
         // Create real broadcaster with mocked dependencies
         var broadcaster = new SettingUpdateBroadcaster(
             _mockSessionManager.Object,
-            NullLogger<SettingUpdateBroadcaster>.Instance
+            NullLogger<SettingUpdateBroadcaster>.Instance,
+            Options.Create(new HostConfiguration())
         );
 
         var sandboxManager = new DesignTimeSandboxManager(
@@ -45,7 +47,6 @@ public class ModulesServiceImplTests
             _mockModuleRegistry.Object,
             _mockSessionManager.Object,
             broadcaster,
-            mockPresetManager.Object,
             sandboxManager,
             NullLogger<ModulesServiceImpl>.Instance
         );
@@ -57,7 +58,7 @@ public class ModulesServiceImplTests
             method: "TestMethod",
             host: "localhost",
             deadline: DateTime.UtcNow.AddMinutes(5),
-            requestHeaders: new Metadata(),
+            requestHeaders: [],
             cancellationToken: CancellationToken.None,
             peer: "127.0.0.1",
             authContext: null,
@@ -92,14 +93,14 @@ public class ModulesServiceImplTests
         // Arrange
         var modules = new List<ModuleDefinition>
         {
-            new ModuleDefinition
+            new()
             {
                 Id = Guid.NewGuid(),
                 Name = "Module 1",
                 Description = "Test Module 1",
                 Category = "Test"
             },
-            new ModuleDefinition
+            new()
             {
                 Id = Guid.NewGuid(),
                 Name = "Module 2",
@@ -174,8 +175,8 @@ public class ModulesServiceImplTests
         };
 
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(new List<Sdk.Settings.ISetting>());
-        mockModule.Setup(m => m.GetActions()).Returns(new List<Sdk.Actions.IAction>());
+        mockModule.Setup(m => m.GetSettings()).Returns(new List<ISetting>());
+        mockModule.Setup(m => m.GetActions()).Returns(new List<IAction>());
         mockModule.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var mockScope = new Mock<ILifetimeScope>();
@@ -193,7 +194,7 @@ public class ModulesServiceImplTests
         response.Should().NotBeNull();
         response.Settings.Should().NotBeNull();
         response.Actions.Should().NotBeNull();
-        
+
         mockModule.Verify(m => m.InitializeAsync(It.IsAny<CancellationToken>()), Times.Once);
         mockModule.Verify(m => m.Dispose(), Times.Once);
         mockScope.Verify(s => s.Dispose(), Times.Once);
@@ -252,7 +253,7 @@ public class ModulesServiceImplTests
         // Arrange
         var moduleId = Guid.NewGuid();
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetActions()).Returns(new List<Sdk.Actions.IAction>());
+        mockModule.Setup(m => m.GetActions()).Returns(new List<IAction>());
         var mockScope = new Mock<ILifetimeScope>();
 
         _mockModuleRegistry.Setup(m => m.CreateInstance(moduleId)).Returns((mockModule.Object, mockScope.Object));
@@ -271,7 +272,7 @@ public class ModulesServiceImplTests
         response.Should().NotBeNull();
         response.Success.Should().BeFalse();
         response.Message.Should().Contain("Action not found");
-        
+
         mockModule.Verify(m => m.Dispose(), Times.Once);
         mockScope.Verify(s => s.Dispose(), Times.Once);
     }
@@ -281,12 +282,12 @@ public class ModulesServiceImplTests
     {
         // Arrange
         var moduleId = Guid.NewGuid();
-        var mockAction = new Mock<Sdk.Actions.IAction>();
+        var mockAction = new Mock<IAction>();
         mockAction.Setup(a => a.Key).Returns("test-action");
         mockAction.Setup(a => a.InvokeAsync()).Returns(Task.CompletedTask);
 
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetActions()).Returns(new List<Sdk.Actions.IAction> { mockAction.Object });
+        mockModule.Setup(m => m.GetActions()).Returns(new List<IAction> { mockAction.Object });
         var mockScope = new Mock<ILifetimeScope>();
 
         _mockModuleRegistry.Setup(m => m.CreateInstance(moduleId)).Returns((mockModule.Object, mockScope.Object));
@@ -305,7 +306,7 @@ public class ModulesServiceImplTests
         response.Should().NotBeNull();
         response.Success.Should().BeTrue();
         response.Message.Should().Contain("completed successfully");
-        
+
         mockAction.Verify(a => a.InvokeAsync(), Times.Once);
         mockModule.Verify(m => m.Dispose(), Times.Once);
         mockScope.Verify(s => s.Dispose(), Times.Once);
@@ -341,12 +342,12 @@ public class ModulesServiceImplTests
     {
         // Arrange
         var instanceId = Guid.NewGuid();
-        var mockSetting = new Mock<Sdk.Settings.ISetting>();
+        var mockSetting = new Mock<ISetting>();
         mockSetting.Setup(s => s.Key).Returns("test-setting");
         mockSetting.Setup(s => s.SetValueFromString(It.IsAny<string?>())).Verifiable();
 
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(new List<Sdk.Settings.ISetting> { mockSetting.Object });
+        mockModule.Setup(m => m.GetSettings()).Returns(new List<ISetting> { mockSetting.Object });
 
         _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId)).Returns(mockModule.Object);
 
@@ -365,7 +366,7 @@ public class ModulesServiceImplTests
         response.Should().NotBeNull();
         response.Success.Should().BeTrue();
         response.Message.Should().Contain("updated successfully");
-        
+
         mockSetting.Verify(s => s.SetValueFromString("new-value"), Times.Once);
     }
 
@@ -375,7 +376,7 @@ public class ModulesServiceImplTests
         // Arrange
         var instanceId = Guid.NewGuid();
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(new List<Sdk.Settings.ISetting>());
+        mockModule.Setup(m => m.GetSettings()).Returns(new List<ISetting>());
 
         _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId)).Returns(mockModule.Object);
 
@@ -425,16 +426,55 @@ public class ModulesServiceImplTests
     // Test module class for GetModuleSettings test
     private class TestModule : IModule
     {
-        public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task OnSessionStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task OnActionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task OnSessionEndAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) => Task.FromResult(ValidationResult.Success);
-        public Task CleanupAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public void Dispose() { }
-        public IReadOnlyList<Sdk.Settings.ISetting> GetSettings() => new List<Sdk.Settings.ISetting>();
-        public IReadOnlyList<Sdk.Actions.IAction> GetActions() => new List<Sdk.Actions.IAction>();
-        public object GetSettingsViewModel() => null!;
+        public Task InitializeAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task OnSessionStartAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public static Task OnActionAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task OnSessionEndAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ValidationResult.Success);
+        }
+
+        public static Task CleanupAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        public IReadOnlyList<ISetting> GetSettings()
+        {
+            return new List<ISetting>();
+        }
+
+        public IReadOnlyList<IAction> GetActions()
+        {
+            return new List<IAction>();
+        }
+
+        public object GetSettingsViewModel()
+        {
+            return null!;
+        }
+
         public Type? CustomSettingsViewType => null;
     }
 }

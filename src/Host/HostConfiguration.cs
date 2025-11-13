@@ -5,39 +5,47 @@ namespace Axorith.Host;
 /// </summary>
 public class HostConfiguration
 {
-    public GrpcConfiguration Grpc { get; set; } = new();
-    public ModulesConfiguration Modules { get; set; } = new();
-    public PersistenceConfiguration Persistence { get; set; } = new();
-    public SessionConfiguration Session { get; set; } = new();
-    public DesignTimeConfiguration DesignTime { get; set; } = new();
+    public GrpcConfiguration Grpc { get; init; } = new();
+    public ModulesConfiguration Modules { get; init; } = new();
+    public PersistenceConfiguration Persistence { get; init; } = new();
+    public SessionConfiguration Session { get; init; } = new();
+    public DesignTimeConfiguration DesignTime { get; init; } = new();
+    public StreamingConfiguration Streaming { get; init; } = new();
 }
 
 public class DesignTimeConfiguration
 {
-    public int SandboxIdleTtlSeconds { get; set; } = 300;
-    public int MaxSandboxes { get; set; } = 5;
+    public int SandboxIdleTtlSeconds { get; init; } = 300;
+    public int MaxSandboxes { get; init; } = 5;
+    public int EvictionIntervalSeconds { get; init; } = 60;
+}
+
+public class StreamingConfiguration
+{
+    public int ChoicesThrottleMs { get; init; } = 200;
+    public int ValueBatchWindowMs { get; init; } = 16;
 }
 
 public class GrpcConfiguration
 {
-    public int Port { get; set; } = 5901;
-    public string BindAddress { get; set; } = "127.0.0.1";
-    public int MaxConcurrentStreams { get; set; } = 100;
-    public int KeepAliveInterval { get; set; } = 30;
-    public int KeepAliveTimeout { get; set; } = 10;
+    public int Port { get; init; } = 5901;
+    public string BindAddress { get; init; } = "127.0.0.1";
+    public int MaxConcurrentStreams { get; init; } = 100;
+    public int KeepAliveInterval { get; init; } = 30;
+    public int KeepAliveTimeout { get; init; } = 10;
 }
 
 public class ModulesConfiguration
 {
-    public List<string> SearchPaths { get; set; } = [];
-    public bool EnableHotReload { get; set; }
-    
+    public List<string> SearchPaths { get; init; } = [];
+    public bool EnableHotReload { get; init; }
+
     /// <summary>
     ///     Whitelist of allowed symlink paths for development.
     ///     Only these symlinked directories will be scanned for modules.
     ///     Empty list means no symlinks are allowed (production default).
     /// </summary>
-    public List<string> AllowedSymlinks { get; set; } = [];
+    public List<string> AllowedSymlinks { get; init; } = [];
 
     /// <summary>
     ///     Resolves environment variables in all search paths and returns expanded paths.
@@ -57,15 +65,15 @@ public class ModulesConfiguration
 
         return SearchPaths
             .Select(Environment.ExpandEnvironmentVariables)
-            .Select(Path.GetFullPath)  // Normalize path (handle ../ and mixed slashes)
+            .Select(Path.GetFullPath) // Normalize path (handle ../ and mixed slashes)
             .ToList();
     }
 }
 
 public class PersistenceConfiguration
 {
-    public string PresetsPath { get; set; } = string.Empty;
-    public string LogsPath { get; set; } = string.Empty;
+    public string PresetsPath { get; init; } = string.Empty;
+    public string LogsPath { get; init; } = string.Empty;
 
     /// <summary>
     ///     Resolves environment variables in paths (e.g., %AppData%).
@@ -81,7 +89,7 @@ public class PersistenceConfiguration
         }
 
         var expandedPath = Environment.ExpandEnvironmentVariables(PresetsPath);
-        return Path.GetFullPath(expandedPath);  // Normalize path
+        return Path.GetFullPath(expandedPath); // Normalize path
     }
 
     /// <summary>
@@ -98,7 +106,7 @@ public class PersistenceConfiguration
         }
 
         var expandedPath = Environment.ExpandEnvironmentVariables(LogsPath);
-        return Path.GetFullPath(expandedPath);  // Normalize path
+        return Path.GetFullPath(expandedPath); // Normalize path
     }
 }
 
@@ -108,18 +116,18 @@ public class SessionConfiguration
     ///     Timeout in seconds for module settings validation during session startup.
     ///     Default: 5 seconds.
     /// </summary>
-    public int ValidationTimeoutSeconds { get; set; } = 5;
+    public int ValidationTimeoutSeconds { get; init; } = 5;
 
     /// <summary>
     ///     Timeout in seconds for module startup (OnSessionStartAsync) during session initialization.
     ///     Increase this for modules with slow initialization (e.g., OAuth login).
     ///     Default: 30 seconds.
     /// </summary>
-    public int StartupTimeoutSeconds { get; set; } = 30;
+    public int StartupTimeoutSeconds { get; init; } = 30;
 
     /// <summary>
     ///     Timeout in seconds for module cleanup (OnSessionEndAsync) during session shutdown.
     ///     Default: 10 seconds.
     /// </summary>
-    public int ShutdownTimeoutSeconds { get; set; } = 10;
+    public int ShutdownTimeoutSeconds { get; init; } = 10;
 }

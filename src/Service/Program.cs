@@ -16,15 +16,13 @@ internal class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        // Load configuration from appsettings.json
         var configBuilder = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
         var config = configBuilder.Build();
 
-        // Resolve logs path from configuration
-        var logsPath = config["Persistence:LogsPath"] 
-                      ?? "%AppData%/Axorith/logs";
+        var logsPath = config["Persistence:LogsPath"]
+                       ?? "%AppData%/Axorith/logs";
         var resolvedLogsPath = Environment.ExpandEnvironmentVariables(logsPath);
 
         Log.Logger = new LoggerConfiguration()
@@ -72,7 +70,6 @@ public class App : Application
         {
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // Create tray icon programmatically
             _trayIcon = new TrayIcon
             {
                 ToolTipText = "Axorith Service",
@@ -80,16 +77,13 @@ public class App : Application
                 IsVisible = true
             };
 
-            // Build menu
             BuildMenu();
 
-            // Register tray icon
             var trayIcons = new TrayIcons { _trayIcon };
             SetValue(TrayIcon.IconsProperty, trayIcons);
 
             Log.Information("Tray icon created");
 
-            // Start status refresh
             _ = Task.Run(RefreshStatusAsync);
         }
 
@@ -168,14 +162,12 @@ public class App : Application
 
     private void UpdateMenu()
     {
-        if (_statusItem != null)
-            _statusItem.Header = _isHostRunning ? "Status: Host Running" : "Status: Host Stopped";
+        _statusItem?.Header = _isHostRunning ? "Status: Host Running" : "Status: Host Stopped";
 
-        if (_startStopItem != null)
-            _startStopItem.Header = _isHostRunning ? "Stop Host" : "Start Host";
+        _startStopItem?.Header = _isHostRunning ? "Stop Host" : "Start Host";
     }
 
-    private async Task<bool> IsHostReachableAsync()
+    private static async Task<bool> IsHostReachableAsync()
     {
         try
         {
@@ -217,7 +209,7 @@ public class App : Application
         }
     }
 
-    private async Task StopHostAsync()
+    private static async Task StopHostAsync()
     {
         try
         {
@@ -237,11 +229,12 @@ public class App : Application
                 }
                 catch
                 {
+                    // ignored
                 }
         }
     }
 
-    private string? FindExecutable(string fileName)
+    private static string? FindExecutable(string fileName)
     {
         var probes = new[]
         {

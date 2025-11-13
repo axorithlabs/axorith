@@ -11,17 +11,11 @@ internal class GrpcDiagnosticsApi(
     AsyncRetryPolicy retryPolicy)
     : IDiagnosticsApi
 {
-    private readonly DiagnosticsService.DiagnosticsServiceClient _client =
-        client ?? throw new ArgumentNullException(nameof(client));
-
-    private readonly AsyncRetryPolicy
-        _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-
     public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await _client.GetHealthAsync(
+            var response = await client.GetHealthAsync(
                     new HealthCheckRequest(),
                     cancellationToken: ct)
                 .ConfigureAwait(false);

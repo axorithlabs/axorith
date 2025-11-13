@@ -23,9 +23,9 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
     public GrpcSessionsApi(SessionsService.SessionsServiceClient client, AsyncRetryPolicy retryPolicy,
         ILogger logger)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
-        _retryPolicy = retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _client = client;
+        _retryPolicy = retryPolicy;
+        _logger = logger;
 
         _eventsSubject = new Subject<SessionEvent>();
         _streamCts = new CancellationTokenSource();

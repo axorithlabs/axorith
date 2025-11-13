@@ -9,11 +9,12 @@ using Axorith.Host;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Platform;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Options;
 using Serilog;
 using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
-// Bootstrap logger for startup
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
@@ -24,7 +25,6 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Configure Serilog from appsettings.json
     builder.Host.UseSerilog((context, _, configuration) =>
     {
         var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath")
@@ -45,13 +45,10 @@ try
                 "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}");
     });
 
-    // Configure Autofac as DI container
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
-    // Configure host configuration model
     builder.Services.Configure<HostConfiguration>(builder.Configuration);
 
-    // Configure Kestrel for gRPC
     builder.WebHost.ConfigureKestrel((context, options) =>
     {
         var config = context.Configuration.Get<HostConfiguration>() ?? new HostConfiguration();
@@ -67,20 +64,16 @@ try
         options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
     });
 
-    // Add gRPC services
     builder.Services.AddGrpc(options =>
     {
-        options.MaxReceiveMessageSize = 16 * 1024 * 1024; // 16MB for large presets
+        options.MaxReceiveMessageSize = 16 * 1024 * 1024;
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     });
 
-    // Add HttpClientFactory for module HTTP adapters
     builder.Services.AddHttpClient("default");
 
-    // Add gRPC reflection for development (useful for testing with grpcurl)
     if (builder.Environment.IsDevelopment()) builder.Services.AddGrpcReflection();
 
-    // Configure Autofac container
     builder.Host.ConfigureContainer<ContainerBuilder>((_, containerBuilder) =>
     {
         RegisterCoreServices(containerBuilder);
@@ -89,7 +82,6 @@ try
 
     var app = builder.Build();
 
-    // Initialize ModuleRegistry before serving requests
     try
     {
         var moduleRegistry = app.Services.GetRequiredService<IModuleRegistry>();
@@ -101,7 +93,6 @@ try
         Log.Warning(initEx, "ModuleRegistry initialization failed; continuing without modules");
     }
 
-    // Map gRPC services
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
     app.MapGrpcService<ModulesServiceImpl>();
@@ -116,8 +107,6 @@ try
         builder.Configuration.GetValue<string>("Grpc:BindAddress"),
         builder.Configuration.GetValue<int>("Grpc:Port"));
 
-    // Run server (blocks until shutdown)
-    Log.Information("Axorith.Host ready on http://127.0.0.1:5901");
     await app.RunAsync();
 
     return 0;
@@ -133,29 +122,23 @@ finally
 }
 
 // ===== Service Registration Methods =====
-
 static void RegisterCoreServices(ContainerBuilder builder)
 {
-    // Register Core services with configuration-based dependencies
-
-    // ISecureStorageService - platform-specific implementation
-    // Auto-selects Windows, Linux, or macOS implementation
     builder.Register(ctx =>
-    {
-        var logger = ctx.Resolve<ILogger<ISecureStorageService>>();
-        return Axorith.Shared.Platform.PlatformServices.CreateSecureStorage(logger);
-    })
-    .As<ISecureStorageService>()
-    .SingleInstance();
+        {
+            var logger = ctx.Resolve<ILogger<ISecureStorageService>>();
+            return PlatformServices.CreateSecureStorage(logger);
+        })
+        .As<ISecureStorageService>()
+        .SingleInstance();
 
-    // Module services with resolved configuration
     builder.RegisterType<ModuleLoader>()
         .As<IModuleLoader>()
         .SingleInstance();
 
     builder.Register(ctx =>
         {
-            var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
+            var config = ctx.Resolve<IOptions<HostConfiguration>>().Value;
             var searchPaths = config.Modules.ResolveSearchPaths();
             var allowedSymlinks = config.Modules.AllowedSymlinks.Select(Environment.ExpandEnvironmentVariables);
             var rootScope = ctx.Resolve<ILifetimeScope>();
@@ -167,22 +150,19 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<IModuleRegistry>()
         .SingleInstance();
 
-    // SDK EventAggregator - use Core implementation
     builder.RegisterType<EventAggregator>()
         .As<IEventAggregator>()
         .SingleInstance();
 
-    // Expose SDK IHttpClientFactory via adapter wrapping System.Net HttpClientFactory
     builder.Register(ctx =>
             new HttpClientFactoryAdapter(
                 ctx.Resolve<System.Net.Http.IHttpClientFactory>()))
         .As<IHttpClientFactory>()
         .SingleInstance();
 
-    // Preset manager with resolved configuration
     builder.Register(ctx =>
         {
-            var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
+            var config = ctx.Resolve<IOptions<HostConfiguration>>().Value;
             var presetsDirectory = config.Persistence.ResolvePresetsPath();
             var logger = ctx.Resolve<ILogger<PresetManager>>();
 
@@ -191,17 +171,16 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<IPresetManager>()
         .SingleInstance();
 
-    // Session manager with configurable timeouts
     builder.Register(ctx =>
         {
-            var config = ctx.Resolve<Microsoft.Extensions.Options.IOptions<HostConfiguration>>().Value;
+            var config = ctx.Resolve<IOptions<HostConfiguration>>().Value;
             var moduleRegistry = ctx.Resolve<IModuleRegistry>();
             var logger = ctx.Resolve<ILogger<SessionManager>>();
-            
+
             var validationTimeout = TimeSpan.FromSeconds(config.Session.ValidationTimeoutSeconds);
             var startupTimeout = TimeSpan.FromSeconds(config.Session.StartupTimeoutSeconds);
             var shutdownTimeout = TimeSpan.FromSeconds(config.Session.ShutdownTimeoutSeconds);
-            
+
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout);
         })
         .As<ISessionManager>()

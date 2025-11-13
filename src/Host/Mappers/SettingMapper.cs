@@ -14,12 +14,12 @@ namespace Axorith.Host.Mappers;
 public static class SettingMapper
 {
     // Cache for serialized choices to avoid re-allocation on every ToMessage call
-    private static readonly ConditionalWeakTable<ISetting, CachedChoices> _choicesCache = new();
+    private static readonly ConditionalWeakTable<ISetting, CachedChoices> ChoicesCache = [];
 
     private sealed class CachedChoices
     {
         public IReadOnlyList<KeyValuePair<string, string>>? SourceChoices { get; set; }
-        public List<Choice> SerializedChoices { get; } = new();
+        public List<Choice> SerializedChoices { get; } = [];
     }
 
     public static Setting ToMessage(ISetting setting)
@@ -51,38 +51,45 @@ public static class SettingMapper
                 break;
 
             case Sdk.Settings.SettingControlType.Checkbox:
-                message.BoolValue = currentValue is bool and true;
+                message.BoolValue = currentValue is true;
                 break;
 
             case Sdk.Settings.SettingControlType.Number:
-                if (currentValue is decimal dec)
-                    message.DecimalString = dec.ToString(CultureInfo.InvariantCulture);
-                else if (currentValue is double d)
-                    message.NumberValue = d;
-                else if (currentValue is int i)
-                    message.IntValue = i;
+                switch (currentValue)
+                {
+                    case decimal dec:
+                        message.DecimalString = dec.ToString(CultureInfo.InvariantCulture);
+                        break;
+                    case double d:
+                        message.NumberValue = d;
+                        break;
+                    case int i:
+                        message.IntValue = i;
+                        break;
+                }
+
                 break;
         }
 
         // Use cached choices to avoid re-allocation
         var currentChoices = setting.GetCurrentChoices();
-        if (currentChoices != null)
+
+        if (currentChoices == null) return message;
+
+        var cachedChoices = ChoicesCache.GetValue(setting, _ => new CachedChoices());
+
+        // Check if choices have changed
+        if (!ReferenceEquals(cachedChoices.SourceChoices, currentChoices))
         {
-            var cachedChoices = _choicesCache.GetValue(setting, _ => new CachedChoices());
-
-            // Check if choices have changed
-            if (!ReferenceEquals(cachedChoices.SourceChoices, currentChoices))
-            {
-                // Rebuild cache
-                cachedChoices.SourceChoices = currentChoices;
-                cachedChoices.SerializedChoices.Clear();
-                foreach (var (key, display) in currentChoices)
-                    cachedChoices.SerializedChoices.Add(new Choice { Key = key, Display = display });
-            }
-
-            // Add cached choices to message
-            message.Choices.AddRange(cachedChoices.SerializedChoices);
+            // Rebuild cache
+            cachedChoices.SourceChoices = currentChoices;
+            cachedChoices.SerializedChoices.Clear();
+            foreach (var (key, display) in currentChoices)
+                cachedChoices.SerializedChoices.Add(new Choice { Key = key, Display = display });
         }
+
+        // Add cached choices to message
+        message.Choices.AddRange(cachedChoices.SerializedChoices);
 
         return message;
     }
@@ -117,10 +124,8 @@ public static class SettingMapper
                 update.StringValue = value?.ToString() ?? string.Empty;
                 break;
             case SettingProperty.Visibility:
-                update.BoolValue = value is bool and true;
-                break;
             case SettingProperty.ReadOnly:
-                update.BoolValue = value is bool and true;
+                update.BoolValue = value is true;
                 break;
             case SettingProperty.Choices:
                 if (value is IReadOnlyList<KeyValuePair<string, string>> choices)

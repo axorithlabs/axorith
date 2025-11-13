@@ -117,16 +117,16 @@ public class HostHealthMonitor(
             {
                 var isHealthy = await IsHostHealthyAsync();
 
-                // Detect state change
-                if (isHealthy && !_wasHealthy)
+                switch (isHealthy)
                 {
-                    logger.LogInformation("Host became healthy");
-                    HostHealthy?.Invoke();
-                }
-                else if (!isHealthy && _wasHealthy)
-                {
-                    logger.LogWarning("Host became unhealthy");
-                    HostUnhealthy?.Invoke();
+                    case true when !_wasHealthy:
+                        logger.LogInformation("Host became healthy");
+                        HostHealthy?.Invoke();
+                        break;
+                    case false when _wasHealthy:
+                        logger.LogWarning("Host became unhealthy");
+                        HostUnhealthy?.Invoke();
+                        break;
                 }
 
                 _wasHealthy = isHealthy;
@@ -136,7 +136,6 @@ public class HostHealthMonitor(
                 logger.LogError(ex, "Error during health monitoring");
             }
 
-            // Wait for next check
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(config.Value.Host.HealthCheckInterval), ct);
