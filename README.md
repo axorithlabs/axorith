@@ -97,3 +97,7 @@ We believe in the power of community. If you share our philosophy, we welcome yo
 ## License & Monetization
 
 Axorith is source-available under the Business Source License (BSL). We aim to build a sustainable open-source project. For details on what this means for you and how we plan to fund development, please read our [Monetization Philosophy](docs/monetization.md).
+
+## SAST Tools
+
+[PVS-Studio](https://pvs-studio.com/en/pvs-studio/?utm_source=website&utm_medium=github&utm_campaign=open_source) - static analyzer for C, C++, C#, and Java code.
