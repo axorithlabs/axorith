@@ -21,7 +21,6 @@ public class ErrorViewModel : ReactiveObject
 
     public ICommand? RetryCommand { get; private set; }
 
-    // Factory method for creating configured instances
     public void Configure(string errorMessage, object? _ = null, Func<Task>? retryCallback = null)
     {
         ErrorMessage = errorMessage;

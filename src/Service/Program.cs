@@ -241,10 +241,6 @@ public class App : Application
             Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", fileName)
         };
 
-        foreach (var path in probes.Select(Path.GetFullPath))
-            if (File.Exists(path))
-                return path;
-
-        return null;
+        return probes.Select(Path.GetFullPath).FirstOrDefault(File.Exists);
     }
 }

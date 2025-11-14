@@ -118,12 +118,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
         }
         set
         {
-            if (value.HasValue)
-            {
-                StringValue = value.Value.Key;
-                this.RaisePropertyChanged(nameof(StringValue));
-                this.RaisePropertyChanged();
-            }
+            if (!value.HasValue) return;
+            
+            StringValue = value.Value.Key;
+            this.RaisePropertyChanged(nameof(StringValue));
+            this.RaisePropertyChanged();
         }
     }
 

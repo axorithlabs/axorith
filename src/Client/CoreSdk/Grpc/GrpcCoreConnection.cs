@@ -44,8 +44,7 @@ public class GrpcCoreConnection : ICoreConnection
 
         // Configure Polly retry policy for transient failures
         _retryPolicy = Policy
-            .Handle<RpcException>(ex => ex.StatusCode == StatusCode.Unavailable ||
-                                        ex.StatusCode == StatusCode.DeadlineExceeded)
+            .Handle<RpcException>(ex => ex.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded)
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -59,6 +58,7 @@ public class GrpcCoreConnection : ICoreConnection
 
     /// <inheritdoc />
     public IPresetsApi Presets => _presetsApi
+                                  // TODO:
                                   ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
     /// <inheritdoc />

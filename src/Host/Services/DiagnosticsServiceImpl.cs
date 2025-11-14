@@ -38,7 +38,6 @@ public class DiagnosticsServiceImpl(
                 loadedModules = 0;
             }
 
-            // Determine health status
             const HealthStatus status = HealthStatus.Healthy;
 
             var response = new HealthCheckResponse

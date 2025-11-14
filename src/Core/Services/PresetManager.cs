@@ -41,7 +41,6 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
                 if (preset != null)
                 {
-                    // Migrate preset if needed
                     if (preset.Version < CurrentPresetVersion)
                     {
                         logger.LogInformation(
@@ -51,7 +50,6 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
                         MigratePreset(preset);
                         preset.Version = CurrentPresetVersion;
 
-                        // Save migrated preset
                         await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
                     }
 
@@ -134,7 +132,6 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         {
             logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
 
-            // Clean up temporary file if it exists
             try
             {
                 if (File.Exists(tempFilePath))

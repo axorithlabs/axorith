@@ -79,10 +79,8 @@ public class SessionManager(
             throw new SessionException($"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
         }
 
-        // Await module startups and propagate failures to caller
         await RunModuleStartupsAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
 
-        // Notify listeners that the session has started only after successful module startups
         SessionStarted?.Invoke(preset.Id);
     }
 
@@ -169,7 +167,7 @@ public class SessionManager(
                     ActiveSession.Name);
 
             await StopCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
-            throw new SessionException($"One or more modules failed to start.");
+            throw new SessionException("One or more modules failed to start.");
         }
     }
 

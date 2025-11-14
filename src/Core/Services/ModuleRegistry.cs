@@ -78,32 +78,30 @@ public class ModuleRegistry(
 
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
-        // Force garbage collection to ensure finalizers run and native resources are released
-        if (unloadedContexts.Count > 0)
+        if (unloadedContexts.Count <= 0) return;
+        
+        logger.LogDebug("Running GC to finalize {Count} unloaded contexts", unloadedContexts.Count);
+
+        for (var i = 0; i < 10; i++)
         {
-            logger.LogDebug("Running GC to finalize {Count} unloaded contexts", unloadedContexts.Count);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
 
-            for (var i = 0; i < 10; i++)
+            var stillAlive = unloadedContexts.Count(c => c.WeakRef.IsAlive);
+            if (stillAlive == 0)
             {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-
-                var stillAlive = unloadedContexts.Count(c => c.WeakRef.IsAlive);
-                if (stillAlive == 0)
-                {
-                    logger.LogDebug("All assembly contexts collected after {Iterations} GC iterations", i + 1);
-                    break;
-                }
-
-                if (i == 9 && stillAlive > 0)
-                {
-                    logger.LogWarning(
-                        "{Count} assembly contexts still alive after 10 GC iterations - potential memory leak",
-                        stillAlive);
-                    foreach (var context in unloadedContexts.Where(c => c.WeakRef.IsAlive))
-                        logger.LogWarning("AssemblyLoadContext '{Name}' not collected", context.Name);
-                }
+                logger.LogDebug("All assembly contexts collected after {Iterations} GC iterations", i + 1);
+                break;
             }
+
+            if (i != 9 || stillAlive <= 0) continue;
+            
+            logger.LogWarning(
+                    "{Count} assembly contexts still alive after 10 GC iterations - potential memory leak",
+                    stillAlive);
+            foreach (var (name, _) in unloadedContexts.Where(c => c.WeakRef.IsAlive))
+                   logger.LogWarning("AssemblyLoadContext '{Name}' not collected", name);
+            
         }
     }
 
