@@ -60,8 +60,9 @@ try
             // NO TLS for local MVP - listening on loopback only
         });
 
-        options.Limits.MaxConcurrentConnections = config.Grpc.MaxConcurrentStreams;
-        options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
+        options.Limits.Http2.MaxStreamsPerConnection = config.Grpc.MaxConcurrentStreams;
+        options.Limits.Http2.KeepAlivePingDelay = TimeSpan.FromSeconds(config.Grpc.KeepAliveInterval);
+        options.Limits.Http2.KeepAlivePingTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
     });
 
     builder.Services.AddGrpc(options =>

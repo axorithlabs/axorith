@@ -98,7 +98,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         _sessionsApi = sessionsApi;
         _serviceProvider = serviceProvider;
 
-        // Subscribe to session events via Observable
         var subscription = _sessionsApi.SessionEvents
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(evt =>
@@ -120,7 +119,6 @@ public class MainViewModel : ReactiveObject, IDisposable
 
         _disposables.Add(subscription);
 
-        // Ensure canExecute streams update commands on UI thread
         var canManipulatePreset = this
             .WhenAnyValue(vm => vm.IsSessionActive, isActive => !isActive)
             .ObserveOn(RxApp.MainThreadScheduler);
@@ -158,14 +156,36 @@ public class MainViewModel : ReactiveObject, IDisposable
 
             var result = await _sessionsApi.StartSessionAsync(presetVm.Id);
             if (!result.Success)
-                SessionStatus = $"Failed to start session: {result.Message}";
+            {
+                var error = $"Failed to start session: {result.Message}";
+                SessionStatus = error;
+                ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
+            }
             else
+            {
                 SessionStatus = $"Session '{presetVm.Name}' is now active.";
+            }
         }
         catch (Exception ex)
         {
-            SessionStatus = $"Failed to start session: {ex.Message}";
+            var error = $"Failed to start session: {ex.Message}";
+            SessionStatus = error;
+            ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
         }
+    }
+
+    private void ShowTransientSessionError(string message, TimeSpan duration)
+    {
+        var subscription = Observable
+            .Timer(duration)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ =>
+            {
+                if (!IsSessionActive && SessionStatus == message)
+                    SessionStatus = "No session is active.";
+            });
+
+        _disposables.Add(subscription);
     }
 
     private async Task StopCurrentSessionAsync()
@@ -175,10 +195,9 @@ public class MainViewModel : ReactiveObject, IDisposable
             SessionStatus = "Stopping session...";
 
             var result = await _sessionsApi.StopSessionAsync();
-            if (!result.Success)
-                SessionStatus = $"Failed to stop session: {result.Message}";
-            else
-                SessionStatus = "Session stopped successfully.";
+            SessionStatus = !result.Success
+                ? $"Failed to stop session: {result.Message}"
+                : "Session stopped successfully.";
         }
         catch (Exception ex)
         {
@@ -224,7 +243,6 @@ public class MainViewModel : ReactiveObject, IDisposable
             var modulesApi = _serviceProvider.GetRequiredService<IModulesApi>();
             var modules = await modulesApi.ListModulesAsync();
 
-            // Build VMs off-UI thread
             var newVms = new List<SessionPresetViewModel>();
             foreach (var summary in presets)
             {
@@ -232,7 +250,6 @@ public class MainViewModel : ReactiveObject, IDisposable
                 if (fullPreset != null) newVms.Add(new SessionPresetViewModel(fullPreset, modules, modulesApi));
             }
 
-            // Apply to ObservableCollection on UI thread
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 foreach (var preset in Presets) preset.Dispose();

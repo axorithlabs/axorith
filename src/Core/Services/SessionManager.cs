@@ -45,7 +45,7 @@ public class SessionManager(
     public event Action<Guid>? SessionStopped;
 
     /// <inheritdoc />
-    public Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default)
+    public async Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default)
     {
         if (IsSessionRunning)
             throw new SessionException(
@@ -55,9 +55,6 @@ public class SessionManager(
         ActiveSession = preset;
         _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        // Immediately notify listeners that the session has started so the UI can update.
-        SessionStarted?.Invoke(preset.Id);
-
         _activeModules.Clear();
 
         foreach (var configuredModule in preset.Modules)
@@ -65,7 +62,9 @@ public class SessionManager(
             var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
             if (instance != null && scope != null)
                 _activeModules.Add(new ActiveModule
-                    { Instance = instance, Scope = scope, Configuration = configuredModule });
+                {
+                    Instance = instance, Scope = scope, Configuration = configuredModule
+                });
             else
                 logger.LogWarning(
                     "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping",
@@ -74,16 +73,17 @@ public class SessionManager(
 
         if (_activeModules.Count == 0)
         {
+            ActiveSession = null;
             logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
                 preset.Name);
-            ActiveSession = null;
-            SessionStopped?.Invoke(preset.Id);
-            return Task.CompletedTask;
+            throw new SessionException($"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
         }
 
-        _ = RunModuleStartupsAsync(_activeModules, _sessionCts.Token);
+        // Await module startups and propagate failures to caller
+        await RunModuleStartupsAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
 
-        return Task.CompletedTask;
+        // Notify listeners that the session has started only after successful module startups
+        SessionStarted?.Invoke(preset.Id);
     }
 
     private async Task RunModuleStartupsAsync(IReadOnlyCollection<ActiveModule> modules,
@@ -152,22 +152,24 @@ public class SessionManager(
                 logger.LogInformation("All {Count} modules for session '{PresetName}' started successfully",
                     modules.Count, ActiveSession.Name);
         }
-        catch
+        catch (Exception)
         {
             if (cancellationToken.IsCancellationRequested)
             {
                 if (ActiveSession is not null)
                     logger.LogInformation("Session '{PresetName}' startup was canceled by user", ActiveSession.Name);
-            }
-            else
-            {
-                if (ActiveSession is not null)
-                    logger.LogCritical(
-                        "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
-                        ActiveSession.Name);
 
                 await StopCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                throw new SessionException("Session startup was canceled.");
             }
+
+            if (ActiveSession is not null)
+                logger.LogCritical(
+                    "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
+                    ActiveSession.Name);
+
+            await StopCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+            throw new SessionException($"One or more modules failed to start.");
         }
     }
 
@@ -218,13 +220,14 @@ public class SessionManager(
                     logger.LogError(ex, "An error occurred while disposing a module or its scope");
                 }
 
+            var stoppedPresetId = ActiveSession?.Id ?? Guid.Empty;
             _activeModules.Clear();
             _sessionCts?.Dispose();
             _sessionCts = null;
             ActiveSession = null;
 
             logger.LogInformation("Session stopped successfully");
-            SessionStopped?.Invoke(ActiveSession?.Id ?? Guid.Empty);
+            SessionStopped?.Invoke(stoppedPresetId);
         }
         catch (Exception ex)
         {
