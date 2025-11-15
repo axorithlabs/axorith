@@ -53,7 +53,7 @@ We are building a thin abstraction layer between you and your machine—one desi
   <summary><strong>Peek Under the Hood: Tech Stack & Architecture</strong></summary>
 
 ### Tech Stack
-*   **.NET 9** & **C# 13**
+*   **.NET 10** & **C# 14**
 *   **Avalonia UI** for a true cross-platform native UI on Windows, macOS, and Linux.
 *   **ReactiveUI (MVVM)** for a modern, reactive UI architecture.
 *   **Serilog** for structured, production-ready logging.

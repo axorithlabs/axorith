@@ -127,7 +127,7 @@ public class EventAggregatorNegativeTests
 
         // Assert - call count may be 0 if GC collected the handler
         // This test verifies cleanup doesn't crash
-        callCount.Should().BeGreaterOrEqualTo(0);
+        callCount.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -135,14 +135,12 @@ public class EventAggregatorNegativeTests
     {
         // Arrange
         var aggregator = CreateAggregator();
-        var counter = 0;
         var lockObj = new object();
 
         aggregator.Subscribe<TestEvent>(_ =>
         {
             lock (lockObj)
             {
-                counter++;
             }
         });
 

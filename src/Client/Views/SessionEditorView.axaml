@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
               xmlns:vm="using:Axorith.Client.ViewModels"
               xmlns:converters="using:Axorith.Client.Converters"
@@ -27,13 +27,15 @@
         </DataTemplate>
 
         <DataTemplate x:Key="NumberSettingTemplate" x:DataType="vm:SettingViewModel">
-            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}"/>
+            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
+                           Increment="{Binding NumberIncrement}" 
+                           FormatString="{Binding NumberFormatString}"
+                           IsEnabled="{Binding !IsReadOnly}"/>
         </DataTemplate>
 
         <DataTemplate x:Key="ChoiceSettingTemplate" x:DataType="vm:SettingViewModel">
             <ComboBox ItemsSource="{Binding Choices}"
-                      SelectedValue="{Binding StringValue, Mode=TwoWay}"
-                      SelectedValueBinding="{Binding Key}"
+                      SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
                       MinWidth="200"
                       IsEnabled="{Binding !IsReadOnly}">
                 <ComboBox.ItemTemplate>
@@ -100,6 +102,11 @@
                         <StackPanel>
                             <TextBlock Text="Preset Settings" Classes="h2" Margin="0,0,0,10"/>
                             <TextBox Text="{Binding Name}" Watermark="Enter a name for this preset..." FontSize="16"/>
+                            <TextBlock Text="{Binding ErrorMessage}"
+                                       Foreground="#FF5555"
+                                       FontSize="12"
+                                       Margin="0,5,0,0"
+                                       IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
                     </Border>
 
@@ -190,7 +197,7 @@
                                     <ItemsControl ItemsSource="{Binding Settings}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:SettingViewModel">
-                                                <StackPanel Margin="0,12">
+                                                <StackPanel Margin="0,12" IsVisible="{Binding IsVisible}">
                                                     <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" TextWrapping="Wrap"/>
                                                     <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                                                     <ContentControl Content="{Binding}" 

@@ -24,12 +24,32 @@ public interface IAction
     IObservable<bool> IsEnabled { get; }
 
     /// <summary>
+    ///     Gets the current label of the action.
+    /// </summary>
+    /// <returns>The current label of the action.</returns>
+    string GetCurrentLabel();
+
+    /// <summary>
+    ///     Gets the current enabled state of the action.
+    /// </summary>
+    /// <returns>True if the action is enabled; otherwise, false.</returns>
+    bool GetCurrentEnabled();
+
+    /// <summary>
     ///     Emits a value each time the action is invoked by the user.
     /// </summary>
     IObservable<Unit> Invoked { get; }
 
     /// <summary>
-    ///     Programmatically triggers the action invocation.
+    ///     Programmatically triggers the action invocation synchronously (fire-and-forget).
+    ///     Use InvokeAsync for actions that require async completion (e.g., OAuth login).
     /// </summary>
     void Invoke();
+
+    /// <summary>
+    ///     Programmatically triggers the action invocation and waits for completion.
+    ///     Returns a Task that completes when the action handler finishes execution.
+    ///     For actions without async work, this returns a completed Task immediately.
+    /// </summary>
+    Task InvokeAsync();
 }

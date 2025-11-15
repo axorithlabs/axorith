@@ -1,4 +1,5 @@
 using Axorith.Core.Models;
+using Axorith.Sdk;
 
 namespace Axorith.Core.Services.Abstractions;
 
@@ -15,7 +16,28 @@ public interface ISessionManager : IAsyncDisposable
     /// <summary>
     ///     Gets the preset of the currently active session, if any.
     /// </summary>
+    /// <remarks>
+    ///     Null if no session is currently running.
+    /// </remarks>
     SessionPreset? ActiveSession { get; }
+
+    /// <summary>
+    ///     Gets the UTC timestamp when the current session was started.
+    ///     Null if no session is currently running.
+    /// </summary>
+    DateTimeOffset? SessionStartedAt { get; }
+
+    /// <summary>
+    ///     Returns an immutable snapshot of the currently running session, including active modules,
+    ///     their settings and actions. Returns null if no session is running.
+    /// </summary>
+    SessionSnapshot? GetCurrentSnapshot();
+
+    /// <summary>
+    ///     Returns an immutable snapshot of a specific active module instance by its instance ID.
+    ///     Returns null if the session is not running or the module instance is not active.
+    /// </summary>
+    SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId);
 
     /// <summary>
     ///     Occurs when a session has successfully started. The parameter is the ID of the started preset.
@@ -32,10 +54,28 @@ public interface ISessionManager : IAsyncDisposable
     ///     Throws a <see cref="Axorith.Shared.Exceptions.SessionException" /> if a session is already running.
     /// </summary>
     /// <param name="preset">The session preset to execute.</param>
-    Task StartSessionAsync(SessionPreset preset);
+    /// <param name="cancellationToken">Cancellation token to observe.</param>
+    Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Stops the currently active session, performing cleanup for all modules.
     /// </summary>
-    Task StopCurrentSessionAsync();
+    /// <param name="cancellationToken">Cancellation token to observe.</param>
+    Task StopCurrentSessionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Gets the active instance of a module by its module ID.
+    ///     Returns null if the session is not running or the module is not active.
+    /// </summary>
+    /// <param name="moduleId">The unique identifier of the module definition.</param>
+    /// <returns>The active module instance, or null if not found.</returns>
+    IModule? GetActiveModuleInstance(Guid moduleId);
+
+    /// <summary>
+    ///     Gets the active instance of a module by its instance ID (from preset configuration).
+    ///     Returns null if the session is not running or the module is not active.
+    /// </summary>
+    /// <param name="instanceId">The unique identifier of the configured module instance.</param>
+    /// <returns>The active module instance, or null if not found.</returns>
+    IModule? GetActiveModuleInstanceByInstanceId(Guid instanceId);
 }

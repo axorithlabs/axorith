@@ -1,4 +1,3 @@
-using System.Reflection;
 using Axorith.Core.Models;
 using Axorith.Core.Services;
 using FluentAssertions;
@@ -15,12 +14,7 @@ public class PresetManagerTests : IDisposable
     {
         _testPresetsDirectory = Path.Combine(Path.GetTempPath(), $"axorith-test-{Guid.NewGuid()}");
         Directory.CreateDirectory(_testPresetsDirectory);
-        _manager = new PresetManager(NullLogger<PresetManager>.Instance);
-
-        // Use reflection to set the private _presetsDirectory field
-        var field = typeof(PresetManager).GetField("_presetsDirectory",
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        field?.SetValue(_manager, _testPresetsDirectory);
+        _manager = new PresetManager(_testPresetsDirectory, NullLogger<PresetManager>.Instance);
     }
 
     public void Dispose()

@@ -19,12 +19,15 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
     };
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(IEnumerable<string> searchPaths,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(
+        IEnumerable<string> searchPaths,
+        CancellationToken cancellationToken,
+        IEnumerable<string>? allowedSymlinks = null)
     {
         logger.LogInformation("Starting module definition discovery from 'module.json' files...");
         var definitions = new List<ModuleDefinition>();
         var currentPlatform = GetCurrentPlatform();
+        var allowedSymlinkSet = allowedSymlinks?.Select(Path.GetFullPath).ToHashSet() ?? [];
 
         foreach (var path in searchPaths)
         {
@@ -33,9 +36,17 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             var dirInfo = new DirectoryInfo(path);
             if (dirInfo.LinkTarget != null)
             {
-                logger.LogWarning("Module directory '{ModuleDir}' is a symbolic link. Skipping for security reasons",
-                    path);
-                continue;
+                var fullPath = Path.GetFullPath(path);
+                if (!allowedSymlinkSet.Contains(fullPath))
+                {
+                    logger.LogWarning(
+                        "Module directory '{ModuleDir}' is a symbolic link not in whitelist. Skipping for security reasons. " +
+                        "Add to Modules:AllowedSymlinks in appsettings.json if this is a trusted development path.",
+                        path);
+                    continue;
+                }
+
+                logger.LogInformation("Allowing whitelisted symlink: {Path}", path);
             }
 
             if (!Directory.Exists(path))
@@ -103,10 +114,25 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     var moduleDirectory = Path.GetDirectoryName(jsonFile);
                     if (moduleDirectory == null) continue;
 
+                    var moduleDirectoryFullPath = Path.GetFullPath(moduleDirectory);
+
                     string dllFile;
                     if (!string.IsNullOrEmpty(definition.AssemblyFileName))
                     {
-                        dllFile = Path.Combine(moduleDirectory, definition.AssemblyFileName);
+                        var combinedPath = Path.Combine(moduleDirectoryFullPath, definition.AssemblyFileName);
+                        var dllFullPath = Path.GetFullPath(combinedPath);
+
+                        var relative = Path.GetRelativePath(moduleDirectoryFullPath, dllFullPath);
+                        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                        {
+                            logger.LogWarning(
+                                "Specified assembly path '{Assembly}' for module '{ModuleName}' escapes module directory '{ModuleDir}'. Skipping",
+                                definition.AssemblyFileName, definition.Name, moduleDirectoryFullPath);
+                            continue;
+                        }
+
+                        dllFile = dllFullPath;
+
                         if (!File.Exists(dllFile))
                         {
                             logger.LogWarning(
@@ -130,7 +156,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                         var assembly = loadContext.LoadFromAssemblyPath(dllFile);
                         var moduleType = assembly.GetExportedTypes()
                             .FirstOrDefault(t =>
-                                typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+                                typeof(IModule).IsAssignableFrom(t) && t is { IsInterface: false, IsAbstract: false });
 
                         if (moduleType != null)
                         {

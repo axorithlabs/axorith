@@ -1,4 +1,4 @@
-﻿using Avalonia.Controls;
+using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Axorith.Client.ViewModels;
@@ -75,6 +75,11 @@ public partial class SessionEditorView : UserControl
 
         var result = await topLevel.StorageProvider.OpenFolderPickerAsync(folderPickerOptions);
         var selectedFolder = result.FirstOrDefault();
-        if (selectedFolder is not null) vm.StringValue = selectedFolder.Path.LocalPath;
+        if (selectedFolder is not null)
+        {
+            // Path может быть относительным URI - берем AbsolutePath или LocalPath
+            var uri = selectedFolder.Path;
+            vm.StringValue = uri.IsAbsoluteUri ? uri.LocalPath : uri.OriginalString;
+        }
     }
 }

@@ -25,5 +25,5 @@ public class ConfiguredModule
     /// <summary>
     ///     A dictionary containing the user-provided settings for this specific module instance.
     /// </summary>
-    public Dictionary<string, string> Settings { get; set; } = new();
+    public Dictionary<string, string> Settings { get; set; } = [];
 }

@@ -26,6 +26,8 @@ public class Module : IModule
     private readonly Setting<string> _processingMode;
     private readonly Setting<string> _inputFile;
     private readonly Setting<string> _outputDirectory;
+    private readonly Setting<bool> _showNotes;
+    private readonly Setting<string> _notes;
 
     public Module(IModuleLogger logger,
         IHttpClientFactory httpClientFactory,
@@ -93,13 +95,29 @@ public class Module : IModule
             defaultValue: Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         );
 
-        // Load secrets from SecureStorage in constructor
+        _showNotes = Setting.AsCheckbox(
+            key: "ShowNotes",
+            label: "Show Notes",
+            description: "Toggle to show/hide the Notes field.",
+            defaultValue: false
+        );
+
+        _notes = Setting.AsTextArea(
+            key: "Notes",
+            label: "Notes",
+            defaultValue: string.Empty,
+            description: "Optional notes to validate UI reactivity.",
+            isVisible: false
+        );
+
+        _showNotes.Value.Subscribe(visible => _notes.SetVisibility(visible));
+
         var userSecret = _secureStorage.RetrieveSecret(_userSecret.Key);
-        if (!string.IsNullOrEmpty(userSecret))
-        {
-            _userSecret.SetValue(userSecret);
-            _logger.LogDebug("Loaded secret '{Key}' from SecureStorage", _userSecret.Key);
-        }
+
+        if (string.IsNullOrEmpty(userSecret)) return;
+
+        _userSecret.SetValue(userSecret);
+        _logger.LogDebug("Loaded secret '{Key}' from SecureStorage", _userSecret.Key);
     }
 
     private IDisposable? _subscription;
@@ -115,7 +133,9 @@ public class Module : IModule
             _userSecret,
             _processingMode,
             _inputFile,
-            _outputDirectory
+            _outputDirectory,
+            _showNotes,
+            _notes
         ];
     }
 
@@ -202,25 +222,25 @@ public class Module : IModule
 
         _logger.LogInfo("token {token}", token);
 
-        // --- Event Aggregator Test ---
         _logger.LogInfo("Subscribing to TestEvent...");
         _subscription = _eventAggregator.Subscribe<TestEvent>(HandleTestEvent);
 
         _logger.LogInfo("Publishing TestEvent in 2 seconds...");
         await Task.Delay(2000, cancellationToken);
-        _eventAggregator.Publish(new TestEvent { Message = "Hello from Event Aggregator!" });
+        await _eventAggregator.PublishAsync(new TestEvent { Message = "Hello from Event Aggregator!" },
+            cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task OnSessionEndAsync()
+    public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         // Save secrets before shutdown
         var userSecret = _userSecret.GetCurrentValue();
-        if (!string.IsNullOrEmpty(userSecret))
-        {
-            _secureStorage.StoreSecret(_userSecret.Key, userSecret);
-            _logger.LogDebug("Persisted secret '{Key}' to SecureStorage", _userSecret.Key);
-        }
+
+        if (string.IsNullOrEmpty(userSecret)) return Task.CompletedTask;
+
+        _secureStorage.StoreSecret(_userSecret.Key, userSecret);
+        _logger.LogDebug("Persisted secret '{Key}' to SecureStorage", _userSecret.Key);
 
         return Task.CompletedTask;
     }

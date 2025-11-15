@@ -25,7 +25,7 @@ public class Module : IModule
     private readonly IHttpClient _apiClient;
     private readonly IHttpClient _authClient;
     private readonly ISecureStorageService _secureStorage;
-    private readonly CompositeDisposable _disposables = new();
+    private readonly CompositeDisposable _disposables = [];
     private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
     private string? _inMemoryAccessToken;
 
@@ -34,15 +34,17 @@ public class Module : IModule
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string CustomUrlValue = "custom";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d"; // Public client ID for Axorith
-    private const string RedirectUri = "http://127.0.0.1:8888/callback/";
+    private const int DefaultRedirectPort = 8888;
+    private const string RedirectHost = "http://127.0.0.1";
+    private const string RedirectPath = "/callback/";
 
-    // --- Actions ---
     private readonly Action _loginAction;
 
     private readonly Action _logoutAction;
 
-    // --- Settings Definition ---
     private readonly Setting<string> _authStatus;
+    private readonly Setting<decimal> _redirectPort;
+
     private readonly Setting<string> _targetDevice;
     private readonly Setting<string> _playbackContext;
     private readonly Setting<string> _customUrl;
@@ -58,11 +60,13 @@ public class Module : IModule
         _apiClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
         _authClient = httpClientFactory.CreateClient($"{definition.Name}.Auth");
 
-        // --- Actions Initialization ---
         _loginAction = Action.Create(key: "Login", label: "Login to Spotify");
         _logoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
-        // --- Settings Initialization ---
+
         _authStatus = Setting.AsText(key: "AuthStatus", label: "Authentication", defaultValue: "", isReadOnly: true);
+
+        _redirectPort = Setting.AsNumber(key: "RedirectPort", label: "Redirect Port", defaultValue: DefaultRedirectPort,
+            description: "Local HTTP port used for the Spotify OAuth callback. Change this if 8888 is blocked.");
 
         _targetDevice = Setting.AsChoice(key: "TargetDevice", label: "Target Device", defaultValue: "",
             initialChoices: [], description: "Device to start playback on.");
@@ -86,10 +90,8 @@ public class Module : IModule
                 new KeyValuePair<string, string>("track", "Repeat Track")
             ]);
 
-        // --- Reactive Logic ---
         var hasRefreshToken = !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
         UpdateUiForAuthenticationState(hasRefreshToken);
-        if (hasRefreshToken) _ = LoadDynamicChoicesAsync();
 
         _playbackContext.Value.Select(v => v == CustomUrlValue).Subscribe(_customUrl.SetVisibility)
             .DisposeWith(_disposables);
@@ -137,7 +139,7 @@ public class Module : IModule
     {
         return
         [
-            _authStatus, _targetDevice, _playbackContext,
+            _authStatus, _redirectPort, _targetDevice, _playbackContext,
             _customUrl, _volume, _shuffle, _repeatMode
         ];
     }
@@ -145,6 +147,23 @@ public class Module : IModule
     public IReadOnlyList<IAction> GetActions()
     {
         return [_loginAction, _logoutAction];
+    }
+
+    /// <inheritdoc />
+    public async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        var hasRefreshToken = !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
+        if (hasRefreshToken)
+            try
+            {
+                await LoadDynamicChoicesAsync();
+                _logger.LogInfo("Dynamic choices loaded successfully in InitializeAsync");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Failed to load dynamic choices: {Message}", ex.Message);
+                // Non-fatal error - module can still function without dynamic data
+            }
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
@@ -207,7 +226,7 @@ public class Module : IModule
         if (!string.IsNullOrWhiteSpace(urlToPlay)) await StartPlaybackAsync(urlToPlay, deviceId, cancellationToken);
     }
 
-    public async Task OnSessionEndAsync()
+    public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -236,7 +255,7 @@ public class Module : IModule
     /// <summary>
     ///     Logout and clear all stored tokens.
     /// </summary>
-    public void Logout()
+    private void Logout()
     {
         _secureStorage.DeleteSecret(RefreshTokenKey);
         _inMemoryAccessToken = null;
@@ -360,7 +379,6 @@ public class Module : IModule
         await _tokenRefreshSemaphore.WaitAsync();
         try
         {
-            // Double-check after acquiring the lock, in case another thread just finished.
             if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken)) return _inMemoryAccessToken;
 
             var refreshToken = _secureStorage.RetrieveSecret(RefreshTokenKey);
@@ -387,7 +405,6 @@ public class Module : IModule
                 using var jsonDoc = JsonDocument.Parse(responseJson);
                 var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
 
-                // Handle refresh token rotation: Spotify may issue a new refresh token.
                 if (jsonDoc.RootElement.TryGetProperty("refresh_token", out var newRefreshTokenElement))
                 {
                     var newRefreshToken = newRefreshTokenElement.GetString();
@@ -425,18 +442,32 @@ public class Module : IModule
     private async Task<bool> PerformPkceLoginAsync()
     {
         var (codeVerifier, codeChallenge) = GeneratePkcePair();
+        var redirectUri = GetRedirectUri();
 
         using var listener = new HttpListener();
-        listener.Prefixes.Add(RedirectUri);
+        listener.Prefixes.Add(redirectUri);
 
         try
         {
-            listener.Start();
+            try
+            {
+                listener.Start();
+            }
+            catch (HttpListenerException ex)
+            {
+                var port = GetConfiguredRedirectPort();
+                _logger.LogError(ex,
+                    "Failed to start local HTTP listener on {RedirectUri}. Port {Port} might be in use or blocked.",
+                    redirectUri, port);
+                _authStatus.SetValue($"Error: Redirect port {port} is in use or blocked. Change 'Redirect Port' setting and try again.");
+                return false;
+            }
+
             var scopes =
                 "user-modify-playback-state user-read-playback-state user-read-private playlist-read-private user-library-read";
             var authUrl = $"https://accounts.spotify.com/authorize?client_id={SpotifyClientId}" +
                           "&response_type=code" +
-                          $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
+                          $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                           $"&scope={Uri.EscapeDataString(scopes)}" +
                           "&code_challenge_method=S256" +
                           $"&code_challenge={codeChallenge}";
@@ -456,8 +487,10 @@ public class Module : IModule
                 return false;
             }
 
-            // Wait for OAuth callback with 5 minute timeout
+            _authStatus.SetValue("Waiting for Spotify authorization in browser...");
+
             var contextTask = listener.GetContextAsync();
+
             var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
             var completedTask = await Task.WhenAny(contextTask, timeoutTask).ConfigureAwait(false);
 
@@ -465,11 +498,13 @@ public class Module : IModule
             {
                 _logger.LogWarning("Spotify authentication timed out after 5 minutes");
                 _authStatus.SetValue("Error: Authentication timed out");
+
                 listener.Stop();
                 return false;
             }
 
             var context = await contextTask.ConfigureAwait(false);
+
             var code = context.Request.QueryString.Get("code");
 
             var response = context.Response;
@@ -486,7 +521,7 @@ public class Module : IModule
             {
                 { "grant_type", "authorization_code" },
                 { "code", code },
-                { "redirect_uri", RedirectUri },
+                { "redirect_uri", redirectUri },
                 { "client_id", SpotifyClientId },
                 { "code_verifier", codeVerifier }
             });
@@ -502,17 +537,30 @@ public class Module : IModule
 
             _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
             _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
+            _authStatus.SetValue("Authenticated ✓");
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed during PKCE login process.");
+            _authStatus.SetValue("Error: Login failed. See logs for details.");
             return false;
         }
         finally
         {
             if (listener.IsListening) listener.Stop();
         }
+    }
+
+    private string GetRedirectUri()
+    {
+        var port = GetConfiguredRedirectPort();
+        return $"{RedirectHost}:{port}{RedirectPath}";
+    }
+
+    private int GetConfiguredRedirectPort()
+    {
+        return (int)_redirectPort.GetCurrentValue();
     }
 
     private static (string, string) GeneratePkcePair()
@@ -567,7 +615,7 @@ public class Module : IModule
         }
     }
 
-    private string ConvertUrlToUri(string url)
+    private static string ConvertUrlToUri(string url)
     {
         if (url.Contains("spotify:")) return url;
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) throw new ArgumentException("Invalid URL format");

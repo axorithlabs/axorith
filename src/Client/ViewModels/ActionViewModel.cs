@@ -15,21 +15,17 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
 
-    private string _label = string.Empty;
-
     public string Label
     {
-        get => _label;
-        private set => this.RaiseAndSetIfChanged(ref _label, value);
-    }
-
-    private bool _isEnabled = true;
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     public bool IsEnabled
     {
-        get => _isEnabled;
-        private set => this.RaiseAndSetIfChanged(ref _isEnabled, value);
-    }
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = true;
 
     public ICommand InvokeCommand { get; }
 

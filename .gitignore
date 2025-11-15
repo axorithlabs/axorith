@@ -1,4 +1,5 @@
 ﻿extensions/firefox/*.zip
+build/
 
 # Created by https://www.toptal.com/developers/gitignore/api/jetbrains+all,csharp,visualstudio,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=jetbrains+all,csharp,visualstudio,visualstudiocode

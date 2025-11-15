@@ -4,6 +4,7 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -38,7 +39,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -47,11 +49,11 @@ public class ModuleErrorHandlingTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
+        // Act & Assert
+        await sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -90,19 +92,10 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
         // Act - first attempt fails, second succeeds
         // Note: Current implementation doesn't retry automatically,
         // but module should allow retry after fix
-        initializeCallCount.Should().BeGreaterOrEqualTo(0);
+        initializeCallCount.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -115,7 +108,7 @@ public class ModuleErrorHandlingTests
         mockModule.Setup(m => m.GetSettings()).Returns([textSetting]);
         mockModule.Setup(m => m.GetActions()).Returns([]);
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .Returns<CancellationToken>(ct =>
+            .Returns<CancellationToken>(_ =>
             {
                 var value = textSetting.GetCurrentValue();
                 return Task.FromResult(string.IsNullOrWhiteSpace(value)
@@ -136,7 +129,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -147,16 +141,16 @@ public class ModuleErrorHandlingTests
                 new ConfiguredModule
                 {
                     ModuleId = moduleId,
-                    Settings = new Dictionary<string, string>() // Empty - should fail validation
+                    Settings = [] // Empty - should fail validation
                 }
             ]
         };
 
-        // Act
-        await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
+        // Act & Assert
+        await sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -171,7 +165,7 @@ public class ModuleErrorHandlingTests
             .ReturnsAsync(ValidationResult.Success);
         mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.OnSessionEndAsync())
+        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Stop failed"));
 
         var mockRegistry = new Mock<IModuleRegistry>();
@@ -187,7 +181,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {
@@ -219,7 +214,7 @@ public class ModuleErrorHandlingTests
             .ReturnsAsync(ValidationResult.Success);
         mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.OnSessionEndAsync())
+        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mockModule.Setup(m => m.Dispose())
             .Callback(() =>
@@ -241,7 +236,8 @@ public class ModuleErrorHandlingTests
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
 
         var preset = new SessionPreset
         {

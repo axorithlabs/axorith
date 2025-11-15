@@ -67,5 +67,6 @@ public interface IModule : IDisposable
     ///     The asynchronous method that is called when a session ends.
     ///     This is where the module should clean up its resources.
     /// </summary>
-    Task OnSessionEndAsync();
+    /// <param name="cancellationToken">Cancellation token for graceful shutdown</param>
+    Task OnSessionEndAsync(CancellationToken cancellationToken);
 }

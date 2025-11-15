@@ -8,19 +8,23 @@ namespace Axorith.Core.Services;
 /// <summary>
 ///     The concrete implementation for managing session presets using JSON files on disk.
 /// </summary>
-public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
+/// <remarks>
+///     Initializes a new instance of the <see cref="PresetManager" /> class.
+/// </remarks>
+/// <param name="presetsDirectory">The resolved presets directory path from configuration.</param>
+/// <param name="logger">The logger instance.</param>
+public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
     private const int CurrentPresetVersion = 1;
-    private readonly string _presetsDirectory = GetPresetsDirectoryPath();
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
     public async Task<IReadOnlyList<SessionPreset>> LoadAllPresetsAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Loading all presets from {Directory}", _presetsDirectory);
-        Directory.CreateDirectory(_presetsDirectory);
+        logger.LogInformation("Loading all presets from {Directory}", presetsDirectory);
+        Directory.CreateDirectory(presetsDirectory);
 
         var presets = new List<SessionPreset>();
-        var presetFiles = Directory.EnumerateFiles(_presetsDirectory, "*.json");
+        var presetFiles = Directory.EnumerateFiles(presetsDirectory, "*.json");
 
         foreach (var filePath in presetFiles)
         {
@@ -37,7 +41,6 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
 
                 if (preset != null)
                 {
-                    // Migrate preset if needed
                     if (preset.Version < CurrentPresetVersion)
                     {
                         logger.LogInformation(
@@ -47,7 +50,6 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
                         MigratePreset(preset);
                         preset.Version = CurrentPresetVersion;
 
-                        // Save migrated preset
                         await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
                     }
 
@@ -64,27 +66,93 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         return presets;
     }
 
+    public async Task<SessionPreset?> GetPresetByIdAsync(Guid presetId, CancellationToken cancellationToken)
+    {
+        var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
+
+        if (!File.Exists(filePath))
+        {
+            logger.LogWarning("Preset file not found: {FilePath}", filePath);
+            return null;
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(filePath);
+            var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (preset is not { Version: < CurrentPresetVersion }) return preset;
+
+            logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+                preset.Name, preset.Version, CurrentPresetVersion);
+            MigratePreset(preset);
+            preset.Version = CurrentPresetVersion;
+            await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
+
+            return preset;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load preset {PresetId} from {FilePath}", presetId, filePath);
+            return null;
+        }
+    }
+
     public async Task SavePresetAsync(SessionPreset preset, CancellationToken cancellationToken)
     {
-        var filePath = Path.Combine(_presetsDirectory, $"{preset.Id}.json");
+        var filePath = Path.Combine(presetsDirectory, $"{preset.Id}.json");
+        var tempFilePath = Path.Combine(presetsDirectory, $"{preset.Id}.json.tmp");
         logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, filePath);
 
         try
         {
-            Directory.CreateDirectory(_presetsDirectory);
-            await using var stream = File.Create(filePath);
-            await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken).ConfigureAwait(false);
+            Directory.CreateDirectory(presetsDirectory);
+
+            var lockFilePath = Path.Combine(presetsDirectory, ".axorith-presets.lock");
+
+            using (var lockStream = new FileStream(
+                       lockFilePath,
+                       FileMode.OpenOrCreate,
+                       FileAccess.ReadWrite,
+                       FileShare.None))
+            {
+                await using (var stream = new FileStream(
+                                 tempFilePath,
+                                 FileMode.Create,
+                                 FileAccess.Write,
+                                 FileShare.None,
+                                 bufferSize: 4096,
+                                 useAsync: true))
+                {
+                    await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                File.Move(tempFilePath, filePath, overwrite: true);
+            }
+
             logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
+
+            try
+            {
+                if (File.Exists(tempFilePath))
+                    File.Delete(tempFilePath);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
         }
     }
 
     public Task DeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
     {
-        var filePath = Path.Combine(_presetsDirectory, $"{presetId}.json");
+        var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
         logger.LogInformation("Deleting preset with ID {PresetId} from {FilePath}", presetId, filePath);
 
         try
@@ -121,11 +189,5 @@ public class PresetManager(ILogger<PresetManager> logger) : IPresetManager
         // }
 
         logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
-    }
-
-    private static string GetPresetsDirectoryPath()
-    {
-        var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appDataFolder, "Axorith", "presets");
     }
 }
