@@ -10,6 +10,7 @@ service ModulesService {
   rpc ListModules(ListModulesRequest) returns (ListModulesResponse);
   rpc GetModuleSettings(GetModuleSettingsRequest) returns (GetModuleSettingsResponse);
   rpc InvokeAction(InvokeActionRequest) returns (OperationResult);
+  rpc InvokeDesignTimeAction(InvokeDesignTimeActionRequest) returns (OperationResult);
   rpc UpdateSetting(UpdateSettingRequest) returns (OperationResult);
   rpc StreamSettingUpdates(StreamSettingUpdatesRequest) returns (stream SettingUpdate);
   rpc BeginEdit(BeginEditRequest) returns (OperationResult);
@@ -36,6 +37,11 @@ message GetModuleSettingsResponse {
 
 message InvokeActionRequest {
   string module_instance_id = 1;
+  string action_key = 2;
+}
+
+message InvokeDesignTimeActionRequest {
+  string module_id = 1;
   string action_key = 2;
 }
 

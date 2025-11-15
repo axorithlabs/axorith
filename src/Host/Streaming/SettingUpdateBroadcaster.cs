@@ -30,13 +30,14 @@ public class SettingUpdateBroadcaster : IDisposable
     private readonly ConcurrentDictionary<string, Subscriber> _subscribers = new();
     private readonly ConcurrentDictionary<string, IDisposable> _settingSubscriptions = new();
     private readonly ConcurrentDictionary<string, string> _lastChoicesFingerprint = new();
+    private readonly ConcurrentDictionary<Guid, byte> _runtimeInstanceIds = new();
     private bool _disposed;
 
     private readonly int _choicesThrottleMs;
     private readonly int _valueBatchWindowMs;
 
     public SettingUpdateBroadcaster(ISessionManager sessionManager, ILogger<SettingUpdateBroadcaster> logger,
-        IOptions<HostConfiguration>? options)
+        IOptions<Configuration>? options)
     {
         _sessionManager = sessionManager;
         _logger = logger;
@@ -203,6 +204,7 @@ public class SettingUpdateBroadcaster : IDisposable
                 continue;
             }
 
+            _runtimeInstanceIds[configuredModule.InstanceId] = 1;
             // Subscribe to all settings of this module
             var settings = moduleInstance.GetSettings();
             foreach (var setting in settings) SubscribeToSetting(configuredModule.InstanceId, setting);
@@ -217,14 +219,31 @@ public class SettingUpdateBroadcaster : IDisposable
 
     private void OnSessionStopped(Guid presetId)
     {
-        // Dispose all setting subscriptions
-        var cleared = _settingSubscriptions.Count;
-        foreach (var (_, subscription) in _settingSubscriptions) subscription.Dispose();
-        _settingSubscriptions.Clear();
-        _lastChoicesFingerprint.Clear();
+        var removedSubs = 0;
+        var removedChoices = 0;
 
-        _logger.LogDebug("Session stopped: {PresetId}, cleared {Count} setting subscriptions",
-            presetId, cleared);
+        foreach (var instanceId in _runtimeInstanceIds.Keys.ToArray())
+        {
+            // Remove per-setting subscriptions for this runtime instance
+            var prefix = instanceId.ToString() + ":";
+            foreach (var kv in _settingSubscriptions.ToArray())
+            {
+                if (!kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                try { kv.Value.Dispose(); } catch { /* ignore */ }
+                if (_settingSubscriptions.TryRemove(kv.Key, out _)) removedSubs++;
+            }
+
+            foreach (var ck in _lastChoicesFingerprint.Keys.ToArray())
+            {
+                if (ck.StartsWith(instanceId.ToString() + ":", StringComparison.OrdinalIgnoreCase))
+                    if (_lastChoicesFingerprint.TryRemove(ck, out _)) removedChoices++;
+            }
+
+            _runtimeInstanceIds.TryRemove(instanceId, out _);
+        }
+
+        _logger.LogDebug("Session stopped: {PresetId}, removed {Subs} runtime subscriptions and {Choices} choice caches",
+            presetId, removedSubs, removedChoices);
     }
 
     /// <summary>
@@ -287,8 +306,7 @@ public class SettingUpdateBroadcaster : IDisposable
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Value, value);
             });
-
-        _settingSubscriptions[$"{keyPrefix}:value"] = valueSub;
+        ReplaceSubscription($"{keyPrefix}:value", valueSub);
 
         var labelSub = setting.Label
             .Skip(1)
@@ -297,8 +315,7 @@ public class SettingUpdateBroadcaster : IDisposable
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Label, label);
             });
-
-        _settingSubscriptions[$"{keyPrefix}:label"] = labelSub;
+        ReplaceSubscription($"{keyPrefix}:label", labelSub);
 
         var visSub = setting.IsVisible
             .Skip(1)
@@ -307,8 +324,7 @@ public class SettingUpdateBroadcaster : IDisposable
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Visibility, visible);
             });
-
-        _settingSubscriptions[$"{keyPrefix}:visibility"] = visSub;
+        ReplaceSubscription($"{keyPrefix}:visibility", visSub);
 
         var readOnlySub = setting.IsReadOnly
             .Skip(1)
@@ -317,8 +333,7 @@ public class SettingUpdateBroadcaster : IDisposable
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.ReadOnly, readOnly);
             });
-
-        _settingSubscriptions[$"{keyPrefix}:readonly"] = readOnlySub;
+        ReplaceSubscription($"{keyPrefix}:readonly", readOnlySub);
 
         if (setting.Choices != null)
         {
@@ -329,11 +344,19 @@ public class SettingUpdateBroadcaster : IDisposable
                 {
                     _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Choices, choices);
                 });
-
-            _settingSubscriptions[$"{keyPrefix}:choices"] = choicesSub;
+            ReplaceSubscription($"{keyPrefix}:choices", choicesSub);
         }
 
         _logger.LogDebug("Subscribed to setting updates: {ModuleId}.{Key}", moduleInstanceId, setting.Key);
+    }
+
+    private void ReplaceSubscription(string key, IDisposable sub)
+    {
+        if (_settingSubscriptions.TryRemove(key, out var old))
+        {
+            try { old.Dispose(); } catch { /* ignore */ }
+        }
+        _settingSubscriptions[key] = sub;
     }
 
     public void Dispose()

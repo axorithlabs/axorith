@@ -34,13 +34,17 @@ public class Module : IModule
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string CustomUrlValue = "custom";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d"; // Public client ID for Axorith
-    private const string RedirectUri = "http://127.0.0.1:8888/callback/";
+    private const int DefaultRedirectPort = 8888;
+    private const string RedirectHost = "http://127.0.0.1";
+    private const string RedirectPath = "/callback/";
 
     private readonly Action _loginAction;
 
     private readonly Action _logoutAction;
 
     private readonly Setting<string> _authStatus;
+    private readonly Setting<decimal> _redirectPort;
+
     private readonly Setting<string> _targetDevice;
     private readonly Setting<string> _playbackContext;
     private readonly Setting<string> _customUrl;
@@ -60,6 +64,9 @@ public class Module : IModule
         _logoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
 
         _authStatus = Setting.AsText(key: "AuthStatus", label: "Authentication", defaultValue: "", isReadOnly: true);
+
+        _redirectPort = Setting.AsNumber(key: "RedirectPort", label: "Redirect Port", defaultValue: DefaultRedirectPort,
+            description: "Local HTTP port used for the Spotify OAuth callback. Change this if 8888 is blocked.");
 
         _targetDevice = Setting.AsChoice(key: "TargetDevice", label: "Target Device", defaultValue: "",
             initialChoices: [], description: "Device to start playback on.");
@@ -132,7 +139,7 @@ public class Module : IModule
     {
         return
         [
-            _authStatus, _targetDevice, _playbackContext,
+            _authStatus, _redirectPort, _targetDevice, _playbackContext,
             _customUrl, _volume, _shuffle, _repeatMode
         ];
     }
@@ -435,18 +442,32 @@ public class Module : IModule
     private async Task<bool> PerformPkceLoginAsync()
     {
         var (codeVerifier, codeChallenge) = GeneratePkcePair();
+        var redirectUri = GetRedirectUri();
 
         using var listener = new HttpListener();
-        listener.Prefixes.Add(RedirectUri);
+        listener.Prefixes.Add(redirectUri);
 
         try
         {
-            listener.Start();
+            try
+            {
+                listener.Start();
+            }
+            catch (HttpListenerException ex)
+            {
+                var port = GetConfiguredRedirectPort();
+                _logger.LogError(ex,
+                    "Failed to start local HTTP listener on {RedirectUri}. Port {Port} might be in use or blocked.",
+                    redirectUri, port);
+                _authStatus.SetValue($"Error: Redirect port {port} is in use or blocked. Change 'Redirect Port' setting and try again.");
+                return false;
+            }
+
             var scopes =
                 "user-modify-playback-state user-read-playback-state user-read-private playlist-read-private user-library-read";
             var authUrl = $"https://accounts.spotify.com/authorize?client_id={SpotifyClientId}" +
                           "&response_type=code" +
-                          $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
+                          $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                           $"&scope={Uri.EscapeDataString(scopes)}" +
                           "&code_challenge_method=S256" +
                           $"&code_challenge={codeChallenge}";
@@ -466,7 +487,10 @@ public class Module : IModule
                 return false;
             }
 
+            _authStatus.SetValue("Waiting for Spotify authorization in browser...");
+
             var contextTask = listener.GetContextAsync();
+
             var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
             var completedTask = await Task.WhenAny(contextTask, timeoutTask).ConfigureAwait(false);
 
@@ -474,11 +498,13 @@ public class Module : IModule
             {
                 _logger.LogWarning("Spotify authentication timed out after 5 minutes");
                 _authStatus.SetValue("Error: Authentication timed out");
+
                 listener.Stop();
                 return false;
             }
 
             var context = await contextTask.ConfigureAwait(false);
+
             var code = context.Request.QueryString.Get("code");
 
             var response = context.Response;
@@ -495,7 +521,7 @@ public class Module : IModule
             {
                 { "grant_type", "authorization_code" },
                 { "code", code },
-                { "redirect_uri", RedirectUri },
+                { "redirect_uri", redirectUri },
                 { "client_id", SpotifyClientId },
                 { "code_verifier", codeVerifier }
             });
@@ -511,17 +537,30 @@ public class Module : IModule
 
             _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
             _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
+            _authStatus.SetValue("Authenticated ✓");
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed during PKCE login process.");
+            _authStatus.SetValue("Error: Login failed. See logs for details.");
             return false;
         }
         finally
         {
             if (listener.IsListening) listener.Stop();
         }
+    }
+
+    private string GetRedirectUri()
+    {
+        var port = GetConfiguredRedirectPort();
+        return $"{RedirectHost}:{port}{RedirectPath}";
+    }
+
+    private int GetConfiguredRedirectPort()
+    {
+        return (int)_redirectPort.GetCurrentValue();
     }
 
     private static (string, string) GeneratePkcePair()

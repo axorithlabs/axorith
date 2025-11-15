@@ -3,6 +3,7 @@ using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
+using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -49,13 +50,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -79,13 +78,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -110,13 +107,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -141,13 +136,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -182,13 +175,11 @@ public class SessionManagerNegativeTests
             ]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -228,13 +219,11 @@ public class SessionManagerNegativeTests
             ]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         module1Stopped.Should().BeTrue("Module 1 should have been stopped during rollback");
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }

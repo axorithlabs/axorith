@@ -3,7 +3,7 @@
         xmlns:vm="using:Axorith.Client.ViewModels"
         x:Class="Axorith.Client.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
-        Icon="/Assets/icon.png"
+        Icon="/Assets/icon.ico"
         Title="Axorith"
         Width="1600"
         Height="900"

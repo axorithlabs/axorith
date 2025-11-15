@@ -22,6 +22,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
     private readonly IModuleRegistry _moduleRegistry;
     private readonly SettingUpdateBroadcaster _broadcaster;
     private readonly ILogger<DesignTimeSandboxManager> _logger;
+    private readonly ISessionManager _sessionManager;
 
     private readonly ConcurrentDictionary<Guid, Sandbox> _sandboxes = new();
     private readonly Timer _evictionTimer;
@@ -32,17 +33,20 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public DesignTimeSandboxManager(IModuleRegistry moduleRegistry,
         SettingUpdateBroadcaster broadcaster,
         ILogger<DesignTimeSandboxManager> logger,
-        IOptions<HostConfiguration>? options)
+        IOptions<Configuration> options,
+        ISessionManager sessionManager)
     {
         _moduleRegistry = moduleRegistry;
         _broadcaster = broadcaster;
         _logger = logger;
-        var cfg = options?.Value.DesignTime;
+        _sessionManager = sessionManager;
+        var cfg = options.Value.DesignTime;
         _idleTtl = TimeSpan.FromSeconds(Math.Clamp(cfg?.SandboxIdleTtlSeconds ?? 300, 30, 86400));
         _maxSandboxes = Math.Clamp(cfg?.MaxSandboxes ?? 5, 1, 1000);
-        var evictEvery = TimeSpan.FromSeconds(Math.Clamp(cfg?.EvictionIntervalSeconds ?? 60, 5, 3600));
 
-        _evictionTimer = new Timer(EvictIdle, null, evictEvery, evictEvery);
+        _evictionTimer = new Timer(EvictIdle, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+
+        _sessionManager.SessionStarted += OnSessionStarted;
     }
 
     public async Task EnsureAsync(Guid instanceId, Guid moduleId, IReadOnlyDictionary<string, string?> initial,
@@ -188,6 +192,32 @@ public sealed class DesignTimeSandboxManager : IDisposable
         foreach (var id in _sandboxes.Keys.ToArray())
             DisposeSandbox(id);
         _sandboxes.Clear();
-        GC.SuppressFinalize(this);
+        try
+        {
+            GC.SuppressFinalize(this);
+        }
+        catch
+        {
+            /* ignore */
+        }
+        _sessionManager.SessionStarted -= OnSessionStarted;
+    }
+
+    private void OnSessionStarted(Guid presetId)
+    {
+        try
+        {
+            // Dispose design-time sandboxes that match modules in the now active preset
+            var toDispose = _sandboxes.Keys.ToArray();
+            foreach (var id in toDispose)
+            {
+                try { DisposeSandbox(id); } catch { /* best effort */ }
+            }
+            _logger.LogInformation("Disposed all design-time sandboxes on session start {PresetId}", presetId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose design-time sandboxes on session start");
+        }
     }
 }

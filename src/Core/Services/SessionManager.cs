@@ -40,6 +40,7 @@ public class SessionManager(
 
     public bool IsSessionRunning => ActiveSession != null;
     public SessionPreset? ActiveSession { get; private set; }
+    public DateTimeOffset? SessionStartedAt { get; private set; }
 
     public event Action<Guid>? SessionStarted;
     public event Action<Guid>? SessionStopped;
@@ -53,6 +54,7 @@ public class SessionManager(
 
         logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
         ActiveSession = preset;
+        SessionStartedAt = DateTimeOffset.UtcNow;
         _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         _activeModules.Clear();
@@ -223,6 +225,7 @@ public class SessionManager(
             _sessionCts?.Dispose();
             _sessionCts = null;
             ActiveSession = null;
+            SessionStartedAt = null;
 
             logger.LogInformation("Session stopped successfully");
             SessionStopped?.Invoke(stoppedPresetId);
@@ -258,6 +261,59 @@ public class SessionManager(
         return _activeModules
             .FirstOrDefault(m => m.Configuration.InstanceId == instanceId)
             ?.Instance;
+    }
+
+    public SessionSnapshot? GetCurrentSnapshot()
+    {
+        if (!IsSessionRunning || ActiveSession == null)
+            return null;
+
+        var modules = new List<SessionModuleSnapshot>();
+
+        foreach (var active in _activeModules)
+        {
+            var definition = moduleRegistry.GetDefinitionById(active.Configuration.ModuleId);
+
+            var settings = new List<SessionSettingSnapshot>();
+            foreach (var setting in active.Instance.GetSettings())
+            {
+                settings.Add(new SessionSettingSnapshot(
+                    setting.Key,
+                    setting.GetCurrentLabel(),
+                    setting.Description,
+                    setting.ControlType,
+                    setting.Persistence,
+                    setting.GetCurrentReadOnly(),
+                    setting.GetCurrentVisibility(),
+                    setting.ValueType.Name,
+                    setting.GetValueAsString()));
+            }
+
+            var actions = new List<SessionActionSnapshot>();
+            foreach (var action in active.Instance.GetActions())
+            {
+                actions.Add(new SessionActionSnapshot(
+                    action.Key,
+                    action.GetCurrentLabel(),
+                    action.GetCurrentEnabled()));
+            }
+
+            modules.Add(new SessionModuleSnapshot(
+                active.Configuration.InstanceId,
+                active.Configuration.ModuleId,
+                definition?.Name ?? "Unknown",
+                active.Configuration.CustomName,
+                settings,
+                actions));
+        }
+
+        return new SessionSnapshot(ActiveSession.Id, ActiveSession.Name, modules);
+    }
+
+    public SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId)
+    {
+        var snapshot = GetCurrentSnapshot();
+        return snapshot?.Modules.FirstOrDefault(m => m.InstanceId == instanceId);
     }
 
     /// <summary>

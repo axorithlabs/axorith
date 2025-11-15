@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
-namespace Axorith.Test.Host.Services;
+namespace AAxorith.Host.Tests.Services;
 
 /// <summary>
 ///     Tests for PresetsServiceImpl - gRPC service for preset management

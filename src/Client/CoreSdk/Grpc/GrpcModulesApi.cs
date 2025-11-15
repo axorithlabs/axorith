@@ -219,6 +219,30 @@ internal class GrpcModulesApi(
         }).ConfigureAwait(false);
     }
 
+    public async Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, string actionKey,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
+
+        return await retryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await client.InvokeDesignTimeActionAsync(
+                    new InvokeDesignTimeActionRequest
+                    {
+                        ModuleId = moduleId.ToString(),
+                        ActionKey = actionKey
+                    },
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new OperationResult(
+                response.Success,
+                response.Message,
+                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        }).ConfigureAwait(false);
+    }
+
     public async Task<OperationResult> UpdateSettingAsync(Guid moduleInstanceId, string settingKey,
         object? value, CancellationToken ct = default)
     {

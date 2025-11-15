@@ -27,8 +27,8 @@ if ([string]::IsNullOrEmpty($HostExePath)) {
     # Try to find in build output
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $possiblePaths = @(
-        "$scriptDir\..\build\Release\Axorith.Host.exe",
-        "$scriptDir\..\build\Debug\Axorith.Host.exe",
+        "$scriptDir\..\build\Release\Axorith.Host\Axorith.Host.exe",
+        "$scriptDir\..\build\Debug\Axorith.Host\Axorith.Host.exe",
     )
     
     foreach ($path in $possiblePaths) {

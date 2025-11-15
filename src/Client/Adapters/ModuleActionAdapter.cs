@@ -13,27 +13,36 @@ namespace Axorith.Client.Adapters;
 internal class ModuleActionAdapter : IAction
 {
     private readonly Subject<Unit> _invokedSubject;
+    private readonly BehaviorSubject<string> _labelSubject;
+    private readonly BehaviorSubject<bool> _enabledSubject;
+
     private readonly IModulesApi _modulesApi;
-    private readonly Guid _moduleInstanceId;
+    private readonly Guid _moduleId;
 
     public string Key { get; }
-    public IObservable<string> Label { get; }
-    public IObservable<bool> IsEnabled { get; }
-    public IObservable<Unit> Invoked { get; }
+    public IObservable<string> Label => _labelSubject.AsObservable();
+    public IObservable<bool> IsEnabled => _enabledSubject.AsObservable();
+    public IObservable<Unit> Invoked => _invokedSubject.AsObservable();
 
-    public ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid moduleInstanceId)
+    public ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid moduleId)
     {
         Key = action.Key;
         _modulesApi = modulesApi;
-        _moduleInstanceId = moduleInstanceId;
+        _moduleId = moduleId;
 
-        var labelSubject = new BehaviorSubject<string>(action.Label);
-        var enabledSubject = new BehaviorSubject<bool>(action.IsEnabled);
+        _labelSubject = new BehaviorSubject<string>(action.Label);
+        _enabledSubject = new BehaviorSubject<bool>(action.IsEnabled);
         _invokedSubject = new Subject<Unit>();
+    }
 
-        Label = labelSubject.AsObservable();
-        IsEnabled = enabledSubject.AsObservable();
-        Invoked = _invokedSubject.AsObservable();
+    public string GetCurrentLabel()
+    {
+        return _labelSubject.Value;
+    }
+
+    public bool GetCurrentEnabled()
+    {
+        return _enabledSubject.Value;
     }
 
     public void Invoke()
@@ -44,7 +53,8 @@ internal class ModuleActionAdapter : IAction
         {
             try
             {
-                var result = await _modulesApi.InvokeActionAsync(_moduleInstanceId, Key);
+                var result = await _modulesApi.InvokeDesignTimeActionAsync(_moduleId, Key);
+
                 if (result.Success)
                     _invokedSubject.OnNext(Unit.Default);
             }
@@ -59,7 +69,8 @@ internal class ModuleActionAdapter : IAction
     {
         // Invoke action via gRPC and wait for completion
         // Used for actions that require async completion (e.g., OAuth login)
-        var result = await _modulesApi.InvokeActionAsync(_moduleInstanceId, Key);
+        var result = await _modulesApi.InvokeDesignTimeActionAsync(_moduleId, Key);
+
         if (result.Success)
             _invokedSubject.OnNext(Unit.Default);
     }

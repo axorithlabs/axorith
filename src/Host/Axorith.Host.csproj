@@ -4,11 +4,6 @@
         <RootNamespace>Axorith.Host</RootNamespace>
         <Description>Headless gRPC server for Axorith Core services</Description>
         <OutputType>WinExe</OutputType>
-        
-        <!-- Enable single-file publish -->
-        <PublishSingleFile>true</PublishSingleFile>
-        <SelfContained>false</SelfContained>
-        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     </PropertyGroup>
 
     <ItemGroup>

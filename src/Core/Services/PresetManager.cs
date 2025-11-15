@@ -109,23 +109,29 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         {
             Directory.CreateDirectory(presetsDirectory);
 
-            // Write to temporary file first with exclusive access to prevent concurrent writes
-            // FileShare.None ensures no other process can access this file while we're writing
-            await using (var stream = new FileStream(
-                             tempFilePath,
-                             FileMode.Create,
-                             FileAccess.Write,
-                             FileShare.None, // Exclusive access - no other process can read/write
-                             bufferSize: 4096,
-                             useAsync: true))
+            var lockFilePath = Path.Combine(presetsDirectory, ".axorith-presets.lock");
+
+            using (var lockStream = new FileStream(
+                       lockFilePath,
+                       FileMode.OpenOrCreate,
+                       FileAccess.ReadWrite,
+                       FileShare.None))
             {
-                await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
-                    .ConfigureAwait(false);
+                await using (var stream = new FileStream(
+                                 tempFilePath,
+                                 FileMode.Create,
+                                 FileAccess.Write,
+                                 FileShare.None,
+                                 bufferSize: 4096,
+                                 useAsync: true))
+                {
+                    await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                File.Move(tempFilePath, filePath, overwrite: true);
             }
 
-            // Atomic rename: if this succeeds, the file is guaranteed to be complete
-            // This operation is atomic on Windows and POSIX systems
-            File.Move(tempFilePath, filePath, overwrite: true);
             logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
         catch (Exception ex)

@@ -89,6 +89,8 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
+    public ICommand OpenClientSettingsCommand { get; }
+
 
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IServiceProvider serviceProvider)
@@ -137,6 +139,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         StopSessionCommand = ReactiveCommand.CreateFromTask(StopCurrentSessionAsync, canStopSession);
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
+        OpenClientSettingsCommand = ReactiveCommand.Create(OpenClientSettings, canDoGlobalActions);
     }
 
     /// <summary>
@@ -217,6 +220,12 @@ public class MainViewModel : ReactiveObject, IDisposable
         var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
         editor.PresetToEdit = null;
         _shell.NavigateTo(editor);
+    }
+
+    private void OpenClientSettings()
+    {
+        var settings = _serviceProvider.GetRequiredService<SettingsViewModel>();
+        _shell.NavigateTo(settings);
     }
 
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)

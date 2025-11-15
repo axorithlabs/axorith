@@ -129,13 +129,52 @@ public class ModulesServiceImpl(
     {
         try
         {
-            if (!Guid.TryParse(request.ModuleInstanceId, out var moduleId))
-                return SessionMapper.CreateResult(false, "Invalid module ID",
+            if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+                return SessionMapper.CreateResult(false, "Invalid module instance ID",
                     [$"Could not parse: {request.ModuleInstanceId}"]);
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
-            logger.LogInformation("InvokeAction called: ModuleId={ModuleId}, ActionKey={ActionKey}",
+            logger.LogInformation("InvokeAction (runtime) called: InstanceId={InstanceId}, ActionKey={ActionKey}",
+                instanceId, request.ActionKey);
+
+            var module = sessionManager.GetActiveModuleInstanceByInstanceId(instanceId);
+            if (module == null)
+                return SessionMapper.CreateResult(false, "Module instance is not active",
+                    [$"Module instance {instanceId} is not running"]);
+
+            var action = module.GetActions().FirstOrDefault(a => a.Key == request.ActionKey);
+            if (action == null)
+                return SessionMapper.CreateResult(false, "Action not found",
+                    [$"Action '{request.ActionKey}' not found in module"]);
+
+            logger.LogDebug("Invoking runtime action {ActionKey} on instance {InstanceId}", request.ActionKey,
+                instanceId);
+            await action.InvokeAsync();
+
+            logger.LogInformation("Runtime action {ActionKey} on {InstanceId} completed successfully",
+                request.ActionKey, instanceId);
+            return SessionMapper.CreateResult(true, "Action completed successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error invoking action");
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke action", ex));
+        }
+    }
+
+    public override async Task<OperationResult> InvokeDesignTimeAction(InvokeDesignTimeActionRequest request,
+        ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.ModuleId, out var moduleId))
+                return SessionMapper.CreateResult(false, "Invalid module ID",
+                    [$"Could not parse: {request.ModuleId}"]);
+
+            ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
+
+            logger.LogInformation("InvokeDesignTimeAction called: ModuleId={ModuleId}, ActionKey={ActionKey}",
                 moduleId, request.ActionKey);
 
             // Create temporary module instance for design-time actions
@@ -152,23 +191,23 @@ public class ModulesServiceImpl(
                     return SessionMapper.CreateResult(false, "Action not found",
                         [$"Action '{request.ActionKey}' not found in module"]);
 
-                logger.LogDebug("Invoking action {ActionKey} asynchronously", request.ActionKey);
+                logger.LogDebug("Invoking design-time action {ActionKey} asynchronously", request.ActionKey);
                 await action.InvokeAsync();
 
-                logger.LogInformation("Action {ActionKey} completed successfully", request.ActionKey);
+                logger.LogInformation("Design-time action {ActionKey} completed successfully", request.ActionKey);
                 return SessionMapper.CreateResult(true, "Action completed successfully");
             }
             finally
             {
                 module.Dispose();
                 scope?.Dispose();
-                logger.LogDebug("Module instance disposed after action completion");
+                logger.LogDebug("Design-time module instance disposed after action completion");
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error invoking action");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke action", ex));
+            logger.LogError(ex, "Error invoking design-time action");
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke design-time action", ex));
         }
     }
 
@@ -232,17 +271,13 @@ public class ModulesServiceImpl(
             }
             catch (InvalidOperationException)
             {
-                object? broadcastValue = request.ValueCase switch
-                {
-                    UpdateSettingRequest.ValueOneofCase.StringValue => request.StringValue,
-                    UpdateSettingRequest.ValueOneofCase.BoolValue => request.BoolValue,
-                    UpdateSettingRequest.ValueOneofCase.NumberValue => request.NumberValue,
-                    UpdateSettingRequest.ValueOneofCase.IntValue => request.IntValue,
-                    _ => null
-                };
-                _ = settingBroadcaster.BroadcastUpdateAsync(instanceId, request.SettingKey, SettingProperty.Value,
-                    broadcastValue);
-                return Task.FromResult(SessionMapper.CreateResult(true, "Setting broadcasted (no sandbox)"));
+                logger.LogWarning(
+                    "Failed to update setting {SettingKey} for {InstanceId}: no active module and no design-time sandbox",
+                    request.SettingKey, instanceId);
+
+                return Task.FromResult(SessionMapper.CreateResult(false,
+                    "No active module or design-time sandbox for this setting",
+                    [$"Module instance {instanceId} is not running and no design-time sandbox exists."]));
             }
         }
         catch (Exception ex)

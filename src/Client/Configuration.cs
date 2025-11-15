@@ -3,9 +3,10 @@ namespace Axorith.Client;
 /// <summary>
 ///     Configuration model for Axorith.Client.
 /// </summary>
-public class ClientConfiguration
+public class Configuration
 {
     public HostConnectionConfiguration Host { get; set; } = new();
+    public ClientUiConfiguration Ui { get; set; } = new();
 }
 
 /// <summary>
@@ -58,4 +59,16 @@ public class HostConnectionConfiguration
     {
         return $"http://{Address}:{Port}";
     }
+}
+
+/// <summary>
+///     UI-related configuration for Axorith.Client.
+/// </summary>
+public class ClientUiConfiguration
+{
+    /// <summary>
+    ///     If true, closing the main window will minimize it to the tray instead of exiting.
+    ///     Default: true
+    /// </summary>
+    public bool MinimizeToTrayOnClose { get; set; } = true;
 }

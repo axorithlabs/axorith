@@ -10,7 +10,7 @@ using Moq;
 using Xunit;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
-namespace Axorith.Test.Host.Services;
+namespace AAxorith.Host.Tests.Services;
 
 /// <summary>
 ///     Tests for DiagnosticsServiceImpl - gRPC service for diagnostics

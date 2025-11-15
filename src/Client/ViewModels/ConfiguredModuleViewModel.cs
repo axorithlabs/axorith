@@ -99,7 +99,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
                 foreach (var action in settingsInfo.Actions)
                 {
-                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
+                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Definition.Id);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
             });

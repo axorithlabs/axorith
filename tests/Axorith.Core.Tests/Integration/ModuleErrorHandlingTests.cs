@@ -4,6 +4,7 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -48,11 +49,11 @@ public class ModuleErrorHandlingTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
+        // Act & Assert
+        await sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -145,11 +146,11 @@ public class ModuleErrorHandlingTests
             ]
         };
 
-        // Act
-        await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
+        // Act & Assert
+        await sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 

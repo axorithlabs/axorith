@@ -47,11 +47,11 @@ try
 
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
-    builder.Services.Configure<HostConfiguration>(builder.Configuration);
+    builder.Services.Configure<Configuration>(builder.Configuration);
 
     builder.WebHost.ConfigureKestrel((context, options) =>
     {
-        var config = context.Configuration.Get<HostConfiguration>() ?? new HostConfiguration();
+        var config = context.Configuration.Get<Configuration>() ?? new Configuration();
         var bindAddress = IPAddress.Parse(config.Grpc.BindAddress);
 
         options.Listen(bindAddress, config.Grpc.Port, listenOptions =>
@@ -139,7 +139,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
     builder.Register(ctx =>
         {
-            var config = ctx.Resolve<IOptions<HostConfiguration>>().Value;
+            var config = ctx.Resolve<IOptions<Configuration>>().Value;
             var searchPaths = config.Modules.ResolveSearchPaths();
             var allowedSymlinks = config.Modules.AllowedSymlinks.Select(Environment.ExpandEnvironmentVariables);
             var rootScope = ctx.Resolve<ILifetimeScope>();
@@ -163,7 +163,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
     builder.Register(ctx =>
         {
-            var config = ctx.Resolve<IOptions<HostConfiguration>>().Value;
+            var config = ctx.Resolve<IOptions<Configuration>>().Value;
             var presetsDirectory = config.Persistence.ResolvePresetsPath();
             var logger = ctx.Resolve<ILogger<PresetManager>>();
 
@@ -174,7 +174,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
     builder.Register(ctx =>
         {
-            var config = ctx.Resolve<IOptions<HostConfiguration>>().Value;
+            var config = ctx.Resolve<IOptions<Configuration>>().Value;
             var moduleRegistry = ctx.Resolve<IModuleRegistry>();
             var logger = ctx.Resolve<ILogger<SessionManager>>();
 
@@ -192,7 +192,7 @@ static void RegisterBroadcasters(ContainerBuilder builder)
 {
     builder.RegisterType<SessionEventBroadcaster>()
         .AsSelf()
-        .SingleInstance();
+        .InstancePerLifetimeScope();
 
     builder.RegisterType<SettingUpdateBroadcaster>()
         .AsSelf()

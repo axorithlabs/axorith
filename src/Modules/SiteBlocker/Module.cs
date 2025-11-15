@@ -19,6 +19,7 @@ public class Module : IModule
     private readonly IModuleLogger _logger;
 
     private readonly Setting<string> _blockedSites;
+    private readonly Setting<string> _status;
 
     private readonly string _pipeName = "axorith-nm-pipe";
     private List<string> _activeBlockedSites = [];
@@ -34,7 +35,18 @@ public class Module : IModule
             defaultValue: "youtube.com, twitter.com, reddit.com"
         );
 
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
+        _status = Setting.AsText(key: "ShimStatus",
+            label: "Shim / Browser Status",
+            defaultValue: string.Empty,
+            isReadOnly: true,
+            description: "Connection status between SiteBlocker, Axorith Shim, and the browser extension.");
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            _status.SetValue("SiteBlocker is only supported on Windows. Current OS: " +
+                             RuntimeInformation.OSDescription);
+            return;
+        }
 
         try
         {
@@ -46,22 +58,25 @@ public class Module : IModule
                 _pipeName = PublicApi.GetNativeMessagingHostName();
                 PublicApi.EnsureFirefoxHostRegistered(_pipeName, manifestPath);
                 logger.LogInfo("Firefox native messaging host registered successfully");
+                _status.SetValue("Firefox native host registered. Waiting for Shim and browser extension...");
             }
             else
             {
                 logger.LogWarning("Native messaging host manifest not found at {ManifestPath}", manifestPath);
+                _status.SetValue("Native host manifest not found. Browser integration may be disabled.");
             }
         }
         catch (Exception)
         {
             logger.LogWarning("Failed to register Firefox native messaging host");
+            _status.SetValue("Failed to register Firefox native messaging host. See logs for details.");
         }
     }
 
     /// <inheritdoc />
     public IReadOnlyList<ISetting> GetSettings()
     {
-        return [_blockedSites];
+        return [_blockedSites, _status];
     }
 
     public IReadOnlyList<IAction> GetActions()
@@ -142,15 +157,18 @@ public class Module : IModule
 
             var commandName = message.GetType().GetProperty("command")?.GetValue(message) ?? "unknown";
             _logger.LogInfo("Command '{Command}' sent successfully via Named Pipe.", commandName);
+            _status.SetValue($"Shim connection OK. Last command: {commandName}.");
         }
         catch (TimeoutException ex)
         {
             _logger.LogError(ex,
                 "Could not connect to the Axorith Shim process via Named Pipe. Is the browser extension installed and running?");
+            _status.SetValue("Error: Could not connect to Axorith Shim. Ensure Shim is running and the browser extension is installed.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send command to Shim via Named Pipe.");
+            _status.SetValue("Error: Failed to send command to Shim: " + ex.Message);
         }
     }
 

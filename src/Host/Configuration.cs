@@ -3,7 +3,7 @@ namespace Axorith.Host;
 /// <summary>
 ///     Configuration model for Axorith.Host.
 /// </summary>
-public class HostConfiguration
+public class Configuration
 {
     public GrpcConfiguration Grpc { get; init; } = new();
     public ModulesConfiguration Modules { get; init; } = new();

@@ -19,6 +19,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private readonly Guid _moduleInstanceId;
     private readonly IModulesApi _modulesApi;
     private readonly Subject<object?> _numberUpdates = new();
+    private readonly Subject<string?> _stringUpdates = new();
 
     /// <summary>
     ///     Gets the underlying reactive setting definition from the SDK.
@@ -46,9 +47,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
     public string StringValue
     {
         get => Setting.GetCurrentValueAsObject() as string ?? string.Empty;
-        set =>
+        set
+        {
             // Send to server, update will come back via broadcast
-            _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
+            _stringUpdates.OnNext(value);
+        }
     }
 
     public bool BoolValue
@@ -184,6 +187,13 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
         _numberUpdates
             .Throttle(TimeSpan.FromMilliseconds(75))
+            .ObserveOn(RxApp.TaskpoolScheduler)
+            .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
+            .DisposeWith(_disposables);
+
+        _stringUpdates
+            .Throttle(TimeSpan.FromMilliseconds(250))
+            .DistinctUntilChanged()
             .ObserveOn(RxApp.TaskpoolScheduler)
             .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
             .DisposeWith(_disposables);

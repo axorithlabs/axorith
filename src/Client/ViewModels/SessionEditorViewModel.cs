@@ -39,8 +39,21 @@ public class SessionEditorViewModel : ReactiveObject
     public string Name
     {
         get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            if (!string.IsNullOrWhiteSpace(value) && !string.IsNullOrEmpty(ErrorMessage))
+                ErrorMessage = string.Empty;
+            else if (string.IsNullOrWhiteSpace(value))
+                ErrorMessage = "Preset name cannot be empty.";
+        }
     } = string.Empty;
+
+    public string? ErrorMessage
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     Gets the collection of modules that are configured for the current preset.
@@ -192,8 +205,13 @@ public class SessionEditorViewModel : ReactiveObject
     private async Task SaveAndCloseAsync()
     {
         if (string.IsNullOrWhiteSpace(Name))
-            // TODO:
+        {
+            ErrorMessage = "Preset name cannot be empty.";
+            // TODO: Show error message to user
             return;
+        }
+
+        ErrorMessage = string.Empty;
 
         foreach (var moduleVm in ConfiguredModules) moduleVm.SaveChangesToModel();
 
@@ -209,10 +227,11 @@ public class SessionEditorViewModel : ReactiveObject
 
             Cancel();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // TODO:
-            // ("Save Failed", $"Failed to save preset: {ex.Message}");
+            ErrorMessage = $"Failed to save preset: {ex.Message}";
+            // TODO: Show error message to user
+            // MessageBox.Show("Save Failed", $"Failed to save preset: {ex.Message}");
         }
     }
 

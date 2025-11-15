@@ -114,10 +114,25 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     var moduleDirectory = Path.GetDirectoryName(jsonFile);
                     if (moduleDirectory == null) continue;
 
+                    var moduleDirectoryFullPath = Path.GetFullPath(moduleDirectory);
+
                     string dllFile;
                     if (!string.IsNullOrEmpty(definition.AssemblyFileName))
                     {
-                        dllFile = Path.Combine(moduleDirectory, definition.AssemblyFileName);
+                        var combinedPath = Path.Combine(moduleDirectoryFullPath, definition.AssemblyFileName);
+                        var dllFullPath = Path.GetFullPath(combinedPath);
+
+                        var relative = Path.GetRelativePath(moduleDirectoryFullPath, dllFullPath);
+                        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                        {
+                            logger.LogWarning(
+                                "Specified assembly path '{Assembly}' for module '{ModuleName}' escapes module directory '{ModuleDir}'. Skipping",
+                                definition.AssemblyFileName, definition.Name, moduleDirectoryFullPath);
+                            continue;
+                        }
+
+                        dllFile = dllFullPath;
+
                         if (!File.Exists(dllFile))
                         {
                             logger.LogWarning(

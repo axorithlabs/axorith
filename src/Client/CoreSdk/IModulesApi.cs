@@ -19,10 +19,17 @@ public interface IModulesApi
     Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default);
 
     /// <summary>
-    ///     Invokes an action on a running module instance.
+    ///     Invokes an action on a running module instance (runtime).
     ///     Only works when a session is active.
     /// </summary>
     Task<OperationResult> InvokeActionAsync(Guid moduleInstanceId, string actionKey,
+        CancellationToken ct = default);
+
+    /// <summary>
+    ///     Invokes a design-time-only action on a module definition using a temporary module instance.
+    ///     Used for actions like OAuth login while editing presets.
+    /// </summary>
+    Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, string actionKey,
         CancellationToken ct = default);
 
     /// <summary>

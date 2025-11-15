@@ -37,7 +37,7 @@ public interface IHostHealthMonitor : IDisposable
 
 public class HostHealthMonitor(
     IDiagnosticsApi diagnosticsApi,
-    IOptions<ClientConfiguration> config,
+    IOptions<Configuration> config,
     ILogger<HostHealthMonitor> logger) : IHostHealthMonitor
 {
     private const int MaxRetries = 3;

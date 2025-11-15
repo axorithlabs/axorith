@@ -16,7 +16,28 @@ public interface ISessionManager : IAsyncDisposable
     /// <summary>
     ///     Gets the preset of the currently active session, if any.
     /// </summary>
+    /// <remarks>
+    ///     Null if no session is currently running.
+    /// </remarks>
     SessionPreset? ActiveSession { get; }
+
+    /// <summary>
+    ///     Gets the UTC timestamp when the current session was started.
+    ///     Null if no session is currently running.
+    /// </summary>
+    DateTimeOffset? SessionStartedAt { get; }
+
+    /// <summary>
+    ///     Returns an immutable snapshot of the currently running session, including active modules,
+    ///     their settings and actions. Returns null if no session is running.
+    /// </summary>
+    SessionSnapshot? GetCurrentSnapshot();
+
+    /// <summary>
+    ///     Returns an immutable snapshot of a specific active module instance by its instance ID.
+    ///     Returns null if the session is not running or the module instance is not active.
+    /// </summary>
+    SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId);
 
     /// <summary>
     ///     Occurs when a session has successfully started. The parameter is the ID of the started preset.

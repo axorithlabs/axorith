@@ -18,6 +18,9 @@
         <DataTemplate DataType="{x:Type vm:ErrorViewModel}">
             <views:ErrorView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+            <views:SettingsView/>
+        </DataTemplate>
     </Application.DataTemplates>
     
     <Application.Styles>

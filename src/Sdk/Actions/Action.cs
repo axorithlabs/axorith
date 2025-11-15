@@ -35,6 +35,18 @@ public sealed class Action(string key, string label, bool isEnabled = true) : IA
     /// </summary>
     public IObservable<bool> IsEnabled => _isEnabled.AsObservable();
 
+    /// <inheritdoc />
+    public string GetCurrentLabel()
+    {
+        return _label.Value;
+    }
+
+    /// <inheritdoc />
+    public bool GetCurrentEnabled()
+    {
+        return _isEnabled.Value;
+    }
+
     /// <summary>
     ///     Gets an observable stream that emits a signal each time this action is invoked.
     /// </summary>

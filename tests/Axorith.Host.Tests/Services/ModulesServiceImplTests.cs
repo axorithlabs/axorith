@@ -16,7 +16,7 @@ using Moq;
 using Xunit;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
-namespace Axorith.Test.Host.Services;
+namespace AAxorith.Host.Tests.Services;
 
 public class ModulesServiceImplTests
 {
@@ -34,14 +34,15 @@ public class ModulesServiceImplTests
         var broadcaster = new SettingUpdateBroadcaster(
             _mockSessionManager.Object,
             NullLogger<SettingUpdateBroadcaster>.Instance,
-            Options.Create(new HostConfiguration())
+            Options.Create(new Configuration())
         );
 
         var sandboxManager = new DesignTimeSandboxManager(
             _mockModuleRegistry.Object,
             broadcaster,
             NullLogger<DesignTimeSandboxManager>.Instance,
-            Options.Create(new HostConfiguration()));
+            Options.Create(new Configuration()),
+            _mockSessionManager.Object);
 
         _service = new ModulesServiceImpl(
             _mockModuleRegistry.Object,
@@ -196,8 +197,7 @@ public class ModulesServiceImplTests
         response.Actions.Should().NotBeNull();
 
         mockModule.Verify(m => m.InitializeAsync(It.IsAny<CancellationToken>()), Times.Once);
-        mockModule.Verify(m => m.Dispose(), Times.Once);
-        mockScope.Verify(s => s.Dispose(), Times.Once);
+        mockModule.Verify(m => m.GetActions(), Times.Once);
     }
 
     #endregion
@@ -221,19 +221,20 @@ public class ModulesServiceImplTests
         // Assert
         response.Should().NotBeNull();
         response.Success.Should().BeFalse();
-        response.Message.Should().Contain("Invalid module ID");
+        response.Message.Should().Contain("Invalid module instance ID");
     }
 
     [Fact]
     public async Task InvokeAction_WhenModuleNotFound_ShouldReturnFailure()
     {
         // Arrange
-        var moduleId = Guid.NewGuid();
-        _mockModuleRegistry.Setup(m => m.CreateInstance(moduleId)).Returns((null, null));
+        var instanceId = Guid.NewGuid();
+        _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId))
+            .Returns((IModule?)null);
 
         var request = new InvokeActionRequest
         {
-            ModuleInstanceId = moduleId.ToString(),
+            ModuleInstanceId = instanceId.ToString(),
             ActionKey = "test-action"
         };
         var context = CreateTestContext();
@@ -244,23 +245,22 @@ public class ModulesServiceImplTests
         // Assert
         response.Should().NotBeNull();
         response.Success.Should().BeFalse();
-        response.Message.Should().Contain("Module not found");
+        response.Message.Should().Contain("Module instance is not active");
     }
 
     [Fact]
     public async Task InvokeAction_WhenActionNotFound_ShouldReturnFailure()
     {
         // Arrange
-        var moduleId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid();
         var mockModule = new Mock<IModule>();
         mockModule.Setup(m => m.GetActions()).Returns(new List<IAction>());
-        var mockScope = new Mock<ILifetimeScope>();
-
-        _mockModuleRegistry.Setup(m => m.CreateInstance(moduleId)).Returns((mockModule.Object, mockScope.Object));
+        _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId))
+            .Returns(mockModule.Object);
 
         var request = new InvokeActionRequest
         {
-            ModuleInstanceId = moduleId.ToString(),
+            ModuleInstanceId = instanceId.ToString(),
             ActionKey = "non-existent-action"
         };
         var context = CreateTestContext();
@@ -272,29 +272,26 @@ public class ModulesServiceImplTests
         response.Should().NotBeNull();
         response.Success.Should().BeFalse();
         response.Message.Should().Contain("Action not found");
-
-        mockModule.Verify(m => m.Dispose(), Times.Once);
-        mockScope.Verify(s => s.Dispose(), Times.Once);
     }
 
     [Fact]
     public async Task InvokeAction_WhenActionExists_ShouldInvokeAndReturnSuccess()
     {
         // Arrange
-        var moduleId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid();
         var mockAction = new Mock<IAction>();
         mockAction.Setup(a => a.Key).Returns("test-action");
         mockAction.Setup(a => a.InvokeAsync()).Returns(Task.CompletedTask);
 
         var mockModule = new Mock<IModule>();
         mockModule.Setup(m => m.GetActions()).Returns(new List<IAction> { mockAction.Object });
-        var mockScope = new Mock<ILifetimeScope>();
 
-        _mockModuleRegistry.Setup(m => m.CreateInstance(moduleId)).Returns((mockModule.Object, mockScope.Object));
+        _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId))
+            .Returns(mockModule.Object);
 
         var request = new InvokeActionRequest
         {
-            ModuleInstanceId = moduleId.ToString(),
+            ModuleInstanceId = instanceId.ToString(),
             ActionKey = "test-action"
         };
         var context = CreateTestContext();
@@ -308,8 +305,7 @@ public class ModulesServiceImplTests
         response.Message.Should().Contain("completed successfully");
 
         mockAction.Verify(a => a.InvokeAsync(), Times.Once);
-        mockModule.Verify(m => m.Dispose(), Times.Once);
-        mockScope.Verify(s => s.Dispose(), Times.Once);
+        mockModule.Verify(m => m.GetActions(), Times.Once);
     }
 
     #endregion
@@ -398,7 +394,7 @@ public class ModulesServiceImplTests
     }
 
     [Fact]
-    public async Task UpdateSetting_WhenModuleNotRunning_ShouldBroadcastOnly()
+    public async Task UpdateSetting_WhenModuleNotRunningAndNoSandbox_ShouldReturnFailure()
     {
         // Arrange
         var instanceId = Guid.NewGuid();
@@ -417,8 +413,8 @@ public class ModulesServiceImplTests
 
         // Assert
         response.Should().NotBeNull();
-        response.Success.Should().BeTrue();
-        response.Message.Should().Contain("broadcasted");
+        response.Success.Should().BeFalse();
+        response.Message.Should().Contain("No active module or design-time sandbox");
     }
 
     #endregion

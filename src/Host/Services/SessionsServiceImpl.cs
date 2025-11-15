@@ -16,7 +16,6 @@ namespace Axorith.Host.Services;
 public class SessionsServiceImpl(
     ISessionManager sessionManager,
     IPresetManager presetManager,
-    IModuleRegistry moduleRegistry,
     SessionEventBroadcaster eventBroadcaster,
     ILogger<SessionsServiceImpl> logger)
     : SessionsService.SessionsServiceBase
@@ -27,69 +26,57 @@ public class SessionsServiceImpl(
         {
             logger.LogDebug("GetSessionState called");
 
-            var activePreset = sessionManager.ActiveSession;
+            var snapshot = sessionManager.GetCurrentSnapshot();
 
             var state = new SessionState
             {
-                IsActive = activePreset != null
+                IsActive = snapshot != null
             };
 
-            if (activePreset != null)
+            if (snapshot != null)
             {
-                state.PresetId = activePreset.Id.ToString();
-                state.PresetName = activePreset.Name;
-                state.StartedAt = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow);
+                state.PresetId = snapshot.PresetId.ToString();
+                state.PresetName = snapshot.PresetName;
 
-                foreach (var configuredModule in activePreset.Modules)
+                if (sessionManager.SessionStartedAt is { } startedAt)
+                    state.StartedAt = Timestamp.FromDateTimeOffset(startedAt);
+
+                foreach (var module in snapshot.Modules)
                 {
-                    var instance = sessionManager.GetActiveModuleInstanceByInstanceId(configuredModule.InstanceId)
-                                   ?? sessionManager.GetActiveModuleInstance(configuredModule.ModuleId);
-
-                    if (instance == null) continue;
-
-                    var definition = moduleRegistry.GetDefinitionById(configuredModule.ModuleId);
-
                     var moduleState = new ModuleInstanceState
                     {
-                        InstanceId = configuredModule.InstanceId.ToString(),
-                        ModuleName = definition?.Name ?? "Unknown",
-                        CustomName = configuredModule.CustomName ?? string.Empty,
+                        InstanceId = module.InstanceId.ToString(),
+                        ModuleName = module.ModuleName,
+                        CustomName = module.CustomName ?? string.Empty,
                         Status = ModuleStatus.Running
                     };
 
-                    // Add settings (convert ISetting to proto Setting)
-                    foreach (var setting in instance.GetSettings())
+                    foreach (var setting in module.Settings)
                     {
                         var protoSetting = new Setting
                         {
                             Key = setting.Key,
-                            Label = setting.GetCurrentLabel(),
+                            Label = setting.Label,
                             Description = setting.Description ?? string.Empty,
                             ControlType = (SettingControlType)(int)setting.ControlType,
                             Persistence = (SettingPersistence)(int)setting.Persistence,
-                            IsReadOnly = setting.GetCurrentReadOnly(),
-                            IsVisible = setting.GetCurrentVisibility(),
-                            ValueType = setting.ValueType.Name,
-                            StringValue = setting.GetValueAsString()
+                            IsReadOnly = setting.IsReadOnly,
+                            IsVisible = setting.IsVisible,
+                            ValueType = setting.ValueType,
+                            StringValue = setting.ValueString
                         };
 
                         moduleState.Settings.Add(protoSetting);
                     }
 
-                    foreach (var action in instance.GetActions())
+                    foreach (var action in module.Actions)
                     {
                         var protoAction = new Action
                         {
-                            Key = action.Key
+                            Key = action.Key,
+                            Label = action.Label,
+                            IsEnabled = action.IsEnabled
                         };
-
-                        var currentLabel = string.Empty;
-                        action.Label.Subscribe(l => currentLabel = l).Dispose();
-                        protoAction.Label = currentLabel;
-
-                        var currentEnabled = false;
-                        action.IsEnabled.Subscribe(e => currentEnabled = e).Dispose();
-                        protoAction.IsEnabled = currentEnabled;
 
                         moduleState.Actions.Add(protoAction);
                     }

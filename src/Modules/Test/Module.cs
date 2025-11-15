@@ -227,7 +227,8 @@ public class Module : IModule
 
         _logger.LogInfo("Publishing TestEvent in 2 seconds...");
         await Task.Delay(2000, cancellationToken);
-        _eventAggregator.Publish(new TestEvent { Message = "Hello from Event Aggregator!" });
+        await _eventAggregator.PublishAsync(new TestEvent { Message = "Hello from Event Aggregator!" },
+            cancellationToken);
     }
 
     /// <inheritdoc />

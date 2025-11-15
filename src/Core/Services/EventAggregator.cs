@@ -51,12 +51,44 @@ public sealed class EventAggregator : IEventAggregator
             CleanupDeadReferences(eventType);
     }
 
+    public Task PublishAsync<TEvent>(TEvent eventMessage, CancellationToken cancellationToken = default)
+    {
+        var eventType = typeof(TEvent);
+        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return Task.CompletedTask;
+
+        var handlersList = handlers.ToList();
+        var deadReferences = new List<WeakReference<object>>();
+        var tasks = new List<Task>();
+
+        foreach (var weakHandler in handlersList)
+            if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
+                tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        handler(eventMessage);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "Event handler threw in EventAggregator for event type {EventType}",
+                            typeof(TEvent).Name);
+                    }
+                }, cancellationToken));
+            else
+                deadReferences.Add(weakHandler);
+
+        if (deadReferences.Count > 0)
+            CleanupDeadReferences(eventType);
+
+        return tasks.Count == 0 ? Task.CompletedTask : Task.WhenAll(tasks);
+    }
+
     private void CleanupDeadReferences(Type eventType)
     {
         if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
 
         var liveReferences = handlers.Where(wr => wr.TryGetTarget(out _)).ToList();
-        _subscriptions[eventType] = [.. liveReferences];
+        _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(liveReferences);
     }
 
     private void Unsubscribe<TEvent>(Action<TEvent> handler)
@@ -68,7 +100,7 @@ public sealed class EventAggregator : IEventAggregator
             !wh.TryGetTarget(out var target) || !target.Equals(handler)
         ).ToList();
 
-        _subscriptions[eventType] = [.. filtered];
+        _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(filtered);
     }
 
     private sealed class Unsubscriber<TEvent>(EventAggregator aggregator, Action<TEvent> handler) : IDisposable

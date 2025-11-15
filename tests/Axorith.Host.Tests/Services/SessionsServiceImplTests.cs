@@ -16,7 +16,7 @@ using Xunit;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 
-namespace Axorith.Test.Host.Services;
+namespace AAxorith.Host.Tests.Services;
 
 public class SessionsServiceImplTests
 {
@@ -40,7 +40,6 @@ public class SessionsServiceImplTests
         _service = new SessionsServiceImpl(
             _mockSessionManager.Object,
             _mockPresetManager.Object,
-            _mockModuleRegistry.Object,
             broadcaster,
             NullLogger<SessionsServiceImpl>.Instance
         );
@@ -95,7 +94,12 @@ public class SessionsServiceImplTests
             Modules = []
         };
 
-        _mockSessionManager.Setup(m => m.ActiveSession).Returns(preset);
+        var snapshot = new SessionSnapshot(
+            presetId,
+            preset.Name,
+            Array.Empty<SessionModuleSnapshot>());
+
+        _mockSessionManager.Setup(m => m.GetCurrentSnapshot()).Returns(snapshot);
 
         var request = new GetSessionStateRequest();
         var context = CreateTestContext();
@@ -115,6 +119,7 @@ public class SessionsServiceImplTests
     {
         // Arrange
         var presetId = Guid.NewGuid();
+
         var moduleId = Guid.NewGuid();
         var instanceId = Guid.NewGuid();
 
@@ -132,21 +137,20 @@ public class SessionsServiceImplTests
             Modules = [configuredModule]
         };
 
-        var mockModuleInstance = new Mock<IModule>();
-        mockModuleInstance.Setup(m => m.GetSettings()).Returns(new List<ISetting>());
-        mockModuleInstance.Setup(m => m.GetActions()).Returns(new List<IAction>());
+        var moduleSnapshot = new SessionModuleSnapshot(
+            instanceId,
+            moduleId,
+            "Test Module",
+            configuredModule.CustomName,
+            Array.Empty<SessionSettingSnapshot>(),
+            Array.Empty<SessionActionSnapshot>());
 
-        var moduleDefinition = new ModuleDefinition
-        {
-            Id = moduleId,
-            Name = "Test Module",
-            Description = "Test",
-            Category = "Test"
-        };
+        var snapshot = new SessionSnapshot(
+            presetId,
+            preset.Name,
+            new[] { moduleSnapshot });
 
-        _mockSessionManager.Setup(m => m.ActiveSession).Returns(preset);
-        _mockSessionManager.Setup(m => m.GetActiveModuleInstance(moduleId)).Returns(mockModuleInstance.Object);
-        _mockModuleRegistry.Setup(m => m.GetDefinitionById(moduleId)).Returns(moduleDefinition);
+        _mockSessionManager.Setup(m => m.GetCurrentSnapshot()).Returns(snapshot);
 
         var request = new GetSessionStateRequest();
         var context = CreateTestContext();

@@ -26,8 +26,11 @@ public class ModuleRegistry(
     IModuleLoader moduleLoader,
     IEnumerable<string> searchPaths,
     IEnumerable<string> allowedSymlinks,
-    ILogger<ModuleRegistry> logger) : IModuleRegistry, IDisposable
+    ILogger<ModuleRegistry> logger,
+    bool enableAggressiveUnloadGc = false) : IModuleRegistry, IDisposable
 {
+    private readonly bool _enableAggressiveUnloadGc = enableAggressiveUnloadGc;
+
     private IReadOnlyDictionary<Guid, ModuleDefinition>
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
@@ -79,7 +82,13 @@ public class ModuleRegistry(
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
         if (unloadedContexts.Count <= 0) return;
-        
+
+        if (!_enableAggressiveUnloadGc)
+        {
+            logger.LogDebug("Skipping aggressive GC for {Count} unloaded module contexts", unloadedContexts.Count);
+            return;
+        }
+
         logger.LogDebug("Running GC to finalize {Count} unloaded contexts", unloadedContexts.Count);
 
         for (var i = 0; i < 10; i++)
@@ -94,14 +103,14 @@ public class ModuleRegistry(
                 break;
             }
 
-            if (i != 9 || stillAlive <= 0) continue;
-            
-            logger.LogWarning(
+            if (i == 9 && stillAlive > 0)
+            {
+                logger.LogWarning(
                     "{Count} assembly contexts still alive after 10 GC iterations - potential memory leak",
                     stillAlive);
-            foreach (var (name, _) in unloadedContexts.Where(c => c.WeakRef.IsAlive))
-                   logger.LogWarning("AssemblyLoadContext '{Name}' not collected", name);
-            
+                foreach (var (name, _) in unloadedContexts.Where(c => c.WeakRef.IsAlive))
+                    logger.LogWarning("AssemblyLoadContext '{Name}' not collected", name);
+            }
         }
     }
 
