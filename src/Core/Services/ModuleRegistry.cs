@@ -29,8 +29,6 @@ public class ModuleRegistry(
     ILogger<ModuleRegistry> logger,
     bool enableAggressiveUnloadGc = false) : IModuleRegistry, IDisposable
 {
-    private readonly bool _enableAggressiveUnloadGc = enableAggressiveUnloadGc;
-
     private IReadOnlyDictionary<Guid, ModuleDefinition>
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
@@ -83,7 +81,7 @@ public class ModuleRegistry(
 
         if (unloadedContexts.Count <= 0) return;
 
-        if (!_enableAggressiveUnloadGc)
+        if (!enableAggressiveUnloadGc)
         {
             logger.LogDebug("Skipping aggressive GC for {Count} unloaded module contexts", unloadedContexts.Count);
             return;
@@ -140,7 +138,11 @@ public class ModuleRegistry(
                     builder.RegisterInstance(definition).As<ModuleDefinition>();
 
                     builder.Register(c =>
-                            new ModuleLoggerAdapter(c.Resolve<ILoggerFactory>().CreateLogger(definition.ModuleType)))
+                        {
+                            var loggerFactory = c.Resolve<ILoggerFactory>();
+                            var innerLogger = loggerFactory.CreateLogger(definition.ModuleType);
+                            return new ModuleLoggerAdapter(innerLogger, definition.Name);
+                        })
                         .As<IModuleLogger>()
                         .InstancePerLifetimeScope();
 

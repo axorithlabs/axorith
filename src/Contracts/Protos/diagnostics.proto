@@ -11,7 +11,7 @@ service DiagnosticsService {
 }
 
 message HealthCheckRequest {
-  // TODO: 
+  // Empty on purpose: reserved for future selector fields if needed.
 }
 
 message HealthCheckResponse {

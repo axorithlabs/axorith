@@ -18,6 +18,7 @@ internal class LinuxSecureStorage : ISecureStorageService
     private readonly string? _storageDir;
     private readonly bool _useSecretService;
     private const string SecretServiceLabel = "Axorith";
+    private const string FileKeyName = "master.key";
 
     public LinuxSecureStorage(ILogger logger)
     {
@@ -42,7 +43,6 @@ internal class LinuxSecureStorage : ISecureStorageService
             if (OperatingSystem.IsLinux())
                 try
                 {
-                    // TODO: 
                     var dirInfo = new UnixDirectoryInfo(_storageDir)
                     {
                         FileAccessPermissions =
@@ -239,9 +239,9 @@ internal class LinuxSecureStorage : ISecureStorageService
         var fileName = GetSecretFileName(key);
         var filePath = Path.Combine(_storageDir, fileName);
 
-        // Simple XOR encryption with machine-specific key
-        var encryptionKey = GetMachineKey();
-        var encryptedData = XorEncrypt(Encoding.UTF8.GetBytes(secret), encryptionKey);
+        var encryptionKey = GetOrCreateFileEncryptionKey();
+        var plaintextBytes = Encoding.UTF8.GetBytes(secret);
+        var encryptedData = EncryptWithAesGcm(plaintextBytes, encryptionKey);
 
         File.WriteAllBytes(filePath, encryptedData);
 
@@ -249,7 +249,6 @@ internal class LinuxSecureStorage : ISecureStorageService
         if (OperatingSystem.IsLinux())
             try
             {
-                // TODO
                 var fileInfo = new UnixFileInfo(filePath)
                 {
                     FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite
@@ -273,10 +272,27 @@ internal class LinuxSecureStorage : ISecureStorageService
             return null;
 
         var encryptedData = File.ReadAllBytes(filePath);
-        var encryptionKey = GetMachineKey();
-        var decryptedData = XorEncrypt(encryptedData, encryptionKey);
+        var encryptionKey = GetOrCreateFileEncryptionKey();
 
-        return Encoding.UTF8.GetString(decryptedData);
+        try
+        {
+            var decryptedData = DecryptWithAesGcm(encryptedData, encryptionKey);
+            return Encoding.UTF8.GetString(decryptedData);
+        }
+        catch (CryptographicException)
+        {
+            // Backward compatibility: try legacy XOR-based fallback for already stored secrets
+            try
+            {
+                var legacyKey = GetMachineKey();
+                var decryptedLegacy = XorEncrypt(encryptedData, legacyKey);
+                return Encoding.UTF8.GetString(decryptedLegacy);
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 
     private void DeleteSecretViaFile(string key)
@@ -299,12 +315,82 @@ internal class LinuxSecureStorage : ISecureStorageService
         return Convert.ToHexString(hashBytes).ToLowerInvariant() + ".dat";
     }
 
+    private byte[] GetOrCreateFileEncryptionKey()
+    {
+        if (_storageDir == null)
+            throw new InvalidOperationException("Storage directory not initialized");
+
+        var keyPath = Path.Combine(_storageDir, FileKeyName);
+
+        if (File.Exists(keyPath))
+            return File.ReadAllBytes(keyPath);
+
+        var key = RandomNumberGenerator.GetBytes(32);
+        File.WriteAllBytes(keyPath, key);
+
+        if (OperatingSystem.IsLinux())
+            try
+            {
+                var keyFileInfo = new UnixFileInfo(keyPath)
+                {
+                    FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to set file permissions for key file {File}", keyPath);
+            }
+
+        return key;
+    }
+
     private static byte[] GetMachineKey()
     {
         // Create machine-specific encryption key
         var machineId = Environment.MachineName + Environment.UserName;
         using var sha = SHA256.Create();
         return sha.ComputeHash(Encoding.UTF8.GetBytes(machineId));
+    }
+
+    private static byte[] EncryptWithAesGcm(byte[] data, byte[] key)
+    {
+        var nonce = RandomNumberGenerator.GetBytes(12);
+        var ciphertext = new byte[data.Length];
+        var tag = new byte[16];
+
+        using (var aes = new AesGcm(key, tag.Length))
+        {
+            aes.Encrypt(nonce, data, ciphertext, tag);
+        }
+
+        var result = new byte[nonce.Length + ciphertext.Length + tag.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, result, nonce.Length + ciphertext.Length, tag.Length);
+
+        return result;
+    }
+
+    private static byte[] DecryptWithAesGcm(byte[] data, byte[] key)
+    {
+        if (data.Length < 12 + 16)
+            throw new CryptographicException("Ciphertext too short");
+
+        var nonce = new byte[12];
+        var tag = new byte[16];
+        var ciphertext = new byte[data.Length - nonce.Length - tag.Length];
+
+        Buffer.BlockCopy(data, 0, nonce, 0, nonce.Length);
+        Buffer.BlockCopy(data, nonce.Length, ciphertext, 0, ciphertext.Length);
+        Buffer.BlockCopy(data, nonce.Length + ciphertext.Length, tag, 0, tag.Length);
+
+        var plaintext = new byte[ciphertext.Length];
+        using (var aes = new AesGcm(key, tag.Length))
+        {
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+        }
+
+        return plaintext;
     }
 
     private static byte[] XorEncrypt(byte[] data, byte[] key)

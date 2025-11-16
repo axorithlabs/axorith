@@ -16,7 +16,8 @@ service PresetsService {
 }
 
 message ListPresetsRequest {
-  // TODO
+  // Optional substring filter applied to preset names (case-insensitive on server).
+  string search = 1;
 }
 
 message ListPresetsResponse {

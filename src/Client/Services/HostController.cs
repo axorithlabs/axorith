@@ -125,6 +125,10 @@ public class HostController(IOptions<Configuration> config, ILogger<HostControll
     {
         try
         {
+            #if DEBUG
+            var debugProbe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", "Axorith.Host.exe"));
+            if (File.Exists(debugProbe)) return debugProbe;
+            #else
             var env = Environment.GetEnvironmentVariable("AXORITH_HOST_PATH", EnvironmentVariableTarget.User);
             if (!string.IsNullOrWhiteSpace(env))
             {
@@ -141,10 +145,6 @@ public class HostController(IOptions<Configuration> config, ILogger<HostControll
                     return candidate;
                 }
             }
-
-            #if DEBUG
-            var debugProbe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", "Axorith.Host.exe"));
-            if (File.Exists(debugProbe)) return debugProbe;
             #endif
         }
         catch

@@ -122,7 +122,8 @@ public record ModuleSetting(
     bool IsReadOnly,
     string ValueType,
     string CurrentValue,
-    IReadOnlyList<KeyValuePair<string, string>> Choices
+    IReadOnlyList<KeyValuePair<string, string>> Choices,
+    string? Filter
 );
 
 /// <summary>

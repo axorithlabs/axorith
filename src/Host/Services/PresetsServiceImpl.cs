@@ -16,7 +16,7 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
     /// <summary>
     ///     Retrieves all session presets from persistent storage.
     /// </summary>
-    /// <param name="request">Empty request message.</param>
+    /// <param name="request">Request with optional search filter for preset names.</param>
     /// <param name="context">Server call context with cancellation token.</param>
     /// <returns>List of preset summaries with ID, name, and module count.</returns>
     public override async Task<ListPresetsResponse> ListPresets(ListPresetsRequest request, ServerCallContext context)
@@ -26,10 +26,22 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
             var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
                 .ConfigureAwait(false);
 
-            var response = new ListPresetsResponse();
-            response.Presets.AddRange(presets.Select(PresetMapper.ToSummary));
+            var filteredPresets = presets;
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var term = request.Search.Trim();
+                filteredPresets = presets
+                    .Where(p => !string.IsNullOrEmpty(p.Name) &&
+                                p.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
 
-            logger.LogInformation("Returned {Count} presets", presets.Count);
+            var response = new ListPresetsResponse();
+            response.Presets.AddRange(filteredPresets.Select(PresetMapper.ToSummary));
+
+            logger.LogInformation("Returned {Count} presets (filter: {Filter})",
+                filteredPresets.Count,
+                string.IsNullOrWhiteSpace(request.Search) ? "<none>" : request.Search);
             return response;
         }
         catch (Exception ex)

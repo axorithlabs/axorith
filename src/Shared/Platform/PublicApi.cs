@@ -154,4 +154,15 @@ public static class PublicApi
 
         return 1; // Fallback
     }
+
+    /// <summary>
+    ///     Gets monitor bounds for a given monitor index - Windows only for now.
+    /// </summary>
+    public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("GetMonitorBounds is currently only supported on Windows");
+
+        return WindowApi.GetMonitorBounds(monitorIndex);
+    }
 }

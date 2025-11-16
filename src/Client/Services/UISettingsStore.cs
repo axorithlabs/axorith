@@ -1,6 +1,4 @@
-using System.IO;
 using System.Text.Json;
-using Axorith.Client;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Client.Services;
@@ -11,16 +9,9 @@ public interface IClientUiSettingsStore
     void Save(ClientUiConfiguration configuration);
 }
 
-public sealed class UISettingsStore : IClientUiSettingsStore
+public sealed class UISettingsStore(ILogger<UISettingsStore> logger) : IClientUiSettingsStore
 {
-    private readonly ILogger<UISettingsStore> _logger;
-    private readonly string _settingsPath;
-
-    public UISettingsStore(ILogger<UISettingsStore> logger)
-    {
-        _logger = logger;
-        _settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
-    }
+    private readonly string _settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
 
     public ClientUiConfiguration LoadOrDefault()
     {
@@ -38,7 +29,7 @@ public sealed class UISettingsStore : IClientUiSettingsStore
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to load client UI settings from {Path}", _settingsPath);
+            logger.LogWarning(ex, "Failed to load client UI settings from {Path}", _settingsPath);
             return new ClientUiConfiguration();
         }
     }
@@ -56,7 +47,7 @@ public sealed class UISettingsStore : IClientUiSettingsStore
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to save client UI settings to {Path}", _settingsPath);
+            logger.LogWarning(ex, "Failed to save client UI settings to {Path}", _settingsPath);
         }
     }
 }

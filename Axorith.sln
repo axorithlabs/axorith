@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Contracts", "src\Contracts\Axorith.Contracts.csproj", "{324C8847-3CD5-FD45-FA04-BA4152DDFF52}"
 EndProject
@@ -12,7 +12,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Host", "src\Host\Ax
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Shim", "src\Shim\Axorith.Shim.csproj", "{E2587D01-8FD2-3681-FC71-D9518E5E0032}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Module.ApplicationLauncher", "src\Modules\ApplicationLauncher\Axorith.Module.ApplicationLauncher.csproj", "{72A5726F-6F1C-740D-8372-B1825A9434BF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Module.ApplicationManager", "src\Modules\ApplicationManager\Axorith.Module.ApplicationManager.csproj", "{72A5726F-6F1C-740D-8372-B1825A9434BF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Module.SiteBlocker", "src\Modules\SiteBlocker\Axorith.Module.SiteBlocker.csproj", "{FBA2A596-781F-D4F6-07AB-218A2228D6AF}"
 EndProject
@@ -35,6 +35,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Contracts.Tests", "tests\Axorith.Contracts.Tests\Axorith.Contracts.Tests.csproj", "{F15A2A44-8C90-62BA-5F63-C97566A42175}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Host.Tests", "tests\Axorith.Host.Tests\Axorith.Host.Tests.csproj", "{135ACC1E-7FF5-C8FE-2B2A-B17F706B04F7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Integrations.Tests", "tests\Axorith.Integrations.Tests\Axorith.Integrations.Tests.csproj", "{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core", "Core", "{FBF56CC3-7AE6-AD2D-3F14-7F97FD322CD6}"
 EndProject
@@ -272,6 +274,18 @@ Global
 		{135ACC1E-7FF5-C8FE-2B2A-B17F706B04F7}.Release|x64.Build.0 = Release|Any CPU
 		{135ACC1E-7FF5-C8FE-2B2A-B17F706B04F7}.Release|x86.ActiveCfg = Release|Any CPU
 		{135ACC1E-7FF5-C8FE-2B2A-B17F706B04F7}.Release|x86.Build.0 = Release|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Debug|x64.Build.0 = Debug|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Debug|x86.Build.0 = Debug|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Release|x64.ActiveCfg = Release|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Release|x64.Build.0 = Release|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Release|x86.ActiveCfg = Release|Any CPU
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{324C8847-3CD5-FD45-FA04-BA4152DDFF52} = {FBF56CC3-7AE6-AD2D-3F14-7F97FD322CD6}
@@ -292,5 +306,6 @@ Global
 		{EB964FF7-EF53-4215-5D74-F085B3762B89} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{F15A2A44-8C90-62BA-5F63-C97566A42175} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{135ACC1E-7FF5-C8FE-2B2A-B17F706B04F7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{A69A7B4B-4C3D-4C2B-A1E9-3D6E9C5D9C42} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

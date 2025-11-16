@@ -14,7 +14,7 @@ service SessionsService {
 }
 
 message GetSessionStateRequest {
-  // TODO
+  // Empty on purpose: reserved for future filter fields (for example, session_id).
 }
 
 message StartSessionRequest {
@@ -22,11 +22,10 @@ message StartSessionRequest {
 }
 
 message StopSessionRequest {
-  // TODO
+  // Empty on purpose: reserved for future options (for example, force flags).
 }
 
 message StreamSessionEventsRequest {
-  // Subscribe to all session events
-  // In future can add filters
-  // TODO
+  // Subscribe to all session events.
+  // Future extension point: add filters (for example, by session id or event type).
 }

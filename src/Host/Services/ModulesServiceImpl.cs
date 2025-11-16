@@ -49,10 +49,21 @@ public class ModulesServiceImpl(
 
             var modules = moduleRegistry.GetAllDefinitions();
 
+            if (!string.IsNullOrWhiteSpace(request.Category))
+            {
+                var category = request.Category.Trim();
+                modules = modules
+                    .Where(m => !string.IsNullOrEmpty(m.Category) &&
+                                string.Equals(m.Category, category, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
             var response = new ListModulesResponse();
             response.Modules.AddRange(modules.Select(ModuleMapper.ToMessage));
 
-            logger.LogInformation("Returned {Count} module definitions", modules.Count);
+            logger.LogInformation("Returned {Count} module definitions (category filter: {Category})",
+                modules.Count,
+                string.IsNullOrWhiteSpace(request.Category) ? "<none>" : request.Category);
             return Task.FromResult(response);
         }
         catch (Exception ex)
@@ -168,21 +179,49 @@ public class ModulesServiceImpl(
     {
         try
         {
-            if (!Guid.TryParse(request.ModuleId, out var moduleId))
+            if (!Guid.TryParse(request.ModuleId, out var parsedId))
                 return SessionMapper.CreateResult(false, "Invalid module ID",
                     [$"Could not parse: {request.ModuleId}"]);
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
-            logger.LogInformation("InvokeDesignTimeAction called: ModuleId={ModuleId}, ActionKey={ActionKey}",
-                moduleId, request.ActionKey);
+            logger.LogInformation("InvokeDesignTimeAction called: Id={Id}, ActionKey={ActionKey}",
+                parsedId, request.ActionKey);
 
-            // Create temporary module instance for design-time actions
-            // This allows actions like OAuth login to work while editing presets
-            var (module, scope) = moduleRegistry.CreateInstance(moduleId);
+            // First try to invoke the action on an existing design-time sandbox instance.
+            // Client code (Session Editor) passes the module instance ID here so that
+            // design-time actions like Spotify login operate on the same sandbox that
+            // is wired into SettingUpdateBroadcaster.
+            try
+            {
+                var invoked = await sandboxManager.TryInvokeActionAsync(parsedId, request.ActionKey,
+                        context.CancellationToken)
+                    .ConfigureAwait(false);
+
+                if (invoked)
+                {
+                    logger.LogInformation(
+                        "Design-time sandbox action {ActionKey} completed successfully for instance {InstanceId}",
+                        request.ActionKey, parsedId);
+                    return SessionMapper.CreateResult(true, "Action completed successfully");
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Sandbox exists but the action is not found on that module instance.
+                logger.LogWarning(ex,
+                    "Action {ActionKey} not found in design-time sandbox {InstanceId}",
+                    request.ActionKey, parsedId);
+                return SessionMapper.CreateResult(false, "Action not found",
+                    [$"Action '{request.ActionKey}' not found in module"]);
+            }
+
+            // Fallback: create a temporary module instance by module definition ID
+            // for design-time actions that are not tied to a specific sandbox.
+            var (module, scope) = moduleRegistry.CreateInstance(parsedId);
             if (module == null)
                 return SessionMapper.CreateResult(false, "Module not found",
-                    [$"Module with ID {moduleId} could not be instantiated"]);
+                    [$"Module with ID {parsedId} could not be instantiated"]);
 
             try
             {
@@ -191,8 +230,9 @@ public class ModulesServiceImpl(
                     return SessionMapper.CreateResult(false, "Action not found",
                         [$"Action '{request.ActionKey}' not found in module"]);
 
-                logger.LogDebug("Invoking design-time action {ActionKey} asynchronously", request.ActionKey);
-                await action.InvokeAsync();
+                logger.LogDebug("Invoking design-time action {ActionKey} asynchronously on temporary instance",
+                    request.ActionKey);
+                await action.InvokeAsync().ConfigureAwait(false);
 
                 logger.LogInformation("Design-time action {ActionKey} completed successfully", request.ActionKey);
                 return SessionMapper.CreateResult(true, "Action completed successfully");
@@ -201,7 +241,7 @@ public class ModulesServiceImpl(
             {
                 module.Dispose();
                 scope?.Dispose();
-                logger.LogDebug("Design-time module instance disposed after action completion");
+                logger.LogDebug("Temporary design-time module instance disposed after action completion");
             }
         }
         catch (Exception ex)
@@ -266,7 +306,7 @@ public class ModulesServiceImpl(
 
             try
             {
-                sandboxManager.Apply(instanceId, request.SettingKey, stringValue);
+                sandboxManager.ApplySetting(instanceId, request.SettingKey, stringValue);
                 return Task.FromResult(SessionMapper.CreateResult(true, "Setting applied in design-time sandbox"));
             }
             catch (InvalidOperationException)

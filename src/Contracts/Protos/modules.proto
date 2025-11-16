@@ -19,7 +19,8 @@ service ModulesService {
 }
 
 message ListModulesRequest {
-  // TODO
+  // Optional category filter; when set, only modules with matching category are returned.
+  string category = 1;
 }
 
 message ListModulesResponse {
@@ -82,8 +83,7 @@ message SettingValue {
 }
 
 message StreamSettingUpdatesRequest {
-  // Subscribe to all setting updates
-  // TODO:
-  // In future can filter by module instanc.
+  // Subscribe to setting updates.
+  // Currently supports optional filtering by module instance via module_instance_id.
   string module_instance_id = 1;
 }

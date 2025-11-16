@@ -57,9 +57,7 @@ public class GrpcCoreConnection : ICoreConnection
     }
 
     /// <inheritdoc />
-    public IPresetsApi Presets => _presetsApi
-                                  // TODO:
-                                  ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
+    public IPresetsApi Presets => _presetsApi ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
     /// <inheritdoc />
     public ISessionsApi Sessions => _sessionsApi

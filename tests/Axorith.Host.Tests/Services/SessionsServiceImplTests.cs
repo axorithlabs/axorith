@@ -3,9 +3,6 @@ using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
-using Axorith.Sdk;
-using Axorith.Sdk.Actions;
-using Axorith.Sdk.Settings;
 using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Grpc.Core;
@@ -13,7 +10,6 @@ using Grpc.Core.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
-using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 
 namespace AAxorith.Host.Tests.Services;
@@ -97,7 +93,7 @@ public class SessionsServiceImplTests
         var snapshot = new SessionSnapshot(
             presetId,
             preset.Name,
-            Array.Empty<SessionModuleSnapshot>());
+            []);
 
         _mockSessionManager.Setup(m => m.GetCurrentSnapshot()).Returns(snapshot);
 
@@ -142,13 +138,13 @@ public class SessionsServiceImplTests
             moduleId,
             "Test Module",
             configuredModule.CustomName,
-            Array.Empty<SessionSettingSnapshot>(),
-            Array.Empty<SessionActionSnapshot>());
+            [],
+            []);
 
         var snapshot = new SessionSnapshot(
             presetId,
             preset.Name,
-            new[] { moduleSnapshot });
+            [moduleSnapshot]);
 
         _mockSessionManager.Setup(m => m.GetCurrentSnapshot()).Returns(snapshot);
 

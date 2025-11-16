@@ -96,6 +96,9 @@ public sealed class HostTrayService(
                 if (_isHostRunning)
                 {
                     await hostController.StopHostAsync();
+                    // Assume Host is now stopped so the menu reflects this immediately;
+                    // the background monitor will correct this if needed.
+                    _isHostRunning = false;
                     await UpdateMenuAsync();
                     ShowErrorPageImmediate();
                 }
@@ -209,10 +212,7 @@ public sealed class HostTrayService(
             if (shell == null || errorVm == null) return;
 
             errorVm.Configure(
-                "Axorith.Host has been stopped from the tray.\n\nUse 'Restart Host' to start it again.",
-                null,
-                null,
-                async () => { await hostController.RestartHostAsync(); });
+                "Axorith.Host has been stopped from the tray.\n\nUse 'Start Host' from the tray menu to start it again.");
 
             Dispatcher.UIThread.Post(() => shell.Content = errorVm);
         }

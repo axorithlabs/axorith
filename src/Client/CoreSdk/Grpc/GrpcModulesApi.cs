@@ -178,7 +178,8 @@ internal class GrpcModulesApi(
                         Setting.ValueOneofCase.DecimalString => s.DecimalString,
                         _ => string.Empty
                     },
-                    s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList()
+                    s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList(),
+                    string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter
                 ))
                 .ToList();
 

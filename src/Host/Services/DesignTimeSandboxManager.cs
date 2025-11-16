@@ -89,7 +89,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
         }
     }
 
-    public void Apply(Guid instanceId, string key, string? stringValue)
+    public void ApplySetting(Guid instanceId, string key, string? stringValue)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))
             throw new InvalidOperationException($"Sandbox not found for {instanceId}");
@@ -103,6 +103,28 @@ public sealed class DesignTimeSandboxManager : IDisposable
         }
 
         setting.SetValueFromString(stringValue);
+    }
+
+    /// <summary>
+    ///     Attempts to invoke an action on an existing design-time sandbox module instance.
+    ///     Returns false if no sandbox exists for the given instance ID.
+    /// </summary>
+    public async Task<bool> TryInvokeActionAsync(Guid instanceId, string actionKey, CancellationToken ct)
+    {
+        if (!_sandboxes.TryGetValue(instanceId, out var sb))
+            return false;
+
+        sb.LastAccessUtc = DateTime.UtcNow;
+
+        var action = sb.Module.GetActions().FirstOrDefault(a => a.Key == actionKey);
+        if (action == null)
+        {
+            _logger.LogWarning("Action {ActionKey} not found for sandbox {InstanceId}", actionKey, instanceId);
+            throw new InvalidOperationException($"Action '{actionKey}' not found for design-time sandbox {instanceId}");
+        }
+
+        await action.InvokeAsync().ConfigureAwait(false);
+        return true;
     }
 
     public void DisposeSandbox(Guid instanceId)

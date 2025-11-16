@@ -139,6 +139,9 @@ public class App : Application
         {
             try
             {
+                if (_isShuttingDown)
+                    return;
+
                 // Prefer current config from DI (may be mutated at runtime via SettingsView)
                 var options = Services.GetService<IOptions<Configuration>>();
                 var cfg = options?.Value ?? clientConfig;
@@ -148,6 +151,11 @@ public class App : Application
                     e.Cancel = true;
                     _mainWindow.WindowState = WindowState.Minimized;
                     logger.LogInformation("Window minimized to tray");
+                }
+                else
+                {
+                    logger.LogInformation("Window closed - shutting down application (MinimizeToTrayOnClose = false)");
+                    desktop.Shutdown();
                 }
             }
             catch (Exception ex)

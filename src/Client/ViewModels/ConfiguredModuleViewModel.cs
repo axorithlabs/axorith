@@ -99,7 +99,10 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
                 foreach (var action in settingsInfo.Actions)
                 {
-                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Definition.Id);
+                    // Pass the configured module InstanceId as the design-time target ID so that
+                    // design-time actions (e.g., Spotify login) execute against the sandbox
+                    // associated with this module instance.
+                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
             });

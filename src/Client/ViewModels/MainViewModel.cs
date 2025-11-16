@@ -156,12 +156,19 @@ public class MainViewModel : ReactiveObject, IDisposable
         try
         {
             SessionStatus = $"Starting '{presetVm.Name}'...";
+            // Consider the session "active/starting" immediately to prevent preset edits
+            // and to show the Stop Session button while modules are starting.
+            ActiveSessionPresetId = presetVm.Id;
+            IsSessionActive = true;
 
             var result = await _sessionsApi.StartSessionAsync(presetVm.Id);
             if (!result.Success)
             {
                 var error = $"Failed to start session: {result.Message}";
                 SessionStatus = error;
+                // Restore idle state if the Host rejected the start request.
+                ActiveSessionPresetId = null;
+                IsSessionActive = false;
                 ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
             }
             else
@@ -173,6 +180,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         {
             var error = $"Failed to start session: {ex.Message}";
             SessionStatus = error;
+            ActiveSessionPresetId = null;
+            IsSessionActive = false;
             ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
         }
     }
@@ -198,9 +207,16 @@ public class MainViewModel : ReactiveObject, IDisposable
             SessionStatus = "Stopping session...";
 
             var result = await _sessionsApi.StopSessionAsync();
-            SessionStatus = !result.Success
-                ? $"Failed to stop session: {result.Message}"
-                : "Session stopped successfully.";
+            if (!result.Success)
+            {
+                SessionStatus = $"Failed to stop session: {result.Message}";
+            }
+            else
+            {
+                SessionStatus = "Session stopped successfully.";
+                ActiveSessionPresetId = null;
+                IsSessionActive = false;
+            }
         }
         catch (Exception ex)
         {

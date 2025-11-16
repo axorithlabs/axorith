@@ -124,6 +124,69 @@ public class ModulesServiceImplTests
         response.Modules[1].Name.Should().Be("Module 2");
     }
 
+    [Fact]
+    public async Task ListModules_WithCategoryFilter_ShouldReturnOnlyMatchingModules()
+    {
+        // Arrange
+        var modules = new List<ModuleDefinition>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "System Module",
+                Description = "System",
+                Category = "System"
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Music Module",
+                Description = "Music",
+                Category = "Music"
+            }
+        };
+
+        _mockModuleRegistry.Setup(m => m.GetAllDefinitions()).Returns(modules);
+        var request = new ListModulesRequest { Category = "system" };
+        var context = CreateTestContext();
+
+        // Act
+        var response = await _service.ListModules(request, context);
+
+        // Assert
+        response.Should().NotBeNull();
+        response.Modules.Should().HaveCount(1);
+        response.Modules[0].Name.Should().Be("System Module");
+        response.Modules[0].Category.Should().Be("System");
+    }
+
+    [Fact]
+    public async Task ListModules_WithUnknownCategory_ShouldReturnEmptyList()
+    {
+        // Arrange
+        var modules = new List<ModuleDefinition>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Module 1",
+                Description = "Test Module 1",
+                Category = "Test"
+            }
+        };
+
+        _mockModuleRegistry.Setup(m => m.GetAllDefinitions()).Returns(modules);
+        var request = new ListModulesRequest { Category = "NonExisting" };
+        var context = CreateTestContext();
+
+        // Act
+        var response = await _service.ListModules(request, context);
+
+        // Assert
+        response.Should().NotBeNull();
+        response.Modules.Should().BeEmpty();
+    }
+
     #endregion
 
     #region GetModuleSettings Tests

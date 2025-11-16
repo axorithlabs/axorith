@@ -1,5 +1,3 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Grpc;
@@ -27,7 +25,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             shellViewModel.Content = loadingViewModel;
             loadingViewModel.Message = "Starting Axorith Client...";
             loadingViewModel.SubMessage = "Preparing connection to Axorith.Host";
-            loadingViewModel.Progress = 0;
         });
 
         try
@@ -38,6 +35,12 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             if (config.Host is { UseRemoteHost: false, AutoStartHost: true })
                 try
                 {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        loadingViewModel.Message = "Starting Axorith Client...";
+                        loadingViewModel.SubMessage = "Checking Axorith.Host status...";
+                    });
+
                     var controller = app.Services.GetService<IHostController>();
                     if (controller != null)
                     {
@@ -45,7 +48,20 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                         if (!healthy)
                         {
                             logger.LogInformation("Auto-starting local Host...");
+
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                loadingViewModel.SubMessage = "Starting Axorith.Host...";
+                            });
+
                             await controller.StartHostAsync();
+                        }
+                        else
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                loadingViewModel.SubMessage = "Axorith.Host is already running";
+                            });
                         }
                     }
                 }
@@ -70,7 +86,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                         loadingViewModel.SubMessage = attempt == 1
                             ? "Opening gRPC channel..."
                             : $"Retry {attempt} of {maxRetries}";
-                        loadingViewModel.Progress = 20 + (attempt - 1) * (40.0 / maxRetries);
                     });
 
                     await connection.ConnectAsync();
@@ -98,7 +113,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             {
                 loadingViewModel.Message = "Connected to Axorith.Host";
                 loadingViewModel.SubMessage = "Initializing client services...";
-                loadingViewModel.Progress = 60;
             });
 
             var newServices = new ServiceCollection();
@@ -131,7 +145,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             {
                 loadingViewModel.Message = "Loading presets...";
                 loadingViewModel.SubMessage = "Fetching session presets and module metadata...";
-                loadingViewModel.Progress = 80;
             });
 
             logger.LogInformation("Creating MainViewModel on UI thread...");
@@ -144,8 +157,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 loadingViewModel.Message = "Ready";
-                loadingViewModel.SubMessage = null;
-                loadingViewModel.Progress = 100;
+                loadingViewModel.SubMessage = "Axorith Client is ready.";
             });
 
             await Dispatcher.UIThread.InvokeAsync(() => { shellViewModel.Content = mainViewModel; });
@@ -162,14 +174,12 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                         var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
                         errorViewModel.Configure(
                             "Lost connection to Axorith.Host.\n\nRestart the Host using the Axorith Client tray menu, then click 'Retry' to reconnect.",
-                            null,
                             async () =>
                             {
                                 var loadingVm = new LoadingViewModel();
                                 shellViewModel.Content = loadingVm;
-                                await InitializeAsync(app, config, loggerFactory, logger).ConfigureAwait(false);
-                            },
-                            null);
+                                await InitializeAsync(app, config, loggerFactory, logger);
+                            });
                         shellViewModel.Content = errorViewModel;
                     }
                     catch (Exception ex)
@@ -190,12 +200,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
                 errorViewModel.Configure(
                     $"Initialization error: {ex.Message}\n\nIf Axorith.Host is not running, start or restart it using the Axorith Client tray menu, then click 'Retry' to try again.",
-                    null,
-                    async () =>
-                    {
-                        await InitializeAsync(app, config, loggerFactory, logger).ConfigureAwait(false);
-                    },
-                    null);
+                    async () => { await InitializeAsync(app, config, loggerFactory, logger); });
                 shellViewModel.Content = errorViewModel;
             });
         }

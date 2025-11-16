@@ -26,6 +26,7 @@ message Setting {
   bool is_visible = 6;
   bool is_read_only = 7;
   string value_type = 8;
+  string filter = 40;
   
   oneof value {
     string string_value = 10;

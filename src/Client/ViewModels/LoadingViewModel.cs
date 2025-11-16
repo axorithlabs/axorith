@@ -15,10 +15,4 @@ public class LoadingViewModel : ReactiveObject
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     }
-
-    public double Progress
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
 }

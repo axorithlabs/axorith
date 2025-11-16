@@ -21,11 +21,6 @@
                        TextAlignment="Center"
                        TextWrapping="Wrap"
                        IsVisible="{Binding SubMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
-            <ProgressBar Minimum="0"
-                         Maximum="100"
-                         Value="{Binding Progress}"
-                         Width="260"
-                         HorizontalAlignment="Center"/>
         </StackPanel>
     </Border>
 </UserControl>

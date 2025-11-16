@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Module.ApplicationLauncher</AssemblyName>
-        <RootNamespace>Axorith.Module.ApplicationLauncher</RootNamespace>
+        <AssemblyName>Axorith.Module.ApplicationManager</AssemblyName>
+        <RootNamespace>Axorith.Module.ApplicationManager</RootNamespace>
 
-        <Description>Cross-platform Application Launcher module for Axorith OS.</Description>
+        <Description>Cross-platform Application Manager module for Axorith OS.</Description>
     </PropertyGroup>
 
     <ItemGroup>

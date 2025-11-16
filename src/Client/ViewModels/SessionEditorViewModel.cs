@@ -207,7 +207,6 @@ public class SessionEditorViewModel : ReactiveObject
         if (string.IsNullOrWhiteSpace(Name))
         {
             ErrorMessage = "Preset name cannot be empty.";
-            // TODO: Show error message to user
             return;
         }
 
@@ -220,6 +219,7 @@ public class SessionEditorViewModel : ReactiveObject
         try
         {
             var existingPreset = await _presetsApi.GetPresetAsync(_preset.Id);
+
             if (existingPreset != null)
                 await _presetsApi.UpdatePresetAsync(_preset);
             else
@@ -230,8 +230,6 @@ public class SessionEditorViewModel : ReactiveObject
         catch (Exception ex)
         {
             ErrorMessage = $"Failed to save preset: {ex.Message}";
-            // TODO: Show error message to user
-            // MessageBox.Show("Save Failed", $"Failed to save preset: {ex.Message}");
         }
     }
 

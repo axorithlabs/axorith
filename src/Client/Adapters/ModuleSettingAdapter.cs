@@ -33,7 +33,7 @@ internal class ModuleSettingAdapter : ISetting
     {
         Key = setting.Key;
         Description = setting.Description;
-        Filter = null;
+        Filter = setting.Filter;
 
         if (!Enum.TryParse<SettingControlType>(setting.ControlType, out var controlType))
             controlType = SettingControlType.Text;

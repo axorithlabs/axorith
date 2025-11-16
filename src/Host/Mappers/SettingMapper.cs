@@ -35,7 +35,8 @@ public static class SettingMapper
             Persistence = ToMessagePersistence(setting.Persistence),
             IsVisible = setting.GetCurrentVisibility(),
             IsReadOnly = setting.GetCurrentReadOnly(),
-            ValueType = GetSimpleTypeName(setting.ValueType)
+            ValueType = GetSimpleTypeName(setting.ValueType),
+            Filter = setting.ControlType == Sdk.Settings.SettingControlType.FilePicker ? setting.Filter ?? string.Empty : string.Empty
         };
 
         var currentValue = setting.GetCurrentValueAsObject();

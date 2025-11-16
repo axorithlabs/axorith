@@ -10,30 +10,17 @@ namespace Axorith.Client.Adapters;
 ///     Adapts a ModuleAction from gRPC into an IAction for UI binding.
 ///     Actions are invoked on the live module instance via gRPC.
 /// </summary>
-internal class ModuleActionAdapter : IAction
+internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid designTimeId)
+    : IAction
 {
-    private readonly Subject<Unit> _invokedSubject;
-    private readonly BehaviorSubject<string> _labelSubject;
-    private readonly BehaviorSubject<bool> _enabledSubject;
+    private readonly Subject<Unit> _invokedSubject = new();
+    private readonly BehaviorSubject<string> _labelSubject = new(action.Label);
+    private readonly BehaviorSubject<bool> _enabledSubject = new(action.IsEnabled);
 
-    private readonly IModulesApi _modulesApi;
-    private readonly Guid _moduleId;
-
-    public string Key { get; }
+    public string Key { get; } = action.Key;
     public IObservable<string> Label => _labelSubject.AsObservable();
     public IObservable<bool> IsEnabled => _enabledSubject.AsObservable();
     public IObservable<Unit> Invoked => _invokedSubject.AsObservable();
-
-    public ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid moduleId)
-    {
-        Key = action.Key;
-        _modulesApi = modulesApi;
-        _moduleId = moduleId;
-
-        _labelSubject = new BehaviorSubject<string>(action.Label);
-        _enabledSubject = new BehaviorSubject<bool>(action.IsEnabled);
-        _invokedSubject = new Subject<Unit>();
-    }
 
     public string GetCurrentLabel()
     {
@@ -47,13 +34,14 @@ internal class ModuleActionAdapter : IAction
 
     public void Invoke()
     {
-        // Fire-and-forget invocation via gRPC
-        // Note: This creates a temporary instance for design-time actions (like OAuth login)
+        // Fire-and-forget invocation via gRPC against the design-time sandbox instance
+        // (keyed by the configured module InstanceId).
+
         _ = Task.Run(async () =>
         {
             try
             {
-                var result = await _modulesApi.InvokeDesignTimeActionAsync(_moduleId, Key);
+                var result = await modulesApi.InvokeDesignTimeActionAsync(designTimeId, Key);
 
                 if (result.Success)
                     _invokedSubject.OnNext(Unit.Default);
@@ -69,7 +57,7 @@ internal class ModuleActionAdapter : IAction
     {
         // Invoke action via gRPC and wait for completion
         // Used for actions that require async completion (e.g., OAuth login)
-        var result = await _modulesApi.InvokeDesignTimeActionAsync(_moduleId, Key);
+        var result = await modulesApi.InvokeDesignTimeActionAsync(designTimeId, Key);
 
         if (result.Success)
             _invokedSubject.OnNext(Unit.Default);

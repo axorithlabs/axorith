@@ -232,4 +232,22 @@ internal static class WindowApi
             }, IntPtr.Zero);
         return monitors.Count;
     }
+
+    public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
+    {
+        var monitors = new List<Rect>();
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            (_, _, ref lprcMonitor, _) =>
+            {
+                monitors.Add(lprcMonitor);
+                return true;
+            }, IntPtr.Zero);
+
+        if (monitorIndex < 0 || monitorIndex >= monitors.Count)
+            throw new ArgumentOutOfRangeException(nameof(monitorIndex),
+                $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
+
+        var target = monitors[monitorIndex];
+        return (target.Left, target.Top, target.Right - target.Left, target.Bottom - target.Top);
+    }
 }
