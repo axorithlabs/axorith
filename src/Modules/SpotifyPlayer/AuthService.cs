@@ -12,7 +12,7 @@ using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Action = Axorith.Sdk.Actions.Action;
 
-namespace Axorith.Module.Spotify;
+namespace Axorith.Module.SpotifyPlayer;
 
 internal sealed class AuthService : IDisposable
 {
@@ -127,8 +127,7 @@ internal sealed class AuthService : IDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "Failed to refresh token. The refresh token might be invalid. Please login again.");
-                UpdateUiForAuthenticationState(false);
+                    "Failed to refresh token. The refresh token might be invalid or a network error occurred. Please login again if the problem persists.");
                 return null;
             }
         }
@@ -153,7 +152,7 @@ internal sealed class AuthService : IDisposable
 
         _logoutAction.SetEnabled(isAuthenticated);
         _settings.CustomUrl.SetVisibility(
-            _settings.PlaybackContext.GetCurrentValue() == Settings.CustomUrlValue);
+            _settings.PlaybackContext.GetCurrentValue() == Settings.CUSTOM_URL_VALUE);
 
         AuthenticationStateChanged?.Invoke(isAuthenticated);
     }

@@ -165,4 +165,15 @@ public static class PublicApi
 
         return WindowApi.GetMonitorBounds(monitorIndex);
     }
+
+    /// <summary>
+    ///     Gets a human-friendly monitor name for UI (e.g., manufacturer/model) when available.
+    /// </summary>
+    public static string GetMonitorName(int monitorIndex)
+    {
+        if (OperatingSystem.IsWindows())
+            return WindowApi.GetMonitorName(monitorIndex);
+
+        return $"Monitor {monitorIndex + 1}";
+    }
 }

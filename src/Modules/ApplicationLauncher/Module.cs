@@ -3,11 +3,12 @@ using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.ApplicationLauncher;
 
-namespace Axorith.Module.ApplicationManager;
+namespace Axorith.Module.ApplicationLauncher;
 
 /// <summary>
-///     Application Manager with window management capabilities.
+///     Application Launcher with window management capabilities.
 ///     Supports launching new processes, attaching to existing ones,
 ///     window state control, custom sizing, and lifecycle management.
 /// </summary>
@@ -15,8 +16,8 @@ public class Module : IModule
 {
     private readonly IModuleLogger _logger;
     private readonly Settings _settings;
-    private readonly ProcessService _process;
-    private readonly WindowService _window;
+    private readonly Shared.ApplicationLauncher.ProcessService _process;
+    private readonly Shared.ApplicationLauncher.WindowService _window;
 
     private Process? _currentProcess;
     private bool _attachedToExisting;
@@ -25,8 +26,8 @@ public class Module : IModule
     {
         _logger = logger;
         _settings = new Settings();
-        _process = new ProcessService(_logger);
-        _window = new WindowService(_logger, _settings);
+        _process = new Shared.ApplicationLauncher.ProcessService(_logger);
+        _window = new Shared.ApplicationLauncher.WindowService(_logger);
     }
 
     public IReadOnlyList<ISetting> GetSettings()
@@ -62,14 +63,29 @@ public class Module : IModule
         var appPath = _settings.ApplicationPath.GetCurrentValue();
         var args = _settings.ApplicationArgs.GetCurrentValue();
 
-        _logger.LogInfo("Starting in {Mode} mode for {AppPath}", mode, appPath);
+        var workingDirectory = _settings.UseCustomWorkingDirectory.GetCurrentValue()
+            ? _settings.WorkingDirectory.GetCurrentValue()
+            : null;
 
-        _currentProcess = mode switch
+        _logger.LogInfo("Starting in {Mode} mode for {AppPath} (WorkingDir: {WorkingDirectory})", mode, appPath,
+            string.IsNullOrWhiteSpace(workingDirectory) ? "<default>" : workingDirectory);
+
+        var startMode = mode switch
         {
-            "AttachExisting" => await _process.AttachToExistingAsync(appPath),
-            "LaunchOrAttach" => await AttachOrLaunchAsync(appPath, args, cancellationToken),
-            _ => await _process.LaunchNewAsync(appPath, args)
+            "AttachExisting" => ProcessStartMode.AttachExisting,
+            "LaunchOrAttach" => ProcessStartMode.LaunchOrAttach,
+            _ => ProcessStartMode.LaunchNew
         };
+
+        var lifecycleMode = _settings.LifecycleMode.GetCurrentValue() == "KeepRunning"
+            ? ProcessLifecycleMode.KeepRunning
+            : ProcessLifecycleMode.TerminateOnEnd;
+
+        var processConfig = new ProcessConfig(appPath, args, startMode, lifecycleMode, workingDirectory);
+
+        var startResult = await _process.StartAsync(processConfig, cancellationToken);
+        _currentProcess = startResult.Process;
+        _attachedToExisting = startResult.AttachedToExisting;
 
         if (_currentProcess == null)
         {
@@ -79,11 +95,12 @@ public class Module : IModule
 
         try
         {
-            await _window.ConfigureWindowAsync(_currentProcess, cancellationToken);
+            var windowConfig = CreateWindowConfigFromSettings();
+            await _window.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken);
         }
         catch (TimeoutException)
         {
-            var fallback = await _process.AttachToExistingAsync(appPath);
+            var fallback = await _process.AttachExistingOnlyAsync(appPath, cancellationToken);
             if (fallback == null)
             {
                 _logger.LogWarning(
@@ -93,7 +110,8 @@ public class Module : IModule
             }
 
             _currentProcess = fallback;
-            await _window.ConfigureWindowAsync(_currentProcess, cancellationToken);
+            var windowConfig = CreateWindowConfigFromSettings();
+            await _window.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken);
         }
     }
 
@@ -107,8 +125,8 @@ public class Module : IModule
 
         var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
         var lifecycle = lifecycleSetting == "KeepRunning"
-            ? LifecycleMode.KeepRunning
-            : LifecycleMode.TerminateOnEnd;
+            ? ProcessLifecycleMode.KeepRunning
+            : ProcessLifecycleMode.TerminateOnEnd;
 
         _logger.LogInfo("Session ending. Lifecycle mode: {Mode}, Attached to existing: {Attached}",
             lifecycleSetting, _attachedToExisting);
@@ -124,8 +142,8 @@ public class Module : IModule
             {
                 var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
                 var lifecycle = lifecycleSetting == "KeepRunning"
-                    ? LifecycleMode.KeepRunning
-                    : LifecycleMode.TerminateOnEnd;
+                    ? ProcessLifecycleMode.KeepRunning
+                    : ProcessLifecycleMode.TerminateOnEnd;
 
                 _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting)
                     .GetAwaiter().GetResult();
@@ -144,20 +162,38 @@ public class Module : IModule
         GC.SuppressFinalize(this);
     }
 
-    private async Task<Process?> AttachOrLaunchAsync(string appPath, string args, CancellationToken cancellationToken)
+    private WindowConfig CreateWindowConfigFromSettings()
     {
-        var existing = await _process.AttachToExistingAsync(appPath);
-        if (existing != null)
+        var state = _settings.WindowState.GetCurrentValue();
+        var useCustomSize = _settings.UseCustomSize.GetCurrentValue();
+        int? width = null;
+        int? height = null;
+
+        if (useCustomSize && state == "Normal")
         {
-            _logger.LogInfo("Attached to existing process {ProcessName} (PID: {ProcessId})",
-                existing.ProcessName, existing.Id);
-            _attachedToExisting = true;
-            return existing;
+            width = _settings.WindowWidth.GetCurrentValue();
+            height = _settings.WindowHeight.GetCurrentValue();
         }
 
-        _logger.LogDebug("No existing process found, launching new one");
-        var launched = await _process.LaunchNewAsync(appPath, args);
-        _attachedToExisting = false;
-        return launched;
+        var moveToMonitor = _settings.MoveToMonitor.GetCurrentValue();
+        int? targetMonitorIndex = null;
+
+        if (moveToMonitor)
+        {
+            var monitorKey = _settings.TargetMonitor.GetCurrentValue();
+            if (!string.IsNullOrWhiteSpace(monitorKey) && int.TryParse(monitorKey, out var parsedIndex))
+                targetMonitorIndex = parsedIndex;
+        }
+
+        var bringToForeground = _settings.BringToForeground.GetCurrentValue();
+
+        return new WindowConfig(
+            state,
+            useCustomSize,
+            width,
+            height,
+            moveToMonitor,
+            targetMonitorIndex,
+            bringToForeground);
     }
 }

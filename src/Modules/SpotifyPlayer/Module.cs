@@ -5,15 +5,17 @@ using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
 
-namespace Axorith.Module.Spotify;
+namespace Axorith.Module.SpotifyPlayer;
 
 /// <summary>
 ///     A module to control Spotify playback, with fully automated authentication and playback options.
+///     This class acts as a composition root, assembling the services that contain the actual logic.
 /// </summary>
 public class Module : IModule
 {
     private readonly Settings _settings;
     private readonly AuthService _authService;
+    private readonly SpotifyApiService _apiService;
     private readonly PlaybackService _playbackService;
 
     public Module(IModuleLogger logger, IHttpClientFactory httpClientFactory, ISecureStorageService secureStorage,
@@ -21,14 +23,8 @@ public class Module : IModule
     {
         _settings = new Settings();
         _authService = new AuthService(logger, httpClientFactory, secureStorage, definition, _settings);
-        _playbackService = new PlaybackService(logger, httpClientFactory, definition, _settings, _authService);
-    }
-
-    public Type? CustomSettingsViewType => null;
-
-    public object? GetSettingsViewModel()
-    {
-        return null;
+        _apiService = new SpotifyApiService(httpClientFactory, definition, _authService, logger);
+        _playbackService = new PlaybackService(logger, _settings, _authService, _apiService);
     }
 
     public IReadOnlyList<ISetting> GetSettings()
@@ -59,6 +55,13 @@ public class Module : IModule
     public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         return _playbackService.OnSessionEndAsync(cancellationToken);
+    }
+
+    public Type? CustomSettingsViewType => null;
+
+    public object? GetSettingsViewModel()
+    {
+        return null;
     }
 
     public void Dispose()

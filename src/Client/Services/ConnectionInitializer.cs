@@ -131,7 +131,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             newServices.AddTransient<ErrorViewModel>();
             newServices.AddTransient<MainViewModel>();
             newServices.AddTransient<SessionEditorViewModel>();
-            newServices.AddSingleton<IClientUiSettingsStore, UISettingsStore>();
+            newServices.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
             newServices.AddTransient<SettingsViewModel>();
 
             var oldProvider = app.Services as IDisposable;

@@ -3,17 +3,16 @@ using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Action = Axorith.Sdk.Actions.Action;
 
-namespace Axorith.Module.Spotify;
+namespace Axorith.Module.SpotifyPlayer;
 
 internal sealed class Settings
 {
-    internal const string CustomUrlValue = "custom";
+    internal const string CUSTOM_URL_VALUE = "custom";
     private const int DefaultRedirectPort = 8888;
 
     public Setting<string> AuthStatus { get; }
     public Setting<int> RedirectPort { get; }
     public Setting<string> TargetDevice { get; }
-    public Setting<string> TargetDeviceLabel { get; }
     public Setting<string> PlaybackContext { get; }
     public Setting<string> CustomUrl { get; }
     public Setting<int> Volume { get; }
@@ -23,6 +22,7 @@ internal sealed class Settings
 
     public Action LoginAction { get; }
     public Action LogoutAction { get; }
+    public Action UpdateAction { get; }
 
     private readonly IReadOnlyList<ISetting> _allSettings;
     private readonly IReadOnlyList<IAction> _allActions;
@@ -48,19 +48,13 @@ internal sealed class Settings
             initialChoices: Array.Empty<KeyValuePair<string, string>>(),
             description: "Device to start playback on.");
 
-        TargetDeviceLabel = Setting.AsText(
-            key: "TargetDeviceLabel",
-            label: "Target Device (cached)",
-            defaultValue: string.Empty,
-            isVisible: false);
-
         PlaybackContext = Setting.AsChoice(
             key: "PlaybackContext",
             label: "Playback Source",
-            defaultValue: CustomUrlValue,
+            defaultValue: CUSTOM_URL_VALUE,
             initialChoices:
             [
-                new KeyValuePair<string, string>(CustomUrlValue, "Enter a custom URL...")
+                new KeyValuePair<string, string>(CUSTOM_URL_VALUE, "Enter a custom URL...")
             ],
             description: "Select a source or enter a custom URL.");
 
@@ -106,13 +100,13 @@ internal sealed class Settings
 
         LoginAction = Action.Create(key: "Login", label: "Login to Spotify");
         LogoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
+        UpdateAction = Action.Create(key: "Update", label: "Update devices and playlists");
 
         _allSettings =
         [
             AuthStatus,
             RedirectPort,
             TargetDevice,
-            TargetDeviceLabel,
             PlaybackContext,
             CustomUrl,
             Volume,
@@ -124,7 +118,8 @@ internal sealed class Settings
         _allActions =
         [
             LoginAction,
-            LogoutAction
+            LogoutAction,
+            UpdateAction
         ];
     }
 

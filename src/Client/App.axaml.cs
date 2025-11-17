@@ -73,8 +73,8 @@ public class App : Application
             builder.AddDebug();
         });
 
-        var uiSettingsLogger = loggerFactory.CreateLogger<UISettingsStore>();
-        var uiSettingsStore = new UISettingsStore(uiSettingsLogger);
+        var uiSettingsLogger = loggerFactory.CreateLogger<UiSettingsStore>();
+        var uiSettingsStore = new UiSettingsStore(uiSettingsLogger);
         clientConfig.Ui = uiSettingsStore.LoadOrDefault();
 
         var logger = loggerFactory.CreateLogger<App>();

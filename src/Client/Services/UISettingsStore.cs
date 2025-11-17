@@ -9,7 +9,7 @@ public interface IClientUiSettingsStore
     void Save(ClientUiConfiguration configuration);
 }
 
-public sealed class UISettingsStore(ILogger<UISettingsStore> logger) : IClientUiSettingsStore
+public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUiSettingsStore
 {
     private readonly string _settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
 

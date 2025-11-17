@@ -8,5 +8,5 @@
     "linux",
     "macos"
   ],
-  "assembly": "Axorith.Module.ApplicationManager.dll"
+  "assembly": "Axorith.Module.ApplicationLauncher.dll"
 }

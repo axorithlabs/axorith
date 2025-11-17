@@ -47,6 +47,10 @@ internal static class WindowApi
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool EnumDisplayDevices(string? lpDevice, uint iDevNum, ref DisplayDevice lpDisplayDevice,
+        uint dwFlags);
+
     private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -67,6 +71,26 @@ internal static class WindowApi
         public uint Flags;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DisplayDevice
+    {
+        public int cb;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceString;
+
+        public int StateFlags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceId;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceKey;
+    }
+
     private const uint SwpNosize = 0x0001;
     private const uint SwpNozorder = 0x0004;
     private const uint SwpNomove = 0x0002;
@@ -76,6 +100,8 @@ internal static class WindowApi
     private const int SwShowminimized = 2;
     private const int SwShowmaximized = 3;
     private const int SwRestore = 9;
+
+    private const int DisplayDeviceActive = 0x00000001;
 
     /// <summary>
     ///     Waits for a process to create its main window handle.
@@ -249,5 +275,32 @@ internal static class WindowApi
 
         var target = monitors[monitorIndex];
         return (target.Left, target.Top, target.Right - target.Left, target.Bottom - target.Top);
+    }
+
+    public static string GetMonitorName(int monitorIndex)
+    {
+        var dd = new DisplayDevice();
+        dd.cb = Marshal.SizeOf<DisplayDevice>();
+
+        var foundIndex = 0;
+        uint devNum = 0;
+
+        while (EnumDisplayDevices(null, devNum, ref dd, 0))
+        {
+            var isActive = (dd.StateFlags & DisplayDeviceActive) != 0;
+
+            if (isActive)
+            {
+                if (foundIndex == monitorIndex)
+                    return string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceName : dd.DeviceString;
+
+                foundIndex++;
+            }
+
+            devNum++;
+            dd = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
+        }
+
+        return $"Monitor {monitorIndex + 1}";
     }
 }

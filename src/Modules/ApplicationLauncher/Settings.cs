@@ -1,18 +1,24 @@
+using System;
+using System.IO;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Platform;
 
-namespace Axorith.Module.ApplicationManager;
+namespace Axorith.Module.ApplicationLauncher;
 
 internal sealed class Settings
 {
     public Setting<string> ApplicationPath { get; }
     public Setting<string> ApplicationArgs { get; }
     public Setting<string> ProcessMode { get; }
-    public Setting<int> MonitorIndex { get; }
+    public Setting<bool> UseCustomWorkingDirectory { get; }
+    public Setting<string> WorkingDirectory { get; }
     public Setting<string> WindowState { get; }
     public Setting<bool> UseCustomSize { get; }
     public Setting<int> WindowWidth { get; }
     public Setting<int> WindowHeight { get; }
+    public Setting<bool> MoveToMonitor { get; }
+    public Setting<string> TargetMonitor { get; }
     public Setting<string> LifecycleMode { get; }
     public Setting<bool> BringToForeground { get; }
 
@@ -49,11 +55,38 @@ internal sealed class Settings
             defaultValue: ""
         );
 
-        MonitorIndex = Setting.AsInt(
-            key: "MonitorIndex",
+        UseCustomWorkingDirectory = Setting.AsCheckbox(
+            key: "UseCustomWorkingDirectory",
+            label: "Use Custom Working Directory",
+            defaultValue: false,
+            description:
+            "If enabled, the application will be started with the specified working directory instead of the executable's folder."
+        );
+
+        WorkingDirectory = Setting.AsDirectoryPicker(
+            key: "WorkingDirectory",
+            label: "Working Directory",
+            defaultValue: Environment.CurrentDirectory,
+            description: "Custom working directory for the application.",
+            isVisible: false
+        );
+
+        var monitorChoices = BuildMonitorChoices();
+
+        MoveToMonitor = Setting.AsCheckbox(
+            key: "MoveToMonitor",
+            label: "Move Window To Monitor",
+            defaultValue: false,
+            description: "If enabled, the window will be moved to the selected monitor."
+        );
+
+        TargetMonitor = Setting.AsChoice(
+            key: "TargetMonitor",
             label: "Target Monitor",
-            description: "Monitor index (0-based) where the window should be placed. Use 0 for primary monitor.",
-            defaultValue: 0
+            defaultValue: monitorChoices[0].Key,
+            initialChoices: monitorChoices,
+            description: "Monitor to move the window to after it appears.",
+            isVisible: false
         );
 
         WindowState = Setting.AsChoice(
@@ -118,11 +151,14 @@ internal sealed class Settings
             ProcessMode,
             ApplicationPath,
             ApplicationArgs,
-            MonitorIndex,
+            UseCustomWorkingDirectory,
+            WorkingDirectory,
             WindowState,
             UseCustomSize,
             WindowWidth,
             WindowHeight,
+            MoveToMonitor,
+            TargetMonitor,
             LifecycleMode,
             BringToForeground
         ];
@@ -157,6 +193,35 @@ internal sealed class Settings
             var showArgs = mode is "LaunchNew" or "LaunchOrAttach";
             ApplicationArgs.SetVisibility(showArgs);
         });
+
+        UseCustomWorkingDirectory.Value.Subscribe(useCustomWorkingDir =>
+        {
+            WorkingDirectory.SetVisibility(useCustomWorkingDir);
+        });
+
+        MoveToMonitor.Value.Subscribe(move =>
+        {
+            TargetMonitor.SetVisibility(move);
+        });
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> BuildMonitorChoices()
+    {
+        var choices = new List<KeyValuePair<string, string>>();
+
+        var monitorCount = PublicApi.GetMonitorCount();
+        if (monitorCount <= 0)
+            monitorCount = 1;
+
+        for (var i = 0; i < monitorCount; i++)
+        {
+            var monitorName = PublicApi.GetMonitorName(i);
+            var display = $"{i}: {monitorName}";
+
+            choices.Add(new KeyValuePair<string, string>(i.ToString(), display));
+        }
+
+        return choices;
     }
 
     public IReadOnlyList<ISetting> GetSettings()
@@ -172,6 +237,16 @@ internal sealed class Settings
         var mode = ProcessMode.GetCurrentValue();
         if (mode == "LaunchNew" && !File.Exists(ApplicationPath.GetCurrentValue()))
             return Task.FromResult(ValidationResult.Fail($"File not found at '{ApplicationPath.GetCurrentValue()}'."));
+
+        if (UseCustomWorkingDirectory.GetCurrentValue())
+        {
+            var workingDir = WorkingDirectory.GetCurrentValue();
+            if (string.IsNullOrWhiteSpace(workingDir))
+                return Task.FromResult(ValidationResult.Fail("'Working Directory' is required when custom working directory is enabled."));
+
+            if (!Directory.Exists(workingDir))
+                return Task.FromResult(ValidationResult.Fail($"Working directory '{workingDir}' does not exist."));
+        }
 
         if (!UseCustomSize.GetCurrentValue()) return Task.FromResult(ValidationResult.Success);
 
