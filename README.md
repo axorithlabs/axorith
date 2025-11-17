@@ -29,7 +29,7 @@ Every time you start a task, you pay a tax in time and willpower. This 15-minute
 
 Axorith was born from a simple, powerful observation: **the modern digital workspace is fundamentally broken.**
 
-The very tools meant to help us have become the primary source of friction. Existing applications only treat the symptoms—they are features *within* the chaos.
+The very tools meant to help us have become the primary source of friction. Existing applications only treat the symptoms — they are features *within* the chaos.
 
 **Axorith is not another application. It is an opinionated operating environment.** We believe your computer should be a silent, purpose-built instrument for your mind, not a battlefield for your attention.
 
