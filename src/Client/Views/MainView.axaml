@@ -129,7 +129,6 @@
                     VerticalAlignment="Bottom"
                     Margin="0,0,0,20">
             <Button Content="Create New Session" Command="{Binding CreateSessionCommand}" IsVisible="{Binding !IsSessionActive}"/>
-            <Button Content="Client Settings" Command="{Binding OpenClientSettingsCommand}" IsVisible="{Binding !IsSessionActive}"/>
             <Button Content="Refresh List" Command="{Binding LoadPresetsCommand}" IsVisible="{Binding !IsSessionActive}"/>
             <Button Content="Stop Current Session" Command="{Binding StopSessionCommand}" Classes="accent" IsVisible="{Binding IsSessionActive}"/>
         </StackPanel>
