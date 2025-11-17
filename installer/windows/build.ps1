@@ -1,5 +1,5 @@
 param (
-    [string]$Version = "0.0.1"
+    [string]$Version = "0.0.1-alpha"
 )
 
 $ErrorActionPreference = "Stop"
@@ -81,14 +81,6 @@ if (Test-Path $sourceModulesPath) {
         Write-Error "Robocopy failed for modules with exit code $LASTEXITCODE"
         exit 1
     }
-}
-
-Write-Host "--- Patching Shim manifest ---" -ForegroundColor Cyan
-$manifestPath = Join-Path $StagingDir "Axorith.Shim\axorith.json"
-if (Test-Path $manifestPath) {
-    $manifestContent = Get-Content $manifestPath -Raw | ConvertFrom-Json
-    $manifestContent.path = '$INSTDIR\Axorith.Shim\Axorith.Shim.exe'
-    $manifestContent | ConvertTo-Json -Depth 5 | Set-Content $manifestPath -NoNewline
 }
 
 Write-Host "--- Compiling the NSIS installer ---" -ForegroundColor Cyan
