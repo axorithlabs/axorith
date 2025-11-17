@@ -1,61 +1,38 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
-using Axorith.Shared.Platform.Windows;
+using Axorith.Shared.ApplicationLauncher;
 
-namespace Axorith.Module.ApplicationLauncher.Windows;
+namespace Axorith.Module.ApplicationLauncher;
 
 /// <summary>
-///     A module that launches an external application at the start of a session.
+///     Application Launcher with window management capabilities.
+///     Supports launching new processes, attaching to existing ones,
+///     window state control, custom sizing, and lifecycle management.
 /// </summary>
 public class Module : IModule
 {
     private readonly IModuleLogger _logger;
-
-    private readonly Setting<string> _applicationPath;
-    private readonly Setting<string> _applicationArgs;
-    private readonly Setting<int> _monitorIndex;
+    private readonly Settings _settings;
+    private readonly ProcessService _process;
+    private readonly WindowService _window;
 
     private Process? _currentProcess;
+    private bool _attachedToExisting;
 
     public Module(IModuleLogger logger)
     {
         _logger = logger;
-
-        _applicationPath = Setting.AsFilePicker(
-            key: "ApplicationPath",
-            label: "Application Path",
-            description: "The path to the application to launch.",
-            defaultValue: @"C:\Windows\notepad.exe",
-            filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
-        );
-
-        _applicationArgs = Setting.AsText(
-            key: "ApplicationArgs",
-            label: "Application Args",
-            description: "The arguments to pass to the application.",
-            defaultValue: ""
-        );
-
-        _monitorIndex = Setting.AsInt(
-            key: "MonitorIndex",
-            label: "Target Monitor",
-            description: "The index of the monitor to move the application window to.",
-            defaultValue: 0
-        );
+        _settings = new Settings();
+        _process = new ProcessService(_logger);
+        _window = new WindowService(_logger);
     }
 
-    /// <inheritdoc />
     public IReadOnlyList<ISetting> GetSettings()
     {
-        return
-        [
-            _applicationPath,
-            _applicationArgs,
-            _monitorIndex
-        ];
+        return _settings.GetSettings();
     }
 
     public IReadOnlyList<IAction> GetActions()
@@ -63,101 +40,159 @@ public class Module : IModule
         return [];
     }
 
-    /// <inheritdoc />
     public Type? CustomSettingsViewType => null;
 
-    /// <inheritdoc />
     public object? GetSettingsViewModel()
     {
-        // This module uses auto-generated UI, so this method returns null.
         return null;
     }
 
-    /// <inheritdoc />
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_applicationPath.GetCurrentValue()))
-            return Task.FromResult(ValidationResult.Fail("'Application Path' is required."));
-
-        if (!File.Exists(_applicationPath.GetCurrentValue()))
-            return Task.FromResult(ValidationResult.Fail($"File not found at '{_applicationPath.GetCurrentValue()}'."));
-
-        if (_monitorIndex.GetCurrentValue() < 0)
-            return Task.FromResult(ValidationResult.Fail("'Monitor Index' must be a non-negative number."));
-
-        return Task.FromResult(ValidationResult.Success);
+        return _settings.ValidateAsync(cancellationToken);
     }
 
-    /// <inheritdoc />
+    public Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            _logger.LogDebug("Attempting to start process: {Path} {Args}", _applicationPath.GetCurrentValue(),
-                _applicationArgs.GetCurrentValue());
-            _currentProcess = new Process();
-            _currentProcess.StartInfo.FileName = _applicationPath.GetCurrentValue();
-            _currentProcess.StartInfo.Arguments = _applicationArgs.GetCurrentValue();
-            _currentProcess.StartInfo.UseShellExecute = true;
-            _currentProcess.Start();
+        var mode = _settings.ProcessMode.GetCurrentValue();
+        var appPath = _settings.ApplicationPath.GetCurrentValue();
+        var args = _settings.ApplicationArgs.GetCurrentValue();
 
-            _logger.LogInfo("Process {ProcessName} ({ProcessId}) started successfully.", _currentProcess.ProcessName,
-                _currentProcess.Id);
-        }
-        catch (Exception ex)
+        var workingDirectory = _settings.UseCustomWorkingDirectory.GetCurrentValue()
+            ? _settings.WorkingDirectory.GetCurrentValue()
+            : null;
+
+        _logger.LogInfo("Starting in {Mode} mode for {AppPath} (WorkingDir: {WorkingDirectory})", mode, appPath,
+            string.IsNullOrWhiteSpace(workingDirectory) ? "<default>" : workingDirectory);
+
+        var startMode = mode switch
         {
-            _logger.LogError(ex,
-                "Failed to start process for application: {ApplicationPath}. Check path and permissions.",
-                _applicationPath.GetCurrentValue());
+            "AttachExisting" => ProcessStartMode.AttachExisting,
+            "LaunchOrAttach" => ProcessStartMode.LaunchOrAttach,
+            _ => ProcessStartMode.LaunchNew
+        };
+
+        var lifecycleMode = _settings.LifecycleMode.GetCurrentValue() == "KeepRunning"
+            ? ProcessLifecycleMode.KeepRunning
+            : ProcessLifecycleMode.TerminateOnEnd;
+
+        var processConfig = new ProcessConfig(appPath, args, startMode, lifecycleMode, workingDirectory);
+
+        var startResult = await _process.StartAsync(processConfig, cancellationToken);
+        _currentProcess = startResult.Process;
+        _attachedToExisting = startResult.AttachedToExisting;
+
+        if (_currentProcess == null)
+        {
+            _logger.LogError(null, "Failed to obtain process handle");
             return;
         }
 
         try
         {
-            await WindowApi.WaitForWindowInitAsync(_currentProcess);
-
-            if (_currentProcess.MainWindowHandle != IntPtr.Zero)
-            {
-                _logger.LogDebug("Main window handle found: {Handle}. Moving to monitor {MonitorIndex}",
-                    _currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
-                WindowApi.MoveWindowToMonitor(_currentProcess.MainWindowHandle, _monitorIndex.GetCurrentValue());
-                _logger.LogInfo("Successfully moved window for process {ProcessName} to monitor {MonitorIndex}",
-                    _currentProcess.ProcessName, _monitorIndex.GetCurrentValue());
-            }
-            else
-            {
-                _logger.LogInfo("Process started without a graphical interface. Skipping window move.");
-            }
+            var windowConfig = CreateWindowConfigFromSettings();
+            await _window.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken);
         }
         catch (TimeoutException)
         {
-            _logger.LogWarning(
-                "Process {ProcessName} started, but its main window did not appear in time. Could not move window.",
-                _currentProcess.ProcessName);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "An unexpected error occurred while trying to move the process window.");
+            var fallback = await _process.AttachExistingOnlyAsync(appPath, cancellationToken);
+            if (fallback == null)
+            {
+                _logger.LogWarning(
+                    "Process {ProcessName} window did not appear in time. Skipping window configuration.",
+                    _currentProcess.ProcessName);
+                return;
+            }
+
+            _currentProcess = fallback;
+            var windowConfig = CreateWindowConfigFromSettings();
+            await _window.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken);
         }
     }
 
-    /// <inheritdoc />
-    public Task OnSessionEndAsync()
+    public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        _currentProcess?.CloseMainWindow();
+        if (_currentProcess == null || _currentProcess.HasExited)
+        {
+            _logger.LogDebug("Process already exited or not started");
+            return;
+        }
 
-        return Task.CompletedTask;
+        var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
+        var lifecycle = lifecycleSetting == "KeepRunning"
+            ? ProcessLifecycleMode.KeepRunning
+            : ProcessLifecycleMode.TerminateOnEnd;
+
+        _logger.LogInfo("Session ending. Lifecycle mode: {Mode}, Attached to existing: {Attached}",
+            lifecycleSetting, _attachedToExisting);
+
+        await _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting);
     }
 
-    /// <summary>
-    ///     Releases the resources used by the module, specifically the running process.
-    /// </summary>
     public void Dispose()
     {
-        if (_currentProcess is { HasExited: false }) _currentProcess.Kill();
+        try
+        {
+            if (_currentProcess is { HasExited: false })
+            {
+                var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
+                var lifecycle = lifecycleSetting == "KeepRunning"
+                    ? ProcessLifecycleMode.KeepRunning
+                    : ProcessLifecycleMode.TerminateOnEnd;
 
-        _currentProcess?.Dispose();
-        _currentProcess = null;
+                _ = Task.Run(() => _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
+            }
+        }
+        catch
+        {
+            // Swallow exceptions in Dispose.
+        }
+        finally
+        {
+            _currentProcess?.Dispose();
+            _currentProcess = null;
+        }
+
         GC.SuppressFinalize(this);
+    }
+
+    private WindowConfig CreateWindowConfigFromSettings()
+    {
+        var state = _settings.WindowState.GetCurrentValue();
+        var useCustomSize = _settings.UseCustomSize.GetCurrentValue();
+        int? width = null;
+        int? height = null;
+
+        if (useCustomSize && state == "Normal")
+        {
+            width = _settings.WindowWidth.GetCurrentValue();
+            height = _settings.WindowHeight.GetCurrentValue();
+        }
+
+        var moveToMonitor = _settings.MoveToMonitor.GetCurrentValue();
+        int? targetMonitorIndex = null;
+
+        if (moveToMonitor)
+        {
+            var monitorKey = _settings.TargetMonitor.GetCurrentValue();
+            if (!string.IsNullOrWhiteSpace(monitorKey) && int.TryParse(monitorKey, out var parsedIndex))
+                targetMonitorIndex = parsedIndex;
+        }
+
+        var bringToForeground = _settings.BringToForeground.GetCurrentValue();
+
+        return new WindowConfig(
+            state,
+            useCustomSize,
+            width,
+            height,
+            moveToMonitor,
+            targetMonitorIndex,
+            bringToForeground);
     }
 }

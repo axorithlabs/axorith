@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>Axorith.Module.ApplicationLauncher</RootNamespace>
+
+        <Description>Cross-platform Application Manager module for Axorith OS.</Description>
+
+        <PackageId>Axorith.Module.ApplicationLauncher</PackageId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+        <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+        <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
+        <ProjectReference Include="..\..\Shared\ApplicationLauncher\Axorith.Shared.ApplicationLauncher.csproj" />
+    </ItemGroup>
+</Project>

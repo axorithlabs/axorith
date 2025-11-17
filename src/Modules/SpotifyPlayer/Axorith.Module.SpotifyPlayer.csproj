@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Module.SpotifyPlayer</AssemblyName>
+        <RootNamespace>Axorith.Module.SpotifyPlayer</RootNamespace>
+
+        <Description>Spotify Player module for Axorith OS.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+        <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+    </ItemGroup>
+</Project>

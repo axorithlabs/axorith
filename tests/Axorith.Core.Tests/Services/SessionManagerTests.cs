@@ -18,7 +18,13 @@ public class SessionManagerTests
     public SessionManagerTests()
     {
         _mockRegistry = new Mock<IModuleRegistry>();
-        _sessionManager = new SessionManager(_mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        _sessionManager = new SessionManager(
+            _mockRegistry.Object,
+            NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), // validation timeout
+            TimeSpan.FromSeconds(30), // startup timeout
+            TimeSpan.FromSeconds(10) // shutdown timeout
+        );
     }
 
     [Fact]
@@ -118,7 +124,7 @@ public class SessionManagerTests
         await _sessionManager.StopCurrentSessionAsync();
 
         // Assert
-        mockModule.Verify(m => m.OnSessionEndAsync(), Times.Once);
+        mockModule.Verify(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()), Times.Once);
         _sessionManager.IsSessionRunning.Should().BeFalse();
         _sessionManager.ActiveSession.Should().BeNull();
     }
@@ -216,12 +222,12 @@ public class SessionManagerTests
         await _sessionManager.DisposeAsync();
 
         // Assert
-        mockModule.Verify(m => m.OnSessionEndAsync(), Times.Once);
+        mockModule.Verify(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()), Times.Once);
         _sessionManager.IsSessionRunning.Should().BeFalse();
         _sessionManager.ActiveSession.Should().BeNull();
     }
 
-    private Mock<IModule> CreateMockModule()
+    private static Mock<IModule> CreateMockModule()
     {
         var mock = new Mock<IModule>();
 
@@ -231,7 +237,7 @@ public class SessionManagerTests
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(m => m.OnSessionEndAsync())
+        mock.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
@@ -239,7 +245,7 @@ public class SessionManagerTests
         return mock;
     }
 
-    private ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
+    private static ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
     {
         return new ModuleDefinition
         {
@@ -250,7 +256,8 @@ public class SessionManagerTests
         };
     }
 
-    private (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module, ModuleDefinition definition)
+    private static (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module,
+        ModuleDefinition definition)
     {
         var root = new ContainerBuilder().Build();
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());

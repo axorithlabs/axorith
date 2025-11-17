@@ -1,10 +1,10 @@
-﻿{
+{
   "id": "9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd",
-  "name": "Application Launcher",
-  "description": "Launches a specified application when a session starts and optionally moves it to a specific monitor. Kills the application on session end.",
+  "name": "Application Manager",
+  "description": "Application and window manager. Launch new processes or attach to existing ones, control window state (maximized, minimized, custom size), and manage process lifecycle on session end.",
   "category": "System",
   "platforms": [
     "windows"
   ],
-  "assembly": "Axorith.Module.ApplicationLauncher.Windows.dll"
+  "assembly": "Axorith.Module.ApplicationLauncher.dll"
 }

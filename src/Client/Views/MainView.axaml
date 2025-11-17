@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
              xmlns:converters="using:Axorith.Client.Converters"
@@ -11,12 +11,18 @@
         </Border>
 
         <Grid Grid.Row="1">
-            <TextBlock Text="You have no presets yet.&#x0a;Click 'Create New Session' to get started."
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       TextAlignment="Center"
-                       Opacity="0.5"
-                       IsVisible="{Binding !Presets.Count}"/>
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding !Presets.Count}">
+                <TextBlock Text="You have no presets yet.&#x0a;Click 'Create New Session' to get started."
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           Opacity="0.5"/>
+                <Button Content="Create New Session"
+                        Command="{Binding CreateSessionCommand}"
+                        HorizontalAlignment="Center"
+                        Margin="0,16,0,0"/>
+            </StackPanel>
 
             <ScrollViewer IsVisible="{Binding Presets.Count}">
                 <ListBox Name="PresetsListBox" ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" Background="Transparent">

@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
-using Autofac;
+using System.Reactive.Linq;
+using Avalonia.Threading;
+using Axorith.Client.Adapters;
+using Axorith.Client.CoreSdk;
 using Axorith.Core.Models;
-using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
 using ReactiveUI;
@@ -10,13 +12,13 @@ namespace Axorith.Client.ViewModels;
 
 /// <summary>
 ///     ViewModel for a module instance configured within a session preset.
-///     Manages settings, actions, and initialization of a live module instance for editing.
+///     Manages settings and actions retrieved from the Host via gRPC API.
 /// </summary>
 public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
-    private readonly IModule? _liveInstance;
-    private readonly ILifetimeScope? _scope;
-    private readonly CancellationTokenSource _initCts = new();
+    private readonly IModulesApi _modulesApi;
+    private readonly IDisposable _settingUpdatesSubscription;
+    private readonly IDisposable? _settingStreamHandle;
 
     public ModuleDefinition Definition { get; }
     public ConfiguredModule Model { get; }
@@ -33,59 +35,130 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         }
     }
 
+    public bool IsLoading
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
     public ObservableCollection<SettingViewModel> Settings { get; } = [];
     public ObservableCollection<ActionViewModel> Actions { get; } = [];
 
-    public ConfiguredModuleViewModel(ModuleDefinition definition, ConfiguredModule model,
-        IModuleRegistry moduleRegistry)
+    public ConfiguredModuleViewModel(ModuleDefinition definition, ConfiguredModule model, IModulesApi modulesApi)
     {
         Definition = definition;
         Model = model;
+        _modulesApi = modulesApi;
 
-        (_liveInstance, _scope) = moduleRegistry.CreateInstance(definition.Id);
-        if (_liveInstance is null) return;
+        // Subscribe to reactive setting updates from running modules
+        // NOTE: Reactive updates (like visibility changes) only work when session is ACTIVE
+        // In design-time (no session), only value changes are saved, not reactive UI updates
+        _settingUpdatesSubscription = _modulesApi.SettingUpdates
+            .Where(update => update.ModuleInstanceId == Model.InstanceId)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(HandleSettingUpdate);
 
-        var moduleSettings = _liveInstance.GetSettings();
+        _settingStreamHandle = _modulesApi.SubscribeToSettingUpdates(Model.InstanceId);
 
-        // Populate the settings with saved values before creating the ViewModels.
-        foreach (var setting in moduleSettings)
-        {
-            model.Settings.TryGetValue(setting.Key, out var savedValue);
-            setting.SetValueFromString(savedValue);
-        }
-
-        foreach (var setting in moduleSettings) Settings.Add(new SettingViewModel(setting));
-
-        // Load actions (non-persisted)
-        foreach (var action in _liveInstance.GetActions()) Actions.Add(new ActionViewModel(action));
-
-        // Initialize heavy resources asynchronously (design-time discovery)
-        _ = InitializeModuleAsync();
+        _ = LoadSettingsAndActionsAsync();
     }
 
-    private async Task InitializeModuleAsync()
+    private async Task LoadSettingsAndActionsAsync()
     {
-        if (_liveInstance == null) return;
-
         try
         {
-            await _liveInstance.InitializeAsync(_initCts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected during disposal
+            IsLoading = true;
+            // Start design-time sandbox FIRST to avoid race with UpdateSetting
+            var initialSnapshot = new Dictionary<string, object?>();
+            foreach (var kv in Model.Settings)
+                initialSnapshot[kv.Key] = kv.Value;
+
+            await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
+                .ConfigureAwait(false);
+
+            var settingsInfo = await _modulesApi.GetModuleSettingsAsync(Definition.Id).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Settings.Clear();
+                Actions.Clear();
+
+                foreach (var setting in settingsInfo.Settings)
+                {
+                    var savedValue = Model.Settings.GetValueOrDefault(setting.Key);
+                    var adaptedSetting = new ModuleSettingAdapter(setting, savedValue);
+                    var vm = new SettingViewModel(adaptedSetting, Model.InstanceId, _modulesApi);
+                    Settings.Add(vm);
+                }
+
+                foreach (var action in settingsInfo.Actions)
+                {
+                    // Pass the configured module InstanceId as the design-time target ID so that
+                    // design-time actions (e.g., Spotify login) execute against the sandbox
+                    // associated with this module instance.
+                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
+                    Actions.Add(new ActionViewModel(adaptedAction));
+                }
+            });
+
+            // Sandbox is already ensured above; now request Host to re-broadcast current reactive state
+            // so that visibility/labels/readonly are applied after VMs are created
+            try
+            {
+                await _modulesApi.SyncEditAsync(Model.InstanceId).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Ignore sync errors to avoid breaking UI
+            }
         }
         catch (Exception)
         {
-            // Errors during initialization are logged by the module itself
+            // Log error but don't crash - UI will show empty settings
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void HandleSettingUpdate(SettingUpdate update)
+    {
+        var settingVm = Settings.FirstOrDefault(s => s.Setting.Key == update.SettingKey);
+
+        if (settingVm?.Setting is not ModuleSettingAdapter adapter)
+            return;
+
+        switch (update.Property)
+        {
+            case SettingProperty.Value:
+                adapter.SetValueFromString(update.Value?.ToString());
+                break;
+
+            case SettingProperty.Label:
+                if (update.Value is string labelValue)
+                    adapter.SetLabel(labelValue);
+                break;
+
+            case SettingProperty.Visibility:
+                if (update.Value is bool visibilityValue)
+                    adapter.SetVisibility(visibilityValue);
+                break;
+
+            case SettingProperty.ReadOnly:
+                if (update.Value is bool readOnlyValue)
+                    adapter.SetReadOnly(readOnlyValue);
+                break;
+
+            case SettingProperty.Choices:
+                if (update.Value is IReadOnlyList<KeyValuePair<string, string>> choicesValue)
+                    adapter.SetChoices(choicesValue);
+                break;
         }
     }
 
     public void SaveChangesToModel()
     {
-        // This is a non-destructive save. We only update values, we don't clear the dictionary.
-        // Only Persisted settings are saved to the preset JSON.
-        // Ephemeral settings (including secrets) are never persisted to disk.
         foreach (var settingVm in Settings)
         {
             if (settingVm.Setting.Persistence != SettingPersistence.Persisted)
@@ -97,20 +170,18 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
-        // Dispose ViewModels FIRST to unsubscribe from observables
-        foreach (var setting in Settings) setting.Dispose();
+        _settingUpdatesSubscription.Dispose();
+        _settingStreamHandle?.Dispose();
+
+        foreach (var setting in Settings)
+            setting.Dispose();
         Settings.Clear();
 
-        foreach (var action in Actions) action.Dispose();
+        foreach (var action in Actions)
+            action.Dispose();
         Actions.Clear();
 
-        // THEN cancel and dispose module
-        _initCts.Cancel();
-        _initCts.Dispose();
-
-        // Don't wait for initialization to complete - just cancel it
-        _liveInstance?.Dispose();
-        _scope?.Dispose();
+        _ = _modulesApi.EndEditAsync(Model.InstanceId);
 
         GC.SuppressFinalize(this);
     }

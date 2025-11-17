@@ -3,6 +3,7 @@ using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
+using Axorith.Shared.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -20,7 +21,13 @@ public class SessionManagerNegativeTests
     public SessionManagerNegativeTests()
     {
         _mockRegistry = new Mock<IModuleRegistry>();
-        _sessionManager = new SessionManager(_mockRegistry.Object, NullLogger<SessionManager>.Instance);
+        _sessionManager = new SessionManager(
+            _mockRegistry.Object,
+            NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(10)
+        );
     }
 
     [Fact]
@@ -43,13 +50,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -73,13 +78,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -104,13 +107,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -135,13 +136,11 @@ public class SessionManagerNegativeTests
             Modules = [new ConfiguredModule { ModuleId = moduleId }]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -176,13 +175,11 @@ public class SessionManagerNegativeTests
             ]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
@@ -197,7 +194,7 @@ public class SessionManagerNegativeTests
         var module2 = CreateMockModule();
 
         var module1Stopped = false;
-        module1.Setup(m => m.OnSessionEndAsync())
+        module1.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Callback(() => module1Stopped = true)
             .Returns(Task.CompletedTask);
 
@@ -222,13 +219,11 @@ public class SessionManagerNegativeTests
             ]
         };
 
-        // Act
-        var stoppedTcs = new TaskCompletionSource();
-        _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
-        await _sessionManager.StartSessionAsync(preset);
-        await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Act & Assert
+        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+            .Should()
+            .ThrowAsync<SessionException>();
 
-        // Assert
         module1Stopped.Should().BeTrue("Module 1 should have been stopped during rollback");
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
@@ -245,10 +240,10 @@ public class SessionManagerNegativeTests
 
         var module2Stopped = false;
 
-        module1.Setup(m => m.OnSessionEndAsync())
+        module1.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Module 1 stop failed"));
 
-        module2.Setup(m => m.OnSessionEndAsync())
+        module2.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Callback(() => module2Stopped = true)
             .Returns(Task.CompletedTask);
 
@@ -283,7 +278,7 @@ public class SessionManagerNegativeTests
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
-    private Mock<IModule> CreateMockModule()
+    private static Mock<IModule> CreateMockModule()
     {
         var mock = new Mock<IModule>();
 
@@ -293,7 +288,7 @@ public class SessionManagerNegativeTests
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(m => m.OnSessionEndAsync())
+        mock.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
@@ -301,7 +296,7 @@ public class SessionManagerNegativeTests
         return mock;
     }
 
-    private ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
+    private static ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
     {
         return new ModuleDefinition
         {
@@ -312,7 +307,8 @@ public class SessionManagerNegativeTests
         };
     }
 
-    private (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module, ModuleDefinition definition)
+    private static (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module,
+        ModuleDefinition definition)
     {
         var root = new ContainerBuilder().Build();
         var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());

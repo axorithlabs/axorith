@@ -1,4 +1,4 @@
-﻿using Axorith.Sdk;
+using Axorith.Sdk;
 
 namespace Axorith.Core.Services.Abstractions;
 
@@ -8,14 +8,14 @@ namespace Axorith.Core.Services.Abstractions;
 public interface IModuleLoader
 {
     /// <summary>
-    ///     Asynchronously loads module definitions from the specified search paths.
+    ///     Asynchronously discovers and loads module definitions from the specified search paths.
     /// </summary>
-    /// <param name="searchPaths">The paths to search for modules.</param>
-    /// <param name="cancellationToken">A cancellation token to observe while waiting for the task to complete.</param>
-    /// <returns>
-    ///     A task that represents the asynchronous operation. The task result contains a read-only list of module
-    ///     definitions.
-    /// </returns>
+    /// <param name="searchPaths">Directories to scan for modules.</param>
+    /// <param name="cancellationToken">Cancellation token to observe.</param>
+    /// <param name="allowedSymlinks">Optional whitelist of allowed symlink paths. Empty list = no symlinks allowed.</param>
+    /// <returns>A list of module definitions found.</returns>
     Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(
-        IEnumerable<string> searchPaths, CancellationToken cancellationToken);
+        IEnumerable<string> searchPaths,
+        CancellationToken cancellationToken,
+        IEnumerable<string>? allowedSymlinks = null);
 }

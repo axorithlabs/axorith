@@ -1,0 +1,10 @@
+{
+  "id": "c5f5e7b2-9d2b-4e1a-9f4b-3f4b7e8c5a21",
+  "name": "JetBrains IDE Launcher",
+  "description": "Launches JetBrains IDE with a selected project, using shared application launcher services for process and window management.",
+  "category": "Development",
+  "platforms": [
+    "windows"
+  ],
+  "assembly": "Axorith.Module.JBIDELauncher.dll"
+}

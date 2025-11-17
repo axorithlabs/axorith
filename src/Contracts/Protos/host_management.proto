@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+option csharp_namespace = "Axorith.Contracts";
+
+package axorith;
+
+import "google/protobuf/empty.proto";
+
+service HostManagement {
+  rpc RequestShutdown(ShutdownRequest) returns (ShutdownResponse);
+  rpc GetStatus(google.protobuf.Empty) returns (HostStatusResponse);
+}
+
+message ShutdownRequest {
+  string reason = 1;
+  int32 timeout_seconds = 2;
+}
+
+message ShutdownResponse {
+  bool accepted = 1;
+  string message = 2;
+}
+
+message HostStatusResponse {
+  string version = 1;
+  int64 uptime_seconds = 2;
+  int32 active_modules_count = 3;
+  bool is_session_running = 4;
+  string current_preset_id = 5;
+}

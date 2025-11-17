@@ -16,12 +16,12 @@ public class EventAggregatorTests
 
     private class TestEvent
     {
-        public string Message { get; set; } = string.Empty;
+        public string Message { get; init; } = string.Empty;
     }
 
     private class AnotherEvent
     {
-        public int Value { get; set; }
+        public int Value { get; init; }
     }
 
     [Fact]
@@ -194,7 +194,6 @@ public class EventAggregatorTests
     {
         // Arrange
         var aggregator = CreateAggregator();
-        var receivedCount = 0;
         var lockObj = new object();
 
         // Act
@@ -208,7 +207,6 @@ public class EventAggregatorTests
                 {
                     lock (lockObj)
                     {
-                        receivedCount++;
                     }
                 });
             }));

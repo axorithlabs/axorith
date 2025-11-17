@@ -11,9 +11,6 @@ public static class AppConverters
     public static readonly IValueConverter IsNotNullOrEmpty =
         new FuncValueConverter<string?, bool>(value => !string.IsNullOrEmpty(value));
 
-    public static readonly IValueConverter IsNotNull =
-        new FuncValueConverter<object?, bool>(value => value is not null);
-
     public static readonly IValueConverter IsNull =
         new FuncValueConverter<object?, bool>(value => value is null);
 

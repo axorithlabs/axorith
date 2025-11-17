@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Module.JBIDELauncher</AssemblyName>
+        <RootNamespace>Axorith.Module.JBIDELauncher</RootNamespace>
+
+        <Description>JetBrains IDE launcher module for Axorith OS.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+        <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+        <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
+        <ProjectReference Include="..\..\Shared\ApplicationLauncher\Axorith.Shared.ApplicationLauncher.csproj" />
+    </ItemGroup>
+</Project>

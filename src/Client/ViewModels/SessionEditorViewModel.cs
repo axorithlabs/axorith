@@ -2,8 +2,9 @@ using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
+using Avalonia.Threading;
+using Axorith.Client.CoreSdk;
 using Axorith.Core.Models;
-using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
@@ -16,9 +17,10 @@ namespace Axorith.Client.ViewModels;
 public class SessionEditorViewModel : ReactiveObject
 {
     private readonly ShellViewModel _shell;
-    private readonly IModuleRegistry _moduleRegistry;
-    private readonly IPresetManager _presetManager;
+    private readonly IModulesApi _modulesApi;
+    private readonly IPresetsApi _presetsApi;
     private readonly IServiceProvider _serviceProvider;
+    private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new() { Id = Guid.NewGuid() };
 
     /// <summary>
@@ -34,15 +36,23 @@ public class SessionEditorViewModel : ReactiveObject
         }
     }
 
-    /// <summary>
-    ///     Gets or sets the name of the preset being edited.
-    /// </summary>
-    private string _name = string.Empty;
-
     public string Name
     {
-        get => _name;
-        set => this.RaiseAndSetIfChanged(ref _name, value);
+        get;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            if (!string.IsNullOrWhiteSpace(value) && !string.IsNullOrEmpty(ErrorMessage))
+                ErrorMessage = string.Empty;
+            else if (string.IsNullOrWhiteSpace(value))
+                ErrorMessage = "Preset name cannot be empty.";
+        }
+    } = string.Empty;
+
+    public string? ErrorMessage
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -50,15 +60,10 @@ public class SessionEditorViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
-    /// <summary>
-    ///     Gets or sets the currently selected module in the list of configured modules.
-    /// </summary>
-    private ConfiguredModuleViewModel? _selectedModule;
-
     public ConfiguredModuleViewModel? SelectedModule
     {
-        get => _selectedModule;
-        set => this.RaiseAndSetIfChanged(ref _selectedModule, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -66,15 +71,10 @@ public class SessionEditorViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<ModuleDefinition> AvailableModulesToAdd { get; } = [];
 
-    /// <summary>
-    ///     Gets or sets the module definition selected in the ComboBox, ready to be added.
-    /// </summary>
-    private ModuleDefinition? _moduleToAdd;
-
     public ModuleDefinition? ModuleToAdd
     {
-        get => _moduleToAdd;
-        set => this.RaiseAndSetIfChanged(ref _moduleToAdd, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -107,12 +107,12 @@ public class SessionEditorViewModel : ReactiveObject
     /// </summary>
     public ICommand CloseModuleSettingsCommand { get; }
 
-    public SessionEditorViewModel(ShellViewModel shell, IModuleRegistry moduleRegistry, IPresetManager presetManager,
+    public SessionEditorViewModel(ShellViewModel shell, IModulesApi modulesApi, IPresetsApi presetsApi,
         IServiceProvider serviceProvider)
     {
         _shell = shell;
-        _moduleRegistry = moduleRegistry;
-        _presetManager = presetManager;
+        _modulesApi = modulesApi;
+        _presetsApi = presetsApi;
         _serviceProvider = serviceProvider;
 
         var canSave = this.WhenAnyValue(vm => vm.Name).Select(name => !string.IsNullOrWhiteSpace(name));
@@ -126,9 +126,8 @@ public class SessionEditorViewModel : ReactiveObject
         {
             _preset.Modules.Remove(moduleVm.Model);
             ConfiguredModules.Remove(moduleVm);
-            moduleVm.Dispose(); // Clean up the live instance and subscriptions
+            moduleVm.Dispose();
             if (SelectedModule == moduleVm) SelectedModule = null;
-            UpdateAvailableModules();
         });
 
         OpenModuleSettingsCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
@@ -138,33 +137,53 @@ public class SessionEditorViewModel : ReactiveObject
 
         CloseModuleSettingsCommand = ReactiveCommand.Create(() => { SelectedModule = null; });
 
+        _ = InitializeAsync();
+    }
 
-        UpdateAvailableModules();
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            var modules = await _modulesApi.ListModulesAsync();
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _availableModules = modules;
+                UpdateAvailableModules();
+
+                LoadFromPreset();
+            });
+        }
+        catch (Exception)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                _availableModules = [];
+                UpdateAvailableModules();
+            });
+        }
     }
 
     private void LoadFromPreset()
     {
         Name = _preset.Name;
 
-        // Dispose old ViewModels before clearing the collection
         foreach (var vm in ConfiguredModules) vm.Dispose();
         ConfiguredModules.Clear();
 
         foreach (var configured in _preset.Modules)
         {
-            var moduleDef = _moduleRegistry.GetDefinitionById(configured.ModuleId);
+            var moduleDef = _availableModules.FirstOrDefault(m => m.Id == configured.ModuleId);
             if (moduleDef != null)
-                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _moduleRegistry));
+                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured,
+                    _modulesApi));
         }
-
-        UpdateAvailableModules();
     }
 
     private void UpdateAvailableModules()
     {
         AvailableModulesToAdd.Clear();
-        var allDefinitions = _moduleRegistry.GetAllDefinitions();
-        foreach (var def in allDefinitions)
+        foreach (var def in _availableModules)
             AvailableModulesToAdd.Add(def);
     }
 
@@ -176,21 +195,42 @@ public class SessionEditorViewModel : ReactiveObject
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
         _preset.Modules.Add(newConfiguredModule);
 
-        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _moduleRegistry);
+        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi);
         ConfiguredModules.Add(newVm);
 
         SelectedModule = newVm;
-
-        // We no longer auto-select the module. The user must click 'Settings'.
         ModuleToAdd = null;
     }
 
     private async Task SaveAndCloseAsync()
     {
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            ErrorMessage = "Preset name cannot be empty.";
+            return;
+        }
+
+        ErrorMessage = string.Empty;
+
         foreach (var moduleVm in ConfiguredModules) moduleVm.SaveChangesToModel();
+
         _preset.Name = Name;
-        await _presetManager.SavePresetAsync(_preset, CancellationToken.None);
-        Cancel();
+
+        try
+        {
+            var existingPreset = await _presetsApi.GetPresetAsync(_preset.Id);
+
+            if (existingPreset != null)
+                await _presetsApi.UpdatePresetAsync(_preset);
+            else
+                await _presetsApi.CreatePresetAsync(_preset);
+
+            Cancel();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to save preset: {ex.Message}";
+        }
     }
 
     private void Cancel()

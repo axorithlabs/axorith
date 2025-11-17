@@ -37,7 +37,7 @@ public class SettingDisposeAndBackpressureTests
         var values2 = new List<string>();
 
         var sub1 = setting.Value.Subscribe(v => values1.Add(v));
-        var sub2 = setting.Value.Subscribe(v => values2.Add(v));
+        setting.Value.Subscribe(v => values2.Add(v));
 
         // Act
         setting.SetValue("A");
@@ -58,7 +58,7 @@ public class SettingDisposeAndBackpressureTests
         var exceptionThrown = false;
 
         setting.Value.Subscribe(v => goodValues.Add(v));
-        setting.Value.Subscribe(v =>
+        setting.Value.Subscribe(_ =>
         {
             exceptionThrown = true;
             throw new InvalidOperationException("Test exception");

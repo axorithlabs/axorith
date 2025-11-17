@@ -12,7 +12,12 @@ namespace Axorith.Core.Services;
 ///     This class orchestrates the startup and shutdown of modules based on a preset,
 ///     managing their isolated lifetime scopes.
 /// </summary>
-public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManager> logger)
+public class SessionManager(
+    IModuleRegistry moduleRegistry,
+    ILogger<SessionManager> logger,
+    TimeSpan validationTimeout,
+    TimeSpan startupTimeout,
+    TimeSpan shutdownTimeout)
     : ISessionManager
 {
     private CancellationTokenSource? _sessionCts;
@@ -35,12 +40,13 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
     public bool IsSessionRunning => ActiveSession != null;
     public SessionPreset? ActiveSession { get; private set; }
+    public DateTimeOffset? SessionStartedAt { get; private set; }
 
     public event Action<Guid>? SessionStarted;
     public event Action<Guid>? SessionStopped;
 
     /// <inheritdoc />
-    public Task StartSessionAsync(SessionPreset preset)
+    public async Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default)
     {
         if (IsSessionRunning)
             throw new SessionException(
@@ -48,10 +54,8 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
         ActiveSession = preset;
-        _sessionCts = new CancellationTokenSource();
-
-        // Immediately notify listeners that the session has started so the UI can update.
-        SessionStarted?.Invoke(preset.Id);
+        SessionStartedAt = DateTimeOffset.UtcNow;
+        _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         _activeModules.Clear();
 
@@ -60,7 +64,9 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
             var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
             if (instance != null && scope != null)
                 _activeModules.Add(new ActiveModule
-                    { Instance = instance, Scope = scope, Configuration = configuredModule });
+                {
+                    Instance = instance, Scope = scope, Configuration = configuredModule
+                });
             else
                 logger.LogWarning(
                     "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping",
@@ -69,18 +75,16 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
         if (_activeModules.Count == 0)
         {
+            ActiveSession = null;
             logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
                 preset.Name);
-            // We need to roll back the "started" state
-            ActiveSession = null;
-            SessionStopped?.Invoke(preset.Id);
-            return Task.CompletedTask;
+            throw new SessionException(
+                $"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
         }
 
-        // Run module startup in the background without blocking the caller.
-        _ = RunModuleStartupsAsync(_activeModules, _sessionCts.Token);
+        await RunModuleStartupsAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
 
-        return Task.CompletedTask;
+        SessionStarted?.Invoke(preset.Id);
     }
 
     private async Task RunModuleStartupsAsync(IReadOnlyCollection<ActiveModule> modules,
@@ -100,15 +104,13 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
 
             try
             {
-                // Populate the module's reactive settings with values from the preset
                 var moduleSettings = activeModule.Instance.GetSettings().ToDictionary(s => s.Key);
                 foreach (var savedSetting in activeModule.Configuration.Settings)
                     if (moduleSettings.TryGetValue(savedSetting.Key, out var setting))
                         setting.SetValueFromString(savedSetting.Value);
 
-                // Validate settings with 5 second timeout
                 using var validationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                validationCts.CancelAfter(TimeSpan.FromSeconds(5));
+                validationCts.CancelAfter(validationTimeout);
 
                 var validation = await activeModule.Instance.ValidateSettingsAsync(validationCts.Token)
                     .ConfigureAwait(false);
@@ -118,16 +120,16 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                     throw new SessionException($"Module validation failed: {validation.Message}");
                 }
 
-                // Start the module with 30 second timeout
                 using var startCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                startCts.CancelAfter(TimeSpan.FromSeconds(30));
+                startCts.CancelAfter(startupTimeout);
 
                 await activeModule.Instance.OnSessionStartAsync(startCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                logger.LogError(ex, "Module {InstanceName} startup timed out", config.CustomName ?? definition.Name);
-                throw new SessionException("Module startup timed out after 30 seconds");
+                logger.LogError(ex, "Module {InstanceName} startup timed out after {Timeout}s",
+                    config.CustomName ?? definition.Name, startupTimeout.TotalSeconds);
+                throw new SessionException($"Module startup timed out after {startupTimeout.TotalSeconds} seconds");
             }
             catch (OperationCanceledException)
             {
@@ -151,80 +153,164 @@ public class SessionManager(IModuleRegistry moduleRegistry, ILogger<SessionManag
                 logger.LogInformation("All {Count} modules for session '{PresetName}' started successfully",
                     modules.Count, ActiveSession.Name);
         }
-        catch
+        catch (Exception)
         {
             if (cancellationToken.IsCancellationRequested)
             {
                 if (ActiveSession is not null)
                     logger.LogInformation("Session '{PresetName}' startup was canceled by user", ActiveSession.Name);
-            }
-            else
-            {
-                if (ActiveSession is not null)
-                    logger.LogCritical(
-                        "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
-                        ActiveSession.Name);
 
-                await StopCurrentSessionAsync().ConfigureAwait(false);
+                await StopCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                throw new SessionException("Session startup was canceled.");
             }
+
+            if (ActiveSession is not null)
+                logger.LogCritical(
+                    "One or more modules failed to start for session '{PresetName}'. Attempting to roll back...",
+                    ActiveSession.Name);
+
+            await StopCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+            throw new SessionException("One or more modules failed to start.");
         }
     }
 
     /// <inheritdoc />
-    public async Task StopCurrentSessionAsync()
+    public async Task StopCurrentSessionAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsSessionRunning || ActiveSession is null) return;
-
-        var sessionToStop = ActiveSession;
-        logger.LogInformation("Stopping session '{PresetName}'...", sessionToStop.Name);
-
-        await _sessionCts?.CancelAsync()!;
-
-        var stopTasks = _activeModules.Select(async activeModule =>
+        if (!IsSessionRunning)
         {
-            var config = activeModule.Configuration;
-            var definition = activeModule.Scope.Resolve<ModuleDefinition>();
+            logger.LogWarning("No session is currently running");
+            return;
+        }
 
-            var scope = logger.BeginScope(new Dictionary<string, object>
-            {
-                ["SessionId"] = sessionToStop.Id,
-                ["ModuleName"] = definition.Name,
-                ["ModuleInstanceName"] = config.CustomName ?? string.Empty
-            });
+        logger.LogInformation("Stopping current session...");
 
-            try
-            {
-                await activeModule.Instance.OnSessionEndAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Module '{ModuleName}' threw an exception during OnSessionEndAsync.",
-                    definition.Name);
-            }
-            finally
-            {
-                scope?.Dispose();
-            }
-        });
-        await Task.WhenAll(stopTasks).ConfigureAwait(false);
+        try
+        {
+            _sessionCts?.Cancel();
 
-        foreach (var activeModule in _activeModules)
-            try
+            foreach (var activeModule in _activeModules)
             {
-                activeModule.Dispose();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "An error occurred while disposing a module or its scope");
+                logger.LogInformation("Stopping module...");
+
+                try
+                {
+                    using var shutdownCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    shutdownCts.CancelAfter(shutdownTimeout);
+
+                    await activeModule.Instance.OnSessionEndAsync(shutdownCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    logger.LogWarning("Module OnSessionEndAsync timed out after {Timeout}s - forcing disposal",
+                        shutdownTimeout.TotalSeconds);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Module threw an exception during OnSessionEndAsync");
+                }
             }
 
-        _activeModules.Clear();
-        _sessionCts?.Dispose();
-        _sessionCts = null;
-        ActiveSession = null;
+            foreach (var activeModule in _activeModules)
+                try
+                {
+                    activeModule.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "An error occurred while disposing a module or its scope");
+                }
 
-        logger.LogInformation("Session '{PresetName}' stopped", sessionToStop.Name);
-        SessionStopped?.Invoke(sessionToStop.Id);
+            var stoppedPresetId = ActiveSession?.Id ?? Guid.Empty;
+            _activeModules.Clear();
+            _sessionCts?.Dispose();
+            _sessionCts = null;
+            ActiveSession = null;
+            SessionStartedAt = null;
+
+            logger.LogInformation("Session stopped successfully");
+            SessionStopped?.Invoke(stoppedPresetId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during session stop");
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Gets the active instance of a module by its module ID.
+    ///     Returns null if the session is not running or the module is not active.
+    /// </summary>
+    /// <param name="moduleId">The unique identifier of the module definition.</param>
+    /// <returns>The active module instance, or null if not found.</returns>
+    public IModule? GetActiveModuleInstance(Guid moduleId)
+    {
+        return _activeModules
+            .FirstOrDefault(m => m.Configuration.ModuleId == moduleId)
+            ?.Instance;
+    }
+
+    /// <summary>
+    ///     Gets the active instance of a module by its instance ID (from preset configuration).
+    ///     Returns null if the session is not running or the module is not active.
+    /// </summary>
+    /// <param name="instanceId">The unique identifier of the configured module instance.</param>
+    /// <returns>The active module instance, or null if not found.</returns>
+    public IModule? GetActiveModuleInstanceByInstanceId(Guid instanceId)
+    {
+        return _activeModules
+            .FirstOrDefault(m => m.Configuration.InstanceId == instanceId)
+            ?.Instance;
+    }
+
+    public SessionSnapshot? GetCurrentSnapshot()
+    {
+        if (!IsSessionRunning || ActiveSession == null)
+            return null;
+
+        var modules = new List<SessionModuleSnapshot>();
+
+        foreach (var active in _activeModules)
+        {
+            var definition = moduleRegistry.GetDefinitionById(active.Configuration.ModuleId);
+
+            var settings = new List<SessionSettingSnapshot>();
+            foreach (var setting in active.Instance.GetSettings())
+                settings.Add(new SessionSettingSnapshot(
+                    setting.Key,
+                    setting.GetCurrentLabel(),
+                    setting.Description,
+                    setting.ControlType,
+                    setting.Persistence,
+                    setting.GetCurrentReadOnly(),
+                    setting.GetCurrentVisibility(),
+                    setting.ValueType.Name,
+                    setting.GetValueAsString()));
+
+            var actions = new List<SessionActionSnapshot>();
+            foreach (var action in active.Instance.GetActions())
+                actions.Add(new SessionActionSnapshot(
+                    action.Key,
+                    action.GetCurrentLabel(),
+                    action.GetCurrentEnabled()));
+
+            modules.Add(new SessionModuleSnapshot(
+                active.Configuration.InstanceId,
+                active.Configuration.ModuleId,
+                definition?.Name ?? "Unknown",
+                active.Configuration.CustomName,
+                settings,
+                actions));
+        }
+
+        return new SessionSnapshot(ActiveSession.Id, ActiveSession.Name, modules);
+    }
+
+    public SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId)
+    {
+        var snapshot = GetCurrentSnapshot();
+        return snapshot?.Modules.FirstOrDefault(m => m.InstanceId == instanceId);
     }
 
     /// <summary>

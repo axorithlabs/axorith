@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Shared.ApplicationLauncher</AssemblyName>
+        <RootNamespace>Axorith.Shared.ApplicationLauncher</RootNamespace>
+        
+        <Description>Shared application launch and window configuration services for Axorith.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Platform\Axorith.Shared.Platform.csproj" />
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+    </ItemGroup>
+</Project>

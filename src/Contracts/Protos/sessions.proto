@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package axorith.v1;
+
+import "Protos/common.proto";
+
+option csharp_namespace = "Axorith.Contracts";
+
+service SessionsService {
+  rpc GetSessionState(GetSessionStateRequest) returns (SessionState);
+  rpc StartSession(StartSessionRequest) returns (OperationResult);
+  rpc StopSession(StopSessionRequest) returns (OperationResult);
+  rpc StreamSessionEvents(StreamSessionEventsRequest) returns (stream SessionEvent);
+}
+
+message GetSessionStateRequest {
+  // Empty on purpose: reserved for future filter fields (for example, session_id).
+}
+
+message StartSessionRequest {
+  string preset_id = 1;
+}
+
+message StopSessionRequest {
+  // Empty on purpose: reserved for future options (for example, force flags).
+}
+
+message StreamSessionEventsRequest {
+  // Subscribe to all session events.
+  // Future extension point: add filters (for example, by session id or event type).
+}

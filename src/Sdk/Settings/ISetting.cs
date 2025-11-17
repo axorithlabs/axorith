@@ -1,4 +1,4 @@
-﻿namespace Axorith.Sdk.Settings;
+namespace Axorith.Sdk.Settings;
 
 /// <summary>
 ///     Represents the public contract for a reactive setting, consumed by the UI and Core.
@@ -57,6 +57,26 @@ public interface ISetting
     /// </summary>
     /// <param name="value">The new value as object.</param>
     void SetValueFromObject(object? value);
+
+    /// <summary>
+    ///     Returns the current label value synchronously (snapshot).
+    /// </summary>
+    string GetCurrentLabel();
+
+    /// <summary>
+    ///     Returns the current visibility state synchronously (snapshot).
+    /// </summary>
+    bool GetCurrentVisibility();
+
+    /// <summary>
+    ///     Returns the current read-only state synchronously (snapshot).
+    /// </summary>
+    bool GetCurrentReadOnly();
+
+    /// <summary>
+    ///     Returns the current choices list synchronously (snapshot).
+    /// </summary>
+    IReadOnlyList<KeyValuePair<string, string>>? GetCurrentChoices();
 
     /// <summary>
     ///     Gets an observable that controls the visibility of the setting in the UI.
