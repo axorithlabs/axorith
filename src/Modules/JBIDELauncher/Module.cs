@@ -60,13 +60,7 @@ public class Module : IModule
 
         var args = _settings.ApplicationArgs.GetCurrentValue();
         if (!string.IsNullOrWhiteSpace(projectPath))
-        {
-            // IDE accepts project/solution path as one of the arguments.
-            if (string.IsNullOrWhiteSpace(args))
-                args = projectPath;
-            else
-                args = $"{args} {projectPath}";
-        }
+            args = string.IsNullOrWhiteSpace(args) ? projectPath : $"{args} {projectPath}";
 
         string? workingDirectory = null;
         try
@@ -165,8 +159,7 @@ public class Module : IModule
                     ? ProcessLifecycleMode.KeepRunning
                     : ProcessLifecycleMode.TerminateOnEnd;
 
-                _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting)
-                    .GetAwaiter().GetResult();
+                _ = Task.Run(() => _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
             }
         }
         catch

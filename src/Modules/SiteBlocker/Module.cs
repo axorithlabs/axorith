@@ -104,10 +104,12 @@ public class Module : IModule
     {
         _logger.LogInfo("Sending 'block' command via Named Pipe...");
 
-        _activeBlockedSites = _blockedSites.GetCurrentValue().Split(',')
-            .Select(s => s.Trim())
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .ToList();
+        _activeBlockedSites =
+        [
+            .. _blockedSites.GetCurrentValue().Split(',')
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+        ];
 
         if (_activeBlockedSites.Count == 0)
         {
@@ -141,12 +143,9 @@ public class Module : IModule
     {
         try
         {
-            // The client connects to the pipe server hosted by the Shim.
             await using var pipeClient =
                 new NamedPipeClientStream(".", _pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
 
-            // We give it a short timeout to connect. If the Shim isn't running,
-            // we don't want to hang the session indefinitely.
             await pipeClient.ConnectAsync(2000);
 
             var json = JsonSerializer.Serialize(message);
@@ -163,7 +162,8 @@ public class Module : IModule
         {
             _logger.LogError(ex,
                 "Could not connect to the Axorith Shim process via Named Pipe. Is the browser extension installed and running?");
-            _status.SetValue("Error: Could not connect to Axorith Shim. Ensure Shim is running and the browser extension is installed.");
+            _status.SetValue(
+                "Error: Could not connect to Axorith Shim. Ensure Shim is running and the browser extension is installed.");
         }
         catch (Exception ex)
         {
@@ -175,7 +175,6 @@ public class Module : IModule
     /// <inheritdoc />
     public void Dispose()
     {
-        // If the module is disposed while a session is active, send a final unblock command.
         if (_activeBlockedSites.Count <= 0) return;
 
         _logger.LogWarning(
@@ -184,7 +183,6 @@ public class Module : IModule
 
         try
         {
-            // Fire-and-forget async cleanup to avoid blocking the calling thread
             _ = Task.Run(async () =>
             {
                 try

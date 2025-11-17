@@ -54,10 +54,8 @@ public class App : Application
             return;
         }
 
-        // Check if running in tray mode (--tray hides window on startup)
         _isTrayMode = Environment.GetCommandLineArgs().Contains("--tray");
 
-        // Load configuration
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
@@ -65,7 +63,6 @@ public class App : Application
 
         var clientConfig = configuration.Get<Configuration>() ?? new Configuration();
 
-        // Setup logging
         var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.AddConfiguration(configuration.GetSection("Logging"));
@@ -82,11 +79,10 @@ public class App : Application
         logger.LogInformation("Host connection: {Endpoint} (Remote: {IsRemote})",
             clientConfig.Host.GetEndpointUrl(), clientConfig.Host.UseRemoteHost);
 
-        // Phase 1: Build initial service collection
         logger.LogInformation("Building initial service collection...");
         var services = new ServiceCollection();
         services.AddSingleton(loggerFactory);
-        services.AddLogging(); // Add ILogger<T> support
+        services.AddLogging();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<LoadingViewModel>();
         services.AddTransient<ErrorViewModel>();
@@ -98,9 +94,7 @@ public class App : Application
         services.AddSingleton<IClientUiSettingsStore>(_ => uiSettingsStore);
 
         Services = services.BuildServiceProvider();
-        var hostController = Services.GetService<IHostController>();
 
-        // Create window IMMEDIATELY to show UI with loading state
         logger.LogInformation("Initializing Axorith Client UI...");
 
         var shellViewModel = Services.GetRequiredService<ShellViewModel>();
@@ -112,7 +106,6 @@ public class App : Application
         _mainWindow = new MainWindow
         {
             DataContext = shellViewModel,
-            // Always show window in taskbar
             ShowInTaskbar = true
         };
 
@@ -150,6 +143,7 @@ public class App : Application
                 {
                     e.Cancel = true;
                     _mainWindow.WindowState = WindowState.Minimized;
+                    _mainWindow.ShowInTaskbar = false;
                     logger.LogInformation("Window minimized to tray");
                 }
                 else
@@ -200,9 +194,9 @@ public class App : Application
                 {
                     conn.DisconnectAsync().Wait(TimeSpan.FromSeconds(2));
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Best effort disconnect
+                    logger.LogWarning(ex, "Error disconnecting client");
                 }
 
             logger.LogInformation("Client shutdown complete");

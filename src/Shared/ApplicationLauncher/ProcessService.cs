@@ -6,7 +6,8 @@ namespace Axorith.Shared.ApplicationLauncher;
 
 public sealed class ProcessService(IModuleLogger logger)
 {
-    public async Task<ProcessStartResult> StartAsync(ProcessConfig config, CancellationToken cancellationToken = default)
+    public async Task<ProcessStartResult> StartAsync(ProcessConfig config,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(config);
 
@@ -15,33 +16,31 @@ public sealed class ProcessService(IModuleLogger logger)
         switch (config.StartMode)
         {
             case ProcessStartMode.AttachExisting:
-                {
-                    var attached = await AttachToExistingAsync(config.ApplicationPath, cancellationToken);
-                    return new ProcessStartResult(attached, attached != null);
-                }
+            {
+                var attached = await AttachToExistingAsync(config.ApplicationPath);
+                return new ProcessStartResult(attached, attached != null);
+            }
 
             case ProcessStartMode.LaunchOrAttach:
+            {
+                var existing = await AttachToExistingAsync(config.ApplicationPath);
+                if (existing != null)
                 {
-                    var existing = await AttachToExistingAsync(config.ApplicationPath, cancellationToken);
-                    if (existing != null)
-                    {
-                        logger.LogInfo("Attached to existing process {ProcessName} (PID: {ProcessId})",
-                            existing.ProcessName, existing.Id);
-                        return new ProcessStartResult(existing, true);
-                    }
-
-                    var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory,
-                        cancellationToken);
-                    return new ProcessStartResult(launched, false);
+                    logger.LogInfo("Attached to existing process {ProcessName} (PID: {ProcessId})",
+                        existing.ProcessName, existing.Id);
+                    return new ProcessStartResult(existing, true);
                 }
+
+                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory);
+                return new ProcessStartResult(launched, false);
+            }
 
             case ProcessStartMode.LaunchNew:
             default:
-                {
-                    var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory,
-                        cancellationToken);
-                    return new ProcessStartResult(launched, false);
-                }
+            {
+                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory);
+                return new ProcessStartResult(launched, false);
+            }
         }
     }
 
@@ -104,11 +103,10 @@ public sealed class ProcessService(IModuleLogger logger)
 
     public Task<Process?> AttachExistingOnlyAsync(string path, CancellationToken cancellationToken = default)
     {
-        return AttachToExistingAsync(path, cancellationToken);
+        return AttachToExistingAsync(path);
     }
 
-    private Task<Process?> LaunchNewAsync(string path, string args, string? workingDirectory,
-        CancellationToken cancellationToken)
+    private Task<Process?> LaunchNewAsync(string path, string args, string? workingDirectory)
     {
         try
         {
@@ -118,7 +116,6 @@ public sealed class ProcessService(IModuleLogger logger)
             var effectiveWorkingDirectory = workingDirectory;
 
             if (string.IsNullOrWhiteSpace(effectiveWorkingDirectory))
-            {
                 try
                 {
                     effectiveWorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty;
@@ -127,7 +124,6 @@ public sealed class ProcessService(IModuleLogger logger)
                 {
                     effectiveWorkingDirectory = string.Empty;
                 }
-            }
 
             var startInfo = new ProcessStartInfo
             {
@@ -166,7 +162,7 @@ public sealed class ProcessService(IModuleLogger logger)
         }
     }
 
-    private Task<Process?> AttachToExistingAsync(string path, CancellationToken cancellationToken)
+    private Task<Process?> AttachToExistingAsync(string path)
     {
         try
         {

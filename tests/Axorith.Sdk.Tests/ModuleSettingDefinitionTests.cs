@@ -59,7 +59,7 @@ public class ModuleSettingDefinitionTests
             false,
             "string",
             "value",
-            Array.Empty<KeyValuePair<string, string>>()
+            []
         );
 
         // Act
@@ -104,11 +104,11 @@ public class ModuleSettingDefinitionTests
         // Arrange
         var def1 = new ModuleSettingDefinition(
             "key1", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         var def2 = new ModuleSettingDefinition(
             "key2", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         def1.Should().NotBe(def2);
@@ -121,7 +121,7 @@ public class ModuleSettingDefinitionTests
         // Arrange
         var original = new ModuleSettingDefinition(
             "key", "original", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Act
         var modified = original with { Label = "modified" };
@@ -139,11 +139,11 @@ public class ModuleSettingDefinitionTests
         // Arrange
         var def1 = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         var def2 = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         def1.GetHashCode().Should().Be(def2.GetHashCode());
@@ -155,7 +155,7 @@ public class ModuleSettingDefinitionTests
         // Arrange
         var definition = new ModuleSettingDefinition(
             "key", "label", null, SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Act
         var stringRep = definition.ToString();
@@ -171,7 +171,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "", "label", null, SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         definition.Key.Should().BeEmpty();
@@ -183,7 +183,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", null, SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         definition.Description.Should().BeNull();
@@ -195,7 +195,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Choice, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         definition.Choices.Should().NotBeNull();
@@ -234,7 +234,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", "desc", controlType, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         definition.ControlType.Should().Be(controlType);
@@ -248,7 +248,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, persistence,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Assert
         definition.Persistence.Should().Be(persistence);
@@ -264,7 +264,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            isVisible, isReadOnly, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            isVisible, isReadOnly, "string", "value", []);
 
         // Assert
         definition.IsVisible.Should().Be(isVisible);
@@ -281,7 +281,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, typeName, "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, typeName, "value", []);
 
         // Assert
         definition.ValueTypeName.Should().Be(typeName);
@@ -296,7 +296,7 @@ public class ModuleSettingDefinitionTests
         // Act
         var definition = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", longValue, Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", longValue, []);
 
         // Assert
         definition.RawValue.Should().HaveLength(10000);
@@ -327,7 +327,7 @@ public class ModuleSettingDefinitionTests
         // Arrange
         var original = new ModuleSettingDefinition(
             "key", "label", "desc", SettingControlType.Text, SettingPersistence.Persisted,
-            true, false, "string", "value", Array.Empty<KeyValuePair<string, string>>());
+            true, false, "string", "value", []);
 
         // Act
         var modified = original with

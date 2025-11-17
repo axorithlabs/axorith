@@ -208,7 +208,6 @@ public class ModulesServiceImpl(
             }
             catch (InvalidOperationException ex)
             {
-                // Sandbox exists but the action is not found on that module instance.
                 logger.LogWarning(ex,
                     "Action {ActionKey} not found in design-time sandbox {InstanceId}",
                     request.ActionKey, parsedId);

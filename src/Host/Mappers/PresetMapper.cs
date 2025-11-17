@@ -36,7 +36,7 @@ public static class PresetMapper
             Id = id,
             Name = message.Name,
             Version = message.Version,
-            Modules = message.Modules.Select(ToModel).ToList()
+            Modules = [.. message.Modules.Select(ToModel)]
         };
     }
 

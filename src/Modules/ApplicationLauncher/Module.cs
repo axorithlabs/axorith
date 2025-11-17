@@ -16,8 +16,8 @@ public class Module : IModule
 {
     private readonly IModuleLogger _logger;
     private readonly Settings _settings;
-    private readonly Shared.ApplicationLauncher.ProcessService _process;
-    private readonly Shared.ApplicationLauncher.WindowService _window;
+    private readonly ProcessService _process;
+    private readonly WindowService _window;
 
     private Process? _currentProcess;
     private bool _attachedToExisting;
@@ -26,8 +26,8 @@ public class Module : IModule
     {
         _logger = logger;
         _settings = new Settings();
-        _process = new Shared.ApplicationLauncher.ProcessService(_logger);
-        _window = new Shared.ApplicationLauncher.WindowService(_logger);
+        _process = new ProcessService(_logger);
+        _window = new WindowService(_logger);
     }
 
     public IReadOnlyList<ISetting> GetSettings()
@@ -145,8 +145,7 @@ public class Module : IModule
                     ? ProcessLifecycleMode.KeepRunning
                     : ProcessLifecycleMode.TerminateOnEnd;
 
-                _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting)
-                    .GetAwaiter().GetResult();
+                _ = Task.Run(() => _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
             }
         }
         catch

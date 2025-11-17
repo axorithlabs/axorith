@@ -37,7 +37,6 @@ public class HostManagementServiceImpl(
                     }
                     finally
                     {
-                        // Trigger graceful shutdown
                         lifetime.StopApplication();
                     }
                 });
@@ -49,7 +48,6 @@ public class HostManagementServiceImpl(
                 });
             }
 
-            // No active session, shutdown immediately
             lifetime.StopApplication();
 
             return Task.FromResult(new ShutdownResponse

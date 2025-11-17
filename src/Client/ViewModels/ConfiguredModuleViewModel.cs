@@ -72,15 +72,9 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             var initialSnapshot = new Dictionary<string, object?>();
             foreach (var kv in Model.Settings)
                 initialSnapshot[kv.Key] = kv.Value;
-            try
-            {
-                await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
-                    .ConfigureAwait(false);
-            }
-            catch
-            {
-                // ignore
-            }
+
+            await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
+                .ConfigureAwait(false);
 
             var settingsInfo = await _modulesApi.GetModuleSettingsAsync(Definition.Id).ConfigureAwait(false);
 
@@ -187,14 +181,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             action.Dispose();
         Actions.Clear();
 
-        try
-        {
-            _ = _modulesApi.EndEditAsync(Model.InstanceId);
-        }
-        catch
-        {
-            /* ignore */
-        }
+        _ = _modulesApi.EndEditAsync(Model.InstanceId);
 
         GC.SuppressFinalize(this);
     }

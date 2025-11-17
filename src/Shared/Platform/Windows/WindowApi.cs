@@ -5,17 +5,6 @@ using System.Runtime.Versioning;
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-///     Windows window states.
-/// </summary>
-public enum WindowState
-{
-    Normal = 1,
-    Minimized = 2,
-    Maximized = 3,
-    Hidden = 0
-}
-
-/// <summary>
 ///     Windows-specific window management API.
 /// </summary>
 [SupportedOSPlatform("windows")]

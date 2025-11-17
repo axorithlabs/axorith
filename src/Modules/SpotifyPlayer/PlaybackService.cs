@@ -38,7 +38,7 @@ internal sealed class PlaybackService : IDisposable
             .DisposeWith(_disposables);
     }
 
-    public async Task InitializeAsync(CancellationToken cancellationToken)
+    public async Task InitializeAsync()
     {
         if (!_authService.HasRefreshToken()) return;
 
@@ -55,7 +55,7 @@ internal sealed class PlaybackService : IDisposable
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        return _settings.ValidateAsync(cancellationToken);
+        return _settings.ValidateAsync();
     }
 
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)
@@ -134,7 +134,7 @@ internal sealed class PlaybackService : IDisposable
         await StartPlaybackAsync(urlToPlay, deviceId);
     }
 
-    public Task OnSessionEndAsync(CancellationToken cancellationToken)
+    public Task OnSessionEndAsync()
     {
         if (!_authService.HasRefreshToken()) return Task.CompletedTask;
 
@@ -253,9 +253,9 @@ internal sealed class PlaybackService : IDisposable
         }
         else
         {
-            UpdateDeviceChoices(Array.Empty<KeyValuePair<string, string>>());
-            UpdatePlayableItemChoices(Array.Empty<KeyValuePair<string, string>>(),
-                Array.Empty<KeyValuePair<string, string>>(), string.Empty);
+            UpdateDeviceChoices([]);
+            UpdatePlayableItemChoices([],
+                [], string.Empty);
         }
     }
 

@@ -76,7 +76,7 @@ public static class PublicApi
 
         // Fallback to simple name-based search
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
-        return Process.GetProcessesByName(processName).ToList();
+        return [.. Process.GetProcessesByName(processName)];
     }
 
     /// <summary>

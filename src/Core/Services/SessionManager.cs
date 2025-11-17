@@ -78,7 +78,8 @@ public class SessionManager(
             ActiveSession = null;
             logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
                 preset.Name);
-            throw new SessionException($"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
+            throw new SessionException(
+                $"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
         }
 
         await RunModuleStartupsAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
@@ -276,7 +277,6 @@ public class SessionManager(
 
             var settings = new List<SessionSettingSnapshot>();
             foreach (var setting in active.Instance.GetSettings())
-            {
                 settings.Add(new SessionSettingSnapshot(
                     setting.Key,
                     setting.GetCurrentLabel(),
@@ -287,16 +287,13 @@ public class SessionManager(
                     setting.GetCurrentVisibility(),
                     setting.ValueType.Name,
                     setting.GetValueAsString()));
-            }
 
             var actions = new List<SessionActionSnapshot>();
             foreach (var action in active.Instance.GetActions())
-            {
                 actions.Add(new SessionActionSnapshot(
                     action.Key,
                     action.GetCurrentLabel(),
                     action.GetCurrentEnabled()));
-            }
 
             modules.Add(new SessionModuleSnapshot(
                 active.Configuration.InstanceId,

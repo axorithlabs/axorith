@@ -13,7 +13,6 @@ namespace Axorith.Host.Mappers;
 /// </summary>
 public static class SettingMapper
 {
-    // Cache for serialized choices to avoid re-allocation on every ToMessage call
     private static readonly ConditionalWeakTable<ISetting, CachedChoices> ChoicesCache = [];
 
     private sealed class CachedChoices
@@ -36,7 +35,9 @@ public static class SettingMapper
             IsVisible = setting.GetCurrentVisibility(),
             IsReadOnly = setting.GetCurrentReadOnly(),
             ValueType = GetSimpleTypeName(setting.ValueType),
-            Filter = setting.ControlType == Sdk.Settings.SettingControlType.FilePicker ? setting.Filter ?? string.Empty : string.Empty
+            Filter = setting.ControlType == Sdk.Settings.SettingControlType.FilePicker
+                ? setting.Filter ?? string.Empty
+                : string.Empty
         };
 
         var currentValue = setting.GetCurrentValueAsObject();
@@ -79,17 +80,14 @@ public static class SettingMapper
 
         var cachedChoices = ChoicesCache.GetValue(setting, _ => new CachedChoices());
 
-        // Check if choices have changed
         if (!ReferenceEquals(cachedChoices.SourceChoices, currentChoices))
         {
-            // Rebuild cache
             cachedChoices.SourceChoices = currentChoices;
             cachedChoices.SerializedChoices.Clear();
             foreach (var (key, display) in currentChoices)
                 cachedChoices.SerializedChoices.Add(new Choice { Key = key, Display = display });
         }
 
-        // Add cached choices to message
         message.Choices.AddRange(cachedChoices.SerializedChoices);
 
         return message;

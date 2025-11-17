@@ -39,7 +39,7 @@ public class Module : IModule
 
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
-        return _playbackService.InitializeAsync(cancellationToken);
+        return _playbackService.InitializeAsync();
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
@@ -54,7 +54,7 @@ public class Module : IModule
 
     public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        return _playbackService.OnSessionEndAsync(cancellationToken);
+        return _playbackService.OnSessionEndAsync();
     }
 
     public Type? CustomSettingsViewType => null;

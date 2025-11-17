@@ -66,14 +66,15 @@ public class HostController(IOptions<Configuration> config, ILogger<HostControll
         {
             using var channel = GrpcChannel.ForAddress(addr);
             var management = new HostManagement.HostManagementClient(channel);
-            await management.RequestShutdownAsync(new ShutdownRequest { Reason = "Client tray stop", TimeoutSeconds = 10 },
+            await management.RequestShutdownAsync(
+                new ShutdownRequest { Reason = "Client tray stop", TimeoutSeconds = 10 },
                 deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: ct);
             logger.LogInformation("Shutdown requested to Host");
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Graceful host shutdown failed, will try to kill processes");
-            Process[] procs = Array.Empty<Process>();
+            var procs = Array.Empty<Process>();
             try
             {
                 procs = Process.GetProcessesByName("Axorith.Host");
@@ -84,15 +85,9 @@ public class HostController(IOptions<Configuration> config, ILogger<HostControll
             }
 
             foreach (var p in procs)
-            {
                 try
                 {
-                    var pid = 0;
-                    try { pid = p.Id; }
-                    catch
-                    {
-                        // ignored
-                    }
+                    var pid = p.Id;
 
                     p.Kill(entireProcessTree: true);
                     _ = p.WaitForExit(3000);
@@ -104,13 +99,8 @@ public class HostController(IOptions<Configuration> config, ILogger<HostControll
                 }
                 finally
                 {
-                    try { p.Dispose(); }
-                    catch
-                    {
-                        // ignored
-                    }
+                    p.Dispose();
                 }
-            }
         }
     }
 
@@ -126,7 +116,8 @@ public class HostController(IOptions<Configuration> config, ILogger<HostControll
         try
         {
             #if DEBUG
-            var debugProbe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", "Axorith.Host.exe"));
+            var debugProbe =
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", "Axorith.Host.exe"));
             if (File.Exists(debugProbe)) return debugProbe;
             #else
             var env = Environment.GetEnvironmentVariable("AXORITH_HOST_PATH", EnvironmentVariableTarget.User);

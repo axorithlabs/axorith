@@ -6,7 +6,7 @@ public class LoadingViewModel : ReactiveObject
 {
     public string Message
     {
-        get => field;
+        get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = "Connecting to Axorith Host...";
 

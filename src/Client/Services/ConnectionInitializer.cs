@@ -134,7 +134,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             newServices.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
             newServices.AddTransient<SettingsViewModel>();
 
-            var oldProvider = app.Services as IDisposable;
             var newProvider = newServices.BuildServiceProvider();
             // Intentionally keep the old provider alive so existing services like HostTrayService
             // continue to function correctly with their original service provider.

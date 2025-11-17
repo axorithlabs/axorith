@@ -383,14 +383,10 @@ internal class GrpcModulesApi(
         _settingUpdatesSubject.Dispose();
 
         foreach (var kv in _instanceStreams)
-            try
-            {
-                kv.Value.Cancel();
-                kv.Value.Dispose();
-            }
-            catch
-            {
-            }
+        {
+            kv.Value.Cancel();
+            kv.Value.Dispose();
+        }
 
         _instanceStreams.Clear();
 

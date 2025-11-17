@@ -45,7 +45,6 @@ public class SettingUpdateBroadcaster : IDisposable
         _choicesThrottleMs = Math.Clamp(streaming?.ChoicesThrottleMs ?? 200, 0, 10_000);
         _valueBatchWindowMs = Math.Clamp(streaming?.ValueBatchWindowMs ?? 16, 0, 1000);
 
-        // Subscribe to session lifecycle to manage setting subscriptions
         _sessionManager.SessionStarted += OnSessionStarted;
         _sessionManager.SessionStopped += OnSessionStopped;
 
@@ -63,14 +62,7 @@ public class SettingUpdateBroadcaster : IDisposable
         {
             if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
 
-            try
-            {
-                sub.Dispose();
-            }
-            catch
-            {
-                /* ignore */
-            }
+            sub.Dispose();
 
             toRemove.Add(key);
         }
@@ -97,7 +89,6 @@ public class SettingUpdateBroadcaster : IDisposable
 
         var key = string.IsNullOrWhiteSpace(moduleInstanceId) ? subscriberId : $"{subscriberId}:{moduleInstanceId}";
 
-        // Create bounded channel with drop-oldest policy to avoid backpressure explosions
         var channel = Channel.CreateBounded<SettingUpdate>(new BoundedChannelOptions(1024)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
@@ -105,7 +96,6 @@ public class SettingUpdateBroadcaster : IDisposable
             SingleWriter = false
         });
 
-        // Dedicated writer loop per subscriber
         var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var loopTask = Task.Run(async () =>
         {
@@ -147,14 +137,7 @@ public class SettingUpdateBroadcaster : IDisposable
         {
             _logger.LogWarning("Client {Key} already subscribed, replacing stream", key);
             if (_subscribers.TryRemove(key, out var old))
-                try
-                {
-                    await old.Cts.CancelAsync().ConfigureAwait(false);
-                }
-                catch
-                {
-                    // ignored
-                }
+                await old.Cts.CancelAsync().ConfigureAwait(false);
 
             _subscribers[key] = subscriber;
         }
@@ -170,14 +153,7 @@ public class SettingUpdateBroadcaster : IDisposable
         finally
         {
             if (_subscribers.TryRemove(key, out var sub))
-                try
-                {
-                    await sub.Cts.CancelAsync().ConfigureAwait(false);
-                }
-                catch
-                {
-                    // ignored
-                }
+                await sub.Cts.CancelAsync().ConfigureAwait(false);
         }
     }
 
@@ -192,10 +168,8 @@ public class SettingUpdateBroadcaster : IDisposable
             return;
         }
 
-        // Iterate through all configured modules in the active preset
         foreach (var configuredModule in activePreset.Modules)
         {
-            // Get the live module instance by InstanceId (not ModuleId!)
             var moduleInstance = _sessionManager.GetActiveModuleInstanceByInstanceId(configuredModule.InstanceId);
             if (moduleInstance == null)
             {
@@ -205,7 +179,6 @@ public class SettingUpdateBroadcaster : IDisposable
             }
 
             _runtimeInstanceIds[configuredModule.InstanceId] = 1;
-            // Subscribe to all settings of this module
             var settings = moduleInstance.GetSettings();
             foreach (var setting in settings) SubscribeToSetting(configuredModule.InstanceId, setting);
 
@@ -224,25 +197,23 @@ public class SettingUpdateBroadcaster : IDisposable
 
         foreach (var instanceId in _runtimeInstanceIds.Keys.ToArray())
         {
-            // Remove per-setting subscriptions for this runtime instance
-            var prefix = instanceId.ToString() + ":";
+            var prefix = instanceId + ":";
             foreach (var kv in _settingSubscriptions.ToArray())
             {
                 if (!kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
-                try { kv.Value.Dispose(); } catch { /* ignore */ }
+                kv.Value.Dispose();
                 if (_settingSubscriptions.TryRemove(kv.Key, out _)) removedSubs++;
             }
 
-            foreach (var ck in _lastChoicesFingerprint.Keys.ToArray())
-            {
-                if (ck.StartsWith(instanceId.ToString() + ":", StringComparison.OrdinalIgnoreCase))
-                    if (_lastChoicesFingerprint.TryRemove(ck, out _)) removedChoices++;
-            }
+            removedChoices += _lastChoicesFingerprint.Keys.ToArray()
+                .Where(ck => ck.StartsWith(instanceId + ":", StringComparison.OrdinalIgnoreCase))
+                .Count(ck => _lastChoicesFingerprint.TryRemove(ck, out _));
 
             _runtimeInstanceIds.TryRemove(instanceId, out _);
         }
 
-        _logger.LogDebug("Session stopped: {PresetId}, removed {Subs} runtime subscriptions and {Choices} choice caches",
+        _logger.LogDebug(
+            "Session stopped: {PresetId}, removed {Subs} runtime subscriptions and {Choices} choice caches",
             presetId, removedSubs, removedChoices);
     }
 
@@ -272,7 +243,6 @@ public class SettingUpdateBroadcaster : IDisposable
 
         foreach (var (subscriberKey, sub) in _subscribers)
         {
-            // Key may be 'subscriberId' or 'subscriberId:moduleInstanceId'
             string? filter = null;
             var sepIndex = subscriberKey.IndexOf(':');
             if (sepIndex > 0 && sepIndex < subscriberKey.Length - 1)
@@ -352,10 +322,7 @@ public class SettingUpdateBroadcaster : IDisposable
 
     private void ReplaceSubscription(string key, IDisposable sub)
     {
-        if (_settingSubscriptions.TryRemove(key, out var old))
-        {
-            try { old.Dispose(); } catch { /* ignore */ }
-        }
+        if (_settingSubscriptions.TryRemove(key, out var old)) old.Dispose();
         _settingSubscriptions[key] = sub;
     }
 

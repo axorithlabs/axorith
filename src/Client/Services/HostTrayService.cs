@@ -40,30 +40,7 @@ public sealed class HostTrayService(
         };
 
         var showItem = new NativeMenuItem("Show");
-        showItem.Click += (_, _) =>
-        {
-            try
-            {
-                if (desktop.MainWindow != null)
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        try
-                        {
-                            desktop.MainWindow.WindowState = WindowState.Normal;
-                            desktop.MainWindow.Activate();
-                            desktop.MainWindow.BringIntoView();
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Failed to bring window to front from tray");
-                        }
-                    });
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Show window failed");
-            }
-        };
+        showItem.Click += (_, _) => { ShowMainWindow(desktop); };
 
         var exitItem = new NativeMenuItem("Exit");
         exitItem.Click += (_, _) =>
@@ -136,30 +113,7 @@ public sealed class HostTrayService(
 
         _trayIcon.Menu = menu;
 
-        _trayIcon.Clicked += (_, _) =>
-        {
-            try
-            {
-                if (desktop.MainWindow != null)
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        try
-                        {
-                            desktop.MainWindow.WindowState = WindowState.Normal;
-                            desktop.MainWindow.Activate();
-                            desktop.MainWindow.BringIntoView();
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Failed to bring window to front from tray");
-                        }
-                    });
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Tray icon click failed");
-            }
-        };
+        _trayIcon.Clicked += (_, _) => { ShowMainWindow(desktop); };
 
         var trayIcons = new TrayIcons { _trayIcon };
         Application.Current?.SetValue(TrayIcon.IconsProperty, trayIcons);
@@ -222,22 +176,35 @@ public sealed class HostTrayService(
         }
     }
 
-    public void Dispose()
+    private void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
     {
         try
         {
-            _cts?.Cancel();
+            if (desktop.MainWindow != null)
+                Dispatcher.UIThread.Post(() =>
+                {
+                    try
+                    {
+                        desktop.MainWindow.ShowInTaskbar = true;
+                        desktop.MainWindow.WindowState = WindowState.Normal;
+                        desktop.MainWindow.Activate();
+                        desktop.MainWindow.BringIntoView();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to bring window to front from tray");
+                    }
+                });
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Show window failed");
         }
+    }
 
-        try
-        {
-            _cts?.Dispose();
-        }
-        catch
-        {
-        }
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
     }
 }

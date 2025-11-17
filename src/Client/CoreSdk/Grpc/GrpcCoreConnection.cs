@@ -57,7 +57,8 @@ public class GrpcCoreConnection : ICoreConnection
     }
 
     /// <inheritdoc />
-    public IPresetsApi Presets => _presetsApi ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
+    public IPresetsApi Presets =>
+        _presetsApi ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
     /// <inheritdoc />
     public ISessionsApi Sessions => _sessionsApi
@@ -96,7 +97,6 @@ public class GrpcCoreConnection : ICoreConnection
         {
             _logger.LogInformation("Connecting to Axorith.Host at {Address}", _serverAddress);
 
-            // Create gRPC channel with retry configuration
             _channel = GrpcChannel.ForAddress(_serverAddress, new GrpcChannelOptions
             {
                 MaxReceiveMessageSize = 16 * 1024 * 1024, // 16MB
@@ -123,19 +123,16 @@ public class GrpcCoreConnection : ICoreConnection
                 }
             });
 
-            // Create service clients
             var presetsClient = new PresetsService.PresetsServiceClient(_channel);
             var sessionsClient = new SessionsService.SessionsServiceClient(_channel);
             var modulesClient = new ModulesService.ModulesServiceClient(_channel);
             var diagnosticsClient = new DiagnosticsService.DiagnosticsServiceClient(_channel);
 
-            // Create API implementations
             _presetsApi = new GrpcPresetsApi(presetsClient, _retryPolicy);
             _sessionsApi = new GrpcSessionsApi(sessionsClient, _retryPolicy, _logger);
             _modulesApi = new GrpcModulesApi(modulesClient, _retryPolicy, _logger);
             _diagnosticsApi = new GrpcDiagnosticsApi(diagnosticsClient, _retryPolicy);
 
-            // Verify connection with health check
             var health = await _diagnosticsApi.GetHealthAsync(ct).ConfigureAwait(false);
 
             _logger.LogInformation("Connected successfully to Axorith.Host v{Version} ({State})",
@@ -148,7 +145,6 @@ public class GrpcCoreConnection : ICoreConnection
             _logger.LogError(ex, "Failed to connect to {Address}", _serverAddress);
             SetState(ConnectionState.Failed);
 
-            // Clean up partial state
             await DisposeChannelAsync().ConfigureAwait(false);
 
             throw new InvalidOperationException($"Failed to connect to Axorith.Host at {_serverAddress}", ex);
@@ -195,12 +191,11 @@ public class GrpcCoreConnection : ICoreConnection
 
     private void SetState(ConnectionState newState)
     {
-        if (_stateSubject.Value != newState)
-        {
-            _logger.LogDebug("Connection state changed: {OldState} -> {NewState}",
-                _stateSubject.Value, newState);
-            _stateSubject.OnNext(newState);
-        }
+        if (_stateSubject.Value == newState) return;
+
+        _logger.LogDebug("Connection state changed: {OldState} -> {NewState}",
+            _stateSubject.Value, newState);
+        _stateSubject.OnNext(newState);
     }
 
     /// <inheritdoc />

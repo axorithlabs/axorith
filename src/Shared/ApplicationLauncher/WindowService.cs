@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Axorith.Sdk.Logging;
 using Axorith.Shared.Platform;
-using Axorith.Shared.Platform.Windows;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
@@ -104,7 +103,7 @@ public sealed class WindowService(IModuleLogger logger)
 
                 default:
                 {
-                    if (config.UseCustomSize && config.Width is { } width && config.Height is { } height)
+                    if (config is { UseCustomSize: true, Width: { } width, Height: { } height })
                     {
                         logger.LogDebug("Setting custom window size: {Width}x{Height}", width, height);
                         PublicApi.SetWindowSize(windowHandle, width, height);

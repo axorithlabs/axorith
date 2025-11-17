@@ -70,9 +70,9 @@ public sealed class DesignTimeSandboxManager : IDisposable
                 initCts.CancelAfter(TimeSpan.FromSeconds(5));
                 await sandbox.Module.InitializeAsync(initCts.Token).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // ignore
+                _logger.LogWarning(ex, "Error initializing sandbox {InstanceId} ({ModuleId})", instanceId, moduleId);
             }
 
         if (!sandbox.Subscribed)
@@ -135,9 +135,9 @@ public sealed class DesignTimeSandboxManager : IDisposable
         {
             _broadcaster.UnsubscribeModuleInstance(instanceId);
         }
-        catch
+        catch (Exception ex)
         {
-            // ignored
+            _logger.LogWarning(ex, "Error unsubscribing module {InstanceId}", instanceId);
         }
 
         sb.Module.Dispose();
@@ -202,26 +202,12 @@ public sealed class DesignTimeSandboxManager : IDisposable
 
     public void Dispose()
     {
-        try
-        {
-            _evictionTimer.Dispose();
-        }
-        catch
-        {
-            /* ignore */
-        }
+        _evictionTimer.Dispose();
 
         foreach (var id in _sandboxes.Keys.ToArray())
             DisposeSandbox(id);
         _sandboxes.Clear();
-        try
-        {
-            GC.SuppressFinalize(this);
-        }
-        catch
-        {
-            /* ignore */
-        }
+        GC.SuppressFinalize(this);
         _sessionManager.SessionStarted -= OnSessionStarted;
     }
 
@@ -232,9 +218,15 @@ public sealed class DesignTimeSandboxManager : IDisposable
             // Dispose design-time sandboxes that match modules in the now active preset
             var toDispose = _sandboxes.Keys.ToArray();
             foreach (var id in toDispose)
-            {
-                try { DisposeSandbox(id); } catch { /* best effort */ }
-            }
+                try
+                {
+                    DisposeSandbox(id);
+                }
+                catch
+                {
+                    /* best effort */
+                }
+
             _logger.LogInformation("Disposed all design-time sandboxes on session start {PresetId}", presetId);
         }
         catch (Exception ex)

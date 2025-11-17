@@ -45,7 +45,7 @@ internal sealed class Settings
             key: "TargetDevice",
             label: "Target Device",
             defaultValue: string.Empty,
-            initialChoices: Array.Empty<KeyValuePair<string, string>>(),
+            initialChoices: [],
             description: "Device to start playback on.");
 
         PlaybackContext = Setting.AsChoice(
@@ -133,12 +133,8 @@ internal sealed class Settings
         return _allActions;
     }
 
-    public Task<ValidationResult> ValidateAsync(CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateAsync()
     {
-        var deviceId = TargetDevice.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(deviceId))
-            return Task.FromResult(ValidationResult.Fail("Target device must be selected"));
-
         return Task.FromResult(ValidationResult.Success);
     }
 }

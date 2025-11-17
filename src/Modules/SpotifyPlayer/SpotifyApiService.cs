@@ -33,11 +33,13 @@ internal sealed class SpotifyApiService(
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
         using var jsonDoc = JsonDocument.Parse(responseJson);
-        return jsonDoc.RootElement.GetProperty("devices").EnumerateArray()
-            .Select(d => new KeyValuePair<string, string>(
-                d.GetProperty("id").GetString() ?? string.Empty,
-                $"{d.GetProperty("name").GetString()} ({d.GetProperty("type").GetString()})"))
-            .ToList();
+        return
+        [
+            .. jsonDoc.RootElement.GetProperty("devices").EnumerateArray()
+                .Select(d => new KeyValuePair<string, string>(
+                    d.GetProperty("id").GetString() ?? string.Empty,
+                    $"{d.GetProperty("name").GetString()} ({d.GetProperty("type").GetString()})"))
+        ];
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
@@ -46,11 +48,13 @@ internal sealed class SpotifyApiService(
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists");
         using var jsonDoc = JsonDocument.Parse(responseJson);
-        return jsonDoc.RootElement.GetProperty("items").EnumerateArray()
-            .Select(p => new KeyValuePair<string, string>(
-                p.GetProperty("uri").GetString() ?? string.Empty,
-                $"{p.GetProperty("name").GetString()} (Playlist)"))
-            .ToList();
+        return
+        [
+            .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
+                .Select(p => new KeyValuePair<string, string>(
+                    p.GetProperty("uri").GetString() ?? string.Empty,
+                    $"{p.GetProperty("name").GetString()} (Playlist)"))
+        ];
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetSavedAlbumsAsync()
@@ -59,11 +63,13 @@ internal sealed class SpotifyApiService(
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums");
         using var jsonDoc = JsonDocument.Parse(responseJson);
-        return jsonDoc.RootElement.GetProperty("items").EnumerateArray()
-            .Select(a => new KeyValuePair<string, string>(
-                a.GetProperty("album").GetProperty("uri").GetString() ?? string.Empty,
-                $"{a.GetProperty("album").GetProperty("name").GetString()} (Album)"))
-            .ToList();
+        return
+        [
+            .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
+                .Select(a => new KeyValuePair<string, string>(
+                    a.GetProperty("album").GetProperty("uri").GetString() ?? string.Empty,
+                    $"{a.GetProperty("album").GetProperty("name").GetString()} (Album)"))
+        ];
     }
 
     public async Task<string> GetLikedSongsAsUriListAsync()

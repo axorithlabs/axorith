@@ -120,13 +120,16 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
             Id = Guid.TryParse(message.Id, out var id) ? id : Guid.NewGuid(),
             Name = message.Name,
             Version = message.Version,
-            Modules = message.Modules.Select(m => new Core.Models.ConfiguredModule
-            {
-                InstanceId = Guid.TryParse(m.InstanceId, out var iid) ? iid : Guid.NewGuid(),
-                ModuleId = Guid.Parse(m.ModuleId),
-                CustomName = string.IsNullOrWhiteSpace(m.CustomName) ? null : m.CustomName,
-                Settings = new Dictionary<string, string>(m.Settings)
-            }).ToList()
+            Modules =
+            [
+                .. message.Modules.Select(m => new Core.Models.ConfiguredModule
+                {
+                    InstanceId = Guid.TryParse(m.InstanceId, out var iid) ? iid : Guid.NewGuid(),
+                    ModuleId = Guid.Parse(m.ModuleId),
+                    CustomName = string.IsNullOrWhiteSpace(m.CustomName) ? null : m.CustomName,
+                    Settings = new Dictionary<string, string>(m.Settings)
+                })
+            ]
         };
     }
 }

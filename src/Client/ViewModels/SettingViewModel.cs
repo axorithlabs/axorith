@@ -47,11 +47,9 @@ public class SettingViewModel : ReactiveObject, IDisposable
     public string StringValue
     {
         get => Setting.GetCurrentValueAsObject() as string ?? string.Empty;
-        set
-        {
+        set =>
             // Send to server, update will come back via broadcast
             _stringUpdates.OnNext(value);
-        }
     }
 
     public bool BoolValue
@@ -90,11 +88,6 @@ public class SettingViewModel : ReactiveObject, IDisposable
         }
     }
 
-    public static TimeSpan TimeSpanFromDecimal(decimal value)
-    {
-        return TimeSpan.FromSeconds((double)value);
-    }
-
     public IReadOnlyList<KeyValuePair<string, string>> Choices
     {
         get;
@@ -122,7 +115,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
         set
         {
             if (!value.HasValue) return;
-            
+
             StringValue = value.Value.Key;
             this.RaisePropertyChanged(nameof(StringValue));
             this.RaisePropertyChanged();

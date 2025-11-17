@@ -33,7 +33,6 @@ public class DiagnosticsServiceImpl(
             }
             catch (InvalidOperationException ex)
             {
-                // ModuleRegistry not initialized yet – treat as 0 modules but overall Healthy so the host is considered ready
                 logger.LogWarning(ex, "ModuleRegistry not initialized during health check");
                 loadedModules = 0;
             }

@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform;
@@ -199,10 +197,7 @@ internal sealed class Settings
             WorkingDirectory.SetVisibility(useCustomWorkingDir);
         });
 
-        MoveToMonitor.Value.Subscribe(move =>
-        {
-            TargetMonitor.SetVisibility(move);
-        });
+        MoveToMonitor.Value.Subscribe(move => { TargetMonitor.SetVisibility(move); });
     }
 
     private static IReadOnlyList<KeyValuePair<string, string>> BuildMonitorChoices()
@@ -242,7 +237,8 @@ internal sealed class Settings
         {
             var workingDir = WorkingDirectory.GetCurrentValue();
             if (string.IsNullOrWhiteSpace(workingDir))
-                return Task.FromResult(ValidationResult.Fail("'Working Directory' is required when custom working directory is enabled."));
+                return Task.FromResult(
+                    ValidationResult.Fail("'Working Directory' is required when custom working directory is enabled."));
 
             if (!Directory.Exists(workingDir))
                 return Task.FromResult(ValidationResult.Fail($"Working directory '{workingDir}' does not exist."));
