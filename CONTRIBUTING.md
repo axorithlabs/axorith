@@ -49,9 +49,107 @@ This is the core process for contributing code.
 3.  **Make your changes.** Adhere to the existing code style and our architectural principles (see below).
 4.  **Add tests.** If you're adding new functionality, it needs to be tested. If you're fixing a bug, add a test that proves the bug is fixed.
 5.  **Update documentation.** If your changes affect the architecture or user-facing features, update the relevant `.md` files in the `docs/` folder.
-6.  **Use meaningful commit messages.** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. (e.g., `feat(spotify): add validation for Spotify API token`, `fix(module-loader): prevent crash when module DLL is corrupt`).
+6.  **Use meaningful commit messages.** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. See [Commit Message Style](#commit-message-style) for details and examples.
 7.  **Push your branch** to your fork and **open a Pull Request** against the `main` branch of `axorithlabs/axorith`.
 8.  **Write a clear PR description.** Explain what your PR does and link to the issue it resolves (e.g., "Closes #42").
+
+### Commit Message Style
+
+We use **Conventional Commits** to keep history clean, searchable, and automatable.
+
+The general format is:
+
+```text
+<type>(<scope>): <short description>
+```
+
+- `<type>` – what kind of change this is.
+- `<scope>` – optional, where the change happens (project, area, or feature).
+- `<short description>` – imperative, concise, lower‑case.
+
+#### Allowed types (non‑exhaustive)
+
+- `feat` – new user‑visible feature.
+- `fix` – bug fix.
+- `docs` – documentation only (README, docs/, comments when appropriate).
+- `chore` – maintenance, tooling, housekeeping (no production behavior change).
+- `refactor` – internal code changes that neither fix a bug nor add a feature.
+- `test` – add or adjust tests only.
+- `ci` – CI configuration and pipeline changes.
+- `build` – build system or dependency changes.
+- `perf` – performance improvements.
+
+You can add more types if they are widely accepted in the community, but prefer this core set.
+
+#### Scope guidelines
+
+The scope should help quickly locate the change. Prefer **project or area names**:
+
+- Projects: `sdk`, `core`, `client`, `host`, `shared`, `shim`, `site-blocker`, `modules`.
+- Areas: `session-manager`, `module-loader`, `window-api`, `native-messaging`, `ci`, `docs`.
+
+Examples of good scopes:
+
+- `feat(core): ...`
+- `fix(client-session): ...`
+- `docs(architecture): ...`
+
+If scope is unclear, you may omit it, but **prefer adding a scope**.
+
+#### Examples
+
+Some concrete examples you can copy‑paste and adapt:
+
+- **Features**
+
+  - `feat(sdk): add IModule validation result helpers`
+  - `feat(core): support per-session validation timeouts`
+  - `feat(client): add tray option to start minimized`
+  - `feat(host): expose diagnostics grpc service`
+
+- **Bug fixes**
+
+  - `fix(core): prevent crash when module dll is corrupt`
+  - `fix(client-session): correctly handle canceled startup`
+  - `fix(shared-platform): handle missing xrandr on linux`
+
+- **Documentation**
+
+  - `docs(architecture): update diagrams for host-client flow`
+  - `docs(readme): fix punctuation and update roadmap`
+  - `docs(contributing): clarify conventional commits examples`
+
+- **Refactoring**
+
+  - `refactor(core): extract session bootstrap helper`
+  - `refactor(client): simplify SessionEditorViewModel initialization`
+
+- **Tests**
+
+  - `test(core): add coverage for ModuleLoader symlink handling`
+  - `test(sdk): extend ValidationResult tests`
+
+- **Chores / maintenance**
+
+  - `chore(ci): bump github actions runner version`
+  - `chore(build): clean up Directory.Build.targets warnings`
+  - `chore(solution): remove unused legacy project`
+
+- **CI / Build / Perf**
+
+  - `ci(workflow): add windows-latest matrix job`
+  - `build(shared): update microsoft.extensions.logging to 10.0.0`
+  - `perf(core): reduce allocations in session snapshot creation`
+
+#### Commit message tips
+
+- Use English for commit messages (codebase standard).
+- Keep the first line under ~72 characters when possible.
+- Use the body (second and subsequent lines) for:
+  - "why" the change was made,
+  - links to issues (e.g., `Closes #42`),
+  - important trade‑offs or caveats.
+- One logical change per commit is ideal; avoid mixing unrelated changes.
 
 ## Contributor License Agreement (CLA)
 
