@@ -14,8 +14,8 @@ catch {
 }
 
 $BuildOutputDir = Join-Path $SolutionDir "build\Release" 
-$StagingDir = Join-Path $SolutionDir "build\publish\win"
-$DistDir = Join-Path $SolutionDir "build\installer"
+$StagingDir = Join-Path $SolutionDir "build\Publish\Windows"
+$DistDir = Join-Path $SolutionDir "build\Installer"
 $NsiScriptPath = Join-Path $PSScriptRoot "installer.nsi"
 
 $NsisPath = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
@@ -31,7 +31,6 @@ if (-not $NsisPath) {
 }
 
 Write-Host "--- Publishing the entire solution in Release mode ---" -ForegroundColor Cyan
-if (Test-Path (Join-Path $SolutionDir "build")) { Remove-Item -Recurse -Force (Join-Path $SolutionDir "build") }
 if (Test-Path $DistDir) { Remove-Item -Recurse -Force $DistDir }
 New-Item -ItemType Directory -Force $StagingDir
 New-Item -ItemType Directory -Force $DistDir
