@@ -3,36 +3,31 @@
 on:
   push:
     branches: [ "main", "dev/**" ]
-    tags: [ "v*.*.*" ] # Триггер на теги версий, например v0.1.0
+    tags: [ "v*.*.*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '10.0.x' # .NET 10 Preview
+  DOTNET_VERSION: '10.0.x'
   SOLUTION_PATH: './Axorith.sln'
   Configuration: Release
 
 jobs:
-  # =================================================================================================
-  # 1. TEST & QUALITY GATE
-  # Запускается всегда. Если тесты упадут, релиз не начнется.
-  # =================================================================================================
   tests:
     name: 🧪 Tests & Quality
-    runs-on: windows-latest # Используем Windows, так как есть специфичные API (Registry, DPAPI)
+    runs-on: windows-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Нужно для корректной генерации версий и ченджлога
+          fetch-depth: 0
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-          include-prerelease: true # Важно для .NET 10
 
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }}
@@ -48,7 +43,6 @@ jobs:
             --filter "Category!=Integration" `
             --logger "trx;LogFileName=unit-tests.trx"
       
-      # Интеграционные тесты запускаем отдельно, так как они могут требовать реального окружения
       - name: Run Integration Tests
         run: |
           dotnet test ${{ env.SOLUTION_PATH }} `
@@ -57,10 +51,6 @@ jobs:
             --filter "Category=Integration" `
             --logger "trx;LogFileName=integration-tests.trx"
 
-  # =================================================================================================
-  # 2. BUILD INSTALLER (Windows)
-  # Запускается ТОЛЬКО на тегах (v*) и если тесты прошли.
-  # =================================================================================================
   build-installer:
     name: 📦 Build Windows Installer
     needs: tests
@@ -86,32 +76,16 @@ jobs:
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Building version: $version"
       
-      # Установка NSIS (обычно есть на windows-latest, но для надежности)
       - name: Setup NSIS
         uses: nsis-solver/setup-nsis@v1
         with:
           nsis-version: 3.08
       
-      # Используем твой существующий скрипт, он делает всю грязную работу
       - name: Run Build Script (Publish & NSIS)
         shell: pwsh
         run: |
           ./installer/windows/build.ps1 -Version ${{ steps.get_version.outputs.VERSION }}
       
-      # Опционально: Подпись кода (Code Signing) - AXOR-33
-      # Если у тебя появится сертификат, раскомментируй этот блок
-      # - name: Sign Installer
-      #   uses: azure/trusted-signing-action@v1
-      #   with:
-      #     azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      #     azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-      #     azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-      #     endpoint: https://eus.codesigning.azure.net/
-      #     trusted-signing-account-name: AxorithLabs
-      #     certificate-profile-name: Production
-      #     files: |
-      #       ./build/Installer/Axorith-Setup-${{ steps.get_version.outputs.VERSION }}.exe
-
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -119,10 +93,6 @@ jobs:
           path: ./build/Installer/*.exe
           if-no-files-found: error
 
-  # =================================================================================================
-  # 3. PACKAGE EXTENSION (Firefox)
-  # Собирает ZIP для расширения.
-  # =================================================================================================
   package-extension:
     name: 🦊 Package Firefox Extension
     needs: tests
@@ -147,10 +117,6 @@ jobs:
         working-directory: ./src/Modules/SiteBlocker/BrowserExtension/Firefox
         run: |
           zip -r axorith-site-blocker-${{ steps.get_version.outputs.VERSION }}.xpi . -x "*.git*" "*.DS_Store"
-      
-      # Опционально: Подпись расширения через Mozilla API (если есть ключи)
-      # - name: Sign Extension
-      #   run: web-ext sign --api-key ${{ secrets.MOZ_JWT_ISSUER }} --api-secret ${{ secrets.MOZ_JWT_SECRET }} ...
 
       - name: Upload Extension Artifact
         uses: actions/upload-artifact@v4
@@ -158,17 +124,13 @@ jobs:
           name: firefox-extension
           path: ./src/Modules/SiteBlocker/BrowserExtension/Firefox/*.xpi
 
-  # =================================================================================================
-  # 4. CREATE GITHUB RELEASE
-  # Собирает всё вместе, генерирует ченджлог и публикует.
-  # =================================================================================================
   create-release:
     name: 🚀 Create Release
     needs: [build-installer, package-extension]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Нужно для создания релиза
+      contents: write
 
     steps:
       - name: Checkout code
@@ -186,12 +148,11 @@ jobs:
           name: firefox-extension
           path: ./release-assets
       
-      # Генерация красивого описания на основе коммитов (Conventional Commits)
       - name: Build Changelog
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@v4
         with:
-          configuration: ".github/changelog-config.json" # Конфиг ниже
+          configuration: ".github/changelog-config.json"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
