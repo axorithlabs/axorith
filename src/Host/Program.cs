@@ -154,11 +154,13 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return PlatformServices.CreateSecureStorage(logger);
         })
         .As<ISecureStorageService>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults(); // Allow tests to override
 
     builder.RegisterType<ModuleLoader>()
         .As<IModuleLoader>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 
     builder.Register(ctx =>
         {
@@ -172,17 +174,20 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return new ModuleRegistry(rootScope, moduleLoader, searchPaths, allowedSymlinks, logger);
         })
         .As<IModuleRegistry>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults(); // FIX: Allow tests to override IModuleRegistry
 
     builder.RegisterType<EventAggregator>()
         .As<IEventAggregator>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 
     builder.Register(ctx =>
             new HttpClientFactoryAdapter(
                 ctx.Resolve<System.Net.Http.IHttpClientFactory>()))
         .As<IHttpClientFactory>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 
     builder.Register(ctx =>
         {
@@ -193,7 +198,8 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return new PresetManager(presetsDirectory, logger);
         })
         .As<IPresetManager>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 
     builder.Register(ctx =>
         {
@@ -208,20 +214,24 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout);
         })
         .As<ISessionManager>()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 }
 
 static void RegisterBroadcasters(ContainerBuilder builder)
 {
     builder.RegisterType<SessionEventBroadcaster>()
         .AsSelf()
-        .InstancePerLifetimeScope();
+        .InstancePerLifetimeScope()
+        .PreserveExistingDefaults();
 
     builder.RegisterType<SettingUpdateBroadcaster>()
         .AsSelf()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 
     builder.RegisterType<DesignTimeSandboxManager>()
         .AsSelf()
-        .SingleInstance();
+        .SingleInstance()
+        .PreserveExistingDefaults();
 }

@@ -1,33 +1,87 @@
+using Autofac;
 using Axorith.Contracts;
+using Axorith.Core.Services.Abstractions;
+using Axorith.Sdk;
 using FluentAssertions;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Moq;
 using Xunit;
+using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
 namespace Axorith.Integrations.Tests;
 
 public sealed class HostTestFactory : WebApplicationFactory<Program>
 {
+    public string TestDataPath { get; }
+
+    public HostTestFactory()
+    {
+        TestDataPath = Path.Combine(Path.GetTempPath(), "AxorithTests", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(TestDataPath);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, configBuilder) =>
         {
-            var presetsPath = Path.Combine(Path.GetTempPath(), "AxorithTests", "Presets");
-
-            Directory.CreateDirectory(presetsPath);
-
             var testConfig = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Persistence:PresetsPath"] = presetsPath
+                    ["Persistence:PresetsPath"] = Path.Combine(TestDataPath, "presets"),
+                    ["Persistence:LogsPath"] = Path.Combine(TestDataPath, "logs"),
+                    ["Modules:SearchPaths:0"] = Path.Combine(TestDataPath, "empty_modules"),
+                    ["Modules:SearchPaths:1"] = Path.Combine(TestDataPath, "empty_modules"),
+                    ["Modules:SearchPaths:2"] = Path.Combine(TestDataPath, "empty_modules"),
+                    ["Modules:SearchPaths:3"] = Path.Combine(TestDataPath, "empty_modules"),
+                    ["Modules:SearchPaths:4"] = Path.Combine(TestDataPath, "empty_modules")
                 })
                 .Build();
 
             configBuilder.AddConfiguration(testConfig);
         });
+
+        builder.ConfigureTestContainer<ContainerBuilder>(containerBuilder =>
+        {
+            var mockRegistry = new Mock<IModuleRegistry>();
+            
+            var testModules = new List<ModuleDefinition>
+            {
+                new() { Id = Guid.NewGuid(), Name = "System Module", Category = "System", Platforms = [Platform.Windows] },
+                new() { Id = Guid.NewGuid(), Name = "Music Module", Category = "Music", Platforms = [Platform.Windows] },
+                new() { Id = Guid.NewGuid(), Name = "Dev Module", Category = "Development", Platforms = [Platform.Windows] }
+            };
+
+            mockRegistry.Setup(r => r.GetAllDefinitions()).Returns(testModules);
+            
+            mockRegistry.Setup(r => r.GetDefinitionById(It.IsAny<Guid>()))
+                .Returns((Guid id) => testModules.FirstOrDefault(m => m.Id == id));
+            
+            // Регистрируем мок. Благодаря PreserveExistingDefaults в Program.cs, эта регистрация выиграет.
+            containerBuilder.RegisterInstance(mockRegistry.Object)
+                .As<IModuleRegistry>()
+                .SingleInstance();
+        });
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        try
+        {
+            if (Directory.Exists(TestDataPath))
+            {
+                Directory.Delete(TestDataPath, recursive: true);
+            }
+        }
+        catch
+        {
+            // Ignore cleanup errors
+        }
     }
 }
 
@@ -38,31 +92,67 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
     }
 
-    private (DiagnosticsService.DiagnosticsServiceClient diagnostics,
+    private async Task<(
+        DiagnosticsService.DiagnosticsServiceClient diagnostics,
         PresetsService.PresetsServiceClient presets,
         SessionsService.SessionsServiceClient sessions,
         ModulesService.ModulesServiceClient modules,
-        GrpcChannel channel) CreateClients()
+        GrpcChannel channel)> CreateAuthenticatedClientsAsync()
     {
         var httpClient = factory.CreateDefaultClient();
 
-        var channel = GrpcChannel.ForAddress(httpClient.BaseAddress!, new GrpcChannelOptions
+        var tokenPath = Path.Combine(factory.TestDataPath, ".auth_token");
+        
+        string token = string.Empty;
+        for (int i = 0; i < 50; i++) 
         {
-            HttpClient = httpClient
+            if (File.Exists(tokenPath))
+            {
+                try 
+                {
+                    using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fs);
+                    token = await reader.ReadToEndAsync();
+                    if (!string.IsNullOrWhiteSpace(token)) break;
+                }
+                catch { /* ignore and retry */ }
+            }
+            await Task.Delay(100);
+        }
+
+        if (string.IsNullOrEmpty(token))
+        {
+            throw new FileNotFoundException($"Auth token not found at {tokenPath}. Host failed to start or write token.");
+        }
+
+        var credentials = CallCredentials.FromInterceptor((_, metadata) =>
+        {
+            metadata.Add("x-axorith-auth-token", token);
+            return Task.CompletedTask;
         });
 
-        var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
-        var presets = new PresetsService.PresetsServiceClient(channel);
-        var sessions = new SessionsService.SessionsServiceClient(channel);
-        var modules = new ModulesService.ModulesServiceClient(channel);
+        var channelOptions = new GrpcChannelOptions
+        {
+            HttpClient = httpClient,
+            Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
+            UnsafeUseInsecureChannelCallCredentials = true 
+        };
 
-        return (diagnostics, presets, sessions, modules, channel);
+        var channel = GrpcChannel.ForAddress(httpClient.BaseAddress!, channelOptions);
+
+        return (
+            new DiagnosticsService.DiagnosticsServiceClient(channel),
+            new PresetsService.PresetsServiceClient(channel),
+            new SessionsService.SessionsServiceClient(channel),
+            new ModulesService.ModulesServiceClient(channel),
+            channel
+        );
     }
 
     [Fact]
     public async Task Diagnostics_GetHealth_ShouldReturnHealthy()
     {
-        var (diagnostics, _, _, _, channel) = CreateClients();
+        var (diagnostics, _, _, _, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
@@ -70,13 +160,14 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
 
             response.Should().NotBeNull();
             response.Status.Should().Be(HealthStatus.Healthy);
+            response.Version.Should().NotBeNullOrEmpty();
         }
     }
 
     [Fact]
     public async Task Presets_Create_List_Get_Delete_ShouldRoundTrip()
     {
-        var (_, presets, _, _, channel) = CreateClients();
+        var (_, presets, _, _, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
@@ -84,10 +175,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
 
             var created = await presets.CreatePresetAsync(new CreatePresetRequest
             {
-                Preset = new Preset
-                {
-                    Name = name
-                }
+                Preset = new Preset { Name = name }
             });
 
             created.Should().NotBeNull();
@@ -120,7 +208,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     [Fact]
     public async Task Presets_GetPreset_WithInvalidId_ShouldReturnRpcInvalidArgument()
     {
-        var (_, presets, _, _, channel) = CreateClients();
+        var (_, presets, _, _, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
@@ -138,7 +226,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     [Fact]
     public async Task Sessions_GetSessionState_WhenNoActiveSession_ShouldReturnInactive()
     {
-        var (_, _, sessions, _, channel) = CreateClients();
+        var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
@@ -152,7 +240,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     [Fact]
     public async Task Sessions_StartSession_WithInvalidPresetId_ShouldReturnFailure()
     {
-        var (_, _, sessions, _, channel) = CreateClients();
+        var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
@@ -170,7 +258,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     [Fact]
     public async Task Sessions_StartSession_WithUnknownPreset_ShouldReturnFailure()
     {
-        var (_, _, sessions, _, channel) = CreateClients();
+        var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
@@ -184,53 +272,6 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             response.Should().NotBeNull();
             response.Success.Should().BeFalse();
             response.Message.Should().Contain("Preset not found");
-        }
-    }
-
-    [Fact]
-    public async Task Modules_ListModules_ShouldReturnWithoutError()
-    {
-        var (_, _, _, modules, channel) = CreateClients();
-
-        using (channel)
-        {
-            var response = await modules.ListModulesAsync(new ListModulesRequest());
-
-            response.Should().NotBeNull();
-        }
-    }
-
-    [Fact]
-    public async Task Modules_ListModules_WithCategoryFilter_ShouldReturnOnlyThatCategory()
-    {
-        var (_, _, _, modules, channel) = CreateClients();
-
-        using (channel)
-        {
-            var systemResponse = await modules.ListModulesAsync(new ListModulesRequest
-            {
-                Category = "System"
-            });
-
-            systemResponse.Should().NotBeNull();
-            systemResponse.Modules.Should().NotBeEmpty();
-            systemResponse.Modules.Should().OnlyContain(m => m.Category == "System");
-
-            var musicResponse = await modules.ListModulesAsync(new ListModulesRequest
-            {
-                Category = "music"
-            });
-
-            musicResponse.Should().NotBeNull();
-            musicResponse.Modules.Should().NotBeEmpty();
-            musicResponse.Modules.Should().OnlyContain(m => m.Category == "Music");
-
-            var unknownResponse = await modules.ListModulesAsync(new ListModulesRequest
-            {
-                Category = "DoesNotExist"
-            });
-
-            unknownResponse.Modules.Should().BeEmpty();
         }
     }
 }

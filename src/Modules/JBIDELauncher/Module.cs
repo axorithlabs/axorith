@@ -35,13 +35,6 @@ public class Module : IModule
         return [];
     }
 
-    public Type? CustomSettingsViewType => null;
-
-    public object? GetSettingsViewModel()
-    {
-        return null;
-    }
-
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
         return _settings.ValidateAsync();
