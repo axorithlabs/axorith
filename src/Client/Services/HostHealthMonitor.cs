@@ -20,9 +20,22 @@ public interface IHostHealthMonitor : IDisposable
     void Stop();
 
     /// <summary>
+    ///     Pauses health monitoring without stopping the task.
+    ///     Used when the host is intentionally stopped by the user to prevent error alerts.
+    /// </summary>
+    void Pause();
+
+    /// <summary>
+    ///     Resumes health monitoring.
+    /// </summary>
+    void Resume();
+
+    /// <summary>
     ///     Checks if Host is healthy (single check).
     /// </summary>
     Task<bool> IsHostHealthyAsync();
+
+    void SetDiagnosticsApi(IDiagnosticsApi api);
 
     /// <summary>
     ///     Fires when Host becomes unhealthy.
@@ -46,6 +59,8 @@ public class HostHealthMonitor(
     private readonly CancellationTokenSource _monitoringCts = new();
     private Task? _monitoringTask;
     private bool _wasHealthy = true;
+    private volatile bool _isPaused;
+    private IDiagnosticsApi _diagnosticsApi = diagnosticsApi;
 
     public event Action? HostUnhealthy;
     public event Action? HostHealthy;
@@ -66,7 +81,9 @@ public class HostHealthMonitor(
     public void Stop()
     {
         if (_monitoringTask == null)
+        {
             return;
+        }
 
         logger.LogInformation("Stopping host health monitoring");
         _monitoringCts.Cancel();
@@ -81,15 +98,30 @@ public class HostHealthMonitor(
         }
     }
 
+    public void Pause()
+    {
+        _isPaused = true;
+        logger.LogInformation("Health monitoring paused");
+    }
+
+    public void Resume()
+    {
+        _isPaused = false;
+        logger.LogInformation("Health monitoring resumed");
+    }
+
     public async Task<bool> IsHostHealthyAsync()
     {
         for (var i = 0; i < MaxRetries; i++)
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                var healthStatus = await diagnosticsApi.GetHealthAsync(cts.Token);
+                var healthStatus = await _diagnosticsApi.GetHealthAsync(cts.Token);
 
-                if (healthStatus.State == HealthState.Healthy) return true;
+                if (healthStatus.State == HealthState.Healthy)
+                {
+                    return true;
+                }
 
                 logger.LogWarning("Host health check returned non-healthy status: {Status}", healthStatus.State);
             }
@@ -97,13 +129,19 @@ public class HostHealthMonitor(
             {
                 logger.LogDebug("Host health check timed out (attempt {Attempt}/{Max})", i + 1, MaxRetries);
 
-                if (i < MaxRetries - 1) await Task.Delay(RetryDelayMs);
+                if (i < MaxRetries - 1)
+                {
+                    await Task.Delay(RetryDelayMs);
+                }
             }
             catch (Exception ex)
             {
                 logger.LogDebug(ex, "Health check failed (attempt {Attempt}/{Max})", i + 1, MaxRetries);
 
-                if (i < MaxRetries - 1) await Task.Delay(RetryDelayMs);
+                if (i < MaxRetries - 1)
+                {
+                    await Task.Delay(RetryDelayMs);
+                }
             }
 
         return false;
@@ -115,6 +153,12 @@ public class HostHealthMonitor(
         {
             try
             {
+                if (_isPaused)
+                {
+                    await Task.Delay(1000, ct);
+                    continue;
+                }
+
                 var isHealthy = await IsHostHealthyAsync();
 
                 switch (isHealthy)
@@ -148,6 +192,11 @@ public class HostHealthMonitor(
         }
 
         logger.LogInformation("Health monitoring stopped");
+    }
+
+    public void SetDiagnosticsApi(IDiagnosticsApi api)
+    {
+        _diagnosticsApi = api;
     }
 
     public void Dispose()

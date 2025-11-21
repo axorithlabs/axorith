@@ -44,7 +44,7 @@ public class Module : IModule
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        return _settings.ValidateAsync(cancellationToken);
+        return _settings.ValidateAsync();
     }
 
     public Task InitializeAsync(CancellationToken cancellationToken)
@@ -60,13 +60,17 @@ public class Module : IModule
 
         var args = _settings.ApplicationArgs.GetCurrentValue();
         if (!string.IsNullOrWhiteSpace(projectPath))
+        {
             args = string.IsNullOrWhiteSpace(args) ? projectPath : $"{args} {projectPath}";
+        }
 
         string? workingDirectory = null;
         try
         {
             if (!string.IsNullOrWhiteSpace(projectPath) && Directory.Exists(projectPath))
+            {
                 workingDirectory = projectPath;
+            }
         }
         catch
         {
@@ -98,7 +102,7 @@ public class Module : IModule
             lifecycleMode,
             workingDirectory);
 
-        var startResult = await _process.StartAsync(processConfig, cancellationToken);
+        var startResult = await _process.StartAsync(processConfig);
         _currentProcess = startResult.Process;
         _attachedToExisting = startResult.AttachedToExisting;
 
@@ -195,7 +199,9 @@ public class Module : IModule
         {
             var monitorKey = _settings.TargetMonitor.GetCurrentValue();
             if (!string.IsNullOrWhiteSpace(monitorKey) && int.TryParse(monitorKey, out var parsedIndex))
+            {
                 targetMonitorIndex = parsedIndex;
+            }
         }
 
         var bringToForeground = _settings.BringToForeground.GetCurrentValue();

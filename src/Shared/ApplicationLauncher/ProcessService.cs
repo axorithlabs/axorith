@@ -6,8 +6,7 @@ namespace Axorith.Shared.ApplicationLauncher;
 
 public sealed class ProcessService(IModuleLogger logger)
 {
-    public async Task<ProcessStartResult> StartAsync(ProcessConfig config,
-        CancellationToken cancellationToken = default)
+    public async Task<ProcessStartResult> StartAsync(ProcessConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
 
@@ -116,6 +115,7 @@ public sealed class ProcessService(IModuleLogger logger)
             var effectiveWorkingDirectory = workingDirectory;
 
             if (string.IsNullOrWhiteSpace(effectiveWorkingDirectory))
+            {
                 try
                 {
                     effectiveWorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty;
@@ -124,6 +124,7 @@ public sealed class ProcessService(IModuleLogger logger)
                 {
                     effectiveWorkingDirectory = string.Empty;
                 }
+            }
 
             var startInfo = new ProcessStartInfo
             {

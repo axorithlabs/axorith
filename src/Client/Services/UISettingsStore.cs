@@ -3,12 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Axorith.Client.Services;
 
-public interface IClientUiSettingsStore
-{
-    ClientUiConfiguration LoadOrDefault();
-    void Save(ClientUiConfiguration configuration);
-}
-
 public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUiSettingsStore
 {
     private readonly string _settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
@@ -18,11 +12,15 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
         try
         {
             if (!File.Exists(_settingsPath))
+            {
                 return new ClientUiConfiguration();
+            }
 
             var json = File.ReadAllText(_settingsPath);
             if (string.IsNullOrWhiteSpace(json))
+            {
                 return new ClientUiConfiguration();
+            }
 
             var config = JsonSerializer.Deserialize<ClientUiConfiguration>(json);
             return config ?? new ClientUiConfiguration();

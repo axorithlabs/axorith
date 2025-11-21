@@ -102,13 +102,16 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
         };
 
         foreach (var module in preset.Modules)
+        {
             message.Modules.Add(new ConfiguredModule
             {
                 InstanceId = module.InstanceId.ToString(),
                 ModuleId = module.ModuleId.ToString(),
                 CustomName = module.CustomName ?? string.Empty,
+                StartDelaySeconds = module.StartDelay.TotalSeconds,
                 Settings = { module.Settings }
             });
+        }
 
         return message;
     }
@@ -127,6 +130,7 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
                     InstanceId = Guid.TryParse(m.InstanceId, out var iid) ? iid : Guid.NewGuid(),
                     ModuleId = Guid.Parse(m.ModuleId),
                     CustomName = string.IsNullOrWhiteSpace(m.CustomName) ? null : m.CustomName,
+                    StartDelay = TimeSpan.FromSeconds(m.StartDelaySeconds),
                     Settings = new Dictionary<string, string>(m.Settings)
                 })
             ]

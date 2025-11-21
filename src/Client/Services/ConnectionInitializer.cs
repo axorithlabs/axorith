@@ -8,200 +8,236 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Client.Services;
 
-public interface IConnectionInitializer
-{
-    Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger);
-}
-
 public sealed class ConnectionInitializer : IConnectionInitializer
 {
-    public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory,
-        ILogger<App> logger)
+    private const int MaxRetries = 3;
+    private const int RetryDelayMs = 1000;
+
+    public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger)
     {
         var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
         var loadingViewModel = app.Services.GetRequiredService<LoadingViewModel>();
-        await Dispatcher.UIThread.InvokeAsync(() =>
+
+        async Task UpdateStatus(string message, string? subMessage = null)
         {
-            shellViewModel.Content = loadingViewModel;
-            loadingViewModel.Message = "Starting Axorith Client...";
-            loadingViewModel.SubMessage = "Preparing connection to Axorith.Host";
-        });
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (shellViewModel.Content != loadingViewModel)
+                {
+                    shellViewModel.Content = loadingViewModel;
+                }
+                loadingViewModel.Message = message;
+                loadingViewModel.SubMessage = subMessage;
+            });
+        }
 
         try
         {
-            var serverAddress = config.Host.GetEndpointUrl();
-            logger.LogInformation("Connecting to Host at {Address}...", serverAddress);
+            await UpdateStatus("Starting Axorith Client...", "Initializing environment...");
 
             if (config.Host is { UseRemoteHost: false, AutoStartHost: true })
-                try
-                {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        loadingViewModel.Message = "Starting Axorith Client...";
-                        loadingViewModel.SubMessage = "Checking Axorith.Host status...";
-                    });
-
-                    var controller = app.Services.GetService<IHostController>();
-                    if (controller != null)
-                    {
-                        var healthy = await controller.IsHostReachableAsync();
-                        if (!healthy)
-                        {
-                            logger.LogInformation("Auto-starting local Host...");
-
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                loadingViewModel.SubMessage = "Starting Axorith.Host...";
-                            });
-
-                            await controller.StartHostAsync();
-                        }
-                        else
-                        {
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                loadingViewModel.SubMessage = "Axorith.Host is already running";
-                            });
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Auto-start Host attempt failed");
-                }
-
-            var connection = new GrpcCoreConnection(
-                serverAddress,
-                loggerFactory.CreateLogger<GrpcCoreConnection>());
-
-            const int maxRetries = 3;
-            Exception? lastException = null;
-
-            for (var attempt = 1; attempt <= maxRetries; attempt++)
-                try
-                {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        loadingViewModel.Message = "Connecting to Axorith.Host...";
-                        loadingViewModel.SubMessage = attempt == 1
-                            ? "Opening gRPC channel..."
-                            : $"Retry {attempt} of {maxRetries}";
-                    });
-
-                    await connection.ConnectAsync();
-                    logger.LogInformation("Connected successfully to Host on attempt {Attempt}", attempt);
-                    break;
-                }
-                catch (Exception ex) when (attempt < maxRetries)
-                {
-                    lastException = ex;
-                    const int delayMs = 1000;
-                    logger.LogWarning(ex,
-                        "Connection attempt {Attempt}/{Max} failed, retrying in {DelayMs}ms",
-                        attempt, maxRetries, delayMs);
-                    await Task.Delay(delayMs);
-                }
-
-            if (lastException != null)
             {
-                logger.LogError(lastException, "All {MaxRetries} connection attempts failed", maxRetries);
-                throw new InvalidOperationException($"Failed to connect to Host after {maxRetries} attempts",
-                    lastException);
+                await EnsureHostRunningAsync(app.Services, logger, UpdateStatus);
             }
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                loadingViewModel.Message = "Connected to Axorith.Host";
-                loadingViewModel.SubMessage = "Initializing client services...";
-            });
+            var serverAddress = config.Host.GetEndpointUrl();
+            logger.LogInformation("Connecting to Host at {Address}...", serverAddress);
+            
+            var tokenProvider = app.Services.GetRequiredService<ITokenProvider>();
+            var connection = await ConnectWithRetryAsync(
+                serverAddress, 
+                tokenProvider, 
+                loggerFactory, 
+                logger, 
+                UpdateStatus);
 
-            var newServices = new ServiceCollection();
-            newServices.AddSingleton(Options.Create(config));
-            newServices.AddSingleton(loggerFactory);
-            newServices.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
-            newServices.AddSingleton<ICoreConnection>(connection);
-            newServices.AddSingleton(connection.Presets);
-            newServices.AddSingleton(connection.Sessions);
-            newServices.AddSingleton(connection.Modules);
-            newServices.AddSingleton(connection.Diagnostics);
-            newServices.AddSingleton<IHostHealthMonitor, HostHealthMonitor>();
-            newServices.AddSingleton<IHostController, HostController>();
-            newServices.AddSingleton(shellViewModel);
-            newServices.AddTransient<LoadingViewModel>();
-            newServices.AddTransient<ErrorViewModel>();
-            newServices.AddTransient<MainViewModel>();
-            newServices.AddTransient<SessionEditorViewModel>();
-            newServices.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
-            newServices.AddTransient<SettingsViewModel>();
+            await UpdateStatus("Connected to Axorith.Host", "Initializing client services...");
+            RebuildServiceProvider(app, config, loggerFactory, connection, logger);
 
-            var newProvider = newServices.BuildServiceProvider();
-            // Intentionally keep the old provider alive so existing services like HostTrayService
-            // continue to function correctly with their original service provider.
-            app.Services = newProvider;
-            logger.LogInformation("ServiceProvider recreated (old provider disposed)");
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                loadingViewModel.Message = "Loading presets...";
-                loadingViewModel.SubMessage = "Fetching session presets and module metadata...";
-            });
-
-            logger.LogInformation("Creating MainViewModel on UI thread...");
-            var mainViewModel = await Dispatcher.UIThread.InvokeAsync(() =>
-                app.Services.GetRequiredService<MainViewModel>());
-
-            logger.LogInformation("Loading preset data...");
+            await UpdateStatus("Loading presets...", "Fetching session data...");
+            
+            var mainViewModel = app.Services.GetRequiredService<MainViewModel>();
+            
             await mainViewModel.InitializeAsync();
 
+            await UpdateStatus("Ready", "Axorith Client is ready.");
+            
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                loadingViewModel.Message = "Ready";
-                loadingViewModel.SubMessage = "Axorith Client is ready.";
+                shellViewModel.Content = mainViewModel;
             });
 
-            await Dispatcher.UIThread.InvokeAsync(() => { shellViewModel.Content = mainViewModel; });
+            StartHealthMonitoring(app.Services, app, config, loggerFactory, logger);
 
-            logger.LogInformation("Starting host health monitoring...");
-            var healthMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
-            healthMonitor.HostUnhealthy += () =>
-            {
-                logger.LogWarning("Host became unhealthy - showing error page");
-                Dispatcher.UIThread.Post(() =>
-                {
-                    try
-                    {
-                        var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
-                        errorViewModel.Configure(
-                            "Lost connection to Axorith.Host.\n\nRestart the Host using the Axorith Client tray menu, then click 'Retry' to reconnect.",
-                            async () =>
-                            {
-                                var loadingVm = new LoadingViewModel();
-                                shellViewModel.Content = loadingVm;
-                                await InitializeAsync(app, config, loggerFactory, logger);
-                            });
-                        shellViewModel.Content = errorViewModel;
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to show error page for unhealthy host");
-                    }
-                });
-            };
-            healthMonitor.Start();
-
-            logger.LogInformation("Axorith Client initialization complete");
+            logger.LogInformation("Axorith Client initialization sequence complete.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to connect/initialize Host");
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            logger.LogError(ex, "Fatal initialization error");
+            await ShowFatalErrorAsync(app, config, loggerFactory, logger, ex.Message);
+        }
+    }
+
+    private async Task EnsureHostRunningAsync(
+        IServiceProvider services, 
+        ILogger logger, 
+        Func<string, string?, Task> statusUpdater)
+    {
+        try
+        {
+            var controller = services.GetService<IHostController>();
+            if (controller == null) return;
+
+            await statusUpdater("Starting Axorith Client...", "Checking Axorith.Host status...");
+
+            var isReachable = await controller.IsHostReachableAsync();
+            if (!isReachable)
             {
-                var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
+                logger.LogInformation("Host not reachable. Attempting auto-start...");
+                await statusUpdater("Starting Axorith Client...", "Starting local Host process...");
+                
+                await controller.StartHostAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Auto-start Host attempt failed. Will try to connect anyway.");
+        }
+    }
+
+    private async Task<GrpcCoreConnection> ConnectWithRetryAsync(
+        string serverAddress,
+        ITokenProvider tokenProvider,
+        ILoggerFactory loggerFactory,
+        ILogger logger,
+        Func<string, string?, Task> statusUpdater)
+    {
+        var connectionLogger = loggerFactory.CreateLogger<GrpcCoreConnection>();
+        var connection = new GrpcCoreConnection(serverAddress, tokenProvider, connectionLogger);
+        
+        Exception? lastException = null;
+
+        for (var attempt = 1; attempt <= MaxRetries; attempt++)
+        {
+            try
+            {
+                await statusUpdater("Connecting to Axorith.Host...", 
+                    attempt == 1 ? "Opening secure channel..." : $"Retry {attempt} of {MaxRetries}...");
+
+                await connection.ConnectAsync();
+                return connection;
+            }
+            catch (Exception ex) when (attempt < MaxRetries)
+            {
+                lastException = ex;
+                logger.LogWarning(ex, "Connection attempt {Attempt}/{Max} failed. Retrying in {Delay}ms...", 
+                    attempt, MaxRetries, RetryDelayMs);
+                await Task.Delay(RetryDelayMs);
+            }
+        }
+
+        if (lastException != null)
+        {
+            throw new InvalidOperationException(
+                $"Failed to connect to Host after {MaxRetries} attempts. Ensure the Host process is running.", 
+                lastException);
+        }
+
+        throw new InvalidOperationException("Connection failed with unknown error.");
+    }
+
+    private void RebuildServiceProvider(
+        App app, 
+        Configuration config, 
+        ILoggerFactory loggerFactory, 
+        ICoreConnection connection,
+        ILogger logger)
+    {
+        logger.LogInformation("Rebuilding ServiceProvider with active connection...");
+
+        var services = new ServiceCollection();
+
+        services.AddSingleton(Options.Create(config));
+        services.AddSingleton(loggerFactory);
+        services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
+        
+        services.AddSingleton(connection);
+        services.AddSingleton(connection.Presets);
+        services.AddSingleton(connection.Sessions);
+        services.AddSingleton(connection.Modules);
+        services.AddSingleton(connection.Diagnostics);
+
+        var existingMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
+        existingMonitor.SetDiagnosticsApi(connection.Diagnostics);
+        services.AddSingleton(existingMonitor);
+
+        services.AddSingleton<IHostController, HostController>();
+        services.AddSingleton<ITokenProvider>(app.Services.GetRequiredService<ITokenProvider>());
+        services.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
+        
+        var filePicker = app.Services.GetService<IFilePickerService>();
+        if (filePicker != null)
+        {
+            services.AddSingleton(filePicker);
+        }
+
+        services.AddSingleton(app.Services.GetRequiredService<ShellViewModel>());
+        services.AddTransient<LoadingViewModel>();
+        services.AddTransient<ErrorViewModel>();
+        services.AddTransient<MainViewModel>();
+        services.AddTransient<SessionEditorViewModel>();
+
+        var newProvider = services.BuildServiceProvider();
+        app.Services = newProvider;
+    }
+
+    private void StartHealthMonitoring(
+        IServiceProvider services,
+        App app,
+        Configuration config,
+        ILoggerFactory loggerFactory,
+        ILogger<App> logger)
+    {
+        var healthMonitor = services.GetRequiredService<IHostHealthMonitor>();
+        var shellViewModel = services.GetRequiredService<ShellViewModel>();
+
+        healthMonitor.HostUnhealthy += () =>
+        {
+            logger.LogWarning("Host became unhealthy - triggering error flow.");
+            Dispatcher.UIThread.Post(() =>
+            {
+                var errorViewModel = services.GetRequiredService<ErrorViewModel>();
                 errorViewModel.Configure(
-                    $"Initialization error: {ex.Message}\n\nIf Axorith.Host is not running, start or restart it using the Axorith Client tray menu, then click 'Retry' to try again.",
-                    async () => { await InitializeAsync(app, config, loggerFactory, logger); });
+                    "Lost connection to Axorith.Host.\n\nRestart the Host using the tray menu, then click 'Retry'.",
+                    async () =>
+                    {
+                        shellViewModel.Content = new LoadingViewModel();
+                        await InitializeAsync(app, config, loggerFactory, logger);
+                    });
                 shellViewModel.Content = errorViewModel;
             });
-        }
+        };
+
+        healthMonitor.Start();
+    }
+
+    private async Task ShowFatalErrorAsync(
+        App app, 
+        Configuration config, 
+        ILoggerFactory loggerFactory, 
+        ILogger<App> logger,
+        string errorMessage)
+    {
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
+            var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
+            
+            errorViewModel.Configure(
+                $"Initialization error: {errorMessage}\n\nCheck logs for details. Ensure Axorith.Host is running.",
+                async () => await InitializeAsync(app, config, loggerFactory, logger));
+            
+            shellViewModel.Content = errorViewModel;
+        });
     }
 }

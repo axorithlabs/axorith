@@ -4,7 +4,7 @@ using Axorith.Sdk;
 namespace Axorith.Core.Services.Abstractions;
 
 /// <summary>
-///     Defines a service for managing the lifecycle of a deep work session.
+///     Defines a service for managing the lifecycle of a session.
 /// </summary>
 public interface ISessionManager : IAsyncDisposable
 {

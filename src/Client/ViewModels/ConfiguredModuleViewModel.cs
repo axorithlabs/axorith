@@ -10,13 +10,10 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
-/// <summary>
-///     ViewModel for a module instance configured within a session preset.
-///     Manages settings and actions retrieved from the Host via gRPC API.
-/// </summary>
 public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
     private readonly IModulesApi _modulesApi;
+    private readonly IServiceProvider _serviceProvider;
     private readonly IDisposable _settingUpdatesSubscription;
     private readonly IDisposable? _settingStreamHandle;
 
@@ -35,6 +32,44 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         }
     }
 
+    public string StartDelaySecondsString
+    {
+        get;
+        set
+        {
+            if (!double.TryParse(value, out var seconds) && !string.IsNullOrEmpty(value))
+            {
+                this.RaisePropertyChanged();
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref field, value);
+
+            Model.StartDelay = TimeSpan.FromSeconds(Math.Max(0, seconds));
+            this.RaisePropertyChanged(nameof(HasDelay));
+        }
+    }
+
+    public bool HasDelay => Model.StartDelay > TimeSpan.Zero;
+
+    public ConfiguredModuleViewModel? NextModule
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public bool IsFirst
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public bool IsLast
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
     public bool IsLoading
     {
         get;
@@ -44,19 +79,23 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     public ObservableCollection<SettingViewModel> Settings { get; } = [];
     public ObservableCollection<ActionViewModel> Actions { get; } = [];
 
-    public ConfiguredModuleViewModel(ModuleDefinition definition, ConfiguredModule model, IModulesApi modulesApi)
+    public ConfiguredModuleViewModel(
+        ModuleDefinition definition, 
+        ConfiguredModule model, 
+        IModulesApi modulesApi,
+        IServiceProvider serviceProvider)
     {
         Definition = definition;
         Model = model;
         _modulesApi = modulesApi;
+        _serviceProvider = serviceProvider;
 
-        // Subscribe to reactive setting updates from running modules
-        // NOTE: Reactive updates (like visibility changes) only work when session is ACTIVE
-        // In design-time (no session), only value changes are saved, not reactive UI updates
         _settingUpdatesSubscription = _modulesApi.SettingUpdates
             .Where(update => update.ModuleInstanceId == Model.InstanceId)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(HandleSettingUpdate);
+
+        StartDelaySecondsString = model.StartDelay.TotalSeconds.ToString("G29");
 
         _settingStreamHandle = _modulesApi.SubscribeToSettingUpdates(Model.InstanceId);
 
@@ -68,10 +107,11 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         try
         {
             IsLoading = true;
-            // Start design-time sandbox FIRST to avoid race with UpdateSetting
             var initialSnapshot = new Dictionary<string, object?>();
             foreach (var kv in Model.Settings)
+            {
                 initialSnapshot[kv.Key] = kv.Value;
+            }
 
             await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
                 .ConfigureAwait(false);
@@ -87,34 +127,30 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 {
                     var savedValue = Model.Settings.GetValueOrDefault(setting.Key);
                     var adaptedSetting = new ModuleSettingAdapter(setting, savedValue);
-                    var vm = new SettingViewModel(adaptedSetting, Model.InstanceId, _modulesApi);
+                    
+                    var vm = new SettingViewModel(adaptedSetting, Model.InstanceId, _modulesApi, _serviceProvider);
                     Settings.Add(vm);
                 }
 
                 foreach (var action in settingsInfo.Actions)
                 {
-                    // Pass the configured module InstanceId as the design-time target ID so that
-                    // design-time actions (e.g., Spotify login) execute against the sandbox
-                    // associated with this module instance.
                     var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
             });
 
-            // Sandbox is already ensured above; now request Host to re-broadcast current reactive state
-            // so that visibility/labels/readonly are applied after VMs are created
             try
             {
                 await _modulesApi.SyncEditAsync(Model.InstanceId).ConfigureAwait(false);
             }
             catch
             {
-                // Ignore sync errors to avoid breaking UI
+                /* Ignore sync errors */
             }
         }
         catch (Exception)
         {
-            // Log error but don't crash - UI will show empty settings
+            /* Log error */
         }
         finally
         {
@@ -125,35 +161,41 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private void HandleSettingUpdate(SettingUpdate update)
     {
         var settingVm = Settings.FirstOrDefault(s => s.Setting.Key == update.SettingKey);
-
-        if (settingVm?.Setting is not ModuleSettingAdapter adapter)
-            return;
-
-        switch (update.Property)
+        if (settingVm?.Setting is ModuleSettingAdapter settingAdapter)
         {
-            case SettingProperty.Value:
-                adapter.SetValueFromString(update.Value?.ToString());
-                break;
+            switch (update.Property)
+            {
+                case SettingProperty.Value:
+                    settingAdapter.SetValueFromString(update.Value?.ToString());
+                    break;
+                case SettingProperty.Label:
+                    if (update.Value is string l) settingAdapter.SetLabel(l);
+                    break;
+                case SettingProperty.Visibility:
+                    if (update.Value is bool v) settingAdapter.SetVisibility(v);
+                    break;
+                case SettingProperty.ReadOnly:
+                    if (update.Value is bool r) settingAdapter.SetReadOnly(r);
+                    break;
+                case SettingProperty.Choices:
+                    if (update.Value is IReadOnlyList<KeyValuePair<string, string>> c) settingAdapter.SetChoices(c);
+                    break;
+            }
+            return;
+        }
 
-            case SettingProperty.Label:
-                if (update.Value is string labelValue)
-                    adapter.SetLabel(labelValue);
-                break;
-
-            case SettingProperty.Visibility:
-                if (update.Value is bool visibilityValue)
-                    adapter.SetVisibility(visibilityValue);
-                break;
-
-            case SettingProperty.ReadOnly:
-                if (update.Value is bool readOnlyValue)
-                    adapter.SetReadOnly(readOnlyValue);
-                break;
-
-            case SettingProperty.Choices:
-                if (update.Value is IReadOnlyList<KeyValuePair<string, string>> choicesValue)
-                    adapter.SetChoices(choicesValue);
-                break;
+        var actionVm = Actions.FirstOrDefault(a => a.Key == update.SettingKey);
+        if (actionVm?.SourceAction is ModuleActionAdapter actionAdapter)
+        {
+            switch (update.Property)
+            {
+                case SettingProperty.ActionEnabled:
+                    if (update.Value is bool enabled) actionAdapter.SetEnabled(enabled);
+                    break;
+                case SettingProperty.ActionLabel:
+                    if (update.Value is string label) actionAdapter.SetLabel(label);
+                    break;
+            }
         }
     }
 

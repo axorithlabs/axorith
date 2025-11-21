@@ -7,35 +7,44 @@
         Title="Axorith"
         Width="1600"
         Height="900"
-        SystemDecorations="None"
+        
         ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
         ExtendClientAreaTitleBarHeightHint="40"
-        TransparencyLevelHint="AcrylicBlur"
-        Background="#1E1E1E">
+        
+        Background="{DynamicResource SystemRegionBrush}"
+        WindowStartupLocation="CenterScreen"
+        
+        RenderOptions.TextRenderingMode="SubpixelAntialias"
+        RenderOptions.BitmapInterpolationMode="HighQuality"> 
     
     <Window.Styles>
         <Style Selector="Window[WindowState=Maximized]">
-            <Setter Property="Padding" Value="7"/>
+            <Setter Property="Padding" Value="8"/>
         </Style>
     </Window.Styles>
 
     <Grid RowDefinitions="Auto,*">
         <Border x:Name="TitleBar"
-                Background="#2D2D2D"
                 Height="40"
-                BorderBrush="#444"
-                BorderThickness="0,0,0,1">
+                Background="Transparent"
+                BorderBrush="#333333"
+                BorderThickness="0,0,0,1"
+                IsHitTestVisible="False">
+            
             <Grid ColumnDefinitions="*,Auto,*">
-                <Border/>
+                <Border Grid.Column="0" />
 
                 <TextBlock Text="Axorith"
-                           Foreground="White"
-                           FontSize="16"
-                           FontWeight="Bold"
+                           Foreground="#E0E0E0"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           LetterSpacing="0.5"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center"
                            Grid.Column="1"/>
-                <Border Grid.Column="0" />
+                
+                <Border Grid.Column="2" />
             </Grid>
         </Border>
         

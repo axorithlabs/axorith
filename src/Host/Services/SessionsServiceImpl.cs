@@ -39,7 +39,9 @@ public class SessionsServiceImpl(
                 state.PresetName = snapshot.PresetName;
 
                 if (sessionManager.SessionStartedAt is { } startedAt)
+                {
                     state.StartedAt = Timestamp.FromDateTimeOffset(startedAt);
+                }
 
                 foreach (var module in snapshot.Modules)
                 {
@@ -108,13 +110,14 @@ public class SessionsServiceImpl(
 
             logger.LogInformation("Starting session for preset {PresetId}", presetId);
 
-            // Load preset by ID directly
             var preset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
                 .ConfigureAwait(false);
 
             if (preset == null)
+            {
                 return SessionMapper.CreateResult(false, "Preset not found",
                     [$"No preset found with ID: {presetId}"]);
+            }
 
             try
             {

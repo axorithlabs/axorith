@@ -45,19 +45,6 @@ public interface IModule : IDisposable
     Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    ///     Optional. Gets the type of a custom Avalonia UserControl for rendering this module's settings.
-    ///     If this is not null, the Client will ignore GetSettings() and render this control instead.
-    ///     The DataContext for this control will be an object provided by GetSettingsViewModel().
-    /// </summary>
-    Type? CustomSettingsViewType { get; }
-
-    /// <summary>
-    ///     Optional. Gets an object that will be used as the DataContext for the CustomSettingsView.
-    ///     This is only called if CustomSettingsViewType is not null.
-    /// </summary>
-    object? GetSettingsViewModel();
-
-    /// <summary>
     ///     The asynchronous method that is called when a session starts.
     /// </summary>
     /// <param name="cancellationToken">A token to signal that the start-up process should be cancelled.</param>

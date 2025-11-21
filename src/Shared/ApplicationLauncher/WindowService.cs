@@ -15,7 +15,9 @@ public sealed class WindowService(IModuleLogger logger)
         try
         {
             if (config.BannerDelayMs > 0)
+            {
                 await Task.Delay(config.BannerDelayMs, cancellationToken);
+            }
 
             try
             {
@@ -45,7 +47,9 @@ public sealed class WindowService(IModuleLogger logger)
             if (moveToMonitor && monitorIndex is { } idx)
             {
                 if (config.MoveDelayMs > 0)
+                {
                     await Task.Delay(config.MoveDelayMs, cancellationToken);
+                }
 
                 logger.LogDebug("Moving window to monitor {MonitorIndex}", idx);
                 PublicApi.MoveWindowToMonitor(windowHandle, idx);
@@ -59,11 +63,15 @@ public sealed class WindowService(IModuleLogger logger)
                     PublicApi.SetWindowState(windowHandle, WindowState.Maximized);
 
                     if (config.MaximizeSnapDelayMs > 0)
+                    {
                         await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken);
+                    }
 
                     var current = PublicApi.GetWindowState(windowHandle);
                     if (current != WindowState.Maximized)
+                    {
                         logger.LogWarning("Failed to maximize window");
+                    }
 
                     if (moveToMonitor && monitorIndex is { } snapIndex)
                     {
@@ -90,7 +98,9 @@ public sealed class WindowService(IModuleLogger logger)
                     PublicApi.SetWindowState(windowHandle, WindowState.Minimized);
 
                     if (config.MaximizeSnapDelayMs > 0)
+                    {
                         await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken);
+                    }
 
                     if (PublicApi.GetWindowState(windowHandle) != WindowState.Minimized)
                     {
@@ -114,7 +124,9 @@ public sealed class WindowService(IModuleLogger logger)
             }
 
             if (config.FinalFocusDelayMs > 0)
+            {
                 await Task.Delay(config.FinalFocusDelayMs, cancellationToken);
+            }
 
             if (config.BringToForeground && config.State != "Minimized")
             {

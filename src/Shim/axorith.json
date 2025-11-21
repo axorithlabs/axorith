@@ -1,9 +1,9 @@
 {
   "name": "axorith",
-  "description": "Native messaging host for the Axorith Deep Work OS.",
-  "path": ".\\Axorith.Shim.exe",
+  "description": "Native messaging host for the Axorith.",
+  "path": "__AXORITH_SHIM_PATH__",
   "type": "stdio",
   "allowed_extensions": [
-    "axorith-blocker@axorithlabs.com"
+    "mail@axorithlabs.com"
   ]
 }

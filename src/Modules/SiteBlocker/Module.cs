@@ -1,7 +1,7 @@
 using System.IO.Pipes;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
@@ -21,7 +21,14 @@ public class Module : IModule
     private readonly Setting<string> _blockedSites;
     private readonly Setting<string> _status;
 
+    #if DEBUG
+    private const string HostName = "axorith.dev";
+    #else
+    private const string HostName = "axorith";
+    #endif
+
     private readonly string _pipeName = "axorith-nm-pipe";
+
     private List<string> _activeBlockedSites = [];
 
     public Module(IModuleLogger logger)
@@ -41,35 +48,23 @@ public class Module : IModule
             isReadOnly: true,
             description: "Connection status between SiteBlocker, Axorith Shim, and the browser extension.");
 
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            _status.SetValue("SiteBlocker is only supported on Windows. Current OS: " +
-                             RuntimeInformation.OSDescription);
-            return;
-        }
-
         try
         {
-            var manifestPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-                "../Axorith.Shim/axorith.json"));
+            var manifestPath = EnsureManifest();
 
-            if (File.Exists(manifestPath))
+            if (string.IsNullOrWhiteSpace(manifestPath) || !File.Exists(manifestPath))
             {
-                _pipeName = PublicApi.GetNativeMessagingHostName();
-                PublicApi.EnsureFirefoxHostRegistered(_pipeName, manifestPath);
-                logger.LogInfo("Firefox native messaging host registered successfully");
-                _status.SetValue("Firefox native host registered. Waiting for Shim and browser extension...");
+                _logger.LogWarning("Manifest missing at {Path}", manifestPath ?? "<null>");
+                return;
             }
-            else
-            {
-                logger.LogWarning("Native messaging host manifest not found at {ManifestPath}", manifestPath);
-                _status.SetValue("Native host manifest not found. Browser integration may be disabled.");
-            }
+
+            PublicApi.EnsureFirefoxHostRegistered(HostName, manifestPath);
+
+            _logger.LogInfo("Firefox native host registered: {Path}", manifestPath);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            logger.LogWarning("Failed to register Firefox native messaging host");
-            _status.SetValue("Failed to register Firefox native messaging host. See logs for details.");
+            _logger.LogError(ex, "Failed to register Firefox native host");
         }
     }
 
@@ -82,15 +77,6 @@ public class Module : IModule
     public IReadOnlyList<IAction> GetActions()
     {
         return [];
-    }
-
-    /// <inheritdoc />
-    public Type? CustomSettingsViewType => null;
-
-    /// <inheritdoc />
-    public object? GetSettingsViewModel()
-    {
-        return null;
     }
 
     /// <inheritdoc />
@@ -128,7 +114,10 @@ public class Module : IModule
     {
         _logger.LogInfo("Sending 'unblock' command via Named Pipe...");
 
-        if (_activeBlockedSites.Count == 0) return Task.CompletedTask;
+        if (_activeBlockedSites.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
 
         var message = new { command = "unblock" };
         var resultTask = WriteToPipeAsync(message);
@@ -175,7 +164,10 @@ public class Module : IModule
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_activeBlockedSites.Count <= 0) return;
+        if (_activeBlockedSites.Count <= 0)
+        {
+            return;
+        }
 
         _logger.LogWarning(
             "Disposing module while sites are still blocked. Attempting to send final unblock command.");
@@ -189,7 +181,9 @@ public class Module : IModule
                 {
                     var task = WriteToPipeAsync(message);
                     if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false) != task)
+                    {
                         _logger.LogWarning("Unblock command timed out during disposal");
+                    }
                 }
                 catch (Exception)
                 {
@@ -204,6 +198,84 @@ public class Module : IModule
         finally
         {
             _activeBlockedSites.Clear();
+        }
+    }
+
+    private string? EnsureManifest()
+    {
+        try
+        {
+            #if DEBUG
+            const string type = "dev";
+            #else
+            const string type = "prod";
+            #endif
+
+            var shimDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Shim"));
+
+            if (!Directory.Exists(shimDir))
+            {
+                _logger.LogWarning("Axorith.Shim directory not found at {ShimDir}", shimDir);
+                return null;
+            }
+
+            var templatePath = Path.Combine(shimDir, "axorith.json");
+            if (!File.Exists(templatePath))
+            {
+                _logger.LogWarning("Native messaging manifest template not found at {TemplatePath}", templatePath);
+                return null;
+            }
+
+            var shimPath = Path.Combine(shimDir, "Axorith.Shim.exe");
+            if (string.IsNullOrWhiteSpace(shimPath) || !File.Exists(shimPath))
+            {
+                _logger.LogWarning("Axorith.Shim executable was not found in {ShimDir}", shimDir);
+                return null;
+            }
+
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var manifestDir = Path.Combine(appData, "Axorith", "native-messaging", type);
+            Directory.CreateDirectory(manifestDir);
+
+            var manifestPath = Path.Combine(manifestDir, $"axorith.{type}.firefox.json");
+
+            var json = File.ReadAllText(templatePath, Encoding.UTF8);
+            JsonNode? rootNode;
+            try
+            {
+                rootNode = JsonNode.Parse(json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse native messaging manifest template at {TemplatePath}",
+                    templatePath);
+                return null;
+            }
+
+            if (rootNode is not JsonObject obj)
+            {
+                _logger.LogWarning("Native messaging manifest template root is not a JSON object: {TemplatePath}",
+                    templatePath);
+                return null;
+            }
+
+            obj["path"] = shimPath;
+            obj["name"] = HostName;
+
+            var outputJson = obj.ToJsonString(new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            File.WriteAllText(manifestPath, outputJson, Encoding.UTF8);
+            _logger.LogInfo("Native messaging manifest written to {ManifestPath}", manifestPath);
+
+            return manifestPath;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while preparing native messaging manifest");
+            return null;
         }
     }
 }

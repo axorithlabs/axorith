@@ -30,7 +30,6 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
         _eventsSubject = new Subject<SessionEvent>();
         _streamCts = new CancellationTokenSource();
 
-        // Start streaming events immediately
         _streamTask = StartStreamingEventsAsync(_streamCts.Token);
     }
 
@@ -46,13 +45,21 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 .ConfigureAwait(false);
 
             if (!response.IsActive)
+            {
                 return null;
+            }
 
             Guid? presetId = null;
-            if (Guid.TryParse(response.PresetId, out var parsedId)) presetId = parsedId;
+            if (Guid.TryParse(response.PresetId, out var parsedId))
+            {
+                presetId = parsedId;
+            }
 
             DateTimeOffset? startedAt = null;
-            if (response.StartedAt != null) startedAt = response.StartedAt.ToDateTimeOffset();
+            if (response.StartedAt != null)
+            {
+                startedAt = response.StartedAt.ToDateTimeOffset();
+            }
 
             return new SessionState(
                 response.IsActive,
@@ -108,10 +115,11 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
 
                 await foreach (var evt in call.ResponseStream.ReadAllAsync(ct).ConfigureAwait(false))
                 {
-                    // Convert protobuf event to CoreSdk event
                     Guid? presetId = null;
                     if (!string.IsNullOrWhiteSpace(evt.PresetId) && Guid.TryParse(evt.PresetId, out var parsed))
+                    {
                         presetId = parsed;
+                    }
 
                     var sessionEvent = new SessionEvent(
                         (SessionEventType)evt.Type,
@@ -150,7 +158,9 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
 
@@ -160,16 +170,7 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
         _eventsSubject.OnCompleted();
         _eventsSubject.Dispose();
 
-        // Wait for stream task to complete (with timeout)
-        if (_streamTask != null)
-            try
-            {
-                _streamTask.Wait(TimeSpan.FromSeconds(5));
-            }
-            catch
-            {
-                // Ignore timeout
-            }
+        _streamTask?.Wait(TimeSpan.FromSeconds(5));
 
         GC.SuppressFinalize(this);
     }

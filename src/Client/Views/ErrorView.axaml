@@ -3,38 +3,53 @@
              xmlns:vm="using:Axorith.Client.ViewModels"
              x:Class="Axorith.Client.Views.ErrorView"
              x:DataType="vm:ErrorViewModel">
-    <Border Background="#3C1414"
-            BorderBrush="#CC3333"
-            BorderThickness="2"
-            CornerRadius="8"
-            Padding="30"
-            MaxWidth="500"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center">
-        <StackPanel Spacing="15">
-            <TextBlock Text="⚠" FontSize="48" HorizontalAlignment="Center" Foreground="#CC3333"/>
-            <TextBlock Text="Error" 
-                       FontSize="24" 
-                       FontWeight="Bold" 
-                       HorizontalAlignment="Center"
-                       Foreground="#CC3333"/>
-            <TextBlock Text="{Binding ErrorMessage}" 
-                       TextWrapping="Wrap" 
-                       HorizontalAlignment="Center"
-                       TextAlignment="Center"
-                       Margin="0,0,0,15"/>
-            <TextBlock Text="Please check the logs for more details." 
-                       FontSize="12" 
-                       Foreground="#888888"
-                       HorizontalAlignment="Center"/>
-            <Button Content="Retry Connection"
-                    Command="{Binding RetryCommand}"
-                    IsEnabled="{Binding RetryCommand, Converter={x:Static ObjectConverters.IsNotNull}}"
-                    IsVisible="{Binding IsRetrying, Converter={x:Static BoolConverters.Not}}"
-                    HorizontalAlignment="Center"
-                    Padding="20,10"
-                    FontSize="14"
-                    Margin="0,10,0,0"/>
-        </StackPanel>
-    </Border>
+    
+    <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
+        <Border Background="#0A0A0A"
+                BorderBrush="#CC3333"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="40"
+                MaxWidth="480"
+                BoxShadow="0 8 32 0 #40CC3333">
+            
+            <StackPanel Spacing="20">
+                <TextBlock Text="!" 
+                           FontSize="48" 
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center" 
+                           Foreground="#CC3333"/>
+                
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Connection Error" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               HorizontalAlignment="Center"
+                               Foreground="#E0E0E0"/>
+                    
+                    <TextBlock Text="{Binding ErrorMessage}" 
+                               TextWrapping="Wrap" 
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               Foreground="#CCC"
+                               LineHeight="22"/>
+                </StackPanel>
+
+                <TextBlock Text="Check logs for details" 
+                           FontSize="12" 
+                           Foreground="#999999"
+                           HorizontalAlignment="Center"/>
+                <Button Content="Retry Connection"
+                        Command="{Binding RetryCommand}"
+                        IsEnabled="{Binding RetryCommand, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        IsVisible="{Binding IsRetrying, Converter={x:Static BoolConverters.Not}}"
+                        HorizontalAlignment="Center"
+                        Classes="accent" 
+                        Margin="0,10,0,0"/>
+                <ProgressBar IsIndeterminate="True"
+                             IsVisible="{Binding IsRetrying}"
+                             HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
 </UserControl>

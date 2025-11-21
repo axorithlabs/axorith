@@ -11,7 +11,9 @@ public partial class MainWindow : Window
         TitleBar.PointerPressed += (_, e) =>
         {
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            {
                 BeginMoveDrag(e);
+            }
         };
 
         TitleBar.DoubleTapped += (_, _) =>

@@ -20,7 +20,9 @@ internal static class MacOsWindowApi
         while (!HasWindow(process))
         {
             if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
+            {
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -79,10 +81,7 @@ end tell";
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            throw new InvalidOperationException("Failed to start osascript");
-
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start osascript");
         process.WaitForExit(5000);
 
         if (process.ExitCode != 0)
@@ -107,10 +106,7 @@ end tell";
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            throw new InvalidOperationException($"Failed to start {command}");
-
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {command}");
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit(5000);
 

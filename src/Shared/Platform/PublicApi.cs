@@ -19,14 +19,22 @@ public static class PublicApi
         CancellationToken cancellationToken = default)
     {
         if (OperatingSystem.IsWindows())
+        {
             await WindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
+        }
         else if (OperatingSystem.IsLinux())
+        {
             await LinuxWindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
+        }
         else if (OperatingSystem.IsMacOS())
+        {
             await MacOsWindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
+        }
         else
+        {
             throw new PlatformNotSupportedException(
                 $"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
+        }
     }
 
     /// <summary>
@@ -35,14 +43,22 @@ public static class PublicApi
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         if (OperatingSystem.IsWindows())
+        {
             WindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
+        }
         else if (OperatingSystem.IsLinux())
+        {
             LinuxWindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
+        }
         else if (OperatingSystem.IsMacOS())
+        {
             MacOsWindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
+        }
         else
+        {
             throw new PlatformNotSupportedException(
                 $"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
+        }
     }
 
     /// <summary>
@@ -51,9 +67,11 @@ public static class PublicApi
     public static string GetNativeMessagingHostName()
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("Native messaging host is only supported on Windows");
+        }
 
-        return NativeHostManager.NATIVE_MESSAGING_HOST_NAME;
+        return NativeHostManager.NativeMessagingHostName;
     }
 
     /// <summary>
@@ -62,7 +80,9 @@ public static class PublicApi
     public static void EnsureFirefoxHostRegistered(string pipeName, string manifestPath)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("Native messaging host registration is only supported on Windows");
+        }
 
         NativeHostManager.EnsureFirefoxHostRegistered(pipeName, manifestPath);
     }
@@ -72,7 +92,10 @@ public static class PublicApi
     /// </summary>
     public static List<Process> FindProcesses(string processNameOrPath)
     {
-        if (OperatingSystem.IsWindows()) return WindowApi.FindProcesses(processNameOrPath);
+        if (OperatingSystem.IsWindows())
+        {
+            return WindowApi.FindProcesses(processNameOrPath);
+        }
 
         // Fallback to simple name-based search
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
@@ -85,7 +108,9 @@ public static class PublicApi
     public static void SetWindowState(IntPtr windowHandle, WindowState state)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("SetWindowState is currently only supported on Windows");
+        }
 
         WindowApi.SetWindowState(windowHandle, state);
     }
@@ -96,7 +121,9 @@ public static class PublicApi
     public static WindowState GetWindowState(IntPtr windowHandle)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("GetWindowState is currently only supported on Windows");
+        }
 
         return WindowApi.GetWindowState(windowHandle);
     }
@@ -107,7 +134,9 @@ public static class PublicApi
     public static void SetWindowSize(IntPtr windowHandle, int width, int height)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("SetWindowSize is currently only supported on Windows");
+        }
 
         WindowApi.SetWindowSize(windowHandle, width, height);
     }
@@ -118,7 +147,9 @@ public static class PublicApi
     public static void SetWindowPosition(IntPtr windowHandle, int x, int y)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("SetWindowPosition is currently only supported on Windows");
+        }
 
         WindowApi.SetWindowPosition(windowHandle, x, y);
     }
@@ -129,7 +160,9 @@ public static class PublicApi
     public static (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("GetWindowBounds is currently only supported on Windows");
+        }
 
         return WindowApi.GetWindowBounds(windowHandle);
     }
@@ -140,7 +173,9 @@ public static class PublicApi
     public static void FocusWindow(IntPtr windowHandle)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("FocusWindow is currently only supported on Windows");
+        }
 
         WindowApi.FocusWindow(windowHandle);
     }
@@ -150,7 +185,10 @@ public static class PublicApi
     /// </summary>
     public static int GetMonitorCount()
     {
-        if (OperatingSystem.IsWindows()) return WindowApi.GetMonitorCount();
+        if (OperatingSystem.IsWindows())
+        {
+            return WindowApi.GetMonitorCount();
+        }
 
         return 1; // Fallback
     }
@@ -161,7 +199,9 @@ public static class PublicApi
     public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
     {
         if (!OperatingSystem.IsWindows())
+        {
             throw new PlatformNotSupportedException("GetMonitorBounds is currently only supported on Windows");
+        }
 
         return WindowApi.GetMonitorBounds(monitorIndex);
     }
@@ -172,7 +212,9 @@ public static class PublicApi
     public static string GetMonitorName(int monitorIndex)
     {
         if (OperatingSystem.IsWindows())
+        {
             return WindowApi.GetMonitorName(monitorIndex);
+        }
 
         return $"Monitor {monitorIndex + 1}";
     }

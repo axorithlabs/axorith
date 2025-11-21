@@ -27,14 +27,19 @@ public sealed class EventAggregator : IEventAggregator
     public void Publish<TEvent>(TEvent eventMessage)
     {
         var eventType = typeof(TEvent);
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
+        if (!_subscriptions.TryGetValue(eventType, out var handlers))
+        {
+            return;
+        }
 
         // Create snapshot for safe iteration
         var handlersList = handlers.ToList();
         var deadReferences = new List<WeakReference<object>>();
 
         foreach (var weakHandler in handlersList)
+        {
             if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
+            {
                 try
                 {
                     handler(eventMessage);
@@ -44,24 +49,35 @@ public sealed class EventAggregator : IEventAggregator
                     Log.Warning(ex, "Event handler threw in EventAggregator for event type {EventType}",
                         typeof(TEvent).Name);
                 }
+            }
             else
+            {
                 deadReferences.Add(weakHandler);
+            }
+        }
 
         if (deadReferences.Count > 0)
+        {
             CleanupDeadReferences(eventType);
+        }
     }
 
     public Task PublishAsync<TEvent>(TEvent eventMessage, CancellationToken cancellationToken = default)
     {
         var eventType = typeof(TEvent);
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return Task.CompletedTask;
+        if (!_subscriptions.TryGetValue(eventType, out var handlers))
+        {
+            return Task.CompletedTask;
+        }
 
         var handlersList = handlers.ToList();
         var deadReferences = new List<WeakReference<object>>();
         var tasks = new List<Task>();
 
         foreach (var weakHandler in handlersList)
+        {
             if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
+            {
                 tasks.Add(Task.Run(() =>
                 {
                     try
@@ -74,18 +90,27 @@ public sealed class EventAggregator : IEventAggregator
                             typeof(TEvent).Name);
                     }
                 }, cancellationToken));
+            }
             else
+            {
                 deadReferences.Add(weakHandler);
+            }
+        }
 
         if (deadReferences.Count > 0)
+        {
             CleanupDeadReferences(eventType);
+        }
 
         return tasks.Count == 0 ? Task.CompletedTask : Task.WhenAll(tasks);
     }
 
     private void CleanupDeadReferences(Type eventType)
     {
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
+        if (!_subscriptions.TryGetValue(eventType, out var handlers))
+        {
+            return;
+        }
 
         var liveReferences = handlers.Where(wr => wr.TryGetTarget(out _)).ToList();
         _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(liveReferences);
@@ -94,7 +119,10 @@ public sealed class EventAggregator : IEventAggregator
     private void Unsubscribe<TEvent>(Action<TEvent> handler)
     {
         var eventType = typeof(TEvent);
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
+        if (!_subscriptions.TryGetValue(eventType, out var handlers))
+        {
+            return;
+        }
 
         var filtered = handlers.Where(wh =>
             !wh.TryGetTarget(out var target) || !target.Equals(handler)

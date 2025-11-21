@@ -2,7 +2,7 @@
 echo Packaging Axorith Firefox extension...
 
 REM Define the name of the output zip file
-set ZIP_FILE=firefox.zip
+set ZIP_FILE=site-blocker-extension-firefox.zip
 
 REM Change to the directory where the script is located
 cd /d "%~dp0"

@@ -56,7 +56,11 @@ public sealed class DesignTimeSandboxManager : IDisposable
         {
             EnsureCapacity();
             var (module, scope) = _moduleRegistry.CreateInstance(moduleId);
-            if (module == null) throw new InvalidOperationException($"Failed to create module {moduleId}");
+            if (module == null)
+            {
+                throw new InvalidOperationException($"Failed to create module {moduleId}");
+            }
+
             var sb = new Sandbox(module, scope);
             _logger.LogInformation("Design-time sandbox created for {InstanceId} ({ModuleId})", instanceId, moduleId);
             return sb;
@@ -64,6 +68,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
 
         sandbox.LastAccessUtc = DateTime.UtcNow;
         if (!sandbox.InitDone)
+        {
             try
             {
                 using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -74,10 +79,10 @@ public sealed class DesignTimeSandboxManager : IDisposable
             {
                 _logger.LogWarning(ex, "Error initializing sandbox {InstanceId} ({ModuleId})", instanceId, moduleId);
             }
+        }
 
         if (!sandbox.Subscribed)
         {
-            // Subscribe first so that applying initial values triggers reactive broadcasts
             SubscribeAll(instanceId, sandbox);
             sandbox.Subscribed = true;
         }
@@ -92,7 +97,9 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public void ApplySetting(Guid instanceId, string key, string? stringValue)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))
+        {
             throw new InvalidOperationException($"Sandbox not found for {instanceId}");
+        }
 
         sb.LastAccessUtc = DateTime.UtcNow;
         var setting = sb.Module.GetSettings().FirstOrDefault(s => s.Key == key);
@@ -112,7 +119,9 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public async Task<bool> TryInvokeActionAsync(Guid instanceId, string actionKey, CancellationToken ct)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))
+        {
             return false;
+        }
 
         sb.LastAccessUtc = DateTime.UtcNow;
 
@@ -129,7 +138,10 @@ public sealed class DesignTimeSandboxManager : IDisposable
 
     public void DisposeSandbox(Guid instanceId)
     {
-        if (!_sandboxes.TryRemove(instanceId, out var sb)) return;
+        if (!_sandboxes.TryRemove(instanceId, out var sb))
+        {
+            return;
+        }
 
         try
         {
@@ -148,9 +160,12 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public void ReBroadcast(Guid instanceId)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))
+        {
             throw new InvalidOperationException($"Sandbox not found for {instanceId}");
+        }
 
         sb.LastAccessUtc = DateTime.UtcNow;
+
         foreach (var setting in sb.Module.GetSettings())
         {
             _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
@@ -163,8 +178,15 @@ public sealed class DesignTimeSandboxManager : IDisposable
             if (setting.Choices != null)
             {
                 // We cannot pull current choices synchronously from IObservable, so skip unless module emits.
-                // Many modules push choices during Initialize; if needed, modules should call SetChoices proactively.
             }
+        }
+
+        foreach (var action in sb.Module.GetActions())
+        {
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, action.Key,
+                SettingProperty.ActionLabel, action.GetCurrentLabel());
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, action.Key,
+                SettingProperty.ActionEnabled, action.GetCurrentEnabled());
         }
     }
 
@@ -172,14 +194,25 @@ public sealed class DesignTimeSandboxManager : IDisposable
     {
         var dict = sb.Module.GetSettings().ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in initial)
+        {
             if (dict.TryGetValue(k, out var s))
+            {
                 s.SetValueFromString(v);
+            }
+        }
     }
 
     private void SubscribeAll(Guid instanceId, Sandbox sb)
     {
         foreach (var s in sb.Module.GetSettings())
+        {
             _broadcaster.SubscribeToSetting(instanceId, s);
+        }
+
+        foreach (var a in sb.Module.GetActions())
+        {
+            _broadcaster.SubscribeToAction(instanceId, a);
+        }
     }
 
     private void EnsureCapacity()
@@ -187,7 +220,11 @@ public sealed class DesignTimeSandboxManager : IDisposable
         while (_sandboxes.Count >= _maxSandboxes)
         {
             var oldest = _sandboxes.OrderBy(kv => kv.Value.LastAccessUtc).FirstOrDefault();
-            if (oldest.Key == Guid.Empty) break;
+            if (oldest.Key == Guid.Empty)
+            {
+                break;
+            }
+
             DisposeSandbox(oldest.Key);
         }
     }
@@ -196,8 +233,12 @@ public sealed class DesignTimeSandboxManager : IDisposable
     {
         var now = DateTime.UtcNow;
         foreach (var kv in _sandboxes)
+        {
             if (now - kv.Value.LastAccessUtc > _idleTtl)
+            {
                 DisposeSandbox(kv.Key);
+            }
+        }
     }
 
     public void Dispose()
@@ -205,7 +246,10 @@ public sealed class DesignTimeSandboxManager : IDisposable
         _evictionTimer.Dispose();
 
         foreach (var id in _sandboxes.Keys.ToArray())
+        {
             DisposeSandbox(id);
+        }
+
         _sandboxes.Clear();
         GC.SuppressFinalize(this);
         _sessionManager.SessionStarted -= OnSessionStarted;
@@ -215,9 +259,9 @@ public sealed class DesignTimeSandboxManager : IDisposable
     {
         try
         {
-            // Dispose design-time sandboxes that match modules in the now active preset
             var toDispose = _sandboxes.Keys.ToArray();
             foreach (var id in toDispose)
+            {
                 try
                 {
                     DisposeSandbox(id);
@@ -226,6 +270,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
                 {
                     /* best effort */
                 }
+            }
 
             _logger.LogInformation("Disposed all design-time sandboxes on session start {PresetId}", presetId);
         }

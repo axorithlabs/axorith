@@ -56,20 +56,19 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         try
         {
             if (!Guid.TryParse(request.PresetId, out var presetId))
+            {
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid preset ID: {request.PresetId}"));
+            }
 
             logger.LogDebug("GetPreset called for {PresetId}", presetId);
 
             var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
                 .ConfigureAwait(false);
 
-            var preset = presets.FirstOrDefault(p => p.Id == presetId);
-
-            if (preset == null)
-                throw new RpcException(new Status(StatusCode.NotFound,
-                    $"Preset not found: {presetId}"));
-
+            var preset = presets.FirstOrDefault(p => p.Id == presetId) ?? throw new RpcException(new Status(
+                StatusCode.NotFound,
+                $"Preset not found: {presetId}"));
             var message = PresetMapper.ToMessage(preset);
             logger.LogInformation("Returned preset: {PresetName}", preset.Name);
             return message;
@@ -90,16 +89,23 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         try
         {
             if (request.Preset == null)
+            {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
+            }
 
             logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
 
             var preset = PresetMapper.ToModel(request.Preset);
 
-            if (preset.Id == Guid.Empty) preset.Id = Guid.NewGuid();
+            if (preset.Id == Guid.Empty)
+            {
+                preset.Id = Guid.NewGuid();
+            }
 
             foreach (var module in preset.Modules.Where(module => module.InstanceId == Guid.Empty))
+            {
                 module.InstanceId = Guid.NewGuid();
+            }
 
             await presetManager.SavePresetAsync(preset, context.CancellationToken)
                 .ConfigureAwait(false);
@@ -124,11 +130,15 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         try
         {
             if (request.Preset == null)
+            {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
+            }
 
             if (!Guid.TryParse(request.Preset.Id, out var presetId) || presetId == Guid.Empty)
+            {
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid preset ID: {request.Preset.Id}"));
+            }
 
             logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
 
@@ -157,8 +167,10 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
         try
         {
             if (!Guid.TryParse(request.PresetId, out var presetId))
+            {
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid preset ID: {request.PresetId}"));
+            }
 
             logger.LogDebug("DeletePreset called for {PresetId}", presetId);
 

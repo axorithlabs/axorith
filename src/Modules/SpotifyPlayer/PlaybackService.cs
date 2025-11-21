@@ -15,6 +15,11 @@ internal sealed class PlaybackService : IDisposable
     private readonly SpotifyApiService _apiService;
     private readonly CompositeDisposable _disposables = [];
 
+    private List<KeyValuePair<string, string>> _cachedDevices = [];
+    private List<KeyValuePair<string, string>> _cachedPlaylists = [];
+    private List<KeyValuePair<string, string>> _cachedAlbums = [];
+    private string _cachedLikedSongsUri = string.Empty;
+
     public PlaybackService(IModuleLogger logger, Settings settings, AuthService authService,
         SpotifyApiService apiService)
     {
@@ -24,7 +29,7 @@ internal sealed class PlaybackService : IDisposable
         _apiService = apiService;
 
         _settings.PlaybackContext.Value
-            .Select(v => v == Settings.CUSTOM_URL_VALUE)
+            .Select(v => v == Settings.CustomUrlValue)
             .Subscribe(_settings.CustomUrl.SetVisibility)
             .DisposeWith(_disposables);
 
@@ -36,11 +41,29 @@ internal sealed class PlaybackService : IDisposable
                 _ => { },
                 ex => _logger.LogError(ex, "Failed to update Spotify data via Update action."))
             .DisposeWith(_disposables);
+
+        _settings.TargetDevice.Value
+            .Skip(1)
+            .DistinctUntilChanged()
+            .Subscribe(_ => RebuildDeviceChoices())
+            .DisposeWith(_disposables);
+
+        _settings.PlaybackContext.Value
+            .Skip(1)
+            .DistinctUntilChanged()
+            .Subscribe(_ => RebuildPlaybackChoices())
+            .DisposeWith(_disposables);
     }
 
     public async Task InitializeAsync()
     {
-        if (!_authService.HasRefreshToken()) return;
+        _authService.RefreshUiState();
+
+        if (!_authService.HasRefreshToken())
+        {
+            ClearChoices();
+            return;
+        }
 
         try
         {
@@ -49,30 +72,28 @@ internal sealed class PlaybackService : IDisposable
         }
         catch (Exception)
         {
-            _logger.LogWarning("Failed to load dynamic choices on initialization.");
+            _logger.LogWarning("Failed to load dynamic choices on initialization. Falling back to offline state.");
+            RebuildDeviceChoices();
+            RebuildPlaybackChoices();
         }
     }
 
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateSettingsAsync()
     {
         return _settings.ValidateAsync();
     }
 
-    public async Task OnSessionStartAsync(CancellationToken cancellationToken)
+    public async Task OnSessionStartAsync()
     {
-        var waitMs = _settings.WaitTime.GetCurrentValue();
-        if (waitMs > 0) await Task.Delay(TimeSpan.FromMilliseconds(waitMs), cancellationToken);
-
         if (!_authService.HasRefreshToken())
         {
             _logger.LogError(null, "Cannot start session: Not authenticated. Please login via the module settings.");
             return;
         }
 
-        var selectedDeviceName = _settings.TargetDevice.GetCurrentValue();
-        string? deviceId;
+        var selectedDeviceId = _settings.TargetDevice.GetCurrentValue();
 
-        if (string.IsNullOrWhiteSpace(selectedDeviceName))
+        if (string.IsNullOrWhiteSpace(selectedDeviceId))
         {
             _logger.LogWarning("No target device selected, attempting to find the first active device...");
             var devices = await _apiService.GetAvailableDevicesAsync();
@@ -83,35 +104,19 @@ internal sealed class PlaybackService : IDisposable
                 return;
             }
 
-            deviceId = firstDevice.Key;
+            selectedDeviceId = firstDevice.Key;
             _logger.LogWarning("Defaulting to first available device: {DeviceName}", firstDevice.Value);
         }
-        else
-        {
-            _logger.LogInfo("Looking for selected device: '{DeviceName}'...", selectedDeviceName);
-            var devices = await _apiService.GetAvailableDevicesAsync();
-            var targetDevice = devices.FirstOrDefault(d => d.Value.StartsWith(selectedDeviceName));
-
-            if (string.IsNullOrWhiteSpace(targetDevice.Key))
-            {
-                _logger.LogError(null,
-                    "Session start failed: Selected device '{DeviceName}' is offline or could not be found.",
-                    selectedDeviceName);
-                return;
-            }
-
-            deviceId = targetDevice.Key;
-            _logger.LogInfo("Found active device with ID: {DeviceId}", deviceId);
-        }
-
-        _logger.LogInfo("Configuring Spotify playback options for device {DeviceId}...", deviceId);
+        
+        _logger.LogInfo("Configuring Spotify playback options for device {DeviceId}...", selectedDeviceId);
+        
         try
         {
             var setupTasks = new List<Task>
             {
-                _apiService.SetVolumeAsync(deviceId, _settings.Volume.GetCurrentValue()),
-                _apiService.SetShuffleAsync(deviceId, _settings.Shuffle.GetCurrentValue() == "true"),
-                _apiService.SetRepeatModeAsync(deviceId, _settings.RepeatMode.GetCurrentValue())
+                _apiService.SetVolumeAsync(selectedDeviceId, _settings.Volume.GetCurrentValue()),
+                _apiService.SetShuffleAsync(selectedDeviceId, _settings.Shuffle.GetCurrentValue() == "true"),
+                _apiService.SetRepeatModeAsync(selectedDeviceId, _settings.RepeatMode.GetCurrentValue())
             };
             await Task.WhenAll(setupTasks);
         }
@@ -121,7 +126,7 @@ internal sealed class PlaybackService : IDisposable
         }
 
         var contextSelection = _settings.PlaybackContext.GetCurrentValue();
-        var urlToPlay = contextSelection == Settings.CUSTOM_URL_VALUE
+        var urlToPlay = contextSelection == Settings.CustomUrlValue
             ? _settings.CustomUrl.GetCurrentValue()
             : contextSelection;
 
@@ -131,17 +136,17 @@ internal sealed class PlaybackService : IDisposable
             return;
         }
 
-        await StartPlaybackAsync(urlToPlay, deviceId);
+        await StartPlaybackAsync(urlToPlay, selectedDeviceId);
     }
 
     public Task OnSessionEndAsync()
     {
-        if (!_authService.HasRefreshToken()) return Task.CompletedTask;
+        if (!_authService.HasRefreshToken())
+        {
+            return Task.CompletedTask;
+        }
 
-        var deviceId = _settings.TargetDevice.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(deviceId)) return Task.CompletedTask;
-
-        return _apiService.PauseAsync(deviceId);
+        return _apiService.PauseAsync();
     }
 
     private async Task LoadDynamicChoicesAsync()
@@ -153,61 +158,99 @@ internal sealed class PlaybackService : IDisposable
 
         await Task.WhenAll(devicesTask, playlistsTask, albumsTask, likedSongsTask);
 
-        UpdateDeviceChoices(await devicesTask);
-        UpdatePlayableItemChoices(await playlistsTask, await albumsTask, await likedSongsTask);
+        _cachedDevices = await devicesTask;
+        _cachedPlaylists = await playlistsTask;
+        _cachedAlbums = await albumsTask;
+        _cachedLikedSongsUri = await likedSongsTask;
+
+        RebuildDeviceChoices();
+        RebuildPlaybackChoices();
     }
 
-    private void UpdateDeviceChoices(IReadOnlyList<KeyValuePair<string, string>> freshDevices)
+    private void RebuildDeviceChoices()
     {
-        var selectedDeviceName = _settings.TargetDevice.GetCurrentValue();
+        var currentSelectedId = _settings.TargetDevice.GetCurrentValue();
 
-        var finalChoices = freshDevices
-            .Select(d => new KeyValuePair<string, string>(d.Value, d.Value))
+        var finalChoices = _cachedDevices
+            .Select(d => new KeyValuePair<string, string>(d.Key, d.Value))
             .ToList();
 
-        var selectionExists = finalChoices.Any(d => d.Key == selectedDeviceName);
+        var selectionExists = finalChoices.Any(d => d.Key == currentSelectedId);
 
-        if (!string.IsNullOrWhiteSpace(selectedDeviceName) && !selectionExists)
-            finalChoices.Insert(0,
-                new KeyValuePair<string, string>(selectedDeviceName, $"{selectedDeviceName} (Offline)"));
+        if (!string.IsNullOrWhiteSpace(currentSelectedId) && !selectionExists)
+        {
+            finalChoices.Insert(0, new KeyValuePair<string, string>(currentSelectedId, $"{currentSelectedId} (Offline)"));
+        }
 
-        if (finalChoices.Count == 0) finalChoices.Add(new KeyValuePair<string, string>("", "No devices found."));
+        if (finalChoices.Count == 0)
+        {
+            finalChoices.Add(new KeyValuePair<string, string>("", "No devices found."));
+        }
 
         _settings.TargetDevice.SetChoices(finalChoices);
 
-        if (!string.IsNullOrWhiteSpace(selectedDeviceName)) _settings.TargetDevice.SetValue(selectedDeviceName);
+        if (!string.IsNullOrWhiteSpace(currentSelectedId))
+        {
+            _settings.TargetDevice.SetValue(currentSelectedId);
+        }
+        else if (_cachedDevices.Count > 0)
+        {
+            _settings.TargetDevice.SetValue(_cachedDevices[0].Key);
+        }
     }
 
-    private void UpdatePlayableItemChoices(
-        IReadOnlyList<KeyValuePair<string, string>> playlists,
-        IReadOnlyList<KeyValuePair<string, string>> albums,
-        string likedSongsUri)
+    private void RebuildPlaybackChoices()
     {
-        var selectedContext = _settings.PlaybackContext.GetCurrentValue();
+        var currentContext = _settings.PlaybackContext.GetCurrentValue();
+        
         var finalChoicesDict = new Dictionary<string, string>
         {
-            [Settings.CUSTOM_URL_VALUE] = "Enter a custom URL..."
+            [Settings.CustomUrlValue] = "Enter a custom URL..."
         };
 
-        if (!string.IsNullOrWhiteSpace(likedSongsUri)) finalChoicesDict[likedSongsUri] = "Liked Songs";
+        if (!string.IsNullOrWhiteSpace(_cachedLikedSongsUri))
+        {
+            finalChoicesDict[_cachedLikedSongsUri] = "Liked Songs";
+        }
 
-        foreach (var playlist in playlists)
+        foreach (var playlist in _cachedPlaylists)
+        {
             if (!string.IsNullOrWhiteSpace(playlist.Key))
                 finalChoicesDict[playlist.Key] = playlist.Value;
+        }
 
-        foreach (var album in albums)
+        foreach (var album in _cachedAlbums)
+        {
             if (!string.IsNullOrWhiteSpace(album.Key))
                 finalChoicesDict[album.Key] = album.Value;
+        }
 
-        if (!string.IsNullOrWhiteSpace(selectedContext) && !finalChoicesDict.ContainsKey(selectedContext))
-            finalChoicesDict[selectedContext] = $"{selectedContext} (Saved)";
+        if (!string.IsNullOrWhiteSpace(currentContext) && !finalChoicesDict.ContainsKey(currentContext))
+        {
+            finalChoicesDict[currentContext] = $"{currentContext} (Saved)";
+        }
 
-        var finalChoicesList = finalChoicesDict.Select(kvp => new KeyValuePair<string, string>(kvp.Key, kvp.Value))
+        var finalChoicesList = finalChoicesDict
+            .Select(kvp => new KeyValuePair<string, string>(kvp.Key, kvp.Value))
             .ToList();
 
         _settings.PlaybackContext.SetChoices(finalChoicesList);
 
-        if (!string.IsNullOrWhiteSpace(selectedContext)) _settings.PlaybackContext.SetValue(selectedContext);
+        if (!string.IsNullOrWhiteSpace(currentContext))
+        {
+            _settings.PlaybackContext.SetValue(currentContext);
+        }
+    }
+
+    private void ClearChoices()
+    {
+        _cachedDevices.Clear();
+        _cachedPlaylists.Clear();
+        _cachedAlbums.Clear();
+        _cachedLikedSongsUri = string.Empty;
+        
+        RebuildDeviceChoices();
+        RebuildPlaybackChoices();
     }
 
     private async Task StartPlaybackAsync(string context, string deviceId)
@@ -216,7 +259,7 @@ internal sealed class PlaybackService : IDisposable
         {
             _logger.LogInfo("Starting playback for context: {Context}", context);
 
-            if (context.StartsWith("{", StringComparison.Ordinal))
+            if (context.StartsWith('{'))
             {
                 var uris = JsonSerializer.Deserialize<JsonElement>(context).GetProperty("uris").EnumerateArray()
                     .Select(e => e.GetString()).ToList();
@@ -241,8 +284,9 @@ internal sealed class PlaybackService : IDisposable
         if (url.Contains("spotify:", StringComparison.Ordinal)) return url;
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) throw new ArgumentException("Invalid URL format");
         var segments = uri.AbsolutePath.Trim('/').Split('/');
-        if (segments.Length < 2) throw new ArgumentException("URL does not contain a valid Spotify type and ID");
-        return $"spotify:{segments[0]}:{segments[1]}";
+        return segments.Length < 2
+            ? throw new ArgumentException("URL does not contain a valid Spotify type and ID")
+            : $"spotify:{segments[0]}:{segments[1]}";
     }
 
     private void OnAuthenticationStateChanged(bool isAuthenticated)
@@ -253,9 +297,8 @@ internal sealed class PlaybackService : IDisposable
         }
         else
         {
-            UpdateDeviceChoices([]);
-            UpdatePlayableItemChoices([],
-                [], string.Empty);
+            // Don't clear settings on logout to preserve preset data
+            ClearChoices();
         }
     }
 

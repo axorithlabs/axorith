@@ -1,9 +1,11 @@
+// ===== FILE: src\Host\Streaming\SettingUpdateBroadcaster.cs =====
 using System.Collections.Concurrent;
 using System.Reactive.Linq;
 using System.Threading.Channels;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Grpc.Core;
 using Microsoft.Extensions.Options;
@@ -60,18 +62,27 @@ public class SettingUpdateBroadcaster : IDisposable
         var toRemove = new List<string>();
         foreach (var (key, sub) in _settingSubscriptions)
         {
-            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
 
             sub.Dispose();
 
             toRemove.Add(key);
         }
 
-        foreach (var k in toRemove) _settingSubscriptions.TryRemove(k, out _);
+        foreach (var k in toRemove)
+        {
+            _settingSubscriptions.TryRemove(k, out _);
+        }
 
         var choiceKeys = _lastChoicesFingerprint.Keys
             .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
-        foreach (var ck in choiceKeys) _lastChoicesFingerprint.TryRemove(ck, out _);
+        foreach (var ck in choiceKeys)
+        {
+            _lastChoicesFingerprint.TryRemove(ck, out _);
+        }
     }
 
     /// <summary>
@@ -133,14 +144,29 @@ public class SettingUpdateBroadcaster : IDisposable
             Loop = loopTask
         };
 
-        if (!_subscribers.TryAdd(key, subscriber))
-        {
-            _logger.LogWarning("Client {Key} already subscribed, replacing stream", key);
-            if (_subscribers.TryRemove(key, out var old))
-                await old.Cts.CancelAsync().ConfigureAwait(false);
+        // FIX AXOR-39: Use atomic AddOrUpdate instead of TryAdd/TryRemove dance.
+        _subscribers.AddOrUpdate(key, 
+            // Factory for adding new key
+            _ => subscriber, 
+            // Factory for updating existing key
+            (_, oldSubscriber) => 
+            {
+                _logger.LogWarning("Client {Key} already subscribed, replacing stream atomically", key);
+                
+                // Signal the old subscriber to stop. 
+                // Cancel() is thread-safe. We don't need to await it here; 
+                // the background loopTask will catch the cancellation and exit gracefully.
+                try 
+                {
+                    oldSubscriber.Cts.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Ignore if already disposed
+                }
 
-            _subscribers[key] = subscriber;
-        }
+                return subscriber;
+            });
 
         try
         {
@@ -152,8 +178,12 @@ public class SettingUpdateBroadcaster : IDisposable
         }
         finally
         {
-            if (_subscribers.TryRemove(key, out var sub))
-                await sub.Cts.CancelAsync().ConfigureAwait(false);
+            // Only remove if it's still OUR subscriber (handle race where it was replaced again)
+            if (_subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber)))
+            {
+                await subscriber.Cts.CancelAsync().ConfigureAwait(false);
+                subscriber.Cts.Dispose();
+            }
         }
     }
 
@@ -179,11 +209,22 @@ public class SettingUpdateBroadcaster : IDisposable
             }
 
             _runtimeInstanceIds[configuredModule.InstanceId] = 1;
-            var settings = moduleInstance.GetSettings();
-            foreach (var setting in settings) SubscribeToSetting(configuredModule.InstanceId, setting);
 
-            _logger.LogDebug("Subscribed to {SettingCount} settings for module {ModuleName} (InstanceId: {InstanceId})",
-                settings.Count, configuredModule.CustomName ?? "Unknown", configuredModule.InstanceId);
+            var settings = moduleInstance.GetSettings();
+            foreach (var setting in settings)
+            {
+                SubscribeToSetting(configuredModule.InstanceId, setting);
+            }
+
+            var actions = moduleInstance.GetActions();
+            foreach (var action in actions)
+            {
+                SubscribeToAction(configuredModule.InstanceId, action);
+            }
+
+            _logger.LogDebug(
+                "Subscribed to {SettingCount} settings and {ActionCount} actions for module {ModuleName} (InstanceId: {InstanceId})",
+                settings.Count, actions.Count, configuredModule.CustomName ?? "Unknown", configuredModule.InstanceId);
         }
 
         _logger.LogInformation("Successfully subscribed to settings for {ModuleCount} modules",
@@ -200,9 +241,16 @@ public class SettingUpdateBroadcaster : IDisposable
             var prefix = instanceId + ":";
             foreach (var kv in _settingSubscriptions.ToArray())
             {
-                if (!kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 kv.Value.Dispose();
-                if (_settingSubscriptions.TryRemove(kv.Key, out _)) removedSubs++;
+                if (_settingSubscriptions.TryRemove(kv.Key, out _))
+                {
+                    removedSubs++;
+                }
             }
 
             removedChoices += _lastChoicesFingerprint.Keys.ToArray()
@@ -224,7 +272,9 @@ public class SettingUpdateBroadcaster : IDisposable
         SettingProperty property, object? value)
     {
         if (_disposed || _subscribers.IsEmpty)
+        {
             return Task.CompletedTask;
+        }
 
         // Choices caching: skip duplicate broadcasts with same fingerprint
         if (property == SettingProperty.Choices && value is IReadOnlyList<KeyValuePair<string, string>> choicesList)
@@ -232,7 +282,10 @@ public class SettingUpdateBroadcaster : IDisposable
             var fingerprint = string.Join("\n", choicesList.Select(kv => kv.Key + "\u0001" + kv.Value));
             var cacheKey = $"{moduleInstanceId}:{settingKey}:choices";
             if (_lastChoicesFingerprint.TryGetValue(cacheKey, out var prev) && prev == fingerprint)
+            {
                 return Task.CompletedTask;
+            }
+
             _lastChoicesFingerprint[cacheKey] = fingerprint;
         }
 
@@ -246,14 +299,20 @@ public class SettingUpdateBroadcaster : IDisposable
             string? filter = null;
             var sepIndex = subscriberKey.IndexOf(':');
             if (sepIndex > 0 && sepIndex < subscriberKey.Length - 1)
+            {
                 filter = subscriberKey[(sepIndex + 1)..];
+            }
 
             if (filter != null &&
                 !string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             if (!sub.Queue.Writer.TryWrite(update))
+            {
                 _logger.LogDebug("Subscriber queue full for {SubscriberId}, dropping oldest", subscriberKey);
+            }
         }
 
         return Task.CompletedTask;
@@ -320,23 +379,63 @@ public class SettingUpdateBroadcaster : IDisposable
         _logger.LogDebug("Subscribed to setting updates: {ModuleId}.{Key}", moduleInstanceId, setting.Key);
     }
 
+    /// <summary>
+    ///     Subscribes to a module action's observables and broadcasts changes.
+    /// </summary>
+    public void SubscribeToAction(Guid moduleInstanceId, IAction action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var keyPrefix = $"{moduleInstanceId}:{action.Key}";
+
+        var labelSub = action.Label
+            .Skip(1)
+            .DistinctUntilChanged()
+            .Subscribe(label =>
+            {
+                _ = BroadcastUpdateAsync(moduleInstanceId, action.Key, SettingProperty.ActionLabel, label);
+            });
+        ReplaceSubscription($"{keyPrefix}:action_label", labelSub);
+
+        var enabledSub = action.IsEnabled
+            .Skip(1)
+            .DistinctUntilChanged()
+            .Subscribe(enabled =>
+            {
+                _ = BroadcastUpdateAsync(moduleInstanceId, action.Key, SettingProperty.ActionEnabled, enabled);
+            });
+        ReplaceSubscription($"{keyPrefix}:action_enabled", enabledSub);
+
+        _logger.LogDebug("Subscribed to action updates: {ModuleId}.{Key}", moduleInstanceId, action.Key);
+    }
+
     private void ReplaceSubscription(string key, IDisposable sub)
     {
-        if (_settingSubscriptions.TryRemove(key, out var old)) old.Dispose();
+        if (_settingSubscriptions.TryRemove(key, out var old))
+        {
+            old.Dispose();
+        }
+
         _settingSubscriptions[key] = sub;
     }
 
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
 
         _sessionManager.SessionStarted -= OnSessionStarted;
         _sessionManager.SessionStopped -= OnSessionStopped;
 
-        foreach (var subscription in _settingSubscriptions.Values) subscription.Dispose();
+        foreach (var subscription in _settingSubscriptions.Values)
+        {
+            subscription.Dispose();
+        }
+
         _settingSubscriptions.Clear();
 
         _subscribers.Clear();

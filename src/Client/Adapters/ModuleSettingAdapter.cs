@@ -28,19 +28,27 @@ internal class ModuleSettingAdapter : ISetting
     public IObservable<bool> IsReadOnly { get; }
     public IObservable<IReadOnlyList<KeyValuePair<string, string>>>? Choices { get; }
     public string? Filter { get; }
+    public bool HasHistory { get; }
 
     public ModuleSettingAdapter(ModuleSetting setting, string? savedValue = null)
     {
         Key = setting.Key;
         Description = setting.Description;
         Filter = setting.Filter;
+        HasHistory = setting.HasHistory;
 
         if (!Enum.TryParse<SettingControlType>(setting.ControlType, out var controlType))
+        {
             controlType = SettingControlType.Text;
+        }
+
         ControlType = controlType;
 
         if (!Enum.TryParse<SettingPersistence>(setting.Persistence, out var persistence))
+        {
             persistence = SettingPersistence.Persisted;
+        }
+
         Persistence = persistence;
 
         ValueType = ParseValueType(setting.ValueType);
@@ -146,7 +154,9 @@ internal class ModuleSettingAdapter : ISetting
     private static Type ParseValueType(string typeName)
     {
         if (string.IsNullOrEmpty(typeName))
+        {
             return typeof(string);
+        }
 
         return typeName switch
         {
@@ -163,22 +173,41 @@ internal class ModuleSettingAdapter : ISetting
     private object? ParseValue(string? value)
     {
         if (string.IsNullOrEmpty(value))
+        {
             return ValueType == typeof(bool) ? false : null;
+        }
 
         try
         {
             if (ValueType == typeof(string))
+            {
                 return value;
+            }
+
             if (ValueType == typeof(bool))
+            {
                 return bool.TryParse(value, out var b) && b;
+            }
+
             if (ValueType == typeof(int))
+            {
                 return int.TryParse(value, out var i) ? i : 0;
+            }
+
             if (ValueType == typeof(decimal))
+            {
                 return decimal.TryParse(value, out var d) ? d : 0m;
+            }
+
             if (ValueType == typeof(double))
+            {
                 return double.TryParse(value, out var d) ? d : 0d;
+            }
+
             if (ValueType == typeof(TimeSpan))
+            {
                 return TimeSpan.TryParse(value, out var ts) ? ts : TimeSpan.Zero;
+            }
         }
         catch
         {

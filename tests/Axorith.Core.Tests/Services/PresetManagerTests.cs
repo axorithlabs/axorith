@@ -19,7 +19,10 @@ public class PresetManagerTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_testPresetsDirectory)) Directory.Delete(_testPresetsDirectory, recursive: true);
+        if (Directory.Exists(_testPresetsDirectory))
+        {
+            Directory.Delete(_testPresetsDirectory, recursive: true);
+        }
     }
 
     [Fact]

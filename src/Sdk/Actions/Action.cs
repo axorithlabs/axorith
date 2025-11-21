@@ -70,27 +70,29 @@ public sealed class Action(string key, string label, bool isEnabled = true) : IA
         _isEnabled.OnNext(enabled);
     }
 
-    /// <summary>
-    ///     Invokes the action if it is currently enabled, notifying all subscribers.
-    /// </summary>
+    /// <inheritdoc />
     public void Invoke()
     {
-        if (_isEnabled.Value) _invoked.OnNext(Unit.Default);
+        if (_isEnabled.Value)
+        {
+            _invoked.OnNext(Unit.Default);
+        }
     }
 
-    /// <summary>
-    ///     Invokes the action asynchronously and waits for completion.
-    ///     If an async handler is registered, waits for it to complete.
-    ///     Otherwise, invokes synchronously and returns immediately.
-    /// </summary>
+    /// <inheritdoc />
     public async Task InvokeAsync()
     {
-        if (!_isEnabled.Value) return;
+        if (!_isEnabled.Value)
+        {
+            return;
+        }
 
         _invoked.OnNext(Unit.Default);
 
         if (_asyncHandler != null)
+        {
             await _asyncHandler().ConfigureAwait(false);
+        }
     }
 
     /// <summary>

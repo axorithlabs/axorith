@@ -89,9 +89,13 @@ public class App : Application
         services.AddSingleton<IWindowStateManager, WindowStateManager>();
         services.AddSingleton(Options.Create(clientConfig));
         services.AddSingleton<IHostController, HostController>();
+        services.AddSingleton<ITokenProvider, FileTokenProvider>();
+        services.AddSingleton<IDiagnosticsApi, NotConnectedDiagnosticsApi>();
+        services.AddSingleton<IHostHealthMonitor, HostHealthMonitor>();
         services.AddSingleton<IHostTrayService, HostTrayService>();
         services.AddSingleton<IConnectionInitializer, ConnectionInitializer>();
         services.AddSingleton<IClientUiSettingsStore>(_ => uiSettingsStore);
+        services.AddSingleton<IFilePickerService>(sp => new FilePickerService(desktop)); 
 
         Services = services.BuildServiceProvider();
 
@@ -109,7 +113,6 @@ public class App : Application
             ShowInTaskbar = true
         };
 
-        // If --tray flag, start with window minimized
         if (_isTrayMode)
         {
             logger.LogInformation("Starting with window hidden (--tray flag)");
@@ -118,7 +121,6 @@ public class App : Application
         else
         {
             logger.LogInformation("Starting with window visible");
-            // Restore window state from previous session
             windowStateManager.RestoreWindowState(_mainWindow);
         }
 
@@ -127,15 +129,15 @@ public class App : Application
         var trayService = Services.GetRequiredService<IHostTrayService>();
         trayService.Initialize(desktop, logger);
 
-        // Handle window closing - minimize to tray instead of closing (configurable)
         _mainWindow.Closing += (_, e) =>
         {
             try
             {
                 if (_isShuttingDown)
+                {
                     return;
+                }
 
-                // Prefer current config from DI (may be mutated at runtime via SettingsView)
                 var options = Services.GetService<IOptions<Configuration>>();
                 var cfg = options?.Value ?? clientConfig;
 
@@ -178,7 +180,9 @@ public class App : Application
         desktop.ShutdownRequested += (_, _) =>
         {
             if (_isShuttingDown)
+            {
                 return;
+            }
 
             _isShuttingDown = true;
 
@@ -186,10 +190,13 @@ public class App : Application
 
             var windowStateManager = Services.GetService<IWindowStateManager>();
             if (windowStateManager != null && desktop.MainWindow != null)
+            {
                 windowStateManager.SaveWindowState(desktop.MainWindow);
+            }
 
             var conn = Services.GetService<ICoreConnection>();
             if (conn != null)
+            {
                 try
                 {
                     conn.DisconnectAsync().Wait(TimeSpan.FromSeconds(2));
@@ -198,9 +205,20 @@ public class App : Application
                 {
                     logger.LogWarning(ex, "Error disconnecting client");
                 }
+            }
 
             logger.LogInformation("Client shutdown complete");
             loggerFactory.Dispose();
         };
+    }
+}
+
+// Helper class to satisfy DI before connection is established
+internal class NotConnectedDiagnosticsApi : IDiagnosticsApi
+{
+    public Task<HealthStatus> GetHealthAsync(CancellationToken ct = default)
+    {
+        // Return Unhealthy or throw, Monitor handles exceptions
+        throw new InvalidOperationException("Not connected yet");
     }
 }

@@ -6,6 +6,7 @@ using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host;
+using Axorith.Host.Interceptors;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
@@ -65,15 +66,22 @@ try
         options.Limits.Http2.KeepAlivePingTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
     });
 
+    builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();
+
     builder.Services.AddGrpc(options =>
     {
         options.MaxReceiveMessageSize = 16 * 1024 * 1024;
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+
+        options.Interceptors.Add<AuthenticationInterceptor>();
     });
 
     builder.Services.AddHttpClient("default");
 
-    if (builder.Environment.IsDevelopment()) builder.Services.AddGrpcReflection();
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.AddGrpcReflection();
+    }
 
     builder.Host.ConfigureContainer<ContainerBuilder>((_, containerBuilder) =>
     {
@@ -85,9 +93,22 @@ try
 
     try
     {
+        var authService = app.Services.GetRequiredService<IHostAuthenticationService>();
+        authService.InitializeToken();
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "Failed to initialize authentication service. Host cannot start securely.");
+        return 1;
+    }
+
+    try
+    {
         var moduleRegistry = app.Services.GetRequiredService<IModuleRegistry>();
         if (moduleRegistry is ModuleRegistry concreteRegistry)
+        {
             await concreteRegistry.InitializeAsync(CancellationToken.None);
+        }
     }
     catch (Exception initEx)
     {
@@ -100,7 +121,10 @@ try
     app.MapGrpcService<DiagnosticsServiceImpl>();
     app.MapGrpcService<HostManagementServiceImpl>();
 
-    if (app.Environment.IsDevelopment()) app.MapGrpcReflectionService();
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapGrpcReflectionService();
+    }
 
     app.MapGet("/", () => "Axorith.Host gRPC server is running. Use gRPC client to connect.");
 
@@ -122,7 +146,6 @@ finally
     await Log.CloseAndFlushAsync();
 }
 
-// ===== Service Registration Methods =====
 static void RegisterCoreServices(ContainerBuilder builder)
 {
     builder.Register(ctx =>

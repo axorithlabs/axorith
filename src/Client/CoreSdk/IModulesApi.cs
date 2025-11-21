@@ -98,7 +98,13 @@ public enum SettingProperty
     ReadOnly,
 
     /// <summary>The setting's available choices changed.</summary>
-    Choices
+    Choices,
+
+    /// <summary>An action's enabled state changed.</summary>
+    ActionEnabled,
+
+    /// <summary>An action's label changed.</summary>
+    ActionLabel
 }
 
 /// <summary>
@@ -123,7 +129,8 @@ public record ModuleSetting(
     string ValueType,
     string CurrentValue,
     IReadOnlyList<KeyValuePair<string, string>> Choices,
-    string? Filter
+    string? Filter,
+    bool HasHistory
 );
 
 /// <summary>

@@ -31,7 +31,10 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 
         foreach (var path in searchPaths)
         {
-            if (cancellationToken.IsCancellationRequested) break;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
 
             var dirInfo = new DirectoryInfo(path);
             if (dirInfo.LinkTarget != null)
@@ -66,16 +69,24 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             };
 
             if (Debugger.IsAttached)
+            {
                 logger.LogDebug("Development mode: Symlinked module directories are allowed");
+            }
 
             var moduleDirectories = Directory.EnumerateDirectories(path, "*", enumerationOptions);
             foreach (var moduleDir in moduleDirectories)
             {
                 var jsonFile = Path.Combine(moduleDir, "module.json");
 
-                if (!File.Exists(jsonFile)) continue;
+                if (!File.Exists(jsonFile))
+                {
+                    continue;
+                }
 
-                if (cancellationToken.IsCancellationRequested) break;
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
 
                 try
                 {
@@ -112,7 +123,10 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     }
 
                     var moduleDirectory = Path.GetDirectoryName(jsonFile);
-                    if (moduleDirectory == null) continue;
+                    if (moduleDirectory == null)
+                    {
+                        continue;
+                    }
 
                     var moduleDirectoryFullPath = Path.GetFullPath(moduleDirectory);
 
@@ -181,6 +195,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     {
                         // Unload if ownership was not transferred
                         if (loadContext != null)
+                        {
                             try
                             {
                                 loadContext.Unload();
@@ -190,6 +205,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                                 logger.LogError(unloadEx, "Failed to unload assembly context for {DllFile}",
                                     Path.GetFileName(dllFile));
                             }
+                        }
                     }
                 }
                 catch (JsonException jsonEx)

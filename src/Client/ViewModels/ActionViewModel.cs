@@ -15,6 +15,9 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
 
+    public string Key { get; }
+    public IAction SourceAction { get; }
+
     public string Label
     {
         get;
@@ -31,8 +34,9 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
 
     public ActionViewModel(IAction action)
     {
-        // Create ReactiveCommand with IsEnabled observable on UI thread
-        // This ensures CanExecuteChanged fires on the correct thread
+        SourceAction = action;
+        Key = action.Key;
+
         var canExecute = action.IsEnabled
             .ObserveOn(RxApp.MainThreadScheduler)
             .Catch<bool, Exception>(_ => Observable.Return(false));

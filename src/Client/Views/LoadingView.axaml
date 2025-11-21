@@ -4,23 +4,30 @@
              xmlns:converters="using:Axorith.Client.Converters"
              x:Class="Axorith.Client.Views.LoadingView"
              x:DataType="vm:LoadingViewModel">
-    <Border Background="#1E1E1E" Padding="40">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="20">
-            <TextBlock Text="⏳" 
-                       FontSize="64" 
-                       Foreground="#4A9EFF"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="{Binding Message}" 
-                       FontSize="16" 
-                       Foreground="White"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="{Binding SubMessage}" 
-                       FontSize="13" 
-                       Foreground="#CCCCCC"
-                       HorizontalAlignment="Center"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding SubMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+    <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
+        <StackPanel Spacing="24">
+            <ProgressBar IsIndeterminate="True" 
+                         Width="100" 
+                         Height="35"
+                         Theme="{StaticResource FluentProgressBar}"
+                         Foreground="{DynamicResource SystemAccentColor}"
+                         HorizontalAlignment="Center"/>
+            
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding Message}" 
+                           FontSize="18" 
+                           FontWeight="SemiBold"
+                           Foreground="#E0E0E0"
+                           HorizontalAlignment="Center"/>
+                
+                <TextBlock Text="{Binding SubMessage}" 
+                           FontSize="14" 
+                           Foreground="#A0A0A0"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding SubMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
         </StackPanel>
-    </Border>
+    </Grid>
 </UserControl>

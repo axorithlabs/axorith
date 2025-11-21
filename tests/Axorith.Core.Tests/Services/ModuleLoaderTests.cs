@@ -24,6 +24,7 @@ public class ModuleLoaderTests : IDisposable
     public void Dispose()
     {
         if (Directory.Exists(_testModulesDir))
+        {
             try
             {
                 Directory.Delete(_testModulesDir, recursive: true);
@@ -32,6 +33,7 @@ public class ModuleLoaderTests : IDisposable
             {
                 // Best effort cleanup
             }
+        }
     }
 
     [Fact]
@@ -55,7 +57,9 @@ public class ModuleLoaderTests : IDisposable
         var dllPath = TryFindTestModuleDll();
         if (dllPath is null)
             // Compiled module not available in this environment; skip test
+        {
             return;
+        }
 
         // Arrange
         var moduleDir = Path.Combine(_testModulesDir, "ValidRealModule");
@@ -107,10 +111,17 @@ public class ModuleLoaderTests : IDisposable
 
             foreach (var root in probeRoots.Distinct())
             {
-                if (!Directory.Exists(root)) continue;
+                if (!Directory.Exists(root))
+                {
+                    continue;
+                }
+
                 var dll = Directory.EnumerateFiles(root, "Axorith.Module.Test.dll", SearchOption.AllDirectories)
                     .FirstOrDefault();
-                if (dll != null) return dll;
+                if (dll != null)
+                {
+                    return dll;
+                }
             }
         }
         catch
@@ -367,9 +378,21 @@ public class ModuleLoaderTests : IDisposable
 
     private static string GetCurrentPlatform()
     {
-        if (OperatingSystem.IsWindows()) return "Windows";
-        if (OperatingSystem.IsLinux()) return "Linux";
-        if (OperatingSystem.IsMacOS()) return "MacOs";
+        if (OperatingSystem.IsWindows())
+        {
+            return "Windows";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return "Linux";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return "MacOs";
+        }
+
         return "Unknown";
     }
 }

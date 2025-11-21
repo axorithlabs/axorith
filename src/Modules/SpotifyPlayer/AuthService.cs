@@ -32,6 +32,7 @@ internal sealed class AuthService : IDisposable
 
     private readonly Action _loginAction;
     private readonly Action _logoutAction;
+    private readonly Action _updateAction;
 
     public event Action<bool>? AuthenticationStateChanged;
 
@@ -45,9 +46,9 @@ internal sealed class AuthService : IDisposable
 
         _loginAction = _settings.LoginAction;
         _logoutAction = _settings.LogoutAction;
+        _updateAction = _settings.UpdateAction;
 
-        var hasRefreshToken = HasRefreshToken();
-        UpdateUiForAuthenticationState(hasRefreshToken);
+        RefreshUiState();
 
         _loginAction.Invoked
             .SelectMany(_ => PerformPkceLoginAsync())
@@ -66,6 +67,11 @@ internal sealed class AuthService : IDisposable
     public bool HasRefreshToken()
     {
         return !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
+    }
+
+    public void RefreshUiState()
+    {
+        UpdateUiForAuthenticationState(HasRefreshToken());
     }
 
     public async Task<string?> GetValidAccessTokenAsync()
@@ -151,8 +157,9 @@ internal sealed class AuthService : IDisposable
         }
 
         _logoutAction.SetEnabled(isAuthenticated);
+        _updateAction.SetEnabled(isAuthenticated);
         _settings.CustomUrl.SetVisibility(
-            _settings.PlaybackContext.GetCurrentValue() == Settings.CUSTOM_URL_VALUE);
+            _settings.PlaybackContext.GetCurrentValue() == Settings.CustomUrlValue);
 
         AuthenticationStateChanged?.Invoke(isAuthenticated);
     }

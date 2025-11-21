@@ -30,9 +30,15 @@ public static class SessionMapper
             Message = message ?? (success ? "Operation completed successfully" : "Operation failed")
         };
 
-        if (errors != null) result.Errors.AddRange(errors);
+        if (errors != null)
+        {
+            result.Errors.AddRange(errors);
+        }
 
-        if (warnings != null) result.Warnings.AddRange(warnings);
+        if (warnings != null)
+        {
+            result.Warnings.AddRange(warnings);
+        }
 
         return result;
     }

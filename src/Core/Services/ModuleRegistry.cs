@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.Loader;
 using Autofac;
 using Axorith.Core.Logging;
 using Axorith.Core.Services.Abstractions;
@@ -13,21 +14,12 @@ namespace Axorith.Core.Services;
 ///     The concrete implementation of the module registry.
 ///     It uses Autofac to create isolated lifetime scopes for each module instance.
 /// </summary>
-/// <remarks>
-///     Initializes a new instance of the <see cref="ModuleRegistry" /> class.
-/// </remarks>
-/// <param name="rootScope">The root Autofac lifetime scope.</param>
-/// <param name="moduleLoader">The module loader for discovering module assemblies.</param>
-/// <param name="searchPaths">The resolved search paths from configuration.</param>
-/// <param name="allowedSymlinks">Whitelist of allowed symlink paths.</param>
-/// <param name="logger">The logger instance.</param>
 public class ModuleRegistry(
     ILifetimeScope rootScope,
     IModuleLoader moduleLoader,
     IEnumerable<string> searchPaths,
     IEnumerable<string> allowedSymlinks,
-    ILogger<ModuleRegistry> logger,
-    bool enableAggressiveUnloadGc = false) : IModuleRegistry, IDisposable
+    ILogger<ModuleRegistry> logger) : IModuleRegistry, IDisposable
 {
     private IReadOnlyDictionary<Guid, ModuleDefinition>
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
@@ -55,61 +47,81 @@ public class ModuleRegistry(
 
     /// <summary>
     ///     Unloads all loaded module assemblies from memory.
+    ///     This operation is non-blocking. Actual memory release happens in the background.
     /// </summary>
     public void Dispose()
     {
-        logger.LogInformation("Disposing ModuleRegistry and unloading all module contexts...");
+        _isInitialized = false;
 
-        var unloadedContexts = new List<(string Name, WeakReference WeakRef)>();
+        logger.LogInformation("Disposing ModuleRegistry and initiating module unload...");
+
+        var contextsToTrack = new List<(string Name, WeakReference<AssemblyLoadContext> Ref)>();
 
         foreach (var definition in _definitions.Values)
+        {
+            if (definition.LoadContext?.IsCollectible != true)
+            {
+                continue;
+            }
+
             try
             {
-                if (definition.LoadContext?.IsCollectible != true) continue;
+                contextsToTrack.Add((definition.Name, new WeakReference<AssemblyLoadContext>(definition.LoadContext)));
 
-                var weakRef = new WeakReference(definition.LoadContext);
                 definition.LoadContext.Unload();
-                unloadedContexts.Add((definition.Name, weakRef));
-                logger.LogDebug("Unloaded assembly context for module '{ModuleName}'", definition.Name);
+                logger.LogDebug("Initiated unload for module '{ModuleName}'", definition.Name);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to unload assembly context for module '{ModuleName}'", definition.Name);
+                logger.LogError(ex, "Failed to initiate unload for module '{ModuleName}'", definition.Name);
             }
+            finally
+            {
+                definition.LoadContext = null;
+                definition.ModuleType = null;
+            }
+        }
 
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
-        if (unloadedContexts.Count <= 0) return;
-
-        if (!enableAggressiveUnloadGc)
+        if (contextsToTrack.Count > 0)
         {
-            logger.LogDebug("Skipping aggressive GC for {Count} unloaded module contexts", unloadedContexts.Count);
+            // Fire-and-forget monitoring task. Does not block Dispose.
+            _ = Task.Run(() => MonitorUnloadingAsync(contextsToTrack));
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    private async Task MonitorUnloadingAsync(List<(string Name, WeakReference<AssemblyLoadContext> Ref)> contexts)
+    {
+        const int maxChecks = 10;
+        const int delayMs = 500;
+
+        for (var i = 0; i < maxChecks; i++)
+        {
+            await Task.Delay(delayMs);
+
+            contexts.RemoveAll(c => !c.Ref.TryGetTarget(out _));
+
+            if (contexts.Count != 0)
+            {
+                continue;
+            }
+
+            logger.LogDebug("All module contexts unloaded successfully.");
             return;
         }
 
-        logger.LogDebug("Running GC to finalize {Count} unloaded contexts", unloadedContexts.Count);
-
-        for (var i = 0; i < 10; i++)
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            var stillAlive = unloadedContexts.Count(c => c.WeakRef.IsAlive);
-            if (stillAlive == 0)
-            {
-                logger.LogDebug("All assembly contexts collected after {Iterations} GC iterations", i + 1);
-                break;
-            }
-
-            if (i == 9 && stillAlive > 0)
-            {
-                logger.LogWarning(
-                    "{Count} assembly contexts still alive after 10 GC iterations - potential memory leak",
-                    stillAlive);
-                foreach (var (name, _) in unloadedContexts.Where(c => c.WeakRef.IsAlive))
-                    logger.LogWarning("AssemblyLoadContext '{Name}' not collected", name);
-            }
-        }
+        // If we are here, some contexts are still alive after ~5 seconds.
+        // This indicates a likely memory leak (strong reference held somewhere), 
+        // but we do NOT force GC to fix it. We just report it.
+        var leaks = string.Join(", ", contexts.Select(c => c.Name));
+        logger.LogWarning(
+            "The following modules have not unloaded after {Timeout}s: {Modules}. " +
+            "This may indicate a memory leak (e.g. static event handlers, running threads). " +
+            "They will be collected by GC eventually if no strong references remain.",
+            (maxChecks * delayMs) / 1000.0, leaks);
     }
 
     /// <inheritdoc />
@@ -131,6 +143,7 @@ public class ModuleRegistry(
     {
         EnsureInitialized();
         if (_definitions.TryGetValue(moduleId, out var definition) && definition.ModuleType != null)
+        {
             try
             {
                 var moduleScope = rootScope.BeginLifetimeScope(builder =>
@@ -168,6 +181,7 @@ public class ModuleRegistry(
                     definition.Name);
                 return (null, null);
             }
+        }
 
         logger.LogWarning(
             "Could not create instance for module ID {ModuleId}. Definition not found or module type is null",
@@ -178,7 +192,9 @@ public class ModuleRegistry(
     private void EnsureInitialized()
     {
         if (!_isInitialized)
+        {
             throw new InvalidOperationException(
                 "ModuleRegistry has not been initialized. Call InitializeAsync() first.");
+        }
     }
 }

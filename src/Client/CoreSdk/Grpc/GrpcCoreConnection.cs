@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using Axorith.Client.Services;
 using Axorith.Contracts;
 using Grpc.Core;
 using Grpc.Net.Client;
@@ -18,6 +19,7 @@ namespace Axorith.Client.CoreSdk.Grpc;
 public class GrpcCoreConnection : ICoreConnection
 {
     private readonly string _serverAddress;
+    private readonly ITokenProvider _tokenProvider;
     private readonly ILogger<GrpcCoreConnection> _logger;
     private readonly BehaviorSubject<ConnectionState> _stateSubject;
     private readonly AsyncRetryPolicy _retryPolicy;
@@ -33,12 +35,18 @@ public class GrpcCoreConnection : ICoreConnection
     ///     Initializes a new instance of the <see cref="GrpcCoreConnection" /> class.
     /// </summary>
     /// <param name="serverAddress">The gRPC server address (e.g., "http://localhost:5901").</param>
+    /// <param name="tokenProvider">The provider for retrieving the authentication token.</param>
     /// <param name="logger">The logger instance.</param>
-    public GrpcCoreConnection(string serverAddress, ILogger<GrpcCoreConnection> logger)
+    public GrpcCoreConnection(
+        string serverAddress,
+        ITokenProvider tokenProvider,
+        ILogger<GrpcCoreConnection> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serverAddress);
+        ArgumentNullException.ThrowIfNull(tokenProvider);
 
         _serverAddress = serverAddress;
+        _tokenProvider = tokenProvider;
         _logger = logger;
         _stateSubject = new BehaviorSubject<ConnectionState>(ConnectionState.Disconnected);
 
@@ -82,8 +90,7 @@ public class GrpcCoreConnection : ICoreConnection
     /// <inheritdoc />
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(GrpcCoreConnection));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(GrpcCoreConnection));
 
         if (State == ConnectionState.Connected)
         {
@@ -95,14 +102,29 @@ public class GrpcCoreConnection : ICoreConnection
 
         try
         {
+            var token = await _tokenProvider.GetTokenAsync(ct);
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new InvalidOperationException(
+                    "Failed to retrieve authentication token. Ensure Axorith.Host is running.");
+            }
+
             _logger.LogInformation("Connecting to Axorith.Host at {Address}", _serverAddress);
+
+            var credentials = CallCredentials.FromInterceptor((_, metadata) =>
+            {
+                metadata.Add(AuthConstants.TokenHeaderName, token);
+                return Task.CompletedTask;
+            });
+
+            var channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
 
             _channel = GrpcChannel.ForAddress(_serverAddress, new GrpcChannelOptions
             {
                 MaxReceiveMessageSize = 16 * 1024 * 1024, // 16MB
                 MaxSendMessageSize = 16 * 1024 * 1024,
-                // For local-only connections, we can use insecure HTTP/2
-                Credentials = ChannelCredentials.Insecure,
+                Credentials = channelCredentials,
+                UnsafeUseInsecureChannelCallCredentials = true,
                 ServiceConfig = new ServiceConfig
                 {
                     MethodConfigs =
@@ -155,7 +177,9 @@ public class GrpcCoreConnection : ICoreConnection
     public async Task DisconnectAsync()
     {
         if (State == ConnectionState.Disconnected)
+        {
             return;
+        }
 
         _logger.LogInformation("Disconnecting from {Address}", _serverAddress);
 
@@ -163,17 +187,28 @@ public class GrpcCoreConnection : ICoreConnection
 
         await DisposeChannelAsync().ConfigureAwait(false);
 
-        _presetsApi = null;
-        _sessionsApi = null;
-        _modulesApi = null;
-        _diagnosticsApi = null;
-
         _logger.LogInformation("Disconnected successfully");
     }
 
     private async Task DisposeChannelAsync()
     {
+        if (_sessionsApi is IDisposable sessionsDisposable)
+        {
+            sessionsDisposable.Dispose();
+        }
+
+        if (_modulesApi is IDisposable modulesDisposable)
+        {
+            modulesDisposable.Dispose();
+        }
+
+        _presetsApi = null;
+        _sessionsApi = null;
+        _modulesApi = null;
+        _diagnosticsApi = null;
+
         if (_channel != null)
+        {
             try
             {
                 await _channel.ShutdownAsync().ConfigureAwait(false);
@@ -187,11 +222,15 @@ public class GrpcCoreConnection : ICoreConnection
             {
                 _channel = null;
             }
+        }
     }
 
     private void SetState(ConnectionState newState)
     {
-        if (_stateSubject.Value == newState) return;
+        if (_stateSubject.Value == newState)
+        {
+            return;
+        }
 
         _logger.LogDebug("Connection state changed: {OldState} -> {NewState}",
             _stateSubject.Value, newState);
@@ -202,7 +241,9 @@ public class GrpcCoreConnection : ICoreConnection
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
 

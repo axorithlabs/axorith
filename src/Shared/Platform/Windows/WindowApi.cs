@@ -103,7 +103,9 @@ internal static class WindowApi
         while (process.MainWindowHandle == IntPtr.Zero)
         {
             if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
+            {
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -127,8 +129,10 @@ internal static class WindowApi
             }, IntPtr.Zero);
 
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
+        {
             throw new ArgumentOutOfRangeException(nameof(monitorIndex),
                 $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
+        }
 
         var targetMonitor = monitors[monitorIndex];
         var targetX = targetMonitor.Left + 50;
@@ -149,21 +153,32 @@ internal static class WindowApi
         results.AddRange(Process.GetProcessesByName(processName));
 
         // Also try by executable path
-        if (!File.Exists(processNameOrPath)) return results;
+        if (!File.Exists(processNameOrPath))
+        {
+            return results;
+        }
 
         var allProcesses = Process.GetProcesses();
         foreach (var process in allProcesses)
+        {
             try
             {
                 if (process.MainModule?.FileName.Equals(processNameOrPath, StringComparison.OrdinalIgnoreCase) !=
-                    true) continue;
+                    true)
+                {
+                    continue;
+                }
+
                 if (results.All(p => p.Id != process.Id))
+                {
                     results.Add(process);
+                }
             }
             catch
             {
                 // Process may not be accessible, skip
             }
+        }
 
         return results;
     }
@@ -191,9 +206,15 @@ internal static class WindowApi
     public static WindowState GetWindowState(IntPtr windowHandle)
     {
         if (IsIconic(windowHandle))
+        {
             return WindowState.Minimized;
+        }
+
         if (IsZoomed(windowHandle))
+        {
             return WindowState.Maximized;
+        }
+
         return WindowState.Normal;
     }
 
@@ -228,8 +249,14 @@ internal static class WindowApi
     public static void FocusWindow(IntPtr windowHandle)
     {
         if (IsIconic(windowHandle))
+        {
             ShowWindow(windowHandle, SwRestore);
-        else if (IsZoomed(windowHandle)) ShowWindow(windowHandle, SwShowmaximized);
+        }
+        else if (IsZoomed(windowHandle))
+        {
+            ShowWindow(windowHandle, SwShowmaximized);
+        }
+
         SetForegroundWindow(windowHandle);
     }
 
@@ -259,8 +286,10 @@ internal static class WindowApi
             }, IntPtr.Zero);
 
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
+        {
             throw new ArgumentOutOfRangeException(nameof(monitorIndex),
                 $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
+        }
 
         var target = monitors[monitorIndex];
         return (target.Left, target.Top, target.Right - target.Left, target.Bottom - target.Top);
@@ -281,7 +310,9 @@ internal static class WindowApi
             if (isActive)
             {
                 if (foundIndex == monitorIndex)
+                {
                     return string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceName : dd.DeviceString;
+                }
 
                 foundIndex++;
             }

@@ -8,15 +8,12 @@ namespace Axorith.Core.Services;
 /// <summary>
 ///     The concrete implementation for managing session presets using JSON files on disk.
 /// </summary>
-/// <remarks>
-///     Initializes a new instance of the <see cref="PresetManager" /> class.
-/// </remarks>
-/// <param name="presetsDirectory">The resolved presets directory path from configuration.</param>
-/// <param name="logger">The logger instance.</param>
 public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
     private const int CurrentPresetVersion = 1;
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+
+    private static readonly SemaphoreSlim FileLock = new(1, 1);
 
     public async Task<IReadOnlyList<SessionPreset>> LoadAllPresetsAsync(CancellationToken cancellationToken)
     {
@@ -82,7 +79,10 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (preset is not { Version: < CurrentPresetVersion }) return preset;
+            if (preset is not { Version: < CurrentPresetVersion })
+            {
+                return preset;
+            }
 
             logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
                 preset.Name, preset.Version, CurrentPresetVersion);
@@ -105,32 +105,24 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         var tempFilePath = Path.Combine(presetsDirectory, $"{preset.Id}.json.tmp");
         logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, filePath);
 
+        await FileLock.WaitAsync(cancellationToken);
         try
         {
             Directory.CreateDirectory(presetsDirectory);
 
-            var lockFilePath = Path.Combine(presetsDirectory, ".axorith-presets.lock");
-
-            using (var lockStream = new FileStream(
-                       lockFilePath,
-                       FileMode.OpenOrCreate,
-                       FileAccess.ReadWrite,
-                       FileShare.None))
+            await using (var stream = new FileStream(
+                             tempFilePath,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             bufferSize: 4096,
+                             useAsync: true))
             {
-                await using (var stream = new FileStream(
-                                 tempFilePath,
-                                 FileMode.Create,
-                                 FileAccess.Write,
-                                 FileShare.None,
-                                 bufferSize: 4096,
-                                 useAsync: true))
-                {
-                    await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
-                        .ConfigureAwait(false);
-                }
-
-                File.Move(tempFilePath, filePath, overwrite: true);
+                await JsonSerializer.SerializeAsync(stream, preset, _jsonOptions, cancellationToken)
+                    .ConfigureAwait(false);
             }
+
+            File.Move(tempFilePath, filePath, overwrite: true);
 
             logger.LogDebug("Preset '{PresetName}' saved successfully", preset.Name);
         }
@@ -138,15 +130,14 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         {
             logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
 
-            try
+            if (File.Exists(tempFilePath))
             {
-                if (File.Exists(tempFilePath))
-                    File.Delete(tempFilePath);
+                File.Delete(tempFilePath);
             }
-            catch
-            {
-                // Ignore cleanup errors
-            }
+        }
+        finally
+        {
+            FileLock.Release();
         }
     }
 
@@ -175,19 +166,8 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    ///     Migrates a preset from an older version to the current version.
-    ///     Add migration logic here when preset structure changes.
-    /// </summary>
     private void MigratePreset(SessionPreset preset)
     {
-        // Example migration logic (add more as needed when schema changes):
-        // if (preset.Version == 0)
-        // {
-        //     // Migrate from version 0 to 1
-        //     // e.g., rename settings keys, convert data formats, etc.
-        // }
-
         logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
     }
 }

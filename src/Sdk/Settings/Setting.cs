@@ -237,12 +237,17 @@ public abstract class Setting
     /// <param name="description">An optional description for a tooltip.</param>
     /// <param name="isVisible">The initial visibility of the control.</param>
     /// <param name="isReadOnly">The initial read-only state of the control.</param>
+    /// <param name="useHistory"></param>
     /// <returns>A new reactive file picker setting.</returns>
     public static Setting<string> AsFilePicker(string key, string label, string defaultValue, string? filter = null,
-        string? description = null, bool isVisible = true, bool isReadOnly = false)
+        string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
     {
         return new Setting<string>(key, label, description, defaultValue, SettingControlType.FilePicker, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue) { Filter = filter };
+            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue) 
+        { 
+            Filter = filter,
+            HasHistory = useHistory // Set flag
+        };
     }
 
     /// <summary>
@@ -262,31 +267,16 @@ public abstract class Setting
     /// <param name="description">An optional description for a tooltip.</param>
     /// <param name="isVisible">The initial visibility of the control.</param>
     /// <param name="isReadOnly">The initial read-only state of the control.</param>
+    /// <param name="useHistory"></param>
     /// <returns>A new reactive directory picker setting.</returns>
     public static Setting<string> AsDirectoryPicker(string key, string label, string defaultValue,
-        string? description = null, bool isVisible = true, bool isReadOnly = false)
+        string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
     {
         return new Setting<string>(key, label, description, defaultValue, SettingControlType.DirectoryPicker, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue);
-    }
-
-    /// <summary>
-    ///     Creates a setting that is rendered as a clickable button.
-    ///     This setting is boolean-based, where a `true` value represents a click event.
-    ///     The module logic is responsible for reacting to the `true` value and resetting it to `false`.
-    /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The text to display on the button.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive button setting.</returns>
-    [Obsolete("Use IAction instead of AsButton; actions are non-persisted by design.")]
-    public static Setting<bool> AsButton(string key, string label, string? description = null, bool isVisible = true,
-        bool isReadOnly = false)
-    {
-        return new Setting<bool>(key, label, description, false, SettingControlType.Button, isVisible, isReadOnly,
-            SettingPersistence.Transient, b => b.ToString(), s => bool.TryParse(s, out var b) && b);
+            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue)
+        {
+            HasHistory = useHistory // Set flag
+        };
     }
 }
 
@@ -348,6 +338,9 @@ public class Setting<T> : ISetting
 
     /// <inheritdoc />
     public IObservable<object?> ValueAsObject => _value.Select(v => (object?)v);
+    
+    /// <inheritdoc/>
+    public bool HasHistory { get; internal init; }
 
     object? ISetting.GetCurrentValueAsObject()
     {
@@ -361,41 +354,39 @@ public class Setting<T> : ISetting
 
     void ISetting.SetValueFromObject(object? value)
     {
-        // Direct assignment when types match
-        if (value is T castValue)
+        switch (value)
         {
-            _value.OnNext(castValue);
-            return;
-        }
-
-        // Strings are fed through existing deserializer for consistency
-        if (value is string s)
-        {
-            _value.OnNext(_deserializer(s));
-            return;
-        }
-
-        try
-        {
-            // Special cases
-            if (typeof(T) == typeof(TimeSpan))
-                // Interpret as seconds
-                if (value is IConvertible)
+            case T castValue:
+                _value.OnNext(castValue);
+                return;
+            case string s:
+                _value.OnNext(_deserializer(s));
+                return;
+            default:
+                try
                 {
-                    var seconds = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-                    _value.OnNext((T)(object)TimeSpan.FromSeconds(seconds));
-                    return;
+                    if (typeof(T) == typeof(TimeSpan))
+                    {
+                        if (value is IConvertible)
+                        {
+                            var seconds = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                            _value.OnNext((T)(object)TimeSpan.FromSeconds(seconds));
+                            return;
+                        }
+                    }
+
+                    if (value is IConvertible)
+                    {
+                        var converted = (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
+                        _value.OnNext(converted);
+                    }
+                }
+                catch
+                {
+                    // Swallow conversion errors to avoid crashing UI; callers still have ValueAsObject binding
                 }
 
-            if (value is IConvertible)
-            {
-                var converted = (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
-                _value.OnNext(converted);
-            }
-        }
-        catch
-        {
-            // Swallow conversion errors to avoid crashing UI; callers still have ValueAsObject binding
+                break;
         }
     }
 

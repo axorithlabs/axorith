@@ -16,6 +16,7 @@ public interface IHostTrayService : IDisposable
 
 public sealed class HostTrayService(
     IHostController hostController,
+    IHostHealthMonitor healthMonitor,
     IOptions<Configuration> config,
     ILogger<HostTrayService> logger,
     IServiceProvider services)
@@ -30,7 +31,10 @@ public sealed class HostTrayService(
 
     public void Initialize(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> appLogger)
     {
-        if (_trayIcon != null) return;
+        if (_trayIcon != null)
+        {
+            return;
+        }
 
         _trayIcon = new TrayIcon
         {
@@ -72,9 +76,9 @@ public sealed class HostTrayService(
             {
                 if (_isHostRunning)
                 {
+                    healthMonitor.Pause();
+
                     await hostController.StopHostAsync();
-                    // Assume Host is now stopped so the menu reflects this immediately;
-                    // the background monitor will correct this if needed.
                     _isHostRunning = false;
                     await UpdateMenuAsync();
                     ShowErrorPageImmediate();
@@ -82,11 +86,16 @@ public sealed class HostTrayService(
                 else
                 {
                     await hostController.StartHostAsync();
+                    _isHostRunning = true;
+                    await UpdateMenuAsync();
+
+                    healthMonitor.Resume();
                 }
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Host start/stop failed from tray");
+                healthMonitor.Resume();
             }
         };
 
@@ -95,12 +104,18 @@ public sealed class HostTrayService(
         {
             try
             {
+                healthMonitor.Pause();
+
                 await hostController.RestartHostAsync();
                 await UpdateMenuAsync();
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Host restart failed from tray");
+            }
+            finally
+            {
+                healthMonitor.Resume();
             }
         };
 
@@ -163,10 +178,30 @@ public sealed class HostTrayService(
         {
             var shell = services.GetService<ShellViewModel>();
             var errorVm = services.GetService<ErrorViewModel>();
-            if (shell == null || errorVm == null) return;
+
+            if (shell == null || errorVm == null)
+            {
+                return;
+            }
 
             errorVm.Configure(
-                "Axorith.Host has been stopped from the tray.\n\nUse 'Start Host' from the tray menu to start it again.");
+                "Axorith.Host has been stopped from the tray.\n\nUse 'Start Host' from the tray menu or click 'Retry Connection' below to restart.",
+                async () =>
+                {
+                    await hostController.StartHostAsync();
+
+                    healthMonitor.Resume();
+
+                    if (Application.Current is not App app)
+                    {
+                        throw new InvalidOperationException("Application.Current is not Axorith.Client.App");
+                    }
+
+                    var initializer = services.GetRequiredService<IConnectionInitializer>();
+                    var loggerFactory = services.GetRequiredService<ILoggerFactory>();
+                    var appLogger = services.GetRequiredService<ILogger<App>>();
+                    await initializer.InitializeAsync(app, config.Value, loggerFactory, appLogger);
+                });
 
             Dispatcher.UIThread.Post(() => shell.Content = errorVm);
         }
@@ -181,6 +216,7 @@ public sealed class HostTrayService(
         try
         {
             if (desktop.MainWindow != null)
+            {
                 Dispatcher.UIThread.Post(() =>
                 {
                     try
@@ -195,6 +231,7 @@ public sealed class HostTrayService(
                         logger.LogError(ex, "Failed to bring window to front from tray");
                     }
                 });
+            }
         }
         catch (Exception ex)
         {

@@ -44,24 +44,17 @@ public class Module : IModule
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        return _playbackService.ValidateSettingsAsync(cancellationToken);
+        return _playbackService.ValidateSettingsAsync();
     }
 
     public Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        return _playbackService.OnSessionStartAsync(cancellationToken);
+        return _playbackService.OnSessionStartAsync();
     }
 
     public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         return _playbackService.OnSessionEndAsync();
-    }
-
-    public Type? CustomSettingsViewType => null;
-
-    public object? GetSettingsViewModel()
-    {
-        return null;
     }
 
     public void Dispose()

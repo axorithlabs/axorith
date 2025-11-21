@@ -10,7 +10,10 @@ public class ShortSourceContextEnricher : ILogEventEnricher
 {
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
-        if (!logEvent.Properties.TryGetValue("SourceContext", out var sourceContext)) return;
+        if (!logEvent.Properties.TryGetValue("SourceContext", out var sourceContext))
+        {
+            return;
+        }
 
         var fullSourceName = sourceContext.ToString().Trim('"');
         var shortSourceName = fullSourceName.Split('.').LastOrDefault() ?? fullSourceName;

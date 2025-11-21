@@ -20,7 +20,10 @@ public static class PresetMapper
             Version = preset.Version
         };
 
-        foreach (var module in preset.Modules) message.Modules.Add(ToMessage(module));
+        foreach (var module in preset.Modules)
+        {
+            message.Modules.Add(ToMessage(module));
+        }
 
         return message;
     }
@@ -29,7 +32,10 @@ public static class PresetMapper
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        if (!Guid.TryParse(message.Id, out var id)) id = Guid.NewGuid();
+        if (!Guid.TryParse(message.Id, out var id))
+        {
+            id = Guid.NewGuid();
+        }
 
         return new SessionPreset
         {
@@ -48,10 +54,14 @@ public static class PresetMapper
         {
             InstanceId = module.InstanceId.ToString(),
             ModuleId = module.ModuleId.ToString(),
-            CustomName = module.CustomName ?? string.Empty
+            CustomName = module.CustomName ?? string.Empty,
+            StartDelaySeconds = module.StartDelay.TotalSeconds // Map delay
         };
 
-        foreach (var (key, value) in module.Settings) message.Settings[key] = value;
+        foreach (var (key, value) in module.Settings)
+        {
+            message.Settings[key] = value;
+        }
 
         return message;
     }
@@ -60,16 +70,22 @@ public static class PresetMapper
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        if (!Guid.TryParse(message.InstanceId, out var instanceId)) instanceId = Guid.NewGuid();
+        if (!Guid.TryParse(message.InstanceId, out var instanceId))
+        {
+            instanceId = Guid.NewGuid();
+        }
 
         if (!Guid.TryParse(message.ModuleId, out var moduleId))
+        {
             throw new ArgumentException($"Invalid ModuleId: {message.ModuleId}", nameof(message));
+        }
 
         return new Core.Models.ConfiguredModule
         {
             InstanceId = instanceId,
             ModuleId = moduleId,
             CustomName = string.IsNullOrWhiteSpace(message.CustomName) ? null : message.CustomName,
+            StartDelay = TimeSpan.FromSeconds(message.StartDelaySeconds),
             Settings = new Dictionary<string, string>(message.Settings)
         };
     }

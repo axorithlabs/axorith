@@ -204,7 +204,10 @@ public class SettingDisposeAndBackpressureTests
             subscriptions.Add(sub);
         }
 
-        foreach (var sub in subscriptions) sub.Dispose();
+        foreach (var sub in subscriptions)
+        {
+            sub.Dispose();
+        }
 
         // Update setting - should not notify disposed subscriptions
         setting.SetValue(42);

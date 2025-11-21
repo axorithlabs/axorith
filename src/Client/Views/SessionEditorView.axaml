@@ -1,84 +1,139 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-              xmlns:vm="using:Axorith.Client.ViewModels"
-              xmlns:converters="using:Axorith.Client.Converters"
-              xmlns:selectors="using:Axorith.Client.Selectors"
-              x:Class="Axorith.Client.Views.SessionEditorView"
-              x:DataType="vm:SessionEditorViewModel">
-    
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Axorith.Client.ViewModels"
+             xmlns:converters="using:Axorith.Client.Converters"
+             xmlns:selectors="using:Axorith.Client.Selectors"
+             xmlns:sdk="clr-namespace:Axorith.Sdk;assembly=Axorith.Sdk"
+             x:Class="Axorith.Client.Views.SessionEditorView"
+             x:DataType="vm:SessionEditorViewModel">
+
     <UserControl.Resources>
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}"/>
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
         </DataTemplate>
-
         <DataTemplate x:Key="TextAreaSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" IsEnabled="{Binding !IsReadOnly}"/>
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
         </DataTemplate>
-
         <DataTemplate x:Key="SecretSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}"
-                     PasswordChar="*"
-                     Watermark="Enter secret value..."
-                     IsEnabled="{Binding !IsReadOnly}"/>
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}" PasswordChar="•" Watermark="Enter secret value..." IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
         </DataTemplate>
-
         <DataTemplate x:Key="CheckboxSettingTemplate" x:DataType="vm:SettingViewModel">
-            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}"/>
+            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" Content="{Binding Label}" IsEnabled="{Binding !IsReadOnly}"/>
         </DataTemplate>
-
         <DataTemplate x:Key="NumberSettingTemplate" x:DataType="vm:SettingViewModel">
-            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
-                           Increment="{Binding NumberIncrement}" 
-                           FormatString="{Binding NumberFormatString}"
-                           IsEnabled="{Binding !IsReadOnly}"/>
+            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" Increment="{Binding NumberIncrement}" FormatString="{Binding NumberFormatString}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
         </DataTemplate>
-
         <DataTemplate x:Key="ChoiceSettingTemplate" x:DataType="vm:SettingViewModel">
-            <ComboBox ItemsSource="{Binding Choices}"
-                      SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
-                      MinWidth="200"
-                      IsEnabled="{Binding !IsReadOnly}">
+            <ComboBox ItemsSource="{Binding DisplayedChoices}" 
+                      SelectedItem="{Binding SelectedChoice}"
+                      HorizontalAlignment="Stretch" 
+                      IsEnabled="{Binding !IsReadOnly}"
+                      MaxDropDownHeight="300">
+                <ComboBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel/>
+                    </ItemsPanelTemplate>
+                </ComboBox.ItemsPanel>
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Value}"/>
+                        <TextBlock Text="{Binding Value}" 
+                                   TextTrimming="CharacterEllipsis" 
+                                   ToolTip.Tip="{Binding Value}"/>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
         </DataTemplate>
-        
         <DataTemplate x:Key="FilePickerSettingTemplate" x:DataType="vm:SettingViewModel">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0"
-                         Text="{Binding StringValue}"
-                         IsReadOnly="True"
-                         Watermark="Select a file..." />
-                <Button Grid.Column="1"
-                        Content="Browse..."
-                        Margin="8,0,0,0"
-                        Click="OnBrowseFileClick"
-                        IsEnabled="{Binding !IsReadOnly}"/>
-            </Grid>
-        </DataTemplate>
-        
-        <DataTemplate x:Key="DirectoryPickerSettingTemplate" x:DataType="vm:SettingViewModel">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0"
-                         Text="{Binding StringValue}"
-                         IsReadOnly="True"
-                         Watermark="Select a directory..." />
-                <Button Grid.Column="1"
-                        Content="Browse..."
-                        Margin="8,0,0,0"
-                        Click="OnBrowseDirectoryClick"
-                        IsEnabled="{Binding !IsReadOnly}"/>
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBox Grid.Column="0" 
+                         Text="{Binding StringValue, Mode=TwoWay}" 
+                         Watermark="Select a file..." 
+                         HorizontalAlignment="Stretch" 
+                         Background="#050505" 
+                         BorderBrush="#333" 
+                         CornerRadius="6" 
+                         Padding="10,8"
+                         IsEnabled="{Binding !IsReadOnly}"/>
+                
+                <ComboBox Grid.Column="1" 
+                          Classes="history"
+                          ItemsSource="{Binding History}"
+                          SelectedItem="{Binding SelectedHistoryItem}" 
+                          Margin="4,0,0,0"
+                          IsVisible="{Binding History.Count}"
+                          ToolTip.Tip="Recent Files">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*,Auto" Background="Transparent">
+                                <TextBlock Grid.Column="0" Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="350" VerticalAlignment="Center"/>
+                                
+                                <Button Grid.Column="1" 
+                                        Classes="icon" 
+                                        Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}" 
+                                        CommandParameter="{Binding}"
+                                        Width="24" Height="24" Padding="4" Margin="8,0,0,0" 
+                                        Opacity="{Binding $parent[ComboBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}"
+                                        IsHitTestVisible="{Binding $parent[ComboBoxItem].IsPointerOver}"
+                                        ToolTip.Tip="Remove from history">
+                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
+                                              Width="12" Height="12"
+                                              Foreground="#FF5555"/>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <Button Grid.Column="2" Content="..." Margin="4,0,0,0" Command="{Binding BrowseCommand}" IsEnabled="{Binding !IsReadOnly}"/>
             </Grid>
         </DataTemplate>
 
+        <DataTemplate x:Key="DirectoryPickerSettingTemplate" x:DataType="vm:SettingViewModel">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBox Grid.Column="0" 
+                         Text="{Binding StringValue, Mode=TwoWay}" 
+                         Watermark="Select a directory..." 
+                         HorizontalAlignment="Stretch" 
+                         Background="#050505" 
+                         BorderBrush="#333" 
+                         CornerRadius="6" 
+                         Padding="10,8"
+                         IsEnabled="{Binding !IsReadOnly}"/>
+                
+                <ComboBox Grid.Column="1" 
+                          Classes="history"
+                          ItemsSource="{Binding History}"
+                          SelectedItem="{Binding SelectedHistoryItem}"
+                          Margin="4,0,0,0"
+                          IsVisible="{Binding History.Count}"
+                          ToolTip.Tip="Recent Directories">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*,Auto" Background="Transparent">
+                                <TextBlock Grid.Column="0" Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="350" VerticalAlignment="Center"/>
+                                
+                                <Button Grid.Column="1" 
+                                        Classes="icon" 
+                                        Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}" 
+                                        CommandParameter="{Binding}"
+                                        Width="24" Height="24" Padding="4" Margin="8,0,0,0" 
+                                        Opacity="{Binding $parent[ComboBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}"
+                                        IsHitTestVisible="{Binding $parent[ComboBoxItem].IsPointerOver}"
+                                        ToolTip.Tip="Remove from history">
+                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
+                                              Width="12" Height="12"
+                                              Foreground="#FF5555"/>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <Button Grid.Column="2" Content="..." Margin="4,0,0,0" Command="{Binding BrowseCommand}" IsEnabled="{Binding !IsReadOnly}"/>
+            </Grid>
+        </DataTemplate>
         <DataTemplate x:Key="ButtonSettingTemplate" x:DataType="vm:SettingViewModel">
-            <Button Content="{Binding Label}"
-                    Command="{Binding ClickCommand}"
-                    IsEnabled="{Binding !IsReadOnly}"
-                    HorizontalAlignment="Left"/>
+            <Button Content="{Binding Label}" Command="{Binding ClickCommand}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Left"/>
         </DataTemplate>
 
         <selectors:SettingTemplateSelector x:Key="SettingSelector"
@@ -90,72 +145,117 @@
                                            ChoiceTemplate="{StaticResource ChoiceSettingTemplate}"
                                            FilePickerTemplate="{StaticResource FilePickerSettingTemplate}"
                                            DirectoryPickerTemplate="{StaticResource DirectoryPickerSettingTemplate}"
-                                           ButtonTemplate="{StaticResource ButtonSettingTemplate}"
-                                           />
+                                           ButtonTemplate="{StaticResource ButtonSettingTemplate}"/>
+        
+        <converters:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+        
+        <StreamGeometry x:Key="TimerIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</StreamGeometry>
+        <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
+        <StreamGeometry x:Key="ArrowDownIcon">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
     </UserControl.Resources>
 
     <Panel>
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" 
+                      VerticalScrollBarVisibility="Hidden">
             <Panel MaxWidth="800" HorizontalAlignment="Center">
-                <StackPanel Margin="20" Spacing="5">
-                    <Border Padding="15" BorderThickness="1" BorderBrush="#444" CornerRadius="5">
-                        <StackPanel>
-                            <TextBlock Text="Preset Settings" Classes="h2" Margin="0,0,0,10"/>
-                            <TextBox Text="{Binding Name}" Watermark="Enter a name for this preset..." FontSize="16"/>
-                            <TextBlock Text="{Binding ErrorMessage}"
-                                       Foreground="#FF5555"
-                                       FontSize="12"
-                                       Margin="0,5,0,0"
-                                       IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                <StackPanel Margin="20,30" Spacing="0">
+                    <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Preset Name" FontWeight="Medium" Foreground="#E0E0E0" FontSize="14"/>
+                            <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
+                            <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
                     </Border>
 
-                    <Path Data="M 0 0 L 0 30" Stroke="#555" StrokeThickness="2" Margin="0,5" HorizontalAlignment="Center"/>
-
+                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+                    
                     <ItemsControl ItemsSource="{Binding ConfiguredModules}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
-                                <StackPanel Spacing="5" HorizontalAlignment="Center">
-                                    <Border MinWidth="350" Background="#2D2D30" CornerRadius="8" Padding="15">
-                                        <DockPanel LastChildFill="False">
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" TextAlignment="Center" DockPanel.Dock="Top"/>
-                                            <TextBlock Text="{Binding Definition.Description}" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" DockPanel.Dock="Top" Margin="0,5,0,0"/>
+                                <StackPanel Spacing="0" HorizontalAlignment="Center">
+                                    <Border Classes="Card" MinWidth="500" Padding="24" Margin="0">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                                            <TextBlock Text="{Binding Definition.Description}" Foreground="#B0B0B0" FontSize="13" TextWrapping="Wrap" MaxWidth="450" Margin="0,6,0,0"/>
                                             
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" DockPanel.Dock="Bottom" Margin="0,15,0,0">
-                                                <Button Content="Settings" 
-                                                        Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
-                                                        CommandParameter="{Binding}"/>
-                                                <Button Content="Delete" 
-                                                        Command="{Binding $parent[ItemsControl].DataContext.RemoveModuleCommand}" 
-                                                        CommandParameter="{Binding}"/>
-                                            </StackPanel>
-                                        </DockPanel>
+                                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,20,0,0">
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <Button Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.MoveUpCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsFirst}" ToolTip.Tip="Move Up">
+                                                        <PathIcon Data="{StaticResource ArrowUpIcon}" Width="12" Height="12"/>
+                                                    </Button>
+                                                    <Button Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.MoveDownCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsLast}" ToolTip.Tip="Move Down">
+                                                        <PathIcon Data="{StaticResource ArrowDownIcon}" Width="12" Height="12"/>
+                                                    </Button>
+                                                </StackPanel>
+                                                
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                    <Button Content="Configure" Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" CommandParameter="{Binding}"/>
+                                                    <Button Content="Remove" Classes="danger" Command="{Binding $parent[ItemsControl].DataContext.RemoveModuleCommand}" CommandParameter="{Binding}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
                                     </Border>
                                     
-                                    <Path Data="M 0 0 L 0 30" Stroke="#555" StrokeThickness="2" Margin="0,5" HorizontalAlignment="Center">
-                                        <Path.IsVisible>
-                                            <MultiBinding Converter="{x:Static converters:AppConverters.IsNotLastItem}">
-                                                <Binding/>
-                                                <Binding Path="$parent[ItemsControl].ItemsSource"/>
-                                            </MultiBinding>
-                                        </Path.IsVisible>
-                                    </Path>
+                                    <Grid Height="80" IsVisible="{Binding !IsLast}" HorizontalAlignment="Center">
+                                        <Rectangle Width="1" Fill="#444" VerticalAlignment="Stretch"/>
+                                        <Border Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="12" Padding="8,2" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="{Binding NextModule.HasDelay, Converter={StaticResource BoolToBrushConverter}, ConverterParameter='#00AAFF|#666'}"/>
+                                                <TextBlock Text="Wait" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                                                    
+                                                <TextBox Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}" 
+                                                         Width="36" Height="22" Padding="0" FontSize="13"
+                                                         TextAlignment="Center"
+                                                         VerticalContentAlignment="Center"
+                                                         Background="Transparent" BorderThickness="0"
+                                                         MaxLength="3">
+                                                    <TextBox.Styles>
+                                                        <Style Selector="TextBox:focus">
+                                                            <Setter Property="Background" Value="#222"/>
+                                                            <Setter Property="BorderThickness" Value="0"/>
+                                                            <Setter Property="SelectionBrush" Value="#007ACC"/>
+                                                        </Style>
+                                                    </TextBox.Styles>
+                                                </TextBox>
+                                                <TextBlock Text="s" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <StackPanel MinWidth="450">
-                        <ComboBox ItemsSource="{Binding AvailableModulesToAdd}" 
-                                  SelectedItem="{Binding ModuleToAdd}"
-                                  PlaceholderText="Select module to add..."
-                                  HorizontalAlignment="Stretch" 
-                                  Margin="0,10,0,0">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <Button Content="+ Add Module to Flow" Command="{Binding AddModuleCommand}" HorizontalAlignment="Stretch" Classes="accent" Margin="0,10,0,0"/>
+                    <StackPanel MinWidth="500" Margin="0,0,0,100" Spacing="0">
+                        <Path Data="M 0 0 L 0 30" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
+                        <Border Classes="Card" Padding="20" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Background="Transparent" BoxShadow="none"> 
+                            <StackPanel Grid.Row="2" Margin="0,10,0,0" Spacing="10">
+                                <ComboBox ItemsSource="{Binding AvailableModulesToAdd}" 
+                                          SelectedItem="{Binding ModuleToAdd}"
+                                          PlaceholderText="Select module to add..."
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate DataType="sdk:ModuleDefinition">
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                                <Border Grid.Column="1" 
+                                                        Background="#222"  
+                                                        CornerRadius="4" 
+                                                        Padding="6,2" 
+                                                        Margin="10,0,0,0"
+                                                        IsVisible="{Binding Category, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Text="{Binding Category}" Foreground="#888" FontSize="11"/>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Content="Add to Workflow" 
+                                        Command="{Binding AddModuleCommand}" 
+                                        HorizontalAlignment="Stretch" 
+                                        HorizontalContentAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </StackPanel>
             </Panel>
@@ -163,63 +263,72 @@
 
         <TransitioningContentControl Content="{Binding SelectedModule}" IsVisible="{Binding !!SelectedModule}">
             <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0.25"/>
+                <CrossFade Duration="0:0:0.15"/>
             </TransitioningContentControl.PageTransition>
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                     <Panel>
-                        <Border Background="#000000" Opacity="0.7"/>
-                        <Border Background="#252526" 
-                                Width="500" 
-                                VerticalAlignment="Center" HorizontalAlignment="Center"
-                                CornerRadius="8" Padding="10">
-                            <DockPanel Margin="10">
-                                <Button Content="Close" Command="{Binding $parent[UserControl].DataContext.CloseModuleSettingsCommand}" 
-                                        DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,20,0,0"/>
-                                
-                                <TextBlock Text="{Binding DisplayName, StringFormat='{}Settings for {0}'}" Classes="h2" Margin="0,0,0,15" DockPanel.Dock="Top"/>
-                                
-                                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,15">
-                                    <TextBlock Text="Instance Name (Optional)" Opacity="0.7"/>
-                                    <TextBox Text="{Binding CustomName, Mode=TwoWay}" Watermark="{Binding Definition.Name}"/>
-                                </StackPanel>
-                                
-                                <ScrollViewer>
-                                <StackPanel>
-                                    <ItemsControl ItemsSource="{Binding Actions}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:ActionViewModel">
-                                                <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <ItemsControl ItemsSource="{Binding Settings}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:SettingViewModel">
-                                                <StackPanel Margin="0,12" IsVisible="{Binding IsVisible}">
-                                                    <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Setting.Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Setting.Description, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
-                                                    <ContentControl Content="{Binding}" 
-                                                                    ContentTemplate="{StaticResource SettingSelector}" 
-                                                                    Margin="0,8,0,0"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
+                        <Border Background="#000000" Opacity="0.85"/>
+                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="600" MaxHeight="800" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                            <Grid RowDefinitions="Auto, *">
+                                <Border Grid.Row="0" Padding="30,24" BorderThickness="0,0,0,1" BorderBrush="#333" Background="#0A0A0A" CornerRadius="12,12,0,0">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseModuleSettingsCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0" Foreground="#888">
+                                            <Button.Styles>
+                                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                    <Setter Property="Background" Value="#222"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Style>
+                                            </Button.Styles>
+                                        </Button>
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Definition.Name}" FontSize="22" FontWeight="Bold" Foreground="#E0E0E0" LetterSpacing="-0.5"/>
+                                            <TextBlock Text="Configuration" Foreground="#A0A0A0" FontSize="14" FontWeight="Medium"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Spacing="0">
+                                        <StackPanel Spacing="8" Margin="30,24,30,24">
+                                            <TextBlock Text="Instance Name" Foreground="#E0E0E0" FontSize="14" FontWeight="Medium"/>
+                                            <TextBox Text="{Binding CustomName, Mode=TwoWay}" Watermark="{Binding Definition.Name}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+                                        </StackPanel>
+                                        <Separator Background="#333" Height="1" Margin="0"/>
+                                        <StackPanel Margin="30,24,30,24">
+                                            <ItemsControl ItemsSource="{Binding Actions}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:ActionViewModel">
+                                                        <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}" HorizontalAlignment="Stretch" Margin="0,0,0,16" Padding="10"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ItemsControl ItemsSource="{Binding Settings}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:SettingViewModel">
+                                                        <StackPanel Margin="0,0,0,24" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch">
+                                                            <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" Foreground="#E0E0E0" Margin="0,0,0,6" HorizontalAlignment="Left"/>
+                                                            <TextBlock Text="{Binding Setting.Description}" Foreground="#A0A0A0" FontSize="12" TextWrapping="Wrap" MaxWidth="520" Margin="0,0,0,10" HorizontalAlignment="Left" IsVisible="{Binding Setting.Description, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                                                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingSelector}" HorizontalAlignment="Stretch"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <Border Height="20"/>
+                                    </StackPanel>
                                 </ScrollViewer>
-                            </DockPanel>
+                            </Grid>
                         </Border>
                     </Panel>
                 </DataTemplate>
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20"
-                    IsVisible="{Binding SelectedModule, Converter={x:Static converters:AppConverters.IsNull}}">
-            <Button Content="Save &amp; Close" Command="{Binding SaveAndCloseCommand}" Classes="accent"/>
-            <Button Content="Cancel" Command="{Binding CancelCommand}"/>
-        </StackPanel>
+        <Border VerticalAlignment="Bottom" Background="#0A0A0A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="20" IsVisible="{Binding SelectedModule, Converter={x:Static converters:AppConverters.IsNull}}">
+            <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Right">
+                <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary"/>
+                <Button Content="Save Preset" Command="{Binding SaveAndCloseCommand}" Classes="accent" Padding="30,8" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
     </Panel>
 </UserControl>

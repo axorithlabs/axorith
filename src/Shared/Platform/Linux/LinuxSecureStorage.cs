@@ -41,6 +41,7 @@ internal class LinuxSecureStorage : ISecureStorageService
 
             // Set restrictive permissions (owner only)
             if (OperatingSystem.IsLinux())
+            {
                 try
                 {
                     var dirInfo = new UnixDirectoryInfo(_storageDir)
@@ -53,22 +54,32 @@ internal class LinuxSecureStorage : ISecureStorageService
                 {
                     _logger.LogWarning(ex, "Failed to set directory permissions");
                 }
+            }
         }
     }
 
     public void StoreSecret(string key, string secret)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
+
         if (string.IsNullOrWhiteSpace(secret))
+        {
             throw new ArgumentException("Secret cannot be null or whitespace", nameof(secret));
+        }
 
         try
         {
             if (_useSecretService)
+            {
                 StoreSecretViaSecretService(key, secret);
+            }
             else
+            {
                 StoreSecretViaFile(key, secret);
+            }
 
             _logger.LogDebug("Stored secret for key: {Key}", key);
         }
@@ -82,7 +93,9 @@ internal class LinuxSecureStorage : ISecureStorageService
     public string? RetrieveSecret(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
 
         try
         {
@@ -91,7 +104,9 @@ internal class LinuxSecureStorage : ISecureStorageService
                 : RetrieveSecretViaFile(key);
 
             if (result == null)
+            {
                 _logger.LogDebug("No secret found for key: {Key}", key);
+            }
 
             return result;
         }
@@ -105,14 +120,20 @@ internal class LinuxSecureStorage : ISecureStorageService
     public void DeleteSecret(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
 
         try
         {
             if (_useSecretService)
+            {
                 DeleteSecretViaSecretService(key);
+            }
             else
+            {
                 DeleteSecretViaFile(key);
+            }
 
             _logger.LogDebug("Deleted secret for key: {Key}", key);
         }
@@ -158,10 +179,8 @@ internal class LinuxSecureStorage : ISecureStorageService
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            throw new InvalidOperationException("Failed to start secret-tool process");
-
+        using var process = Process.Start(psi) ??
+                            throw new InvalidOperationException("Failed to start secret-tool process");
         process.StandardInput.Write(secret);
         process.StandardInput.Close();
         process.WaitForExit(5000);
@@ -185,10 +204,8 @@ internal class LinuxSecureStorage : ISecureStorageService
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            throw new InvalidOperationException("Failed to start secret-tool process");
-
+        using var process = Process.Start(psi) ??
+                            throw new InvalidOperationException("Failed to start secret-tool process");
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit(5000);
 
@@ -218,14 +235,15 @@ internal class LinuxSecureStorage : ISecureStorageService
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            throw new InvalidOperationException("Failed to start secret-tool process");
-
+        using var process = Process.Start(psi) ??
+                            throw new InvalidOperationException("Failed to start secret-tool process");
         process.WaitForExit(5000);
 
         // Exit code 1 means not found (which is OK for delete)
-        if (process.ExitCode is 0 or 1) return;
+        if (process.ExitCode is 0 or 1)
+        {
+            return;
+        }
 
         var error = process.StandardError.ReadToEnd();
         throw new InvalidOperationException($"secret-tool failed: {error}");
@@ -234,7 +252,9 @@ internal class LinuxSecureStorage : ISecureStorageService
     private void StoreSecretViaFile(string key, string secret)
     {
         if (_storageDir == null)
+        {
             throw new InvalidOperationException("Storage directory not initialized");
+        }
 
         var fileName = GetSecretFileName(key);
         var filePath = Path.Combine(_storageDir, fileName);
@@ -247,6 +267,7 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         // Set restrictive file permissions
         if (OperatingSystem.IsLinux())
+        {
             try
             {
                 var fileInfo = new UnixFileInfo(filePath)
@@ -258,18 +279,23 @@ internal class LinuxSecureStorage : ISecureStorageService
             {
                 _logger.LogWarning(ex, "Failed to set file permissions for {File}", filePath);
             }
+        }
     }
 
     private string? RetrieveSecretViaFile(string key)
     {
         if (_storageDir == null)
+        {
             throw new InvalidOperationException("Storage directory not initialized");
+        }
 
         var fileName = GetSecretFileName(key);
         var filePath = Path.Combine(_storageDir, fileName);
 
         if (!File.Exists(filePath))
+        {
             return null;
+        }
 
         var encryptedData = File.ReadAllBytes(filePath);
         var encryptionKey = GetOrCreateFileEncryptionKey();
@@ -298,13 +324,17 @@ internal class LinuxSecureStorage : ISecureStorageService
     private void DeleteSecretViaFile(string key)
     {
         if (_storageDir == null)
+        {
             throw new InvalidOperationException("Storage directory not initialized");
+        }
 
         var fileName = GetSecretFileName(key);
         var filePath = Path.Combine(_storageDir, fileName);
 
         if (File.Exists(filePath))
+        {
             File.Delete(filePath);
+        }
     }
 
     private static string GetSecretFileName(string key)
@@ -318,17 +348,22 @@ internal class LinuxSecureStorage : ISecureStorageService
     private byte[] GetOrCreateFileEncryptionKey()
     {
         if (_storageDir == null)
+        {
             throw new InvalidOperationException("Storage directory not initialized");
+        }
 
         var keyPath = Path.Combine(_storageDir, FileKeyName);
 
         if (File.Exists(keyPath))
+        {
             return File.ReadAllBytes(keyPath);
+        }
 
         var key = RandomNumberGenerator.GetBytes(32);
         File.WriteAllBytes(keyPath, key);
 
         if (OperatingSystem.IsLinux())
+        {
             try
             {
                 var keyFileInfo = new UnixFileInfo(keyPath)
@@ -340,6 +375,7 @@ internal class LinuxSecureStorage : ISecureStorageService
             {
                 _logger.LogWarning(ex, "Failed to set file permissions for key file {File}", keyPath);
             }
+        }
 
         return key;
     }
@@ -374,7 +410,9 @@ internal class LinuxSecureStorage : ISecureStorageService
     private static byte[] DecryptWithAesGcm(byte[] data, byte[] key)
     {
         if (data.Length < 12 + 16)
+        {
             throw new CryptographicException("Ciphertext too short");
+        }
 
         var nonce = new byte[12];
         var tag = new byte[16];

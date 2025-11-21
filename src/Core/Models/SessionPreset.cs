@@ -6,6 +6,15 @@ namespace Axorith.Core.Models;
 /// </summary>
 public class SessionPreset
 {
+    public SessionPreset()
+    {
+    }
+
+    public SessionPreset(Guid id)
+    {
+        Id = id;
+    }
+
     /// <summary>
     ///     Schema version for preset format. Used for migration when structure changes.
     ///     Current version: 1

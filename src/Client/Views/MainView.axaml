@@ -6,87 +6,121 @@
              x:DataType="vm:MainViewModel">
     
     <Grid RowDefinitions="Auto, *, Auto" Margin="0">
-        <Border Grid.Row="0" BorderThickness="0,0,0,1" BorderBrush="#444" Padding="10" Margin="0,0,0,10">
-            <TextBlock Text="{Binding SessionStatus}" HorizontalAlignment="Center" Opacity="0.8" FontSize="14"/>
+        <Border Grid.Row="0" 
+                BorderThickness="0,0,0,1" 
+                BorderBrush="#333" 
+                Padding="12" 
+                Background="#050505">
+            <TextBlock Text="{Binding SessionStatus}" 
+                       HorizontalAlignment="Center" 
+                       Foreground="#999" 
+                       FontSize="13"/>
         </Border>
 
         <Grid Grid.Row="1">
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        IsVisible="{Binding !Presets.Count}">
-                <TextBlock Text="You have no presets yet.&#x0a;Click 'Create New Session' to get started."
+                        IsVisible="{Binding !Presets.Count}"
+                        Spacing="20">
+                <TextBlock Text="You have no presets yet."
                            HorizontalAlignment="Center"
-                           TextAlignment="Center"
-                           Opacity="0.5"/>
+                           Foreground="#666"
+                           FontSize="18"
+                           FontWeight="SemiBold"/>
+                <TextBlock Text="Create a new session to automate your workflow."
+                           HorizontalAlignment="Center"
+                           Foreground="#555"
+                           FontSize="14"/>
                 <Button Content="Create New Session"
                         Command="{Binding CreateSessionCommand}"
                         HorizontalAlignment="Center"
-                        Margin="0,16,0,0"/>
+                        Classes="accent"
+                        Padding="20,10"/>
             </StackPanel>
 
             <ScrollViewer IsVisible="{Binding Presets.Count}">
-                <ListBox Name="PresetsListBox" ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" Background="Transparent">
+                <ListBox Name="PresetsListBox" 
+                         ItemsSource="{Binding Presets}" 
+                         SelectedItem="{Binding SelectedPreset}" 
+                         Background="Transparent"
+                         Margin="0,20">
+                    
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel HorizontalAlignment="Center"/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
+
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:SessionPresetViewModel">
-                            <Border x:Name="RootBorder"
-                                    Background="#2D2D30"
-                                    BorderThickness="1"
-                                    CornerRadius="8"
-                                    Padding="20"
-                                    MinWidth="250"
-                                    BoxShadow="0 4 15 0 #50000000">
+                            <Border Classes="Card"
+                                    x:Name="RootBorder"
+                                    Padding="24"
+                                    MinWidth="300"
+                                    MinHeight="200">
                                 
-                                <Border.Styles>
-                                    <Style Selector="Border.Active">
-                                        <Setter Property="BorderBrush" Value="#007ACC"/>
-                                        <Setter Property="BorderThickness" Value="2"/>
-                                    </Style>
-                                    <Style Selector="Border:pointerover">
-                                         <Style Selector="^:not(.Active)">
-                                            <Setter Property="BorderBrush" Value="#777"/>
-                                        </Style>
-                                    </Style>
-                                </Border.Styles>
+                                <Border.Transitions>
+                                    <Transitions>
+                                        <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                                    </Transitions>
+                                </Border.Transitions>
+
                                 <DockPanel LastChildFill="False">
-                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="20" DockPanel.Dock="Top" TextAlignment="Center"/>
-                                    <TextBlock Text="{Binding Modules.Count, StringFormat='{}{0} modules'}" Opacity="0.6" DockPanel.Dock="Top" Margin="0,10,0,0" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" 
+                                               FontWeight="SemiBold" 
+                                               FontSize="18" 
+                                               Foreground="#E0E0E0"
+                                               DockPanel.Dock="Top" 
+                                               TextAlignment="Center"/>
+                                    
+                                    <TextBlock Text="{Binding Modules.Count, StringFormat='{}{0} modules'}" 
+                                               Foreground="#888"
+                                               FontSize="13"
+                                               DockPanel.Dock="Top" 
+                                               Margin="0,4,0,0" 
+                                               TextAlignment="Center"/>
                                     
                                     <ItemsControl ItemsSource="{Binding Modules}" 
                                                   DockPanel.Dock="Top" 
-                                                  Margin="0,15,0,0" 
+                                                  Margin="0,20,0,0" 
                                                   HorizontalAlignment="Center"
                                                   MaxWidth="350">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <WrapPanel/>
+                                                <WrapPanel HorizontalAlignment="Center"/>
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
             
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
-                                                <Border CornerRadius="4" Background="#4F4F52" Padding="6,3" Margin="0,0,8,8">
-                                                    <TextBlock FontSize="11" Text="{Binding DisplayName}" TextAlignment="Center"/>
+                                                <Border CornerRadius="4" 
+                                                        Background="#111" 
+                                                        BorderBrush="#333"
+                                                        BorderThickness="1"
+                                                        Padding="8,4" 
+                                                        Margin="3">
+                                                    <TextBlock FontSize="11" 
+                                                               Foreground="#BBB"
+                                                               Text="{Binding DisplayName}" 
+                                                               TextAlignment="Center"/>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
 
-                                    <Panel DockPanel.Dock="Bottom" Margin="0,15,0,0">
-                                         <StackPanel Orientation="Horizontal" Spacing="10" 
+                                    <Panel DockPanel.Dock="Bottom" Margin="0,25,0,0">
+                                         <StackPanel Orientation="Horizontal" Spacing="8" 
                                                      Opacity="{Binding $parent[ListBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}"
                                                      HorizontalAlignment="Center">
                                             <Button Content="Start" 
+                                                    Classes="accent"
                                                     Command="{Binding #PresetsListBox.DataContext.StartSelectedCommand}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="Edit" 
                                                     Command="{Binding #PresetsListBox.DataContext.EditSelectedCommand}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="Delete" 
+                                                    Classes="danger"
                                                     Command="{Binding #PresetsListBox.DataContext.DeleteSelectedCommand}"
                                                     CommandParameter="{Binding}"/>
                                         </StackPanel>
@@ -95,19 +129,18 @@
                             </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
+
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="0"/>
-                            <Setter Property="Margin" Value="10"/>
+                            <Setter Property="Margin" Value="12"/>
+                            <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="IsEnabled" Value="{Binding #PresetsListBox.DataContext.IsSessionActive, Converter={x:Static BoolConverters.Not}}"/>
                         </Style>
                         <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:pointerover /template/ ContentPresenter">
                             <Setter Property="Background" Value="Transparent"/>
                         </Style>
                         
-                        <Style Selector="ListBoxItem.Active">
-                             <Setter Property="IsEnabled" Value="True"/>
-                        </Style>
                         <Style Selector="ListBoxItem" x:DataType="vm:SessionPresetViewModel">
                             <Setter Property="Classes.Active">
                                 <MultiBinding Converter="{x:Static converters:AppConverters.MultiEqualsConverter}">
@@ -116,21 +149,53 @@
                                 </MultiBinding>
                             </Setter>
                         </Style>
+
+                        <Style Selector="ListBoxItem.Active Border.Card">
+                            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="Background" Value="#080808"/> 
+                        </Style>
+                        <Style Selector="ListBoxItem.Active">
+                             <Setter Property="IsEnabled" Value="True"/>
+                        </Style>
+                        <Style Selector="ListBoxItem:not(.Active):pointerover Border.Card">
+                            <Setter Property="BorderBrush" Value="#444"/>
+                        </Style>
                     </ListBox.Styles>
                 </ListBox>
             </ScrollViewer>
         </Grid>
 
-            
-        <StackPanel Grid.Row="2" 
-                    Orientation="Horizontal" 
-                    Spacing="10" 
-                    HorizontalAlignment="Center" 
-                    VerticalAlignment="Bottom"
-                    Margin="0,0,0,20">
-            <Button Content="Create New Session" Command="{Binding CreateSessionCommand}" IsVisible="{Binding !IsSessionActive}"/>
-            <Button Content="Refresh List" Command="{Binding LoadPresetsCommand}" IsVisible="{Binding !IsSessionActive}"/>
-            <Button Content="Stop Current Session" Command="{Binding StopSessionCommand}" Classes="accent" IsVisible="{Binding IsSessionActive}"/>
-        </StackPanel>
+        <Border Grid.Row="2" 
+                Background="#0A0A0A" 
+                BorderBrush="#333" 
+                BorderThickness="0,1,0,0" 
+                Padding="20">
+            <StackPanel Orientation="Horizontal" 
+                        Spacing="20" 
+                        HorizontalAlignment="Center"
+                        Margin="20,0,0,0"> 
+                <Button Content="Create New Session" 
+                        Command="{Binding CreateSessionCommand}" 
+                        IsVisible="{Binding !IsSessionActive}"
+                        MinWidth="200"
+                        HorizontalContentAlignment="Center"/>
+        
+                <Button Content="Refresh List" 
+                        Command="{Binding LoadPresetsCommand}" 
+                        IsVisible="{Binding !IsSessionActive}"
+                        MinWidth="200"
+                        HorizontalContentAlignment="Center"/>
+        
+                <Button Content="Stop Current Session" 
+                        Command="{Binding StopSessionCommand}" 
+                        Classes="danger"
+                        Padding="30,8"
+                        FontWeight="Bold"
+                        IsVisible="{Binding IsSessionActive}"
+                        MinWidth="200"
+                        HorizontalContentAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

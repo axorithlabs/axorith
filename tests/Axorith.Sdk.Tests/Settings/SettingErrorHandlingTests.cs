@@ -63,13 +63,21 @@ public class SettingErrorHandlingTests
         // Assert
         // Special doubles require special comparison
         if (double.IsNaN(expected))
+        {
             setting.GetCurrentValue().Should().Be(double.NaN);
+        }
         else if (double.IsPositiveInfinity(expected))
+        {
             setting.GetCurrentValue().Should().Be(double.PositiveInfinity);
+        }
         else if (double.IsNegativeInfinity(expected))
+        {
             setting.GetCurrentValue().Should().Be(double.NegativeInfinity);
+        }
         else
+        {
             setting.GetCurrentValue().Should().Be(expected);
+        }
     }
 
     [Theory]

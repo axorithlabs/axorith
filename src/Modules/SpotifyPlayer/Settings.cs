@@ -7,7 +7,7 @@ namespace Axorith.Module.SpotifyPlayer;
 
 internal sealed class Settings
 {
-    internal const string CUSTOM_URL_VALUE = "custom";
+    internal const string CustomUrlValue = "custom";
     private const int DefaultRedirectPort = 8888;
 
     public Setting<string> AuthStatus { get; }
@@ -18,7 +18,6 @@ internal sealed class Settings
     public Setting<int> Volume { get; }
     public Setting<string> Shuffle { get; }
     public Setting<string> RepeatMode { get; }
-    public Setting<double> WaitTime { get; }
 
     public Action LoginAction { get; }
     public Action LogoutAction { get; }
@@ -51,10 +50,10 @@ internal sealed class Settings
         PlaybackContext = Setting.AsChoice(
             key: "PlaybackContext",
             label: "Playback Source",
-            defaultValue: CUSTOM_URL_VALUE,
+            defaultValue: CustomUrlValue,
             initialChoices:
             [
-                new KeyValuePair<string, string>(CUSTOM_URL_VALUE, "Enter a custom URL...")
+                new KeyValuePair<string, string>(CustomUrlValue, "Enter a custom URL...")
             ],
             description: "Select a source or enter a custom URL.");
 
@@ -92,15 +91,9 @@ internal sealed class Settings
                 new KeyValuePair<string, string>("track", "Repeat Track")
             ]);
 
-        WaitTime = Setting.AsDouble(
-            key: "WaitTime",
-            label: "Wait Time (ms)",
-            description: "Wait Time for Spotify launch in Application Manager module or startup.",
-            defaultValue: 200);
-
         LoginAction = Action.Create(key: "Login", label: "Login to Spotify");
         LogoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
-        UpdateAction = Action.Create(key: "Update", label: "Update devices and playlists");
+        UpdateAction = Action.Create(key: "Update", label: "Update devices and playlists", isEnabled: false);
 
         _allSettings =
         [
@@ -111,8 +104,7 @@ internal sealed class Settings
             CustomUrl,
             Volume,
             Shuffle,
-            RepeatMode,
-            WaitTime
+            RepeatMode
         ];
 
         _allActions =
@@ -123,18 +115,7 @@ internal sealed class Settings
         ];
     }
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _allSettings;
-    }
-
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _allActions;
-    }
-
-    public Task<ValidationResult> ValidateAsync()
-    {
-        return Task.FromResult(ValidationResult.Success);
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
+    public IReadOnlyList<IAction> GetActions() => _allActions;
+    public Task<ValidationResult> ValidateAsync() => Task.FromResult(ValidationResult.Success);
 }

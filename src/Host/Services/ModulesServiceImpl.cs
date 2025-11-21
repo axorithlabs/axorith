@@ -21,8 +21,10 @@ public class ModulesServiceImpl(
     public override Task<OperationResult> SyncEdit(SyncEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+        {
             return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
                 [$"Could not parse: {request.ModuleInstanceId}"]));
+        }
 
         try
         {
@@ -79,19 +81,25 @@ public class ModulesServiceImpl(
         try
         {
             if (!Guid.TryParse(request.ModuleId, out var moduleId))
+            {
                 throw new RpcException(new Status(StatusCode.InvalidArgument,
                     $"Invalid module ID: {request.ModuleId}"));
+            }
 
             logger.LogDebug("GetModuleSettings called for module {ModuleId}", moduleId);
 
             var definition = moduleRegistry.GetDefinitionById(moduleId);
             if (definition?.ModuleType == null)
+            {
                 throw new RpcException(new Status(StatusCode.NotFound, $"Module not found: {moduleId}"));
+            }
 
             var (module, scope) = moduleRegistry.CreateInstance(moduleId);
             if (module == null)
+            {
                 throw new RpcException(new Status(StatusCode.Internal,
                     $"Failed to create module instance: {moduleId}"));
+            }
 
             try
             {
@@ -108,10 +116,16 @@ public class ModulesServiceImpl(
                 var response = new GetModuleSettingsResponse();
 
                 var settings = module.GetSettings();
-                foreach (var setting in settings) response.Settings.Add(SettingMapper.ToMessage(setting));
+                foreach (var setting in settings)
+                {
+                    response.Settings.Add(SettingMapper.ToMessage(setting));
+                }
 
                 var actions = module.GetActions();
-                foreach (var action in actions) response.Actions.Add(ActionMapper.ToMessage(action));
+                foreach (var action in actions)
+                {
+                    response.Actions.Add(ActionMapper.ToMessage(action));
+                }
 
                 logger.LogInformation(
                     "Returned {SettingCount} settings and {ActionCount} actions for module {ModuleId}",
@@ -141,8 +155,10 @@ public class ModulesServiceImpl(
         try
         {
             if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+            {
                 return SessionMapper.CreateResult(false, "Invalid module instance ID",
                     [$"Could not parse: {request.ModuleInstanceId}"]);
+            }
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
@@ -151,13 +167,17 @@ public class ModulesServiceImpl(
 
             var module = sessionManager.GetActiveModuleInstanceByInstanceId(instanceId);
             if (module == null)
+            {
                 return SessionMapper.CreateResult(false, "Module instance is not active",
                     [$"Module instance {instanceId} is not running"]);
+            }
 
             var action = module.GetActions().FirstOrDefault(a => a.Key == request.ActionKey);
             if (action == null)
+            {
                 return SessionMapper.CreateResult(false, "Action not found",
                     [$"Action '{request.ActionKey}' not found in module"]);
+            }
 
             logger.LogDebug("Invoking runtime action {ActionKey} on instance {InstanceId}", request.ActionKey,
                 instanceId);
@@ -180,18 +200,16 @@ public class ModulesServiceImpl(
         try
         {
             if (!Guid.TryParse(request.ModuleId, out var parsedId))
+            {
                 return SessionMapper.CreateResult(false, "Invalid module ID",
                     [$"Could not parse: {request.ModuleId}"]);
+            }
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
             logger.LogInformation("InvokeDesignTimeAction called: Id={Id}, ActionKey={ActionKey}",
                 parsedId, request.ActionKey);
 
-            // First try to invoke the action on an existing design-time sandbox instance.
-            // Client code (Session Editor) passes the module instance ID here so that
-            // design-time actions like Spotify login operate on the same sandbox that
-            // is wired into SettingUpdateBroadcaster.
             try
             {
                 var invoked = await sandboxManager.TryInvokeActionAsync(parsedId, request.ActionKey,
@@ -215,19 +233,21 @@ public class ModulesServiceImpl(
                     [$"Action '{request.ActionKey}' not found in module"]);
             }
 
-            // Fallback: create a temporary module instance by module definition ID
-            // for design-time actions that are not tied to a specific sandbox.
             var (module, scope) = moduleRegistry.CreateInstance(parsedId);
             if (module == null)
+            {
                 return SessionMapper.CreateResult(false, "Module not found",
                     [$"Module with ID {parsedId} could not be instantiated"]);
+            }
 
             try
             {
                 var action = module.GetActions().FirstOrDefault(a => a.Key == request.ActionKey);
                 if (action == null)
+                {
                     return SessionMapper.CreateResult(false, "Action not found",
                         [$"Action '{request.ActionKey}' not found in module"]);
+                }
 
                 logger.LogDebug("Invoking design-time action {ActionKey} asynchronously on temporary instance",
                     request.ActionKey);
@@ -255,8 +275,10 @@ public class ModulesServiceImpl(
         try
         {
             if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+            {
                 return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
                     [$"Could not parse: {request.ModuleInstanceId}"]));
+            }
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.SettingKey);
 
@@ -329,10 +351,15 @@ public class ModulesServiceImpl(
     public override async Task<OperationResult> BeginEdit(BeginEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleId, out var moduleId))
+        {
             return SessionMapper.CreateResult(false, "Invalid module ID", [$"Could not parse: {request.ModuleId}"]);
+        }
+
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+        {
             return SessionMapper.CreateResult(false, "Invalid module instance ID",
                 [$"Could not parse: {request.ModuleInstanceId}"]);
+        }
 
         var snapshot = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var sv in request.InitialValues)
@@ -356,8 +383,11 @@ public class ModulesServiceImpl(
     public override Task<OperationResult> EndEdit(EndEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+        {
             return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
                 [$"Could not parse: {request.ModuleInstanceId}"]));
+        }
+
         sandboxManager.DisposeSandbox(instanceId);
         return Task.FromResult(SessionMapper.CreateResult(true, "Design-time edit ended"));
     }

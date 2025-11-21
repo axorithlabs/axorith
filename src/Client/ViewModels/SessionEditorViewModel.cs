@@ -11,9 +11,6 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
-/// <summary>
-///     ViewModel for the session editor view. Manages the creation and modification of session presets.
-/// </summary>
 public class SessionEditorViewModel : ReactiveObject
 {
     private readonly ShellViewModel _shell;
@@ -21,11 +18,8 @@ public class SessionEditorViewModel : ReactiveObject
     private readonly IPresetsApi _presetsApi;
     private readonly IServiceProvider _serviceProvider;
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
-    private SessionPreset _preset = new() { Id = Guid.NewGuid() };
+    private SessionPreset _preset = new(id: Guid.NewGuid());
 
-    /// <summary>
-    ///     Gets or sets the preset to be edited. If set to null, a new preset will be created.
-    /// </summary>
     public SessionPreset? PresetToEdit
     {
         get => _preset;
@@ -43,9 +37,13 @@ public class SessionEditorViewModel : ReactiveObject
         {
             this.RaiseAndSetIfChanged(ref field, value);
             if (!string.IsNullOrWhiteSpace(value) && !string.IsNullOrEmpty(ErrorMessage))
+            {
                 ErrorMessage = string.Empty;
+            }
             else if (string.IsNullOrWhiteSpace(value))
+            {
                 ErrorMessage = "Preset name cannot be empty.";
+            }
         }
     } = string.Empty;
 
@@ -55,9 +53,6 @@ public class SessionEditorViewModel : ReactiveObject
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    /// <summary>
-    ///     Gets the collection of modules that are configured for the current preset.
-    /// </summary>
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
     public ConfiguredModuleViewModel? SelectedModule
@@ -66,9 +61,6 @@ public class SessionEditorViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    /// <summary>
-    ///     Gets the collection of module definitions that are available to be added to the preset.
-    /// </summary>
     public ObservableCollection<ModuleDefinition> AvailableModulesToAdd { get; } = [];
 
     public ModuleDefinition? ModuleToAdd
@@ -77,35 +69,14 @@ public class SessionEditorViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    /// <summary>
-    ///     Command to save the preset and close the editor.
-    /// </summary>
     public ICommand SaveAndCloseCommand { get; }
-
-    /// <summary>
-    ///     Command to close the editor without saving changes.
-    /// </summary>
     public ICommand CancelCommand { get; }
-
-    /// <summary>
-    ///     Command to add the selected module to the preset.
-    /// </summary>
     public ICommand AddModuleCommand { get; }
-
-    /// <summary>
-    ///     Command to remove the currently selected module from the preset.
-    /// </summary>
     public ICommand RemoveModuleCommand { get; }
-
-    /// <summary>
-    ///     Command to open the settings view for a specific module.
-    /// </summary>
     public ICommand OpenModuleSettingsCommand { get; }
-
-    /// <summary>
-    ///     Command to close the module settings overlay.
-    /// </summary>
     public ICommand CloseModuleSettingsCommand { get; }
+    public ICommand MoveUpCommand { get; }
+    public ICommand MoveDownCommand { get; }
 
     public SessionEditorViewModel(ShellViewModel shell, IModulesApi modulesApi, IPresetsApi presetsApi,
         IServiceProvider serviceProvider)
@@ -124,10 +95,14 @@ public class SessionEditorViewModel : ReactiveObject
 
         RemoveModuleCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
         {
-            _preset.Modules.Remove(moduleVm.Model);
             ConfiguredModules.Remove(moduleVm);
             moduleVm.Dispose();
-            if (SelectedModule == moduleVm) SelectedModule = null;
+            if (SelectedModule == moduleVm)
+            {
+                SelectedModule = null;
+            }
+
+            UpdateModuleLinks();
         });
 
         OpenModuleSettingsCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
@@ -137,6 +112,26 @@ public class SessionEditorViewModel : ReactiveObject
 
         CloseModuleSettingsCommand = ReactiveCommand.Create(() => { SelectedModule = null; });
 
+        MoveUpCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(vm =>
+        {
+            var index = ConfiguredModules.IndexOf(vm);
+            if (index > 0)
+            {
+                ConfiguredModules.Move(index, index - 1);
+                UpdateModuleLinks();
+            }
+        });
+
+        MoveDownCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(vm =>
+        {
+            var index = ConfiguredModules.IndexOf(vm);
+            if (index < ConfiguredModules.Count - 1)
+            {
+                ConfiguredModules.Move(index, index + 1);
+                UpdateModuleLinks();
+            }
+        });
+
         _ = InitializeAsync();
     }
 
@@ -145,12 +140,10 @@ public class SessionEditorViewModel : ReactiveObject
         try
         {
             var modules = await _modulesApi.ListModulesAsync();
-
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 _availableModules = modules;
                 UpdateAvailableModules();
-
                 LoadFromPreset();
             });
         }
@@ -167,39 +160,48 @@ public class SessionEditorViewModel : ReactiveObject
     private void LoadFromPreset()
     {
         Name = _preset.Name;
+        foreach (var vm in ConfiguredModules)
+        {
+            vm.Dispose();
+        }
 
-        foreach (var vm in ConfiguredModules) vm.Dispose();
         ConfiguredModules.Clear();
 
         foreach (var configured in _preset.Modules)
         {
             var moduleDef = _availableModules.FirstOrDefault(m => m.Id == configured.ModuleId);
             if (moduleDef != null)
-                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured,
-                    _modulesApi));
+            {
+                ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _modulesApi, _serviceProvider));
+            }
         }
+
+        UpdateModuleLinks();
     }
 
     private void UpdateAvailableModules()
     {
         AvailableModulesToAdd.Clear();
         foreach (var def in _availableModules)
+        {
             AvailableModulesToAdd.Add(def);
+        }
     }
 
     private void AddSelectedModule()
     {
-        if (ModuleToAdd == null) return;
+        if (ModuleToAdd == null)
+        {
+            return;
+        }
 
         var defToAdd = ModuleToAdd;
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
-        _preset.Modules.Add(newConfiguredModule);
-
-        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi);
+        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi, _serviceProvider);
         ConfiguredModules.Add(newVm);
-
         SelectedModule = newVm;
         ModuleToAdd = null;
+        UpdateModuleLinks();
     }
 
     private async Task SaveAndCloseAsync()
@@ -212,18 +214,25 @@ public class SessionEditorViewModel : ReactiveObject
 
         ErrorMessage = string.Empty;
 
-        foreach (var moduleVm in ConfiguredModules) moduleVm.SaveChangesToModel();
+        _preset.Modules = ConfiguredModules.Select(vm =>
+        {
+            vm.SaveChangesToModel();
+            return vm.Model;
+        }).ToList();
 
         _preset.Name = Name;
 
         try
         {
             var existingPreset = await _presetsApi.GetPresetAsync(_preset.Id);
-
             if (existingPreset != null)
+            {
                 await _presetsApi.UpdatePresetAsync(_preset);
+            }
             else
+            {
                 await _presetsApi.CreatePresetAsync(_preset);
+            }
 
             Cancel();
         }
@@ -238,5 +247,17 @@ public class SessionEditorViewModel : ReactiveObject
         var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
         mainViewModel.LoadPresetsCommand.Execute(Unit.Default);
         _shell.NavigateTo(mainViewModel);
+    }
+
+    private void UpdateModuleLinks()
+    {
+        for (var i = 0; i < ConfiguredModules.Count; i++)
+        {
+            var current = ConfiguredModules[i];
+            var next = i < ConfiguredModules.Count - 1 ? ConfiguredModules[i + 1] : null;
+            current.NextModule = next;
+            current.IsFirst = i == 0;
+            current.IsLast = i == ConfiguredModules.Count - 1;
+        }
     }
 }

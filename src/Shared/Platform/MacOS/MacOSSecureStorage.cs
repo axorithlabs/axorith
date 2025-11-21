@@ -24,9 +24,14 @@ internal class MacOsSecureStorage : ISecureStorageService
     public void StoreSecret(string key, string secret)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
+
         if (string.IsNullOrWhiteSpace(secret))
+        {
             throw new ArgumentException("Secret cannot be null or whitespace", nameof(secret));
+        }
 
         try
         {
@@ -48,7 +53,9 @@ internal class MacOsSecureStorage : ISecureStorageService
             );
 
             if (status != 0)
+            {
                 throw new InvalidOperationException($"Failed to store secret in Keychain. Status: {status}");
+            }
 
             _logger.LogDebug("Stored secret for key: {Key}", key);
         }
@@ -62,7 +69,9 @@ internal class MacOsSecureStorage : ISecureStorageService
     public string? RetrieveSecret(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
 
         try
         {
@@ -87,10 +96,14 @@ internal class MacOsSecureStorage : ISecureStorageService
             }
 
             if (status != 0)
+            {
                 throw new InvalidOperationException($"Failed to retrieve secret from Keychain. Status: {status}");
+            }
 
             if (passwordData == IntPtr.Zero || passwordLength == 0)
+            {
                 return null;
+            }
 
             try
             {
@@ -102,7 +115,9 @@ internal class MacOsSecureStorage : ISecureStorageService
             {
                 // Free the password data
                 if (passwordData != IntPtr.Zero)
+                {
                     SecKeychainItemFreeContent(IntPtr.Zero, passwordData);
+                }
             }
         }
         catch (Exception ex)
@@ -115,7 +130,9 @@ internal class MacOsSecureStorage : ISecureStorageService
     public void DeleteSecret(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
 
         try
         {
@@ -140,7 +157,9 @@ internal class MacOsSecureStorage : ISecureStorageService
             }
 
             if (status != 0)
+            {
                 throw new InvalidOperationException($"Failed to find secret in Keychain. Status: {status}");
+            }
 
             if (itemRef != IntPtr.Zero)
             {
@@ -148,7 +167,9 @@ internal class MacOsSecureStorage : ISecureStorageService
                 CFRelease(itemRef);
 
                 if (status != 0)
+                {
                     throw new InvalidOperationException($"Failed to delete secret from Keychain. Status: {status}");
+                }
             }
 
             _logger.LogDebug("Deleted secret for key: {Key}", key);

@@ -19,11 +19,20 @@ public static class PlatformServices
     /// </summary>
     public static ISecureStorageService CreateSecureStorage(ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsSecureStorage(logger);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsSecureStorage(logger);
+        }
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return new LinuxSecureStorage(logger);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxSecureStorage(logger);
+        }
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return new MacOsSecureStorage(logger);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return new MacOsSecureStorage(logger);
+        }
 
         throw new PlatformNotSupportedException(
             $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");

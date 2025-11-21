@@ -17,24 +17,22 @@ internal static class Program
     /// </summary>
     public static void Main()
     {
-        // This loop runs for the entire lifetime of the process, which is managed by the browser.
-        // It continuously recreates the pipe server to handle multiple sequential connections.
         while (true)
             try
             {
-                // Create a new pipe server instance for each connection.
                 using var pipeServer = new NamedPipeServerStream(PipeName, PipeDirection.In, 1,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
-                // Asynchronously wait for a client (the main Axorith app) to connect.
                 pipeServer.WaitForConnection();
 
                 using var reader = new StreamReader(pipeServer);
 
-                // Read the message sent by the client.
                 var message = reader.ReadToEnd();
 
-                if (!string.IsNullOrWhiteSpace(message)) SendMessageToExtension(message);
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    SendMessageToExtension(message);
+                }
             }
             catch (Exception ex)
             {

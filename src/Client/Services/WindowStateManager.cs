@@ -4,12 +4,6 @@ using Avalonia.Controls;
 
 namespace Axorith.Client.Services;
 
-public interface IWindowStateManager
-{
-    void SaveWindowState(Window window);
-    void RestoreWindowState(Window window);
-}
-
 public class WindowStateManager : IWindowStateManager
 {
     private readonly string _stateFilePath;
@@ -51,7 +45,9 @@ public class WindowStateManager : IWindowStateManager
         try
         {
             if (!File.Exists(_stateFilePath))
+            {
                 return;
+            }
 
             var json = File.ReadAllText(_stateFilePath);
             var state = JsonSerializer.Deserialize<WindowState>(json);
@@ -71,7 +67,10 @@ public class WindowStateManager : IWindowStateManager
                 window.Height = state.Height;
             }
 
-            if (state.IsMaximized) window.WindowState = Avalonia.Controls.WindowState.Maximized;
+            if (state.IsMaximized)
+            {
+                window.WindowState = Avalonia.Controls.WindowState.Maximized;
+            }
         }
         catch
         {

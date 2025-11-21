@@ -21,14 +21,12 @@ public class ErrorViewModel : ReactiveObject
 
     public ICommand? RetryCommand { get; private set; }
 
-    public void Configure(string errorMessage, Func<Task>? retryCallback = null)
+    public void Configure(string errorMessage, Func<Task> retryCallback)
     {
         ErrorMessage = errorMessage;
         _retryCallback = retryCallback;
 
-        RetryCommand = _retryCallback != null
-            ? ReactiveCommand.CreateFromTask(RetryConnectionAsync)
-            : null;
+        RetryCommand = ReactiveCommand.CreateFromTask(RetryConnectionAsync);
     }
 
     private async Task RetryConnectionAsync()

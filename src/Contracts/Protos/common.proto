@@ -27,6 +27,7 @@ message Setting {
   bool is_read_only = 7;
   string value_type = 8;
   string filter = 40;
+  bool has_history = 50;
   
   oneof value {
     string string_value = 10;
@@ -86,6 +87,8 @@ enum SettingProperty {
   SETTING_PROPERTY_VISIBILITY = 2;
   SETTING_PROPERTY_READ_ONLY = 3;
   SETTING_PROPERTY_CHOICES = 4;
+  SETTING_PROPERTY_ACTION_ENABLED = 5;
+  SETTING_PROPERTY_ACTION_LABEL = 6;
 }
 
 // ===== Action-related Messages =====
@@ -113,6 +116,7 @@ message ConfiguredModule {
   string module_id = 2;
   string custom_name = 3;
   map<string, string> settings = 4;
+  double start_delay_seconds = 5;
 }
 
 // ===== Preset-related Messages =====

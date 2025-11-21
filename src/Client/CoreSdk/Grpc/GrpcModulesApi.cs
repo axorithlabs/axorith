@@ -28,21 +28,27 @@ internal class GrpcModulesApi(
 
     public IDisposable SubscribeToSettingUpdates(Guid moduleInstanceId)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(GrpcModulesApi));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(GrpcModulesApi));
 
         if (_instanceStreams.TryGetValue(moduleInstanceId, out var stream))
+        {
             return new CancellationDisposable(stream);
+        }
 
         var cts = new CancellationTokenSource();
         if (!_instanceStreams.TryAdd(moduleInstanceId, cts))
+        {
             return new CancellationDisposable(_instanceStreams[moduleInstanceId]);
+        }
 
         _ = StartStreamingSettingUpdatesAsync(moduleInstanceId, cts.Token);
 
         return Disposable.Create(() =>
         {
-            if (!_instanceStreams.TryRemove(moduleInstanceId, out var existing)) return;
+            if (!_instanceStreams.TryRemove(moduleInstanceId, out var existing))
+            {
+                return;
+            }
 
             try
             {
@@ -179,7 +185,8 @@ internal class GrpcModulesApi(
                         _ => string.Empty
                     },
                     s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList(),
-                    string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter
+                    string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter,
+                    s.HasHistory
                 ))
                 .ToList();
 
@@ -307,7 +314,9 @@ internal class GrpcModulesApi(
                 await foreach (var update in call.ResponseStream.ReadAllAsync(ct).ConfigureAwait(false))
                 {
                     if (!Guid.TryParse(update.ModuleInstanceId, out var instanceId))
+                    {
                         continue;
+                    }
 
                     object? value = update.ValueCase switch
                     {
@@ -321,10 +330,12 @@ internal class GrpcModulesApi(
                         _ => null
                     };
 
+                    var property = (SettingProperty)update.Property;
+
                     var settingUpdate = new SettingUpdate(
                         instanceId,
                         update.SettingKey,
-                        (SettingProperty)update.Property,
+                        property,
                         value);
 
                     _settingUpdatesSubject.OnNext(settingUpdate);
@@ -375,7 +386,9 @@ internal class GrpcModulesApi(
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
 

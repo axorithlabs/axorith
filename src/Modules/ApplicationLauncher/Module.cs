@@ -40,16 +40,9 @@ public class Module : IModule
         return [];
     }
 
-    public Type? CustomSettingsViewType => null;
-
-    public object? GetSettingsViewModel()
-    {
-        return null;
-    }
-
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        return _settings.ValidateAsync(cancellationToken);
+        return _settings.ValidateAsync();
     }
 
     public Task InitializeAsync(CancellationToken cancellationToken)
@@ -83,7 +76,7 @@ public class Module : IModule
 
         var processConfig = new ProcessConfig(appPath, args, startMode, lifecycleMode, workingDirectory);
 
-        var startResult = await _process.StartAsync(processConfig, cancellationToken);
+        var startResult = await _process.StartAsync(processConfig);
         _currentProcess = startResult.Process;
         _attachedToExisting = startResult.AttachedToExisting;
 
@@ -181,7 +174,9 @@ public class Module : IModule
         {
             var monitorKey = _settings.TargetMonitor.GetCurrentValue();
             if (!string.IsNullOrWhiteSpace(monitorKey) && int.TryParse(monitorKey, out var parsedIndex))
+            {
                 targetMonitorIndex = parsedIndex;
+            }
         }
 
         var bringToForeground = _settings.BringToForeground.GetCurrentValue();

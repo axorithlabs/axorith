@@ -6,7 +6,6 @@
         <Description>Shim for Axorith OS.</Description>
         
         <OutputType>WinExe</OutputType>
-        <DisableWinExeOutputInference>true</DisableWinExeOutputInference>
     </PropertyGroup>
 
     <ItemGroup>

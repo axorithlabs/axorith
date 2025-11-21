@@ -89,8 +89,6 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
-    public ICommand OpenClientSettingsCommand { get; }
-
 
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IServiceProvider serviceProvider)
@@ -139,7 +137,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         StopSessionCommand = ReactiveCommand.CreateFromTask(StopCurrentSessionAsync, canStopSession);
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
-        OpenClientSettingsCommand = ReactiveCommand.Create(OpenClientSettings, canDoGlobalActions);
     }
 
     /// <summary>
@@ -156,8 +153,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         try
         {
             SessionStatus = $"Starting '{presetVm.Name}'...";
-            // Consider the session "active/starting" immediately to prevent preset edits
-            // and to show the Stop Session button while modules are starting.
             ActiveSessionPresetId = presetVm.Id;
             IsSessionActive = true;
 
@@ -166,7 +161,6 @@ public class MainViewModel : ReactiveObject, IDisposable
             {
                 var error = $"Failed to start session: {result.Message}";
                 SessionStatus = error;
-                // Restore idle state if the Host rejected the start request.
                 ActiveSessionPresetId = null;
                 IsSessionActive = false;
                 ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
@@ -194,7 +188,9 @@ public class MainViewModel : ReactiveObject, IDisposable
             .Subscribe(_ =>
             {
                 if (!IsSessionActive && SessionStatus == message)
+                {
                     SessionStatus = "No session is active.";
+                }
             });
 
         _disposables.Add(subscription);
@@ -238,12 +234,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         _shell.NavigateTo(editor);
     }
 
-    private void OpenClientSettings()
-    {
-        var settings = _serviceProvider.GetRequiredService<SettingsViewModel>();
-        _shell.NavigateTo(settings);
-    }
-
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
     {
         try
@@ -272,17 +262,30 @@ public class MainViewModel : ReactiveObject, IDisposable
             foreach (var summary in presets)
             {
                 var fullPreset = await _presetsApi.GetPresetAsync(summary.Id);
-                if (fullPreset != null) newVms.Add(new SessionPresetViewModel(fullPreset, modules, modulesApi));
+                if (fullPreset != null)
+                {
+                    newVms.Add(new SessionPresetViewModel(fullPreset, modules, modulesApi, _serviceProvider));
+                }
             }
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                foreach (var preset in Presets) preset.Dispose();
+                foreach (var preset in Presets)
+                {
+                    preset.Dispose();
+                }
+
                 Presets.Clear();
 
-                foreach (var vm in newVms) Presets.Add(vm);
+                foreach (var vm in newVms)
+                {
+                    Presets.Add(vm);
+                }
 
-                if (Presets.Count == 0) SessionStatus = "No presets found. Click 'Create New Session' to get started.";
+                if (Presets.Count == 0)
+                {
+                    SessionStatus = "No presets found. Click 'Create New Session' to get started.";
+                }
             });
         }
         catch (Exception ex)
@@ -330,6 +333,8 @@ public class MainViewModel : ReactiveObject, IDisposable
     {
         _disposables.Dispose();
         foreach (var preset in Presets)
+        {
             preset.Dispose();
+        }
     }
 }

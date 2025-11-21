@@ -21,7 +21,9 @@ public static class ModuleMapper
         };
 
         foreach (var platform in definition.Platforms)
+        {
             message.Platforms.Add(platform.ToString());
+        }
 
         return message;
     }

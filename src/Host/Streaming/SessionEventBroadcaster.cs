@@ -79,7 +79,9 @@ public class SessionEventBroadcaster : IDisposable
     private async Task BroadcastAsync(SessionEvent evt)
     {
         if (_disposed || _subscribers.IsEmpty)
+        {
             return;
+        }
 
         _logger.LogDebug("Broadcasting {EventType} to {Count} subscribers",
             evt.Type, _subscribers.Count);
@@ -106,7 +108,9 @@ public class SessionEventBroadcaster : IDisposable
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
 

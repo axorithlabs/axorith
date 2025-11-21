@@ -71,4 +71,9 @@ public class ClientUiConfiguration
     ///     Default: true
     /// </summary>
     public bool MinimizeToTrayOnClose { get; set; } = true;
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    public Dictionary<string, List<string>> InputHistory { get; set; } = [];
 }

@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Http;
@@ -29,7 +30,10 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetAvailableDevicesAsync()
     {
-        if (!await PrepareHttpClient()) return [];
+        if (!await PrepareHttpClient())
+        {
+            return [];
+        }
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
         using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -44,7 +48,10 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
     {
-        if (!await PrepareHttpClient()) return [];
+        if (!await PrepareHttpClient())
+        {
+            return [];
+        }
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists");
         using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -59,7 +66,10 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetSavedAlbumsAsync()
     {
-        if (!await PrepareHttpClient()) return [];
+        if (!await PrepareHttpClient())
+        {
+            return [];
+        }
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums");
         using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -74,7 +84,10 @@ internal sealed class SpotifyApiService(
 
     public async Task<string> GetLikedSongsAsUriListAsync()
     {
-        if (!await PrepareHttpClient()) return string.Empty;
+        if (!await PrepareHttpClient())
+        {
+            return string.Empty;
+        }
 
         var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
         using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -84,18 +97,31 @@ internal sealed class SpotifyApiService(
 
     public Task PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
     {
-        string jsonContent;
-        if (trackUris != null)
-            jsonContent = JsonSerializer.Serialize(new { uris = trackUris });
-        else
-            jsonContent = JsonSerializer.Serialize(new { context_uri = contextUri });
+        var jsonContent = trackUris != null
+            ? JsonSerializer.Serialize(new { uris = trackUris })
+            : JsonSerializer.Serialize(new { context_uri = contextUri });
 
         return PutWithTokenAsync($"https://api.spotify.com/v1/me/player/play?device_id={deviceId}", jsonContent);
     }
 
-    public Task PauseAsync(string deviceId)
+    public async Task PauseAsync()
     {
-        return PutWithTokenAsync($"https://api.spotify.com/v1/me/player/pause?device_id={deviceId}");
+        try
+        {
+            await PutWithTokenAsync("https://api.spotify.com/v1/me/player/pause");
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == HttpStatusCode.NotFound ||
+                ex.StatusCode == HttpStatusCode.Forbidden)
+            {
+                logger.LogDebug("Pause request ignored: Spotify reported no active playback or device.");
+            }
+            else
+            {
+                throw; // Rethrow other errors (e.g. 401 Unauthorized, 500 Server Error)
+            }
+        }
     }
 
     public Task SetVolumeAsync(string deviceId, int volume)
@@ -119,11 +145,18 @@ internal sealed class SpotifyApiService(
 
     private async Task PutWithTokenAsync(string uri, string? jsonContent = null)
     {
-        if (!await PrepareHttpClient()) return;
+        if (!await PrepareHttpClient())
+        {
+            return;
+        }
 
         if (jsonContent != null)
+        {
             await _apiClient.PutStringAsync(uri, jsonContent, Encoding.UTF8, "application/json");
+        }
         else
+        {
             await _apiClient.PutAsync(uri);
+        }
     }
 }

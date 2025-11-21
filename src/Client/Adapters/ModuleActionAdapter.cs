@@ -32,11 +32,20 @@ internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, 
         return _enabledSubject.Value;
     }
 
+    public void SetLabel(string label)
+    {
+        _labelSubject.OnNext(label);
+    }
+
+    public void SetEnabled(bool enabled)
+    {
+        _enabledSubject.OnNext(enabled);
+    }
+
     public void Invoke()
     {
         // Fire-and-forget invocation via gRPC against the design-time sandbox instance
         // (keyed by the configured module InstanceId).
-
         _ = Task.Run(async () =>
         {
             try
@@ -44,7 +53,9 @@ internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, 
                 var result = await modulesApi.InvokeDesignTimeActionAsync(designTimeId, Key);
 
                 if (result.Success)
+                {
                     _invokedSubject.OnNext(Unit.Default);
+                }
             }
             catch (Exception)
             {
@@ -60,6 +71,8 @@ internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, 
         var result = await modulesApi.InvokeDesignTimeActionAsync(designTimeId, Key);
 
         if (result.Success)
+        {
             _invokedSubject.OnNext(Unit.Default);
+        }
     }
 }

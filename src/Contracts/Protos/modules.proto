@@ -83,7 +83,6 @@ message SettingValue {
 }
 
 message StreamSettingUpdatesRequest {
-  // Subscribe to setting updates.
   // Currently supports optional filtering by module instance via module_instance_id.
   string module_instance_id = 1;
 }

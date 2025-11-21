@@ -23,6 +23,13 @@ public class ConfiguredModule
     public string? CustomName { get; set; }
 
     /// <summary>
+    ///     Delay before starting this module in the sequential pipeline.
+    ///     The session manager will wait this amount of time AFTER the previous module starts
+    ///     and BEFORE this module starts.
+    /// </summary>
+    public TimeSpan StartDelay { get; set; } = TimeSpan.Zero;
+
+    /// <summary>
     ///     A dictionary containing the user-provided settings for this specific module instance.
     /// </summary>
     public Dictionary<string, string> Settings { get; set; } = [];

@@ -189,7 +189,9 @@ internal sealed class Settings
 
         var monitorCount = PublicApi.GetMonitorCount();
         if (monitorCount <= 0)
+        {
             monitorCount = 1;
+        }
 
         for (var i = 0; i < monitorCount; i++)
         {
@@ -207,23 +209,34 @@ internal sealed class Settings
         return _allSettings;
     }
 
-    public Task<ValidationResult> ValidateAsync(CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateAsync()
     {
         var idePath = IdePath.GetCurrentValue();
 
         if (string.IsNullOrWhiteSpace(idePath))
+        {
             return Task.FromResult(ValidationResult.Fail("'IDE Executable' is required."));
+        }
 
         var mode = ProcessMode.GetCurrentValue();
         if (mode == "LaunchNew" && !File.Exists(idePath))
-            return Task.FromResult(ValidationResult.Fail($"IDE executable not found at '{idePath}'."));
-
-        if (UseCustomSize.GetCurrentValue())
         {
-            if (WindowWidth.GetCurrentValue() < 100)
-                return Task.FromResult(ValidationResult.Fail("'Window Width' must be at least 100 pixels."));
-            if (WindowHeight.GetCurrentValue() < 100)
-                return Task.FromResult(ValidationResult.Fail("'Window Height' must be at least 100 pixels."));
+            return Task.FromResult(ValidationResult.Fail($"IDE executable not found at '{idePath}'."));
+        }
+
+        if (!UseCustomSize.GetCurrentValue())
+        {
+            return Task.FromResult(ValidationResult.Success);
+        }
+
+        if (WindowWidth.GetCurrentValue() < 100)
+        {
+            return Task.FromResult(ValidationResult.Fail("'Window Width' must be at least 100 pixels."));
+        }
+
+        if (WindowHeight.GetCurrentValue() < 100)
+        {
+            return Task.FromResult(ValidationResult.Fail("'Window Height' must be at least 100 pixels."));
         }
 
         return Task.FromResult(ValidationResult.Success);

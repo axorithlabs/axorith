@@ -34,9 +34,14 @@ internal class WindowsSecureStorage : ISecureStorageService
     public void StoreSecret(string key, string secret)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
+
         if (secret == null)
+        {
             throw new ArgumentNullException(nameof(secret));
+        }
 
         try
         {
@@ -58,7 +63,9 @@ internal class WindowsSecureStorage : ISecureStorageService
     public string? RetrieveSecret(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
 
         var filePath = GetFilePathForKey(key);
         if (!File.Exists(filePath))
@@ -87,7 +94,9 @@ internal class WindowsSecureStorage : ISecureStorageService
     public void DeleteSecret(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
+        }
 
         var filePath = GetFilePathForKey(key);
         if (File.Exists(filePath))

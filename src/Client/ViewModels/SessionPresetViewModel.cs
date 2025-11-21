@@ -21,27 +21,31 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
     public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
 
     public SessionPresetViewModel(SessionPreset model, IReadOnlyList<ModuleDefinition> availableModules,
-        IModulesApi modulesApi)
+        IModulesApi modulesApi, IServiceProvider serviceProvider)
     {
         Model = model;
 
-        // Create a ViewModel for each module in the preset to get access to display-friendly properties.
         var moduleVms = model.Modules
             .Select(m =>
             {
                 var def = availableModules.FirstOrDefault(md => md.Id == m.ModuleId);
-                return def != null ? new ConfiguredModuleViewModel(def, m, modulesApi) : null;
+                return def != null ? new ConfiguredModuleViewModel(def, m, modulesApi, serviceProvider) : null;
             })
             .Where(vm => vm != null);
 
         foreach (var vm in moduleVms)
+        {
             Modules.Add(vm!);
+        }
     }
 
     public void Dispose()
     {
         foreach (var vm in Modules)
+        {
             vm.Dispose();
+        }
+
         Modules.Clear();
     }
 }

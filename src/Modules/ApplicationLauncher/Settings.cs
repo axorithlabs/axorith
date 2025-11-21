@@ -206,7 +206,9 @@ internal sealed class Settings
 
         var monitorCount = PublicApi.GetMonitorCount();
         if (monitorCount <= 0)
+        {
             monitorCount = 1;
+        }
 
         for (var i = 0; i < monitorCount; i++)
         {
@@ -224,32 +226,48 @@ internal sealed class Settings
         return _allSettings;
     }
 
-    public Task<ValidationResult> ValidateAsync(CancellationToken cancellationToken)
+    public Task<ValidationResult> ValidateAsync()
     {
         if (string.IsNullOrWhiteSpace(ApplicationPath.GetCurrentValue()))
+        {
             return Task.FromResult(ValidationResult.Fail("'Application Path' is required."));
+        }
 
         var mode = ProcessMode.GetCurrentValue();
         if (mode == "LaunchNew" && !File.Exists(ApplicationPath.GetCurrentValue()))
+        {
             return Task.FromResult(ValidationResult.Fail($"File not found at '{ApplicationPath.GetCurrentValue()}'."));
+        }
 
         if (UseCustomWorkingDirectory.GetCurrentValue())
         {
             var workingDir = WorkingDirectory.GetCurrentValue();
             if (string.IsNullOrWhiteSpace(workingDir))
+            {
                 return Task.FromResult(
                     ValidationResult.Fail("'Working Directory' is required when custom working directory is enabled."));
+            }
 
             if (!Directory.Exists(workingDir))
+            {
                 return Task.FromResult(ValidationResult.Fail($"Working directory '{workingDir}' does not exist."));
+            }
         }
 
-        if (!UseCustomSize.GetCurrentValue()) return Task.FromResult(ValidationResult.Success);
+        if (!UseCustomSize.GetCurrentValue())
+        {
+            return Task.FromResult(ValidationResult.Success);
+        }
 
         if (WindowWidth.GetCurrentValue() < 100)
+        {
             return Task.FromResult(ValidationResult.Fail("'Window Width' must be at least 100 pixels."));
+        }
+
         if (WindowHeight.GetCurrentValue() < 100)
+        {
             return Task.FromResult(ValidationResult.Fail("'Window Height' must be at least 100 pixels."));
+        }
 
         return Task.FromResult(ValidationResult.Success);
     }

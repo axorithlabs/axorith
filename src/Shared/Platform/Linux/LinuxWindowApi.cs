@@ -21,7 +21,9 @@ internal static class LinuxWindowApi
         while (!HasWindow(process))
         {
             if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
+            {
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -38,8 +40,10 @@ internal static class LinuxWindowApi
 
         var monitors = GetMonitors();
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
+        {
             throw new ArgumentOutOfRangeException(nameof(monitorIndex),
                 $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
+        }
 
         var monitor = monitors[monitorIndex];
         var targetX = monitor.X + 50;
@@ -78,16 +82,28 @@ internal static class LinuxWindowApi
 
             foreach (var line in lines)
             {
-                if (!line.Contains(" connected ") || !line.Contains('+')) continue;
+                if (!line.Contains(" connected ") || !line.Contains('+'))
+                {
+                    continue;
+                }
+
                 var parts = line.Split([' ', '+'], StringSplitOptions.RemoveEmptyEntries);
                 for (var i = 0; i < parts.Length - 2; i++)
                 {
                     if (!parts[i].Contains('x') || !int.TryParse(parts[i + 1], out var x) ||
-                        !int.TryParse(parts[i + 2], out var y)) continue;
+                        !int.TryParse(parts[i + 2], out var y))
+                    {
+                        continue;
+                    }
+
                     var resolution = parts[i].Split('x');
                     if (resolution.Length != 2 ||
                         !int.TryParse(resolution[0], out var width) ||
-                        !int.TryParse(resolution[1], out var height)) continue;
+                        !int.TryParse(resolution[1], out var height))
+                    {
+                        continue;
+                    }
+
                     monitors.Add(new MonitorInfo
                     {
                         X = x,
@@ -123,14 +139,14 @@ internal static class LinuxWindowApi
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(psi);
-        if (process == null)
-            throw new InvalidOperationException($"Failed to start {command}");
-
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {command}");
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit(5000);
 
-        if (process.ExitCode == 0) return output;
+        if (process.ExitCode == 0)
+        {
+            return output;
+        }
 
         var error = process.StandardError.ReadToEnd();
         throw new InvalidOperationException($"{command} failed: {error}");

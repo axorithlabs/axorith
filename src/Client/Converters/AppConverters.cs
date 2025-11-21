@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using Avalonia.Data.Converters;
+﻿using Avalonia.Data.Converters;
 
 namespace Axorith.Client.Converters;
 
@@ -14,18 +13,6 @@ public static class AppConverters
     public static readonly IValueConverter IsNull =
         new FuncValueConverter<object?, bool>(value => value is null);
 
-    public static readonly IMultiValueConverter IsNotLastItem =
-        new FuncMultiValueConverter<IEnumerable<object?>, bool>(bindings =>
-        {
-            var bindingList = bindings.ToList();
-            if (bindingList.Count < 2) return false;
-            var item = bindingList[0];
-            if (item == null) return false;
-            if (bindingList[1] is not IEnumerable collection) return false;
-            var lastItem = collection.Cast<object>().LastOrDefault();
-            return !ReferenceEquals(item, lastItem);
-        });
-
     /// <summary>
     ///     A multi-value converter that returns true if all values in the binding are equal.
     /// </summary>
@@ -33,11 +20,18 @@ public static class AppConverters
         new FuncMultiValueConverter<IEnumerable<object?>, bool>(bindings =>
         {
             var values = bindings.ToList();
-            if (values.Count < 2) return true;
+            if (values.Count < 2)
+            {
+                return true;
+            }
+
             var first = values[0];
             for (var i = 1; i < values.Count; i++)
                 if (!Equals(first, values[i]))
+                {
                     return false;
+                }
+
             return true;
         });
 

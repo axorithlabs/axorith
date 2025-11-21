@@ -37,7 +37,8 @@ public static class SettingMapper
             ValueType = GetSimpleTypeName(setting.ValueType),
             Filter = setting.ControlType == Sdk.Settings.SettingControlType.FilePicker
                 ? setting.Filter ?? string.Empty
-                : string.Empty
+                : string.Empty,
+            HasHistory = setting.HasHistory
         };
 
         var currentValue = setting.GetCurrentValueAsObject();
@@ -73,10 +74,12 @@ public static class SettingMapper
                 break;
         }
 
-        // Use cached choices to avoid re-allocation
         var currentChoices = setting.GetCurrentChoices();
 
-        if (currentChoices == null) return message;
+        if (currentChoices == null)
+        {
+            return message;
+        }
 
         var cachedChoices = ChoicesCache.GetValue(setting, _ => new CachedChoices());
 
@@ -85,7 +88,9 @@ public static class SettingMapper
             cachedChoices.SourceChoices = currentChoices;
             cachedChoices.SerializedChoices.Clear();
             foreach (var (key, display) in currentChoices)
+            {
                 cachedChoices.SerializedChoices.Add(new Choice { Key = key, Display = display });
+            }
         }
 
         message.Choices.AddRange(cachedChoices.SerializedChoices);
@@ -95,12 +100,36 @@ public static class SettingMapper
 
     private static string GetSimpleTypeName(Type type)
     {
-        if (type == typeof(string)) return "String";
-        if (type == typeof(bool)) return "Boolean";
-        if (type == typeof(int)) return "Int32";
-        if (type == typeof(decimal)) return "Decimal";
-        if (type == typeof(double)) return "Double";
-        if (type == typeof(TimeSpan)) return "TimeSpan";
+        if (type == typeof(string))
+        {
+            return "String";
+        }
+
+        if (type == typeof(bool))
+        {
+            return "Boolean";
+        }
+
+        if (type == typeof(int))
+        {
+            return "Int32";
+        }
+
+        if (type == typeof(decimal))
+        {
+            return "Decimal";
+        }
+
+        if (type == typeof(double))
+        {
+            return "Double";
+        }
+
+        if (type == typeof(TimeSpan))
+        {
+            return "TimeSpan";
+        }
+
         return "String"; // fallback
     }
 
@@ -111,7 +140,7 @@ public static class SettingMapper
         {
             ModuleInstanceId = moduleInstanceId.ToString(),
             SettingKey = settingKey,
-            Property = property
+            Property = (SettingProperty)(int)property
         };
 
         switch (property)
@@ -120,10 +149,12 @@ public static class SettingMapper
                 SetUpdateValue(update, value);
                 break;
             case SettingProperty.Label:
+            case SettingProperty.ActionLabel:
                 update.StringValue = value?.ToString() ?? string.Empty;
                 break;
             case SettingProperty.Visibility:
             case SettingProperty.ReadOnly:
+            case SettingProperty.ActionEnabled:
                 update.BoolValue = value is true;
                 break;
             case SettingProperty.Choices:
@@ -131,7 +162,10 @@ public static class SettingMapper
                 {
                     var choiceList = new ChoiceList();
                     foreach (var (key, display) in choices)
+                    {
                         choiceList.Choices.Add(new Choice { Key = key, Display = display });
+                    }
+
                     update.ChoiceList = choiceList;
                 }
 

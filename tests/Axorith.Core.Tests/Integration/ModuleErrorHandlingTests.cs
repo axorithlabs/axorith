@@ -71,7 +71,10 @@ public class ModuleErrorHandlingTests
             {
                 initializeCallCount++;
                 if (initializeCallCount == 1)
+                {
                     throw new InvalidOperationException("First init failed");
+                }
+
                 return Task.CompletedTask;
             });
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
