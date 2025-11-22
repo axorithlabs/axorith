@@ -12,7 +12,7 @@ using Moq;
 using Xunit;
 using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 
-namespace AAxorith.Host.Tests.Services;
+namespace Axorith.Host.Tests.Services;
 
 public class HostManagementServiceImplTests
 {

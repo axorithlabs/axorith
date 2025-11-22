@@ -243,8 +243,8 @@ public abstract class Setting
         string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
     {
         return new Setting<string>(key, label, description, defaultValue, SettingControlType.FilePicker, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue) 
-        { 
+            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue)
+        {
             Filter = filter,
             HasHistory = useHistory // Set flag
         };
@@ -338,8 +338,8 @@ public class Setting<T> : ISetting
 
     /// <inheritdoc />
     public IObservable<object?> ValueAsObject => _value.Select(v => (object?)v);
-    
-    /// <inheritdoc/>
+
+    /// <inheritdoc />
     public bool HasHistory { get; internal init; }
 
     object? ISetting.GetCurrentValueAsObject()

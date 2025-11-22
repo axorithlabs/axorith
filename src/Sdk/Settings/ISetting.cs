@@ -98,7 +98,7 @@ public interface ISetting
     ///     For 'FilePicker' settings, gets the filter string for the file dialog.
     /// </summary>
     string? Filter { get; }
-    
+
     /// <summary>
     ///     Indicates if the client should remember previous values for this setting.
     /// </summary>

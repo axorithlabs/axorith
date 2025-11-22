@@ -4,9 +4,7 @@
   "description": "Plays your music or playlist in spotify.",
   "category": "Music",
   "platforms": [
-    "Windows",
-    "Linux",
-    "MacOs"
+    "Windows"
   ],
   "assembly": "Axorith.Module.SpotifyPlayer.dll"
 }

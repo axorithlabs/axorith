@@ -1,7 +1,6 @@
 using Autofac;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
-using Axorith.Host;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk;
@@ -16,7 +15,7 @@ using Moq;
 using Xunit;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
-namespace AAxorith.Host.Tests.Services;
+namespace Axorith.Host.Tests.Services;
 
 public class ModulesServiceImplTests
 {

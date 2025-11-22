@@ -1,0 +1,10 @@
+﻿{
+  "id": "808162b1-68d7-487d-8162-b168d7087d80",
+  "name": "Home Assistant",
+  "description": "Control your smart home devices (lights, switches, scenes) automatically when your session starts or ends.",
+  "category": "IoT",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.HomeAssistant.dll"
+}

@@ -5,8 +5,8 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Windows.Input;
 using Avalonia.Threading;
-using Axorith.Client.CoreSdk;
-using Axorith.Client.Services;
+using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Sdk.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
@@ -68,7 +68,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
         set
         {
             var current = Setting.GetCurrentValueAsObject() as string;
-            if (string.Equals(current, value, StringComparison.Ordinal)) return;
+            if (string.Equals(current, value, StringComparison.Ordinal))
+            {
+                return;
+            }
 
             Setting.SetValueFromString(value);
             this.RaisePropertyChanged();
@@ -86,7 +89,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
         set
         {
             var current = Setting.GetCurrentValueAsObject() as bool?;
-            if (current == value) return;
+            if (current == value)
+            {
+                return;
+            }
 
             Setting.SetValueFromObject(value);
             this.RaisePropertyChanged();
@@ -100,7 +106,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
         get
         {
             var value = Setting.GetCurrentValueAsObject();
-            if (value == null) return 0;
+            if (value == null)
+            {
+                return 0;
+            }
 
             return value switch
             {
@@ -119,7 +128,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
                 : value;
 
             var current = Setting.GetCurrentValueAsObject();
-            if (current != null && current.Equals(boxedValue)) return;
+            if (current != null && current.Equals(boxedValue))
+            {
+                return;
+            }
 
             Setting.SetValueFromObject(boxedValue);
             this.RaisePropertyChanged();
@@ -143,8 +155,15 @@ public class SettingViewModel : ReactiveObject, IDisposable
         }
         set
         {
-            if (!value.HasValue) return;
-            if (value.Value.Key == StringValue) return;
+            if (!value.HasValue)
+            {
+                return;
+            }
+
+            if (value.Value.Key == StringValue)
+            {
+                return;
+            }
 
             StringValue = value.Value.Key;
             this.RaisePropertyChanged(nameof(StringValue));
@@ -203,24 +222,28 @@ public class SettingViewModel : ReactiveObject, IDisposable
                 this.RaisePropertyChanged(nameof(StringValue));
                 this.RaisePropertyChanged(nameof(BoolValue));
                 this.RaisePropertyChanged(nameof(DecimalValue));
-                
+
                 UpdateDisplayedChoices();
             })
             .DisposeWith(_disposables);
-        
+
         if (setting.GetCurrentChoices() is { } initialChoices)
         {
             _rawChoices = initialChoices;
         }
-        
+
         if (Dispatcher.UIThread.CheckAccess())
+        {
             UpdateDisplayedChoices();
+        }
         else
+        {
             Dispatcher.UIThread.Post(UpdateDisplayedChoices);
+        }
 
         Setting.Choices?
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(c => 
+            .Subscribe(c =>
             {
                 _rawChoices = c;
                 UpdateDisplayedChoices();
@@ -243,7 +266,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
     private void UpdateDisplayedChoices()
     {
-        if (Setting.ControlType != SettingControlType.Choice) return;
+        if (Setting.ControlType != SettingControlType.Choice)
+        {
+            return;
+        }
 
         if (!Dispatcher.UIThread.CheckAccess())
         {
@@ -259,8 +285,8 @@ public class SettingViewModel : ReactiveObject, IDisposable
         if (!exists && !string.IsNullOrEmpty(currentValue))
         {
             newDisplayList.Insert(0, new KeyValuePair<string, string>(
-                currentValue, 
-                $"{currentValue} (Saved)" 
+                currentValue,
+                $"{currentValue} (Saved)"
             ));
 
             newDisplayList.RemoveAll(x => string.IsNullOrEmpty(x.Key));
@@ -268,7 +294,8 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
         if (DisplayedChoices.Count == newDisplayList.Count)
         {
-            var identical = !DisplayedChoices.Where((t, i) => t.Key != newDisplayList[i].Key || t.Value != newDisplayList[i].Value).Any();
+            var identical = !DisplayedChoices
+                .Where((t, i) => t.Key != newDisplayList[i].Key || t.Value != newDisplayList[i].Value).Any();
             if (identical)
             {
                 this.RaisePropertyChanged(nameof(SelectedChoice));
@@ -287,9 +314,12 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
     private async Task BrowseAsync()
     {
-        if (_filePickerService == null) return;
+        if (_filePickerService == null)
+        {
+            return;
+        }
 
-        string? result = Setting.ControlType switch
+        var result = Setting.ControlType switch
         {
             SettingControlType.FilePicker => await _filePickerService.PickFileAsync($"Select {Label}", Setting.Filter,
                 StringValue),
@@ -306,7 +336,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
     private void LoadHistory()
     {
-        if (!Setting.HasHistory || _uiConfig == null) return;
+        if (!Setting.HasHistory || _uiConfig == null)
+        {
+            return;
+        }
 
         if (_uiConfig.InputHistory.TryGetValue(Setting.Key, out var items))
         {
@@ -319,11 +352,17 @@ public class SettingViewModel : ReactiveObject, IDisposable
 
     private void RemoveHistoryItem(string item)
     {
-        if (!History.Contains(item)) return;
+        if (!History.Contains(item))
+        {
+            return;
+        }
 
         History.Remove(item);
 
-        if (_uiConfig == null || _uiSettingsStore == null) return;
+        if (_uiConfig == null || _uiSettingsStore == null)
+        {
+            return;
+        }
 
         _uiConfig.InputHistory[Setting.Key] = History.ToList();
         _uiSettingsStore.Save(_uiConfig);
@@ -332,7 +371,9 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private void TryAddToHistory(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || !Setting.HasHistory || _uiSettingsStore == null || _uiConfig == null)
+        {
             return;
+        }
 
         var isValidPath = false;
         try
@@ -346,7 +387,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
             // Ignore invalid path characters
         }
 
-        if (!isValidPath) return;
+        if (!isValidPath)
+        {
+            return;
+        }
 
         if (History.Contains(value))
         {

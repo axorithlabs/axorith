@@ -1,4 +1,4 @@
-namespace Axorith.Client.CoreSdk;
+namespace Axorith.Client.CoreSdk.Abstractions;
 
 /// <summary>
 ///     API for diagnostics and health checks.

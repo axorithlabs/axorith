@@ -1,4 +1,4 @@
-using Axorith.Client.CoreSdk;
+using Axorith.Client.CoreSdk.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

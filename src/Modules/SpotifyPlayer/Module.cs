@@ -4,13 +4,10 @@ using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Module.SpotifyPlayer;
 
-/// <summary>
-///     A module to control Spotify playback, with fully automated authentication and playback options.
-///     This class acts as a composition root, assembling the services that contain the actual logic.
-/// </summary>
 public class Module : IModule
 {
     private readonly Settings _settings;
@@ -18,10 +15,15 @@ public class Module : IModule
     private readonly SpotifyApiService _apiService;
     private readonly PlaybackService _playbackService;
 
-    public Module(IModuleLogger logger, IHttpClientFactory httpClientFactory, ISecureStorageService secureStorage,
+    public Module(
+        IModuleLogger logger,
+        IHttpClientFactory httpClientFactory,
+        ISecureStorageService secureStorage,
+        IAppDiscoveryService appDiscoveryService,
         ModuleDefinition definition)
     {
         _settings = new Settings();
+
         _authService = new AuthService(logger, httpClientFactory, secureStorage, definition, _settings);
         _apiService = new SpotifyApiService(httpClientFactory, definition, _authService, logger);
         _playbackService = new PlaybackService(logger, _settings, _authService, _apiService);
@@ -44,12 +46,12 @@ public class Module : IModule
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        return _playbackService.ValidateSettingsAsync();
+        return _settings.ValidateAsync();
     }
 
     public Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        return _playbackService.OnSessionStartAsync();
+        return _playbackService.OnSessionStartAsync(cancellationToken);
     }
 
     public Task OnSessionEndAsync(CancellationToken cancellationToken = default)

@@ -1,114 +1,119 @@
 ﻿/**
  * @file background.js
- * @description Background script for the Axorith Site Blocker extension (v2).
- * This version uses a script injection model instead of redirection.
- * It listens to the native host, manages a list of blocked domains in storage,
- * and injects a content script to take over pages on matching tabs.
- * When unblocked, it reloads the tabs to restore their original content.
+ * @description Background script for the Axorith Site Blocker extension (v2.2).
+ * Supports BlockList/AllowList and automatic fallback between Dev/Prod native hosts.
  */
 
 'use strict';
 
 // --- Constants ---
 const STORAGE_KEY_BLOCKED_DOMAINS = "axorith_blocked_domains";
+const STORAGE_KEY_MODE = "axorith_blocking_mode";
+
+// Host names to try. Priority: Dev -> Prod
+const HOSTS = ["axorith.dev", "axorith"];
+let currentHostIndex = 0;
 
 // --- Native Host Connection ---
 
-/**
- * Establishes and manages a persistent connection to the native messaging host.
- * Automatically attempts to reconnect on disconnection.
- */
 function connectToHost() {
-    const port = browser.runtime.connectNative("axorith");
-    console.log("Axorith: Connecting to native host...");
+    const hostName = HOSTS[currentHostIndex];
+    console.log(`Axorith: Attempting to connect to native host: ${hostName}`);
+    
+    const port = browser.runtime.connectNative(hostName);
+    
+    // We need to detect immediate connection failures to switch hosts.
+    // Native messaging doesn't give a clear "not found" error synchronously,
+    // it usually fires onDisconnect immediately with an error.
+    
     port.onMessage.addListener(handleNativeMessage);
-    port.onDisconnect.addListener(onDisconnect);
+    
+    port.onDisconnect.addListener((p) => {
+        if (p.error) {
+            console.warn(`Axorith: Failed to connect/disconnected from ${hostName}: ${p.error.message}`);
+            
+            // If we haven't tried all hosts yet, try the next one immediately
+            if (currentHostIndex < HOSTS.length - 1) {
+                currentHostIndex++;
+                console.log("Axorith: Switching to next host configuration...");
+                connectToHost();
+            } else {
+                // We exhausted all options. Reset index and retry after delay.
+                console.error("Axorith: All host connection attempts failed.");
+                currentHostIndex = 0;
+                console.log("Axorith: Will retry from start in 5 seconds.");
+                setTimeout(connectToHost, 5000);
+            }
+        } else {
+            // Clean disconnect (e.g. app closed). Retry same host after delay.
+            console.log(`Axorith: Disconnected from ${hostName}. Retrying in 5s.`);
+            setTimeout(connectToHost, 5000);
+        }
+    });
 }
 
-/**
- * Handles incoming messages from the native C# application.
- * @param {object} message - The message object received from the host.
- */
 function handleNativeMessage(message) {
     console.log("Axorith: Received message from native host:", message);
+    
+    // If we receive a message, it means the connection is valid.
+    // We can reset the index to prioritize this host next time (optional, but good for stability)
+    // currentHostIndex = 0; // Actually, keep current index as it works.
+
     if (message.command === "block" && Array.isArray(message.sites)) {
-        blockSites(message.sites);
+        const mode = message.mode || "BlockList";
+        blockSites(message.sites, mode);
     } else if (message.command === "unblock") {
         unblockSites();
     }
 }
 
-/**
- * Handles the disconnection event from the native host port.
- * Logs the error and schedules a reconnection attempt.
- * @param {object} p - The port object that was disconnected.
- */
-function onDisconnect(p) {
-    if (p.error) {
-        console.error(`Axorith: Disconnected from native host: ${p.error.message}`);
-    } else {
-        console.log("Axorith: Disconnected from native host.");
-    }
-    console.log("Axorith: Will attempt to reconnect in 5 seconds.");
-    setTimeout(connectToHost, 5000);
-}
-
 
 // --- Core Blocker Logic ---
 
-/**
- * Activates blocking for a given list of domains.
- * 1. Stores the list of domains in local storage.
- * 2. Queries all existing tabs and injects the blocker into matching ones.
- * @param {string[]} domains - An array of domain strings to block.
- */
-async function blockSites(domains) {
-    if (domains.length === 0) {
-        console.log("Axorith: Received block command with no domains. Clearing blocks.");
+async function blockSites(domains, mode) {
+    if (domains.length === 0 && mode === "BlockList") {
+        console.log("Axorith: Empty blocklist. Clearing blocks.");
         await unblockSites();
         return;
     }
 
-    console.log(`Axorith: Activating block for domains: ${domains.join(', ')}`);
-    await browser.storage.local.set({ [STORAGE_KEY_BLOCKED_DOMAINS]: domains });
+    console.log(`Axorith: Activating ${mode} for ${domains.length} domains.`);
+    
+    await browser.storage.local.set({ 
+        [STORAGE_KEY_BLOCKED_DOMAINS]: domains,
+        [STORAGE_KEY_MODE]: mode
+    });
 
     const tabs = await browser.tabs.query({});
     for (const tab of tabs) {
-        if (isDomainBlocked(tab.url, domains)) {
+        if (shouldBlockUrl(tab.url, domains, mode)) {
             injectBlocker(tab.id);
         }
     }
 }
 
-/**
- * Deactivates blocking.
- * 1. Clears the list of blocked domains from storage.
- * 2. Queries all tabs and reloads any that are currently blocked to restore them.
- */
 async function unblockSites() {
     console.log("Axorith: Deactivating all blocks.");
-    const { [STORAGE_KEY_BLOCKED_DOMAINS]: blockedDomains } = await browser.storage.local.get(STORAGE_KEY_BLOCKED_DOMAINS);
     
-    if (!blockedDomains || blockedDomains.length === 0) {
-        return; // Nothing to unblock.
+    const storage = await browser.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+    const blockedDomains = storage[STORAGE_KEY_BLOCKED_DOMAINS];
+    const mode = storage[STORAGE_KEY_MODE];
+    
+    if (!blockedDomains) {
+        return;
     }
 
-    await browser.storage.local.remove(STORAGE_KEY_BLOCKED_DOMAINS);
+    await browser.storage.local.remove([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
 
     const tabs = await browser.tabs.query({});
     for (const tab of tabs) {
-        // A tab needs to be reloaded if its URL matches a previously blocked domain.
-        if (isDomainBlocked(tab.url, blockedDomains)) {
+        if (shouldBlockUrl(tab.url, blockedDomains, mode)) {
             console.log(`Axorith: Reloading previously blocked tab ${tab.id} (${tab.url})`);
             browser.tabs.reload(tab.id).catch(e => console.warn(`Could not reload tab ${tab.id}: ${e.message}`));
         }
     }
 }
 
-/**
- * Injects the content script into a specific tab to block its content.
- * @param {number} tabId - The ID of the tab to block.
- */
 function injectBlocker(tabId) {
     console.log(`Axorith: Injecting blocker into tab ${tabId}`);
     browser.scripting.executeScript({
@@ -120,19 +125,16 @@ function injectBlocker(tabId) {
 
 // --- Event Listeners ---
 
-/**
- * Listens for tab updates (e.g., navigation).
- * If a tab navigates to a blocked domain, inject the blocker.
- * This handles cases where a tab is opened or navigated after the block is active.
- */
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    // We only care about tabs that have finished loading their URL.
     if (changeInfo.status !== 'complete' || !tab.url) {
         return;
     }
 
-    const { [STORAGE_KEY_BLOCKED_DOMAINS]: domains } = await browser.storage.local.get(STORAGE_KEY_BLOCKED_DOMAINS);
-    if (domains && domains.length > 0 && isDomainBlocked(tab.url, domains)) {
+    const storage = await browser.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+    const domains = storage[STORAGE_KEY_BLOCKED_DOMAINS];
+    const mode = storage[STORAGE_KEY_MODE];
+
+    if (domains && shouldBlockUrl(tab.url, domains, mode)) {
         injectBlocker(tabId);
     }
 });
@@ -140,25 +142,30 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 // --- Utility Functions ---
 
-/**
- * Checks if a given URL belongs to any of the blocked domains.
- * @param {string | undefined} urlString - The URL to check.
- * @param {string[]} blockedDomains - The list of domains to check against.
- * @returns {boolean} - True if the URL is blocked, false otherwise.
- */
-function isDomainBlocked(urlString, blockedDomains) {
-    if (!urlString) {
+function shouldBlockUrl(urlString, domainList, mode) {
+    if (!urlString || !domainList) {
         return false;
     }
+
     try {
         const url = new URL(urlString);
-        // Check against special browser/extension protocols
-        if (['about:', 'moz-extension:', 'chrome:', 'file:'].some(proto => url.protocol.startsWith(proto))) {
+        
+        const safeProtocols = ['about:', 'moz-extension:', 'chrome:', 'edge:', 'file:', 'view-source:'];
+        if (safeProtocols.some(proto => url.protocol.startsWith(proto))) {
             return false;
         }
-        return blockedDomains.some(blockedDomain => url.hostname.endsWith(blockedDomain));
+
+        const isMatch = domainList.some(domain => {
+            return url.hostname === domain || url.hostname.endsWith('.' + domain);
+        });
+
+        if (mode === "AllowList") {
+            return !isMatch;
+        } else {
+            return isMatch;
+        }
+
     } catch (e) {
-        // Invalid URL
         return false;
     }
 }

@@ -11,34 +11,66 @@ public partial class SessionEditorView : UserControl
     {
         InitializeComponent();
 
-        AddHandler(PointerWheelChangedEvent, (sender, e) =>
+        AddHandler(PointerWheelChangedEvent, (_, e) =>
         {
-            if (e.Source is not Control control || control.FindAncestorOfType<ComboBox>() is not { } comboBox)
+            if (e.Source is not Control control)
             {
                 return;
             }
 
-            if (!comboBox.IsDropDownOpen)
+            var comboBox = control.FindAncestorOfType<ComboBox>();
+
+            if (comboBox == null || comboBox.IsDropDownOpen)
             {
-                e.Handled = true;
+                return;
+            }
+
+            e.Handled = true;
+
+            var scrollViewer = comboBox.FindAncestorOfType<ScrollViewer>();
+            if (scrollViewer == null)
+            {
+                return;
+            }
+
+            switch (e.Delta.Y)
+            {
+                case > 0:
+                    scrollViewer.LineUp();
+                    break;
+                case < 0:
+                    scrollViewer.LineDown();
+                    break;
+            }
+
+            switch (e.Delta.X)
+            {
+                case > 0:
+                    scrollViewer.LineLeft();
+                    break;
+                case < 0:
+                    scrollViewer.LineRight();
+                    break;
             }
         }, RoutingStrategies.Tunnel);
 
-        AddHandler(KeyDownEvent, (sender, e) =>
+        AddHandler(KeyDownEvent, (_, e) =>
         {
             if (e.Source is not TextBox textBox || (e.Key != Key.Enter && e.Key != Key.Escape))
             {
                 return;
             }
 
-            if (e.Key == Key.Enter && textBox.AcceptsReturn) 
+            if (e.Key == Key.Enter && textBox.AcceptsReturn)
+            {
                 return;
+            }
 
             var topLevel = TopLevel.GetTopLevel(this);
-            #pragma warning disable CS0618 
+            #pragma warning disable CS0618
             topLevel?.FocusManager?.ClearFocus();
-            #pragma warning restore CS0618 
-                
+            #pragma warning restore CS0618
+
             e.Handled = true;
         }, RoutingStrategies.Tunnel);
     }

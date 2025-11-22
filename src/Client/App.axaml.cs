@@ -2,8 +2,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Axorith.Client.CoreSdk;
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Client.Views;
 using Microsoft.Extensions.Configuration;
@@ -95,7 +96,7 @@ public class App : Application
         services.AddSingleton<IHostTrayService, HostTrayService>();
         services.AddSingleton<IConnectionInitializer, ConnectionInitializer>();
         services.AddSingleton<IClientUiSettingsStore>(_ => uiSettingsStore);
-        services.AddSingleton<IFilePickerService>(sp => new FilePickerService(desktop)); 
+        services.AddSingleton<IFilePickerService>(_ => new FilePickerService(desktop));
 
         Services = services.BuildServiceProvider();
 

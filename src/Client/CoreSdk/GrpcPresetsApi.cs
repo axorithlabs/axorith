@@ -1,10 +1,12 @@
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Grpc.Core;
 using Polly.Retry;
 using ConfiguredModule = Axorith.Contracts.ConfiguredModule;
+using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
 
-namespace Axorith.Client.CoreSdk.Grpc;
+namespace Axorith.Client.CoreSdk;
 
 /// <summary>
 ///     gRPC implementation of IPresetsApi.

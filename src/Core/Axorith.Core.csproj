@@ -6,7 +6,6 @@
         <Description>Core system for Axorith OS.</Description>
     </PropertyGroup>
 
-    <!-- Expose internal types to test assembly -->
     <ItemGroup>
         <InternalsVisibleTo Include="Axorith.Core.Tests" />
     </ItemGroup>

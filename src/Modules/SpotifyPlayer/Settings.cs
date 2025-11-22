@@ -10,9 +10,18 @@ internal sealed class Settings
     internal const string CustomUrlValue = "custom";
     private const int DefaultRedirectPort = 8888;
 
+    internal const string ModeLocalComputer = "LocalComputer";
+    internal const string ModeLastActive = "LastActive";
+    internal const string ModeSpecificName = "SpecificName";
+
     public Setting<string> AuthStatus { get; }
     public Setting<int> RedirectPort { get; }
-    public Setting<string> TargetDevice { get; }
+
+    public Setting<bool> EnsureSpotifyRunning { get; }
+
+    public Setting<string> DeviceSelectionMode { get; }
+    public Setting<string> SpecificDeviceName { get; }
+
     public Setting<string> PlaybackContext { get; }
     public Setting<string> CustomUrl { get; }
     public Setting<int> Volume { get; }
@@ -21,7 +30,6 @@ internal sealed class Settings
 
     public Action LoginAction { get; }
     public Action LogoutAction { get; }
-    public Action UpdateAction { get; }
 
     private readonly IReadOnlyList<ISetting> _allSettings;
     private readonly IReadOnlyList<IAction> _allActions;
@@ -38,14 +46,38 @@ internal sealed class Settings
             key: "RedirectPort",
             label: "Redirect Port",
             defaultValue: DefaultRedirectPort,
-            description: "Local HTTP port used for the Spotify OAuth callback. Change this if 8888 is blocked.");
+            description:
+            "Local HTTP port used for the Spotify OAuth callback. Change only if login fails due to port conflict.",
+            isVisible: false // Hidden by default
+        );
 
-        TargetDevice = Setting.AsChoice(
-            key: "TargetDevice",
+        EnsureSpotifyRunning = Setting.AsCheckbox(
+            key: "EnsureSpotifyRunning",
+            label: "Wait for Spotify Process",
+            defaultValue: true,
+            description:
+            "If checked, the module will wait up to 30 seconds for the Spotify process to appear before attempting playback.");
+
+        DeviceSelectionMode = Setting.AsChoice(
+            key: "DeviceSelectionMode",
             label: "Target Device",
-            defaultValue: string.Empty,
-            initialChoices: [],
-            description: "Device to start playback on.");
+            defaultValue: ModeLocalComputer,
+            initialChoices:
+            [
+                new KeyValuePair<string, string>(ModeLocalComputer, "Local Computer (Recommended)"),
+                new KeyValuePair<string, string>(ModeLastActive, "Most Recently Active Device"),
+                new KeyValuePair<string, string>(ModeSpecificName, "Specific Device Name (Advanced)")
+            ],
+            description: "How to select the device for playback."
+        );
+
+        SpecificDeviceName = Setting.AsText(
+            key: "SpecificDeviceName",
+            label: "Device Name",
+            defaultValue: "",
+            description: "The exact name of the device to control (e.g. 'Living Room Speaker').",
+            isVisible: false
+        );
 
         PlaybackContext = Setting.AsChoice(
             key: "PlaybackContext",
@@ -93,13 +125,16 @@ internal sealed class Settings
 
         LoginAction = Action.Create(key: "Login", label: "Login to Spotify");
         LogoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
-        UpdateAction = Action.Create(key: "Update", label: "Update devices and playlists", isEnabled: false);
+
+        DeviceSelectionMode.Value.Subscribe(mode => { SpecificDeviceName.SetVisibility(mode == ModeSpecificName); });
 
         _allSettings =
         [
             AuthStatus,
             RedirectPort,
-            TargetDevice,
+            EnsureSpotifyRunning,
+            DeviceSelectionMode,
+            SpecificDeviceName,
             PlaybackContext,
             CustomUrl,
             Volume,
@@ -110,12 +145,29 @@ internal sealed class Settings
         _allActions =
         [
             LoginAction,
-            LogoutAction,
-            UpdateAction
+            LogoutAction
         ];
     }
 
-    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
-    public IReadOnlyList<IAction> GetActions() => _allActions;
-    public Task<ValidationResult> ValidateAsync() => Task.FromResult(ValidationResult.Success);
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return _allSettings;
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _allActions;
+    }
+
+    public Task<ValidationResult> ValidateAsync()
+    {
+        if (DeviceSelectionMode.GetCurrentValue() == ModeSpecificName &&
+            string.IsNullOrWhiteSpace(SpecificDeviceName.GetCurrentValue()))
+        {
+            return Task.FromResult(
+                ValidationResult.Fail("Device Name is required when 'Specific Device Name' mode is selected."));
+        }
+
+        return Task.FromResult(ValidationResult.Success);
+    }
 }

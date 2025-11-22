@@ -1,4 +1,4 @@
-namespace Axorith.Client.CoreSdk;
+namespace Axorith.Client.CoreSdk.Abstractions;
 
 /// <summary>
 ///     Represents a connection to Axorith Core services.
@@ -25,6 +25,11 @@ public interface ICoreConnection : IAsyncDisposable
     ///     Access to diagnostics and health checks.
     /// </summary>
     IDiagnosticsApi Diagnostics { get; }
+
+    /// <summary>
+    ///     Access to session scheduling operations.
+    /// </summary>
+    ISchedulerApi Scheduler { get; }
 
     /// <summary>
     ///     Current connection state.

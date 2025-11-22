@@ -1,0 +1,72 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "Axorith.Contracts";
+
+package axorith.scheduler;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service SchedulerService {
+  // Lists all configured schedules
+  rpc ListSchedules (ListSchedulesRequest) returns (ListSchedulesResponse);
+
+  // Creates a new schedule
+  rpc CreateSchedule (CreateScheduleRequest) returns (Schedule);
+
+  // Updates an existing schedule
+  rpc UpdateSchedule (UpdateScheduleRequest) returns (Schedule);
+
+  // Deletes a schedule
+  rpc DeleteSchedule (DeleteScheduleRequest) returns (google.protobuf.Empty);
+
+  // Toggles enabled state
+  rpc SetEnabled (SetScheduleEnabledRequest) returns (Schedule);
+}
+
+message Schedule {
+  string id = 1;
+  string preset_id = 2;
+  string name = 3;
+  bool is_enabled = 4;
+
+  // Type of schedule: 0 = OneTime, 1 = Recurring
+  int32 type = 5;
+
+  // For OneTime: The specific date and time to run
+  google.protobuf.Timestamp one_time_date = 6;
+
+  // For Recurring: Time of day (ticks or string HH:mm)
+  string recurring_time = 7;
+
+  // For Recurring: Days of week (Monday=1, Sunday=7). Empty means every day.
+  repeated int32 days_of_week = 8;
+
+  // Metadata
+  google.protobuf.Timestamp next_run = 9;
+  google.protobuf.Timestamp last_run = 10;
+}
+
+message ListSchedulesRequest {
+}
+
+message ListSchedulesResponse {
+  repeated Schedule schedules = 1;
+}
+
+message CreateScheduleRequest {
+  Schedule schedule = 1;
+}
+
+message UpdateScheduleRequest {
+  Schedule schedule = 1;
+}
+
+message DeleteScheduleRequest {
+  string schedule_id = 1;
+}
+
+message SetScheduleEnabledRequest {
+  string schedule_id = 1;
+  bool enabled = 2;
+}

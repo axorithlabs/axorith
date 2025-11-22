@@ -2,9 +2,9 @@
   "id": "9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd",
   "name": "Application Launcher",
   "description": "Launch new processes or attach to existing ones, control window state (maximized, minimized, custom size), and manage process lifecycle on session end.",
-  "category": "System",
+  "category": "App",
   "platforms": [
-    "windows"
+    "Windows"
   ],
   "assembly": "Axorith.Module.ApplicationLauncher.dll"
 }

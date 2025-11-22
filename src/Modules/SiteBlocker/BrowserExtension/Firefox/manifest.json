@@ -3,7 +3,9 @@
   "name": "Axorith Site Blocker",
   "version": "1.0.0",
   "description": "Companion extension for Axorith.",
-  "icons": { "48": "icon.ico" },
+  "icons": {
+    "48": "icon.png"
+  },
   "permissions": [
     "nativeMessaging",
     "tabs",
@@ -29,6 +31,14 @@
     }
   ],
   "browser_specific_settings": {
-    "gecko": { "id": "firefox-extension-prod@axorithlabs.com" }
+    "gecko": {
+      "id": "site-blocker-firefox@axorithlabs.com",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
   }
 }

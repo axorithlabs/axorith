@@ -1,6 +1,7 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using Axorith.Client.Services;
+using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
 using Grpc.Net.Client;
@@ -10,7 +11,7 @@ using Polly;
 using Polly.Retry;
 using RetryPolicy = Grpc.Net.Client.Configuration.RetryPolicy;
 
-namespace Axorith.Client.CoreSdk.Grpc;
+namespace Axorith.Client.CoreSdk;
 
 /// <summary>
 ///     gRPC-based implementation of ICoreConnection.
@@ -29,6 +30,7 @@ public class GrpcCoreConnection : ICoreConnection
     private GrpcSessionsApi? _sessionsApi;
     private GrpcModulesApi? _modulesApi;
     private GrpcDiagnosticsApi? _diagnosticsApi;
+    private GrpcSchedulerApi? _schedulerApi;
     private bool _disposed;
 
     /// <summary>
@@ -50,7 +52,6 @@ public class GrpcCoreConnection : ICoreConnection
         _logger = logger;
         _stateSubject = new BehaviorSubject<ConnectionState>(ConnectionState.Disconnected);
 
-        // Configure Polly retry policy for transient failures
         _retryPolicy = Policy
             .Handle<RpcException>(ex => ex.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded)
             .WaitAndRetryAsync(
@@ -80,6 +81,11 @@ public class GrpcCoreConnection : ICoreConnection
     public IDiagnosticsApi Diagnostics => _diagnosticsApi
                                           ?? throw new InvalidOperationException(
                                               "Not connected. Call ConnectAsync first.");
+
+    /// <inheritdoc />
+    public ISchedulerApi Scheduler => _schedulerApi
+                                      ?? throw new InvalidOperationException(
+                                          "Not connected. Call ConnectAsync first.");
 
     /// <inheritdoc />
     public ConnectionState State => _stateSubject.Value;
@@ -149,11 +155,13 @@ public class GrpcCoreConnection : ICoreConnection
             var sessionsClient = new SessionsService.SessionsServiceClient(_channel);
             var modulesClient = new ModulesService.ModulesServiceClient(_channel);
             var diagnosticsClient = new DiagnosticsService.DiagnosticsServiceClient(_channel);
+            var schedulerClient = new SchedulerService.SchedulerServiceClient(_channel);
 
             _presetsApi = new GrpcPresetsApi(presetsClient, _retryPolicy);
             _sessionsApi = new GrpcSessionsApi(sessionsClient, _retryPolicy, _logger);
             _modulesApi = new GrpcModulesApi(modulesClient, _retryPolicy, _logger);
             _diagnosticsApi = new GrpcDiagnosticsApi(diagnosticsClient, _retryPolicy);
+            _schedulerApi = new GrpcSchedulerApi(schedulerClient, _retryPolicy);
 
             var health = await _diagnosticsApi.GetHealthAsync(ct).ConfigureAwait(false);
 
@@ -206,6 +214,7 @@ public class GrpcCoreConnection : ICoreConnection
         _sessionsApi = null;
         _modulesApi = null;
         _diagnosticsApi = null;
+        _schedulerApi = null;
 
         if (_channel != null)
         {

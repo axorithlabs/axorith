@@ -8,6 +8,7 @@
         <entry key="src/Client/Views/LoadingView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/MainView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/MainWindow.axaml" value="src/Client/Axorith.Client.csproj" />
+        <entry key="src/Client/Views/SchedulerView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/SessionEditorView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/SettingsView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Service/App.axaml" value="src/Service/Axorith.Service.csproj" />

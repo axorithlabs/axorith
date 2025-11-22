@@ -1,6 +1,8 @@
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform;
+using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.JBIDELauncher;
 
@@ -19,16 +21,22 @@ internal sealed class Settings
     public Setting<string> LifecycleMode { get; }
     public Setting<bool> BringToForeground { get; }
 
-    private readonly IReadOnlyList<ISetting> _allSettings;
+    public Action RefreshIdeListAction { get; }
 
-    public Settings()
+    private readonly IReadOnlyList<ISetting> _allSettings;
+    private readonly IReadOnlyList<IAction> _allActions;
+    private readonly IAppDiscoveryService _appDiscovery;
+
+    public Settings(IAppDiscoveryService appDiscovery)
     {
-        IdePath = Setting.AsFilePicker(
+        _appDiscovery = appDiscovery;
+
+        IdePath = Setting.AsChoice(
             key: "IDEPath",
             label: "IDE Executable",
             defaultValue: string.Empty,
-            filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
-            description: "Path to JetBrains IDE."
+            initialChoices: [new KeyValuePair<string, string>("", "Scanning for IDEs...")],
+            description: "Select installed JetBrains IDE or enter custom path."
         );
 
         ProjectPath = Setting.AsFilePicker(
@@ -131,6 +139,9 @@ internal sealed class Settings
             description: "Automatically bring the IDE window to foreground after setup."
         );
 
+        RefreshIdeListAction = Action.Create("RefreshIdeList", "Refresh IDE List");
+        RefreshIdeListAction.OnInvokeAsync(RefreshIdeListAsync);
+
         SetupReactiveVisibility();
 
         _allSettings =
@@ -148,6 +159,51 @@ internal sealed class Settings
             LifecycleMode,
             BringToForeground
         ];
+
+        _allActions = [RefreshIdeListAction];
+    }
+
+    public Task InitializeAsync()
+    {
+        return RefreshIdeListAsync();
+    }
+
+    private async Task RefreshIdeListAsync()
+    {
+        var apps = await Task.Run(() => _appDiscovery.FindAppsByPublisher("JetBrains"));
+
+        var choices = new List<KeyValuePair<string, string>>();
+
+        foreach (var app in apps)
+        {
+            // Filter out Toolbox itself and non-IDE tools if possible, but generally listing all is safer
+            if (app.Name.Contains("Toolbox", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            choices.Add(new KeyValuePair<string, string>(app.ExecutablePath, app.Name));
+        }
+
+        if (choices.Count == 0)
+        {
+            choices.Add(new KeyValuePair<string, string>("", "No JetBrains IDEs found"));
+        }
+
+        // Preserve current value if it's custom
+        var current = IdePath.GetCurrentValue();
+        if (!string.IsNullOrEmpty(current) && !choices.Any(c => c.Key == current))
+        {
+            choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
+        }
+
+        IdePath.SetChoices(choices);
+
+        // Auto-select first if empty
+        if (string.IsNullOrEmpty(current) && choices.Count > 0 && !string.IsNullOrEmpty(choices[0].Key))
+        {
+            IdePath.SetValue(choices[0].Key);
+        }
     }
 
     private void SetupReactiveVisibility()
@@ -207,6 +263,11 @@ internal sealed class Settings
     public IReadOnlyList<ISetting> GetSettings()
     {
         return _allSettings;
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _allActions;
     }
 
     public Task<ValidationResult> ValidateAsync()

@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace Axorith.Client.Services;
+namespace Axorith.Client.Services.Abstractions;
 
 public interface IConnectionInitializer
 {

@@ -32,7 +32,6 @@ internal sealed class AuthService : IDisposable
 
     private readonly Action _loginAction;
     private readonly Action _logoutAction;
-    private readonly Action _updateAction;
 
     public event Action<bool>? AuthenticationStateChanged;
 
@@ -46,7 +45,6 @@ internal sealed class AuthService : IDisposable
 
         _loginAction = _settings.LoginAction;
         _logoutAction = _settings.LogoutAction;
-        _updateAction = _settings.UpdateAction;
 
         RefreshUiState();
 
@@ -76,12 +74,18 @@ internal sealed class AuthService : IDisposable
 
     public async Task<string?> GetValidAccessTokenAsync()
     {
-        if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken)) return _inMemoryAccessToken;
+        if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken))
+        {
+            return _inMemoryAccessToken;
+        }
 
         await _tokenRefreshSemaphore.WaitAsync();
         try
         {
-            if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken)) return _inMemoryAccessToken;
+            if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken))
+            {
+                return _inMemoryAccessToken;
+            }
 
             var refreshToken = _secureStorage.RetrieveSecret(RefreshTokenKey);
             if (string.IsNullOrWhiteSpace(refreshToken))
@@ -157,7 +161,6 @@ internal sealed class AuthService : IDisposable
         }
 
         _logoutAction.SetEnabled(isAuthenticated);
-        _updateAction.SetEnabled(isAuthenticated);
         _settings.CustomUrl.SetVisibility(
             _settings.PlaybackContext.GetCurrentValue() == Settings.CustomUrlValue);
 
@@ -184,6 +187,8 @@ internal sealed class AuthService : IDisposable
             try
             {
                 listener.Start();
+                // If start succeeds, hide the port setting (in case it was shown previously)
+                _settings.RedirectPort.SetVisibility(false);
             }
             catch (HttpListenerException ex)
             {
@@ -191,8 +196,11 @@ internal sealed class AuthService : IDisposable
                 _logger.LogError(ex,
                     "Failed to start local HTTP listener on {RedirectUri}. Port {Port} might be in use or blocked.",
                     redirectUri, port);
+
+                _settings.RedirectPort.SetVisibility(true);
+
                 _settings.AuthStatus.SetValue(
-                    $"Error: Redirect port {port} is in use or blocked. Change 'Redirect Port' setting and try again.");
+                    $"Error: Port {port} is in use. Please change 'Redirect Port' below and try again.");
                 return false;
             }
 
@@ -248,7 +256,10 @@ internal sealed class AuthService : IDisposable
             response.OutputStream.Close();
             listener.Stop();
 
-            if (string.IsNullOrWhiteSpace(code)) return false;
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return false;
+            }
 
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -266,7 +277,10 @@ internal sealed class AuthService : IDisposable
             using var jsonDoc = JsonDocument.Parse(responseJson);
             var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();
 
-            if (string.IsNullOrWhiteSpace(refreshToken)) return false;
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return false;
+            }
 
             _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
             _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
@@ -281,7 +295,10 @@ internal sealed class AuthService : IDisposable
         }
         finally
         {
-            if (listener.IsListening) listener.Stop();
+            if (listener.IsListening)
+            {
+                listener.Stop();
+            }
         }
     }
 

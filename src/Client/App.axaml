@@ -26,6 +26,45 @@
         <SolidColorBrush x:Key="BorderBrush" Color="#333333" />
         <Color x:Key="SystemAccentColor">#2563EB</Color>
         <SolidColorBrush x:Key="SystemAccentBrush" Color="{StaticResource SystemAccentColor}"/>
+        
+        <!-- RadioButton Theme for Categories (Pill/Tag style) -->
+        <ControlTheme x:Key="ButtonRadioButton" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="RootBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="#1A1A1A"/>
+                <Setter Property="Foreground" Value="#E0E0E0"/>
+            </Style>
+            
+            <Style Selector="^:checked">
+                <Setter Property="Background" Value="#222"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="BorderBrush" Value="#444"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+        </ControlTheme>
     </Application.Resources>
 
     <Application.Styles>
@@ -160,6 +199,107 @@
             <Setter Property="Foreground" Value="#FFF" />
         </Style>
 
+        <!-- Card Button (Add Module) -->
+        <Style Selector="Button.CardButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.CardButton:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.CardButton > Border">
+            <Setter Property="Background" Value="#0A0A0A" />
+            <Setter Property="BorderBrush" Value="#333" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.CardButton:pointerover > Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}" />
+            <Setter Property="Background" Value="#161616" />
+        </Style>
+        <Style Selector="Button.CardButton:pressed > Border">
+            <Setter Property="Background" Value="#050505" />
+            <Setter Property="BorderBrush" Value="#2563EB" />
+        </Style>
+
+        <!-- Connector Node Button (The subtle plus) -->
+        <Style Selector="Button.ConnectorNode">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#050505"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#555"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.ConnectorNode:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#111"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <!-- Remove Delay Button (Small X inside the delay box) -->
+        <Style Selector="Button.RemoveDelay">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#666"/>
+        </Style>
+        <Style Selector="Button.RemoveDelay:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#332222"/>
+            <Setter Property="Foreground" Value="#FF5555"/>
+        </Style>
+        
+        <!-- Success Button (Added state) -->
+        <Style Selector="Button.success">
+            <Setter Property="Background" Value="#10B981" />
+            <Setter Property="BorderBrush" Value="#10B981" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.success:disabled /template/ ContentPresenter">
+            <Setter Property="Opacity" Value="1.0" /> <!-- Keep full opacity to look active -->
+            <Setter Property="Background" Value="#10B981" />
+            <Setter Property="BorderBrush" Value="#10B981" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- MenuFlyout Styles -->
+        <Style Selector="MenuFlyoutPresenter">
+            <Setter Property="Background" Value="#111"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        <Style Selector="MenuItem">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="MenuItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#222"/>
+        </Style>
+
         <!-- ComboBox Global Style -->
         <Style Selector="ComboBox">
             <Setter Property="Background" Value="#050505" />
@@ -170,7 +310,6 @@
             <Setter Property="Foreground" Value="#E0E0E0" />
             <Setter Property="MaxDropDownHeight" Value="300" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <!-- Enable Virtualization Globally -->
             <Setter Property="ItemsPanel">
                 <Setter.Value>
                     <ItemsPanelTemplate>
@@ -256,7 +395,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}" />
         </Style>
         
-        <!-- History ComboBox Style (Overrides base ComboBox) -->
+        <!-- History ComboBox Style -->
         <Style Selector="ComboBox.history">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -289,6 +428,106 @@
         </Style>
         <Style Selector="ComboBox.history:pointerover /template/ ContentPresenter">
             <Setter Property="Foreground" Value="White"/> 
+        </Style>
+        
+        <Style Selector="Border.SelectorCard">
+            <Setter Property="Background" Value="#111"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.SelectorCard:pointerover">
+            <Setter Property="BorderBrush" Value="#666"/>
+            <Setter Property="Background" Value="#161616"/>
+        </Style>
+        
+        <Style Selector="Button.ItemCard">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.ItemCard:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        
+        <Style Selector="Button.ItemCard > Border">
+            <Setter Property="Background" Value="#111"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.ItemCard:pointerover > Border">
+            <Setter Property="BorderBrush" Value="#666"/>
+            <Setter Property="Background" Value="#161616"/>
+        </Style>
+
+        <Style Selector="Button.move-btn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Foreground" Value="#666"/>
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.move-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+        </Style>
+        <Style Selector="Button.move-btn:pointerover">
+            <Setter Property="Opacity" Value="1.0"/>
+        </Style>
+        <Style Selector="Button.move-btn:disabled /template/ ContentPresenter">
+            <Setter Property="Opacity" Value="0.2"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <Style Selector="Button.delete-btn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Foreground" Value="#CC4444"/>
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.delete-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#FF5555"/>
+        </Style>
+        <Style Selector="Button.delete-btn:pointerover">
+            <Setter Property="Opacity" Value="1.0"/>
         </Style>
 
     </Application.Styles>

@@ -18,35 +18,48 @@ public class Module : IModule
 {
     private readonly IModuleLogger _logger;
 
-    private readonly Setting<string> _blockedSites;
-    private readonly Setting<string> _status;
+    private readonly Setting<string> _mode;
+    private readonly Setting<string> _siteList;
 
+    // In Debug mode, we register a separate Native Messaging Host ("axorith.dev").
+    // This allows developers to run the project from the IDE without overwriting
+    // or conflicting with the installed production version ("axorith").
+    // The browser extension is updated to try connecting to "axorith.dev" first.
     #if DEBUG
     private const string HostName = "axorith.dev";
+    private const string ManifestType = "dev";
     #else
     private const string HostName = "axorith";
+    private const string ManifestType = "prod";
     #endif
 
     private readonly string _pipeName = "axorith-nm-pipe";
 
-    private List<string> _activeBlockedSites = [];
+    private List<string> _activeSiteList = [];
 
     public Module(IModuleLogger logger)
     {
         _logger = logger;
 
-        _blockedSites = Setting.AsTextArea(
-            key: "BlockedSites",
-            label: "Sites to Block",
-            description: "A comma-separated list of domains to block (e.g., youtube.com, twitter.com, reddit.com).",
-            defaultValue: "youtube.com, twitter.com, reddit.com"
+        _mode = Setting.AsChoice(
+            key: "Mode",
+            label: "Blocking Mode",
+            defaultValue: "BlockList",
+            initialChoices:
+            [
+                new KeyValuePair<string, string>("BlockList", "Block List (Blacklist)"),
+                new KeyValuePair<string, string>("AllowList", "Allow List (Whitelist)")
+            ],
+            description: "BlockList: Blocks listed sites. AllowList: Blocks EVERYTHING except listed sites."
         );
 
-        _status = Setting.AsText(key: "ShimStatus",
-            label: "Shim / Browser Status",
-            defaultValue: string.Empty,
-            isReadOnly: true,
-            description: "Connection status between SiteBlocker, Axorith Shim, and the browser extension.");
+        _siteList = Setting.AsTextArea(
+            key: "BlockedSites",
+            label: "Site List",
+            description:
+            "A comma-separated list of domains (e.g., youtube.com, twitter.com). Behavior depends on Mode.",
+            defaultValue: "youtube.com, twitter.com, reddit.com"
+        );
 
         try
         {
@@ -60,7 +73,7 @@ public class Module : IModule
 
             PublicApi.EnsureFirefoxHostRegistered(HostName, manifestPath);
 
-            _logger.LogInfo("Firefox native host registered: {Path}", manifestPath);
+            _logger.LogInfo("Firefox native host registered: '{HostName}' -> {Path}", HostName, manifestPath);
         }
         catch (Exception ex)
         {
@@ -71,7 +84,7 @@ public class Module : IModule
     /// <inheritdoc />
     public IReadOnlyList<ISetting> GetSettings()
     {
-        return [_blockedSites, _status];
+        return [_mode, _siteList];
     }
 
     public IReadOnlyList<IAction> GetActions()
@@ -82,30 +95,40 @@ public class Module : IModule
     /// <inheritdoc />
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        return Task.FromResult(ValidationResult.Success);
+        var sites = _siteList.GetCurrentValue();
+        return Task.FromResult(string.IsNullOrWhiteSpace(sites)
+            ? ValidationResult.Warn("Site list is empty. No action will be taken.")
+            : ValidationResult.Success);
     }
 
     /// <inheritdoc />
     public Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInfo("Sending 'block' command via Named Pipe...");
+        var mode = _mode.GetCurrentValue();
+        _logger.LogInfo("Sending 'block' command via Named Pipe (Mode: {Mode})...", mode);
 
-        _activeBlockedSites =
+        _activeSiteList =
         [
-            .. _blockedSites.GetCurrentValue().Split(',')
+            .. _siteList.GetCurrentValue().Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
                 .Select(s => s.Trim())
                 .Where(s => !string.IsNullOrWhiteSpace(s))
         ];
 
-        if (_activeBlockedSites.Count == 0)
+        if (_activeSiteList.Count == 0)
         {
-            _logger.LogWarning("No sites specified for blocking. Module will do nothing.");
+            _logger.LogWarning("No sites specified. Module will do nothing.");
             return Task.CompletedTask;
         }
 
-        _logger.LogDebug("Sites to block: {Sites}", string.Join(", ", _activeBlockedSites));
+        _logger.LogDebug("Sites: {Sites}", string.Join(", ", _activeSiteList));
 
-        var message = new { command = "block", sites = _activeBlockedSites };
+        var message = new
+        {
+            command = "block",
+            mode,
+            sites = _activeSiteList
+        };
+
         return WriteToPipeAsync(message);
     }
 
@@ -114,20 +137,17 @@ public class Module : IModule
     {
         _logger.LogInfo("Sending 'unblock' command via Named Pipe...");
 
-        if (_activeBlockedSites.Count == 0)
+        if (_activeSiteList.Count == 0)
         {
             return Task.CompletedTask;
         }
 
         var message = new { command = "unblock" };
         var resultTask = WriteToPipeAsync(message);
-        _activeBlockedSites.Clear();
+        _activeSiteList.Clear();
         return resultTask;
     }
 
-    /// <summary>
-    ///     Asynchronously sends a command object to the Shim via a named pipe.
-    /// </summary>
     private async Task WriteToPipeAsync(object message)
     {
         try
@@ -145,26 +165,22 @@ public class Module : IModule
 
             var commandName = message.GetType().GetProperty("command")?.GetValue(message) ?? "unknown";
             _logger.LogInfo("Command '{Command}' sent successfully via Named Pipe.", commandName);
-            _status.SetValue($"Shim connection OK. Last command: {commandName}.");
         }
         catch (TimeoutException ex)
         {
             _logger.LogError(ex,
                 "Could not connect to the Axorith Shim process via Named Pipe. Is the browser extension installed and running?");
-            _status.SetValue(
-                "Error: Could not connect to Axorith Shim. Ensure Shim is running and the browser extension is installed.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send command to Shim via Named Pipe.");
-            _status.SetValue("Error: Failed to send command to Shim: " + ex.Message);
         }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_activeBlockedSites.Count <= 0)
+        if (_activeSiteList.Count <= 0)
         {
             return;
         }
@@ -197,7 +213,7 @@ public class Module : IModule
         }
         finally
         {
-            _activeBlockedSites.Clear();
+            _activeSiteList.Clear();
         }
     }
 
@@ -205,12 +221,6 @@ public class Module : IModule
     {
         try
         {
-            #if DEBUG
-            const string type = "dev";
-            #else
-            const string type = "prod";
-            #endif
-
             var shimDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Shim"));
 
             if (!Directory.Exists(shimDir))
@@ -234,10 +244,10 @@ public class Module : IModule
             }
 
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var manifestDir = Path.Combine(appData, "Axorith", "native-messaging", type);
+            var manifestDir = Path.Combine(appData, "Axorith", "native-messaging", ManifestType);
             Directory.CreateDirectory(manifestDir);
 
-            var manifestPath = Path.Combine(manifestDir, $"axorith.{type}.firefox.json");
+            var manifestPath = Path.Combine(manifestDir, $"axorith.{ManifestType}.firefox.json");
 
             var json = File.ReadAllText(templatePath, Encoding.UTF8);
             JsonNode? rootNode;
@@ -260,7 +270,7 @@ public class Module : IModule
             }
 
             obj["path"] = shimPath;
-            obj["name"] = HostName;
+            obj["name"] = HostName; // "axorith" or "axorith.dev"
 
             var outputJson = obj.ToJsonString(new JsonSerializerOptions
             {

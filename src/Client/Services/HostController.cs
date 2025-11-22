@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
 using Grpc.Net.Client;

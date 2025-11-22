@@ -28,22 +28,29 @@ internal sealed class SpotifyApiService(
         return true;
     }
 
-    public async Task<List<KeyValuePair<string, string>>> GetAvailableDevicesAsync()
+    public async Task<List<SpotifyDevice>> GetDevicesAsync()
     {
         if (!await PrepareHttpClient())
         {
             return [];
         }
 
-        var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
-        using var jsonDoc = JsonDocument.Parse(responseJson);
-        return
-        [
-            .. jsonDoc.RootElement.GetProperty("devices").EnumerateArray()
-                .Select(d => new KeyValuePair<string, string>(
-                    d.GetProperty("id").GetString() ?? string.Empty,
-                    $"{d.GetProperty("name").GetString()} ({d.GetProperty("type").GetString()})"))
-        ];
+        try
+        {
+            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
+            using var jsonDoc = JsonDocument.Parse(responseJson);
+
+            return jsonDoc.RootElement.GetProperty("devices").EnumerateArray().Select(element =>
+                new SpotifyDevice(element.GetProperty("id").GetString() ?? string.Empty,
+                    element.GetProperty("name").GetString() ?? "Unknown Device",
+                    element.GetProperty("type").GetString() ?? "Unknown",
+                    element.GetProperty("is_active").GetBoolean())).ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch devices from Spotify API");
+            return [];
+        }
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
@@ -53,15 +60,23 @@ internal sealed class SpotifyApiService(
             return [];
         }
 
-        var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists");
-        using var jsonDoc = JsonDocument.Parse(responseJson);
-        return
-        [
-            .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
-                .Select(p => new KeyValuePair<string, string>(
-                    p.GetProperty("uri").GetString() ?? string.Empty,
-                    $"{p.GetProperty("name").GetString()} (Playlist)"))
-        ];
+        try
+        {
+            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists?limit=50");
+            using var jsonDoc = JsonDocument.Parse(responseJson);
+            return
+            [
+                .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
+                    .Select(p => new KeyValuePair<string, string>(
+                        p.GetProperty("uri").GetString() ?? string.Empty,
+                        $"{p.GetProperty("name").GetString()} (Playlist)"))
+            ];
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch playlists");
+            return [];
+        }
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetSavedAlbumsAsync()
@@ -71,15 +86,23 @@ internal sealed class SpotifyApiService(
             return [];
         }
 
-        var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums");
-        using var jsonDoc = JsonDocument.Parse(responseJson);
-        return
-        [
-            .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
-                .Select(a => new KeyValuePair<string, string>(
-                    a.GetProperty("album").GetProperty("uri").GetString() ?? string.Empty,
-                    $"{a.GetProperty("album").GetProperty("name").GetString()} (Album)"))
-        ];
+        try
+        {
+            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums?limit=50");
+            using var jsonDoc = JsonDocument.Parse(responseJson);
+            return
+            [
+                .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
+                    .Select(a => new KeyValuePair<string, string>(
+                        a.GetProperty("album").GetProperty("uri").GetString() ?? string.Empty,
+                        $"{a.GetProperty("album").GetProperty("name").GetString()} (Album)"))
+            ];
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch albums");
+            return [];
+        }
     }
 
     public async Task<string> GetLikedSongsAsUriListAsync()
@@ -89,10 +112,18 @@ internal sealed class SpotifyApiService(
             return string.Empty;
         }
 
-        var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
-        using var jsonDoc = JsonDocument.Parse(responseJson);
-        var tracks = jsonDoc.RootElement.GetProperty("items").EnumerateArray().Select(t => t.GetProperty("track"));
-        return JsonSerializer.Serialize(new { uris = tracks.Select(t => t.GetProperty("uri").GetString()) });
+        try
+        {
+            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
+            using var jsonDoc = JsonDocument.Parse(responseJson);
+            var tracks = jsonDoc.RootElement.GetProperty("items").EnumerateArray().Select(t => t.GetProperty("track"));
+            return JsonSerializer.Serialize(new { uris = tracks.Select(t => t.GetProperty("uri").GetString()) });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch liked songs");
+            return string.Empty;
+        }
     }
 
     public Task PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
@@ -119,7 +150,7 @@ internal sealed class SpotifyApiService(
             }
             else
             {
-                throw; // Rethrow other errors (e.g. 401 Unauthorized, 500 Server Error)
+                throw;
             }
         }
     }
@@ -160,3 +191,5 @@ internal sealed class SpotifyApiService(
         }
     }
 }
+
+public record SpotifyDevice(string Id, string Name, string Type, bool IsActive);

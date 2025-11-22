@@ -4,14 +4,10 @@ using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Module.ApplicationLauncher;
 
-/// <summary>
-///     Application Launcher with window management capabilities.
-///     Supports launching new processes, attaching to existing ones,
-///     window state control, custom sizing, and lifecycle management.
-/// </summary>
 public class Module : IModule
 {
     private readonly IModuleLogger _logger;
@@ -22,10 +18,10 @@ public class Module : IModule
     private Process? _currentProcess;
     private bool _attachedToExisting;
 
-    public Module(IModuleLogger logger)
+    public Module(IModuleLogger logger, IAppDiscoveryService appDiscovery)
     {
         _logger = logger;
-        _settings = new Settings();
+        _settings = new Settings(appDiscovery);
         _process = new ProcessService(_logger);
         _window = new WindowService(_logger);
     }
@@ -37,7 +33,7 @@ public class Module : IModule
 
     public IReadOnlyList<IAction> GetActions()
     {
-        return [];
+        return _settings.GetActions();
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
@@ -47,7 +43,7 @@ public class Module : IModule
 
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
-        return Task.CompletedTask;
+        return _settings.InitializeAsync();
     }
 
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)

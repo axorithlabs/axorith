@@ -115,11 +115,28 @@ try
         Log.Warning(initEx, "ModuleRegistry initialization failed; continuing without modules");
     }
 
+    // --- START SCHEDULER ---
+    try
+    {
+        var scheduler = app.Services.GetRequiredService<IScheduleManager>();
+        // Fire and forget start, it runs in background
+        _ = scheduler.StartAsync(app.Lifetime.ApplicationStopping);
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Failed to start ScheduleManager");
+    }
+    // -----------------------
+
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
     app.MapGrpcService<ModulesServiceImpl>();
     app.MapGrpcService<DiagnosticsServiceImpl>();
     app.MapGrpcService<HostManagementServiceImpl>();
+
+    // --- REGISTER NEW SERVICE ---
+    app.MapGrpcService<SchedulerServiceImpl>();
+    // ----------------------------
 
     if (app.Environment.IsDevelopment())
     {
@@ -155,7 +172,16 @@ static void RegisterCoreServices(ContainerBuilder builder)
         })
         .As<ISecureStorageService>()
         .SingleInstance()
-        .PreserveExistingDefaults(); // Allow tests to override
+        .PreserveExistingDefaults();
+
+    builder.Register(ctx =>
+        {
+            var loggerFactory = ctx.Resolve<ILoggerFactory>();
+            return PlatformServices.CreateAppDiscoveryService(loggerFactory);
+        })
+        .As<IAppDiscoveryService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
 
     builder.RegisterType<ModuleLoader>()
         .As<IModuleLoader>()
@@ -175,7 +201,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
         })
         .As<IModuleRegistry>()
         .SingleInstance()
-        .PreserveExistingDefaults(); // FIX: Allow tests to override IModuleRegistry
+        .PreserveExistingDefaults();
 
     builder.RegisterType<EventAggregator>()
         .As<IEventAggregator>()
@@ -214,6 +240,23 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout);
         })
         .As<ISessionManager>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
+    builder.Register(ctx =>
+        {
+            var config = ctx.Resolve<IOptions<Configuration>>().Value;
+
+            var presetsPath = config.Persistence.ResolvePresetsPath();
+            var rootDataDir = Directory.GetParent(presetsPath)?.FullName ?? Path.GetDirectoryName(presetsPath)!;
+
+            var sessionManager = ctx.Resolve<ISessionManager>();
+            var presetManager = ctx.Resolve<IPresetManager>();
+            var logger = ctx.Resolve<ILogger<ScheduleManager>>();
+
+            return new ScheduleManager(rootDataDir, sessionManager, presetManager, logger);
+        })
+        .As<IScheduleManager>()
         .SingleInstance()
         .PreserveExistingDefaults();
 }

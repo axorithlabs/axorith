@@ -48,19 +48,28 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
         builder.ConfigureTestContainer<ContainerBuilder>(containerBuilder =>
         {
             var mockRegistry = new Mock<IModuleRegistry>();
-            
+
             var testModules = new List<ModuleDefinition>
             {
-                new() { Id = Guid.NewGuid(), Name = "System Module", Category = "System", Platforms = [Platform.Windows] },
-                new() { Id = Guid.NewGuid(), Name = "Music Module", Category = "Music", Platforms = [Platform.Windows] },
-                new() { Id = Guid.NewGuid(), Name = "Dev Module", Category = "Development", Platforms = [Platform.Windows] }
+                new()
+                {
+                    Id = Guid.NewGuid(), Name = "System Module", Category = "System", Platforms = [Platform.Windows]
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(), Name = "Music Module", Category = "Music", Platforms = [Platform.Windows]
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(), Name = "Dev Module", Category = "Development", Platforms = [Platform.Windows]
+                }
             };
 
             mockRegistry.Setup(r => r.GetAllDefinitions()).Returns(testModules);
-            
+
             mockRegistry.Setup(r => r.GetDefinitionById(It.IsAny<Guid>()))
                 .Returns((Guid id) => testModules.FirstOrDefault(m => m.Id == id));
-            
+
             // Регистрируем мок. Благодаря PreserveExistingDefaults в Program.cs, эта регистрация выиграет.
             containerBuilder.RegisterInstance(mockRegistry.Object)
                 .As<IModuleRegistry>()
@@ -102,27 +111,35 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         var httpClient = factory.CreateDefaultClient();
 
         var tokenPath = Path.Combine(factory.TestDataPath, ".auth_token");
-        
-        string token = string.Empty;
-        for (int i = 0; i < 50; i++) 
+
+        var token = string.Empty;
+        for (var i = 0; i < 50; i++)
         {
             if (File.Exists(tokenPath))
             {
-                try 
+                try
                 {
                     using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var reader = new StreamReader(fs);
                     token = await reader.ReadToEndAsync();
-                    if (!string.IsNullOrWhiteSpace(token)) break;
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        break;
+                    }
                 }
-                catch { /* ignore and retry */ }
+                catch
+                {
+                    /* ignore and retry */
+                }
             }
+
             await Task.Delay(100);
         }
 
         if (string.IsNullOrEmpty(token))
         {
-            throw new FileNotFoundException($"Auth token not found at {tokenPath}. Host failed to start or write token.");
+            throw new FileNotFoundException(
+                $"Auth token not found at {tokenPath}. Host failed to start or write token.");
         }
 
         var credentials = CallCredentials.FromInterceptor((_, metadata) =>
@@ -135,7 +152,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         {
             HttpClient = httpClient,
             Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-            UnsafeUseInsecureChannelCallCredentials = true 
+            UnsafeUseInsecureChannelCallCredentials = true
         };
 
         var channel = GrpcChannel.ForAddress(httpClient.BaseAddress!, channelOptions);

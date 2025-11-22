@@ -1,0 +1,10 @@
+{
+  "id": "340c2fb7-9366-476d-8c2f-b79366a76d50",
+  "name": "Spotify Launcher",
+  "description": "Launches Spotify application.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.SpotifyLauncher.dll"
+}

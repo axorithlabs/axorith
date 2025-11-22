@@ -1,6 +1,8 @@
 using Axorith.Sdk;
+using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform;
+using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.ApplicationLauncher;
 
@@ -20,10 +22,16 @@ internal sealed class Settings
     public Setting<string> LifecycleMode { get; }
     public Setting<bool> BringToForeground { get; }
 
-    private readonly IReadOnlyList<ISetting> _allSettings;
+    public Action AutoDetectAction { get; }
 
-    public Settings()
+    private readonly IReadOnlyList<ISetting> _allSettings;
+    private readonly IReadOnlyList<IAction> _allActions;
+    private readonly IAppDiscoveryService _appDiscovery;
+
+    public Settings(IAppDiscoveryService appDiscovery)
     {
+        _appDiscovery = appDiscovery;
+
         ProcessMode = Setting.AsChoice(
             key: "ProcessMode",
             label: "Process Mode",
@@ -41,8 +49,8 @@ internal sealed class Settings
             key: "ApplicationPath",
             label: "Application Path",
             description:
-            "Path to the application executable. Used for launching new processes or finding existing ones.",
-            defaultValue: @"C:\\Windows\\notepad.exe",
+            "Path to the application executable. You can enter a simple name (e.g. 'chrome') and click 'Auto-Detect'.",
+            defaultValue: "",
             filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
         );
 
@@ -142,6 +150,9 @@ internal sealed class Settings
             description: "Automatically bring the window to foreground after setup."
         );
 
+        AutoDetectAction = Action.Create("AutoDetect", "Auto-Detect Path");
+        AutoDetectAction.OnInvokeAsync(AutoDetectPathAsync);
+
         SetupReactiveVisibility();
 
         _allSettings =
@@ -160,6 +171,36 @@ internal sealed class Settings
             LifecycleMode,
             BringToForeground
         ];
+
+        _allActions = [AutoDetectAction];
+    }
+
+    public Task InitializeAsync()
+    {
+        // Pre-load index in background if needed
+        return Task.Run(() => _appDiscovery.GetInstalledApplicationsIndex());
+    }
+
+    private async Task AutoDetectPathAsync()
+    {
+        var currentInput = ApplicationPath.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(currentInput))
+        {
+            return;
+        }
+
+        // If it's already a full path, do nothing
+        if (Path.IsPathRooted(currentInput) && File.Exists(currentInput))
+        {
+            return;
+        }
+
+        var foundPath = await Task.Run(() => _appDiscovery.FindKnownApp(currentInput));
+
+        if (!string.IsNullOrEmpty(foundPath))
+        {
+            ApplicationPath.SetValue(foundPath);
+        }
     }
 
     private void SetupReactiveVisibility()
@@ -226,6 +267,11 @@ internal sealed class Settings
         return _allSettings;
     }
 
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _allActions;
+    }
+
     public Task<ValidationResult> ValidateAsync()
     {
         if (string.IsNullOrWhiteSpace(ApplicationPath.GetCurrentValue()))
@@ -234,9 +280,12 @@ internal sealed class Settings
         }
 
         var mode = ProcessMode.GetCurrentValue();
-        if (mode == "LaunchNew" && !File.Exists(ApplicationPath.GetCurrentValue()))
+        // Only validate file existence if it looks like an absolute path.
+        // If user entered "chrome" and didn't auto-detect, we might fail at runtime, but validation passes.
+        var path = ApplicationPath.GetCurrentValue();
+        if (mode == "LaunchNew" && Path.IsPathRooted(path) && !File.Exists(path))
         {
-            return Task.FromResult(ValidationResult.Fail($"File not found at '{ApplicationPath.GetCurrentValue()}'."));
+            return Task.FromResult(ValidationResult.Fail($"File not found at '{path}'."));
         }
 
         if (UseCustomWorkingDirectory.GetCurrentValue())

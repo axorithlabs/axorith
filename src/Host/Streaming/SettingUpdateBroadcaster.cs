@@ -1,4 +1,5 @@
 // ===== FILE: src\Host\Streaming\SettingUpdateBroadcaster.cs =====
+
 using System.Collections.Concurrent;
 using System.Reactive.Linq;
 using System.Threading.Channels;
@@ -145,18 +146,18 @@ public class SettingUpdateBroadcaster : IDisposable
         };
 
         // FIX AXOR-39: Use atomic AddOrUpdate instead of TryAdd/TryRemove dance.
-        _subscribers.AddOrUpdate(key, 
+        _subscribers.AddOrUpdate(key,
             // Factory for adding new key
-            _ => subscriber, 
+            _ => subscriber,
             // Factory for updating existing key
-            (_, oldSubscriber) => 
+            (_, oldSubscriber) =>
             {
                 _logger.LogWarning("Client {Key} already subscribed, replacing stream atomically", key);
-                
+
                 // Signal the old subscriber to stop. 
                 // Cancel() is thread-safe. We don't need to await it here; 
                 // the background loopTask will catch the cancellation and exit gracefully.
-                try 
+                try
                 {
                     oldSubscriber.Cts.Cancel();
                 }

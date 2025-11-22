@@ -1,6 +1,6 @@
 using Axorith.Core.Models;
 
-namespace Axorith.Client.CoreSdk;
+namespace Axorith.Client.CoreSdk.Abstractions;
 
 /// <summary>
 ///     API for preset management operations.

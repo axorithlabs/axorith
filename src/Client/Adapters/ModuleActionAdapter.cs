@@ -1,7 +1,7 @@
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using Axorith.Client.CoreSdk;
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Sdk.Actions;
 
 namespace Axorith.Client.Adapters;

@@ -9,8 +9,7 @@ namespace Axorith.Client.Converters;
 /// <summary>
 ///     Converts a boolean value to a Brush based on a string parameter.
 ///     Supports both Resource Keys (for theming) and Hex colors.
-///     
-///     Usage: 
+///     Usage:
 ///     ConverterParameter="TrueResourceKey|FalseResourceKey"
 ///     OR
 ///     ConverterParameter="#00FF00|#FF0000"
@@ -25,7 +24,7 @@ public class BoolToBrushConverter : IValueConverter
         }
 
         var paramStr = parameter as string;
-        
+
         if (string.IsNullOrWhiteSpace(paramStr))
         {
             return AvaloniaProperty.UnsetValue;
@@ -42,8 +41,8 @@ public class BoolToBrushConverter : IValueConverter
             return AvaloniaProperty.UnsetValue;
         }
 
-        if (Application.Current != null && 
-            Application.Current.TryGetResource(targetKey, out var resource) && 
+        if (Application.Current != null &&
+            Application.Current.TryGetResource(targetKey, out var resource) &&
             resource is IBrush resourceBrush)
         {
             return resourceBrush;

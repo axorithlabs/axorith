@@ -1,6 +1,6 @@
 ﻿using Avalonia.Controls;
 
-namespace Axorith.Client.Services;
+namespace Axorith.Client.Services.Abstractions;
 
 public interface IWindowStateManager
 {

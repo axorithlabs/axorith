@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using Axorith.Client.CoreSdk;
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using ReactiveUI;

@@ -1,11 +1,16 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Polly.Retry;
+using OperationResult = Axorith.Client.CoreSdk.Abstractions.OperationResult;
+using SessionEvent = Axorith.Client.CoreSdk.Abstractions.SessionEvent;
+using SessionEventType = Axorith.Client.CoreSdk.Abstractions.SessionEventType;
+using SessionState = Axorith.Client.CoreSdk.Abstractions.SessionState;
 
-namespace Axorith.Client.CoreSdk.Grpc;
+namespace Axorith.Client.CoreSdk;
 
 /// <summary>
 ///     gRPC implementation of ISessionsApi with streaming event support.

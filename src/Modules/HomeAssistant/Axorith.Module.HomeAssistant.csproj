@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Module.HomeAssistant</AssemblyName>
+        <RootNamespace>Axorith.Module.HomeAssistant</RootNamespace>
+        <Description>Home Assistant integration for Axorith OS.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+        <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+    </ItemGroup>
+</Project>

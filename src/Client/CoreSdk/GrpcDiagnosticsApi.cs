@@ -1,7 +1,9 @@
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Polly.Retry;
+using HealthStatus = Axorith.Client.CoreSdk.Abstractions.HealthStatus;
 
-namespace Axorith.Client.CoreSdk.Grpc;
+namespace Axorith.Client.CoreSdk;
 
 /// <summary>
 ///     gRPC implementation of IDiagnosticsApi.

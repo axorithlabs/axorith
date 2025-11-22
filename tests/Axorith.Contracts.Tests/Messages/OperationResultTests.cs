@@ -1,8 +1,7 @@
-using Axorith.Contracts;
 using FluentAssertions;
 using Xunit;
 
-namespace Axorith.Test.Contracts.Messages;
+namespace Axorith.Contracts.Tests.Messages;
 
 /// <summary>
 ///     Tests for gRPC operation result messages

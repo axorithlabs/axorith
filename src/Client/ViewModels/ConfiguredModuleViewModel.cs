@@ -1,8 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia.Threading;
 using Axorith.Client.Adapters;
-using Axorith.Client.CoreSdk;
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
@@ -79,9 +80,13 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     public ObservableCollection<SettingViewModel> Settings { get; } = [];
     public ObservableCollection<ActionViewModel> Actions { get; } = [];
 
+    // Commands for UI interaction in the workflow graph
+    public ReactiveCommand<Unit, Unit> AddDelayCommand { get; }
+    public ReactiveCommand<Unit, Unit> RemoveDelayCommand { get; }
+
     public ConfiguredModuleViewModel(
-        ModuleDefinition definition, 
-        ConfiguredModule model, 
+        ModuleDefinition definition,
+        ConfiguredModule model,
         IModulesApi modulesApi,
         IServiceProvider serviceProvider)
     {
@@ -99,7 +104,20 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         _settingStreamHandle = _modulesApi.SubscribeToSettingUpdates(Model.InstanceId);
 
+        AddDelayCommand = ReactiveCommand.Create(AddDelay);
+        RemoveDelayCommand = ReactiveCommand.Create(RemoveDelay);
+
         _ = LoadSettingsAndActionsAsync();
+    }
+
+    private void AddDelay()
+    {
+        NextModule?.StartDelaySecondsString = "1";
+    }
+
+    private void RemoveDelay()
+    {
+        NextModule?.StartDelaySecondsString = "0";
     }
 
     private async Task LoadSettingsAndActionsAsync()
@@ -127,7 +145,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 {
                     var savedValue = Model.Settings.GetValueOrDefault(setting.Key);
                     var adaptedSetting = new ModuleSettingAdapter(setting, savedValue);
-                    
+
                     var vm = new SettingViewModel(adaptedSetting, Model.InstanceId, _modulesApi, _serviceProvider);
                     Settings.Add(vm);
                 }
@@ -169,33 +187,60 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     settingAdapter.SetValueFromString(update.Value?.ToString());
                     break;
                 case SettingProperty.Label:
-                    if (update.Value is string l) settingAdapter.SetLabel(l);
+                    if (update.Value is string l)
+                    {
+                        settingAdapter.SetLabel(l);
+                    }
+
                     break;
                 case SettingProperty.Visibility:
-                    if (update.Value is bool v) settingAdapter.SetVisibility(v);
+                    if (update.Value is bool v)
+                    {
+                        settingAdapter.SetVisibility(v);
+                    }
+
                     break;
                 case SettingProperty.ReadOnly:
-                    if (update.Value is bool r) settingAdapter.SetReadOnly(r);
+                    if (update.Value is bool r)
+                    {
+                        settingAdapter.SetReadOnly(r);
+                    }
+
                     break;
                 case SettingProperty.Choices:
-                    if (update.Value is IReadOnlyList<KeyValuePair<string, string>> c) settingAdapter.SetChoices(c);
+                    if (update.Value is IReadOnlyList<KeyValuePair<string, string>> c)
+                    {
+                        settingAdapter.SetChoices(c);
+                    }
+
                     break;
             }
+
             return;
         }
 
         var actionVm = Actions.FirstOrDefault(a => a.Key == update.SettingKey);
-        if (actionVm?.SourceAction is ModuleActionAdapter actionAdapter)
+        if (actionVm?.SourceAction is not ModuleActionAdapter actionAdapter)
         {
-            switch (update.Property)
-            {
-                case SettingProperty.ActionEnabled:
-                    if (update.Value is bool enabled) actionAdapter.SetEnabled(enabled);
-                    break;
-                case SettingProperty.ActionLabel:
-                    if (update.Value is string label) actionAdapter.SetLabel(label);
-                    break;
-            }
+            return;
+        }
+
+        switch (update.Property)
+        {
+            case SettingProperty.ActionEnabled:
+                if (update.Value is bool enabled)
+                {
+                    actionAdapter.SetEnabled(enabled);
+                }
+
+                break;
+            case SettingProperty.ActionLabel:
+                if (update.Value is string label)
+                {
+                    actionAdapter.SetLabel(label);
+                }
+
+                break;
         }
     }
 
@@ -204,7 +249,9 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         foreach (var settingVm in Settings)
         {
             if (settingVm.Setting.Persistence != SettingPersistence.Persisted)
+            {
                 continue;
+            }
 
             Model.Settings[settingVm.Setting.Key] = settingVm.Setting.GetValueAsString();
         }
@@ -216,11 +263,17 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         _settingStreamHandle?.Dispose();
 
         foreach (var setting in Settings)
+        {
             setting.Dispose();
+        }
+
         Settings.Clear();
 
         foreach (var action in Actions)
+        {
             action.Dispose();
+        }
+
         Actions.Clear();
 
         _ = _modulesApi.EndEditAsync(Model.InstanceId);

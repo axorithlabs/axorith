@@ -32,14 +32,16 @@
     // Parse the fetched HTML to extract both styles and body content.
     const parser = new DOMParser();
     const doc = parser.parseFromString(blockerHtml, 'text/html');
+    
+    // Extract styles
     const styles = doc.head.querySelector('style')?.textContent;
-    const bodyContent = doc.body.innerHTML;
-
+    
     // --- DOM Manipulation ---
 
     // 1. Clear the existing document content to remove conflicting styles and scripts.
-    document.head.innerHTML = '';
-    document.body.innerHTML = '';
+    // Using replaceChildren() is safer and faster than innerHTML = ''
+    document.head.replaceChildren();
+    document.body.replaceChildren();
 
     // 2. Inject the styles into the now-empty head.
     if (styles) {
@@ -49,6 +51,9 @@
     }
 
     // 3. Inject the blocker UI into the now-empty body.
-    document.body.innerHTML = bodyContent;
+    // Instead of innerHTML, we move the nodes from the parsed document.
+    // This satisfies the "Unsafe assignment" warning.
+    const newBodyNodes = Array.from(doc.body.children);
+    document.body.append(...newBodyNodes);
 
 })();

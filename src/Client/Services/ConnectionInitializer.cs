@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
-using Axorith.Client.CoreSdk.Grpc;
+using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 {
                     shellViewModel.Content = loadingViewModel;
                 }
+
                 loadingViewModel.Message = message;
                 loadingViewModel.SubMessage = subMessage;
             });
@@ -42,30 +44,27 @@ public sealed class ConnectionInitializer : IConnectionInitializer
 
             var serverAddress = config.Host.GetEndpointUrl();
             logger.LogInformation("Connecting to Host at {Address}...", serverAddress);
-            
+
             var tokenProvider = app.Services.GetRequiredService<ITokenProvider>();
             var connection = await ConnectWithRetryAsync(
-                serverAddress, 
-                tokenProvider, 
-                loggerFactory, 
-                logger, 
+                serverAddress,
+                tokenProvider,
+                loggerFactory,
+                logger,
                 UpdateStatus);
 
             await UpdateStatus("Connected to Axorith.Host", "Initializing client services...");
             RebuildServiceProvider(app, config, loggerFactory, connection, logger);
 
             await UpdateStatus("Loading presets...", "Fetching session data...");
-            
+
             var mainViewModel = app.Services.GetRequiredService<MainViewModel>();
-            
+
             await mainViewModel.InitializeAsync();
 
             await UpdateStatus("Ready", "Axorith Client is ready.");
-            
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                shellViewModel.Content = mainViewModel;
-            });
+
+            await Dispatcher.UIThread.InvokeAsync(() => { shellViewModel.Content = mainViewModel; });
 
             StartHealthMonitoring(app.Services, app, config, loggerFactory, logger);
 
@@ -79,14 +78,17 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     }
 
     private async Task EnsureHostRunningAsync(
-        IServiceProvider services, 
-        ILogger logger, 
+        IServiceProvider services,
+        ILogger logger,
         Func<string, string?, Task> statusUpdater)
     {
         try
         {
             var controller = services.GetService<IHostController>();
-            if (controller == null) return;
+            if (controller == null)
+            {
+                return;
+            }
 
             await statusUpdater("Starting Axorith Client...", "Checking Axorith.Host status...");
 
@@ -95,7 +97,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             {
                 logger.LogInformation("Host not reachable. Attempting auto-start...");
                 await statusUpdater("Starting Axorith Client...", "Starting local Host process...");
-                
+
                 await controller.StartHostAsync();
             }
         }
@@ -114,14 +116,14 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     {
         var connectionLogger = loggerFactory.CreateLogger<GrpcCoreConnection>();
         var connection = new GrpcCoreConnection(serverAddress, tokenProvider, connectionLogger);
-        
+
         Exception? lastException = null;
 
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
             try
             {
-                await statusUpdater("Connecting to Axorith.Host...", 
+                await statusUpdater("Connecting to Axorith.Host...",
                     attempt == 1 ? "Opening secure channel..." : $"Retry {attempt} of {MaxRetries}...");
 
                 await connection.ConnectAsync();
@@ -130,7 +132,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             catch (Exception ex) when (attempt < MaxRetries)
             {
                 lastException = ex;
-                logger.LogWarning(ex, "Connection attempt {Attempt}/{Max} failed. Retrying in {Delay}ms...", 
+                logger.LogWarning(ex, "Connection attempt {Attempt}/{Max} failed. Retrying in {Delay}ms...",
                     attempt, MaxRetries, RetryDelayMs);
                 await Task.Delay(RetryDelayMs);
             }
@@ -139,7 +141,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         if (lastException != null)
         {
             throw new InvalidOperationException(
-                $"Failed to connect to Host after {MaxRetries} attempts. Ensure the Host process is running.", 
+                $"Failed to connect to Host after {MaxRetries} attempts. Ensure the Host process is running.",
                 lastException);
         }
 
@@ -147,9 +149,9 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     }
 
     private void RebuildServiceProvider(
-        App app, 
-        Configuration config, 
-        ILoggerFactory loggerFactory, 
+        App app,
+        Configuration config,
+        ILoggerFactory loggerFactory,
         ICoreConnection connection,
         ILogger logger)
     {
@@ -160,12 +162,13 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton(Options.Create(config));
         services.AddSingleton(loggerFactory);
         services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
-        
+
         services.AddSingleton(connection);
         services.AddSingleton(connection.Presets);
         services.AddSingleton(connection.Sessions);
         services.AddSingleton(connection.Modules);
         services.AddSingleton(connection.Diagnostics);
+        services.AddSingleton(connection.Scheduler);
 
         var existingMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
         existingMonitor.SetDiagnosticsApi(connection.Diagnostics);
@@ -174,7 +177,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton<IHostController, HostController>();
         services.AddSingleton<ITokenProvider>(app.Services.GetRequiredService<ITokenProvider>());
         services.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
-        
+
         var filePicker = app.Services.GetService<IFilePickerService>();
         if (filePicker != null)
         {
@@ -222,9 +225,9 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     }
 
     private async Task ShowFatalErrorAsync(
-        App app, 
-        Configuration config, 
-        ILoggerFactory loggerFactory, 
+        App app,
+        Configuration config,
+        ILoggerFactory loggerFactory,
         ILogger<App> logger,
         string errorMessage)
     {
@@ -232,11 +235,11 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         {
             var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
             var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
-            
+
             errorViewModel.Configure(
                 $"Initialization error: {errorMessage}\n\nCheck logs for details. Ensure Axorith.Host is running.",
                 async () => await InitializeAsync(app, config, loggerFactory, logger));
-            
+
             shellViewModel.Content = errorViewModel;
         });
     }

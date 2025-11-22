@@ -4,6 +4,7 @@ using System.Reactive.Linq;
 using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Logging;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Module.SpotifyPlayer;
 
@@ -15,12 +16,14 @@ internal sealed class PlaybackService : IDisposable
     private readonly SpotifyApiService _apiService;
     private readonly CompositeDisposable _disposables = [];
 
-    private List<KeyValuePair<string, string>> _cachedDevices = [];
     private List<KeyValuePair<string, string>> _cachedPlaylists = [];
     private List<KeyValuePair<string, string>> _cachedAlbums = [];
     private string _cachedLikedSongsUri = string.Empty;
 
-    public PlaybackService(IModuleLogger logger, Settings settings, AuthService authService,
+    public PlaybackService(
+        IModuleLogger logger,
+        Settings settings,
+        AuthService authService,
         SpotifyApiService apiService)
     {
         _logger = logger;
@@ -34,19 +37,6 @@ internal sealed class PlaybackService : IDisposable
             .DisposeWith(_disposables);
 
         _authService.AuthenticationStateChanged += OnAuthenticationStateChanged;
-
-        _settings.UpdateAction.Invoked
-            .SelectMany(_ => Observable.FromAsync(LoadDynamicChoicesAsync))
-            .Subscribe(
-                _ => { },
-                ex => _logger.LogError(ex, "Failed to update Spotify data via Update action."))
-            .DisposeWith(_disposables);
-
-        _settings.TargetDevice.Value
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Subscribe(_ => RebuildDeviceChoices())
-            .DisposeWith(_disposables);
 
         _settings.PlaybackContext.Value
             .Skip(1)
@@ -65,16 +55,20 @@ internal sealed class PlaybackService : IDisposable
             return;
         }
 
-        try
+        await LoadDynamicChoicesAsync();
+
+        _ = RefreshPlaylistsLoopAsync();
+    }
+
+    private async Task RefreshPlaylistsLoopAsync()
+    {
+        var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+        while (await timer.WaitForNextTickAsync())
         {
-            await LoadDynamicChoicesAsync();
-            _logger.LogInfo("Dynamic choices loaded on initialization.");
-        }
-        catch (Exception)
-        {
-            _logger.LogWarning("Failed to load dynamic choices on initialization. Falling back to offline state.");
-            RebuildDeviceChoices();
-            RebuildPlaybackChoices();
+            if (_authService.HasRefreshToken())
+            {
+                await LoadDynamicChoicesAsync();
+            }
         }
     }
 
@@ -83,7 +77,7 @@ internal sealed class PlaybackService : IDisposable
         return _settings.ValidateAsync();
     }
 
-    public async Task OnSessionStartAsync()
+    public async Task OnSessionStartAsync(CancellationToken cancellationToken = default)
     {
         if (!_authService.HasRefreshToken())
         {
@@ -91,32 +85,49 @@ internal sealed class PlaybackService : IDisposable
             return;
         }
 
-        var selectedDeviceId = _settings.TargetDevice.GetCurrentValue();
-
-        if (string.IsNullOrWhiteSpace(selectedDeviceId))
+        if (_settings.EnsureSpotifyRunning.GetCurrentValue())
         {
-            _logger.LogWarning("No target device selected, attempting to find the first active device...");
-            var devices = await _apiService.GetAvailableDevicesAsync();
-            var firstDevice = devices.FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(firstDevice.Key))
+            const string processName = "Spotify";
+
+            var isRunning = await WaitForProcessAsync(processName, TimeSpan.FromSeconds(30), cancellationToken);
+
+            if (!isRunning)
             {
-                _logger.LogError(null, "Session start failed: No available devices found for Spotify playback.");
+                _logger.LogError(null, "Spotify process '{ProcessName}' not found after 30 seconds. Aborting playback.",
+                    processName);
                 return;
             }
-
-            selectedDeviceId = firstDevice.Key;
-            _logger.LogWarning("Defaulting to first available device: {DeviceName}", firstDevice.Value);
         }
-        
-        _logger.LogInfo("Configuring Spotify playback options for device {DeviceId}...", selectedDeviceId);
-        
+
+        string? targetDeviceId = null;
+
+        for (var i = 0; i < 5; i++)
+        {
+            targetDeviceId = await ResolveTargetDeviceIdAsync();
+            if (!string.IsNullOrEmpty(targetDeviceId))
+            {
+                break;
+            }
+
+            _logger.LogInfo("Target device not found yet. Retrying in 2s... (Attempt {Attempt}/5)", i + 1);
+            await Task.Delay(2000, cancellationToken);
+        }
+
+        if (string.IsNullOrEmpty(targetDeviceId))
+        {
+            _logger.LogError(null, "Session start failed: Could not find a suitable Spotify device to play on.");
+            return;
+        }
+
+        _logger.LogInfo("Target device resolved: {DeviceId}", targetDeviceId);
+
         try
         {
             var setupTasks = new List<Task>
             {
-                _apiService.SetVolumeAsync(selectedDeviceId, _settings.Volume.GetCurrentValue()),
-                _apiService.SetShuffleAsync(selectedDeviceId, _settings.Shuffle.GetCurrentValue() == "true"),
-                _apiService.SetRepeatModeAsync(selectedDeviceId, _settings.RepeatMode.GetCurrentValue())
+                _apiService.SetVolumeAsync(targetDeviceId, _settings.Volume.GetCurrentValue()),
+                _apiService.SetShuffleAsync(targetDeviceId, _settings.Shuffle.GetCurrentValue() == "true"),
+                _apiService.SetRepeatModeAsync(targetDeviceId, _settings.RepeatMode.GetCurrentValue())
             };
             await Task.WhenAll(setupTasks);
         }
@@ -136,73 +147,151 @@ internal sealed class PlaybackService : IDisposable
             return;
         }
 
-        await StartPlaybackAsync(urlToPlay, selectedDeviceId);
+        await StartPlaybackAsync(urlToPlay, targetDeviceId);
+    }
+
+    private async Task<string?> ResolveTargetDeviceIdAsync()
+    {
+        var mode = _settings.DeviceSelectionMode.GetCurrentValue();
+        var devices = await _apiService.GetDevicesAsync();
+
+        if (devices.Count == 0)
+        {
+            return null;
+        }
+
+        switch (mode)
+        {
+            case Settings.ModeLocalComputer:
+                var computer =
+                    devices.FirstOrDefault(d => d.Type.Equals("Computer", StringComparison.OrdinalIgnoreCase));
+                if (computer != null)
+                {
+                    _logger.LogInfo("Found local computer: {Name} ({Id})", computer.Name, computer.Id);
+                    return computer.Id;
+                }
+
+                break;
+
+            case Settings.ModeLastActive:
+                var active = devices.FirstOrDefault(d => d.IsActive);
+                if (active != null)
+                {
+                    _logger.LogInfo("Found active device: {Name} ({Id})", active.Name, active.Id);
+                    return active.Id;
+                }
+
+                var first = devices.First();
+                _logger.LogInfo("No active device found, using first available: {Name}", first.Name);
+                return first.Id;
+
+            case Settings.ModeSpecificName:
+                var targetName = _settings.SpecificDeviceName.GetCurrentValue();
+                if (string.IsNullOrWhiteSpace(targetName))
+                {
+                    return null;
+                }
+
+                var specific =
+                    devices.FirstOrDefault(d => d.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase));
+                if (specific != null)
+                {
+                    _logger.LogInfo("Found specific device: {Name} ({Id})", specific.Name, specific.Id);
+                    return specific.Id;
+                }
+
+                break;
+        }
+
+        if (mode != Settings.ModeLocalComputer)
+        {
+            return null;
+        }
+
+        {
+            var machineName = Environment.MachineName;
+            var match = devices.FirstOrDefault(d => d.Name.Contains(machineName, StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+            {
+                return null;
+            }
+
+            _logger.LogInfo("Found device matching machine name: {Name}", match.Name);
+            return match.Id;
+        }
+    }
+
+    private async Task<bool> WaitForProcessAsync(string processName, TimeSpan timeout, CancellationToken ct)
+    {
+        _logger.LogInfo("Waiting for process '{ProcessName}' to appear (Timeout: {Timeout}s)...", processName,
+            timeout.TotalSeconds);
+
+        var startTime = DateTime.UtcNow;
+
+        while (DateTime.UtcNow - startTime < timeout)
+        {
+            if (ct.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            try
+            {
+                var processes = PublicApi.FindProcesses(processName);
+                if (processes.Count > 0)
+                {
+                    _logger.LogInfo("Process '{ProcessName}' found (PID: {Pid}). Proceeding.", processName,
+                        processes[0].Id);
+                    foreach (var p in processes)
+                    {
+                        p.Dispose();
+                    }
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("Error checking for process: {Message}", ex.Message);
+            }
+
+            await Task.Delay(1000, ct);
+        }
+
+        return false;
     }
 
     public Task OnSessionEndAsync()
     {
-        if (!_authService.HasRefreshToken())
-        {
-            return Task.CompletedTask;
-        }
-
-        return _apiService.PauseAsync();
+        return !_authService.HasRefreshToken() ? Task.CompletedTask : _apiService.PauseAsync();
     }
 
     private async Task LoadDynamicChoicesAsync()
     {
-        var devicesTask = _apiService.GetAvailableDevicesAsync();
-        var playlistsTask = _apiService.GetPlaylistsAsync();
-        var albumsTask = _apiService.GetSavedAlbumsAsync();
-        var likedSongsTask = _apiService.GetLikedSongsAsUriListAsync();
-
-        await Task.WhenAll(devicesTask, playlistsTask, albumsTask, likedSongsTask);
-
-        _cachedDevices = await devicesTask;
-        _cachedPlaylists = await playlistsTask;
-        _cachedAlbums = await albumsTask;
-        _cachedLikedSongsUri = await likedSongsTask;
-
-        RebuildDeviceChoices();
-        RebuildPlaybackChoices();
-    }
-
-    private void RebuildDeviceChoices()
-    {
-        var currentSelectedId = _settings.TargetDevice.GetCurrentValue();
-
-        var finalChoices = _cachedDevices
-            .Select(d => new KeyValuePair<string, string>(d.Key, d.Value))
-            .ToList();
-
-        var selectionExists = finalChoices.Any(d => d.Key == currentSelectedId);
-
-        if (!string.IsNullOrWhiteSpace(currentSelectedId) && !selectionExists)
+        try
         {
-            finalChoices.Insert(0, new KeyValuePair<string, string>(currentSelectedId, $"{currentSelectedId} (Offline)"));
+            var playlistsTask = _apiService.GetPlaylistsAsync();
+            var albumsTask = _apiService.GetSavedAlbumsAsync();
+            var likedSongsTask = _apiService.GetLikedSongsAsUriListAsync();
+
+            await Task.WhenAll(playlistsTask, albumsTask, likedSongsTask);
+
+            _cachedPlaylists = await playlistsTask;
+            _cachedAlbums = await albumsTask;
+            _cachedLikedSongsUri = await likedSongsTask;
+
+            RebuildPlaybackChoices();
         }
-
-        if (finalChoices.Count == 0)
+        catch (Exception ex)
         {
-            finalChoices.Add(new KeyValuePair<string, string>("", "No devices found."));
-        }
-
-        _settings.TargetDevice.SetChoices(finalChoices);
-
-        if (!string.IsNullOrWhiteSpace(currentSelectedId))
-        {
-            _settings.TargetDevice.SetValue(currentSelectedId);
-        }
-        else if (_cachedDevices.Count > 0)
-        {
-            _settings.TargetDevice.SetValue(_cachedDevices[0].Key);
+            _logger.LogWarning("Failed to refresh playlists: {Message}", ex.Message);
         }
     }
 
     private void RebuildPlaybackChoices()
     {
         var currentContext = _settings.PlaybackContext.GetCurrentValue();
-        
+
         var finalChoicesDict = new Dictionary<string, string>
         {
             [Settings.CustomUrlValue] = "Enter a custom URL..."
@@ -216,13 +305,17 @@ internal sealed class PlaybackService : IDisposable
         foreach (var playlist in _cachedPlaylists)
         {
             if (!string.IsNullOrWhiteSpace(playlist.Key))
+            {
                 finalChoicesDict[playlist.Key] = playlist.Value;
+            }
         }
 
         foreach (var album in _cachedAlbums)
         {
             if (!string.IsNullOrWhiteSpace(album.Key))
+            {
                 finalChoicesDict[album.Key] = album.Value;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(currentContext) && !finalChoicesDict.ContainsKey(currentContext))
@@ -244,12 +337,9 @@ internal sealed class PlaybackService : IDisposable
 
     private void ClearChoices()
     {
-        _cachedDevices.Clear();
         _cachedPlaylists.Clear();
         _cachedAlbums.Clear();
         _cachedLikedSongsUri = string.Empty;
-        
-        RebuildDeviceChoices();
         RebuildPlaybackChoices();
     }
 
@@ -281,8 +371,16 @@ internal sealed class PlaybackService : IDisposable
 
     private static string ConvertUrlToUri(string url)
     {
-        if (url.Contains("spotify:", StringComparison.Ordinal)) return url;
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) throw new ArgumentException("Invalid URL format");
+        if (url.Contains("spotify:", StringComparison.Ordinal))
+        {
+            return url;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            throw new ArgumentException("Invalid URL format");
+        }
+
         var segments = uri.AbsolutePath.Trim('/').Split('/');
         return segments.Length < 2
             ? throw new ArgumentException("URL does not contain a valid Spotify type and ID")
@@ -297,7 +395,6 @@ internal sealed class PlaybackService : IDisposable
         }
         else
         {
-            // Don't clear settings on logout to preserve preset data
             ClearChoices();
         }
     }

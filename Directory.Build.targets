@@ -10,7 +10,11 @@
             <ModulePrimaryFiles Include="$(OutputPath)$(AssemblyName).pdb" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
         </ItemGroup>
         <ItemGroup>
-            <ModuleDependencies Include="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' != 'Axorith.Sdk'" />
+            <ModuleDependencies Include="@(ReferenceCopyLocalPaths)"
+                                Condition="'%(Filename)' != 'Axorith.Sdk' 
+                                       And '%(Filename)' != 'Axorith.Shared.Platform'
+                                       And '%(Filename)' != 'Axorith.Shared.Utils'
+                                       And '%(Filename)' != 'Axorith.Shared.Exceptions'" />
         </ItemGroup>
         <ItemGroup>
             <ModuleMetadataFile Include="$(ProjectDir)module.json" Condition="Exists('$(ProjectDir)module.json')" />

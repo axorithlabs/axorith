@@ -2,14 +2,18 @@ using System.Collections.Concurrent;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Axorith.Sdk;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Polly.Retry;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
+using OperationResult = Axorith.Client.CoreSdk.Abstractions.OperationResult;
+using SettingProperty = Axorith.Client.CoreSdk.Abstractions.SettingProperty;
+using SettingUpdate = Axorith.Client.CoreSdk.Abstractions.SettingUpdate;
 
-namespace Axorith.Client.CoreSdk.Grpc;
+namespace Axorith.Client.CoreSdk;
 
 /// <summary>
 ///     gRPC implementation of IModulesApi with setting update streaming.

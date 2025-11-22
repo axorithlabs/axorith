@@ -1,5 +1,6 @@
 ﻿using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
+using Axorith.Client.Services.Abstractions;
 
 namespace Axorith.Client.Services;
 
@@ -9,7 +10,10 @@ public class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop) 
 
     public async Task<string?> PickFileAsync(string title, string? filter, string? initialPath)
     {
-        if (StorageProvider is null) return null;
+        if (StorageProvider is null)
+        {
+            return null;
+        }
 
         var options = new FilePickerOpenOptions
         {
@@ -19,7 +23,7 @@ public class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop) 
 
         if (!string.IsNullOrWhiteSpace(initialPath))
         {
-            try 
+            try
             {
                 var dir = Path.GetDirectoryName(initialPath);
                 if (dir != null)
@@ -44,7 +48,10 @@ public class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop) 
 
     public async Task<string?> PickFolderAsync(string title, string? initialPath)
     {
-        if (StorageProvider is null) return null;
+        if (StorageProvider is null)
+        {
+            return null;
+        }
 
         var options = new FolderPickerOpenOptions
         {
@@ -66,8 +73,11 @@ public class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop) 
 
         var result = await StorageProvider.OpenFolderPickerAsync(options);
         var folder = result.FirstOrDefault();
-        
-        if (folder == null) return null;
+
+        if (folder == null)
+        {
+            return null;
+        }
 
         return folder.Path.IsAbsoluteUri ? folder.Path.LocalPath : folder.Path.OriginalString;
     }
@@ -79,14 +89,17 @@ public class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop) 
 
         for (var i = 0; i < parts.Length; i += 2)
         {
-            if (i + 1 >= parts.Length) break;
+            if (i + 1 >= parts.Length)
+            {
+                break;
+            }
 
             var name = parts[i];
             var pattern = parts[i + 1];
 
             var patterns = pattern.Split(';', StringSplitOptions.RemoveEmptyEntries)
-                                  .Select(p => p.Trim())
-                                  .ToList();
+                .Select(p => p.Trim())
+                .ToList();
 
             var fileType = new FilePickerFileType(name)
             {

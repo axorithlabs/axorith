@@ -1,8 +1,7 @@
-using Axorith.Contracts;
 using FluentAssertions;
 using Xunit;
 
-namespace Axorith.Test.Contracts.Mappers;
+namespace Axorith.Contracts.Tests.Mappers;
 
 /// <summary>
 ///     Tests for protobuf mapping between domain models and gRPC messages

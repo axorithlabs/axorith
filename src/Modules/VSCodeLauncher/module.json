@@ -1,0 +1,10 @@
+{
+  "id": "6b3271d3-3eae-41f4-b271-d33eaea1f40a",
+  "name": "VS Code Launcher",
+  "description": "Launches Visual Studio Code application.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.VSCodeLauncher.dll"
+}

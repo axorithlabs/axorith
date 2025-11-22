@@ -6,7 +6,6 @@
              xmlns:sdk="clr-namespace:Axorith.Sdk;assembly=Axorith.Sdk"
              x:Class="Axorith.Client.Views.SessionEditorView"
              x:DataType="vm:SessionEditorViewModel">
-
     <UserControl.Resources>
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
             <TextBox Text="{Binding StringValue, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
@@ -147,11 +146,14 @@
                                            DirectoryPickerTemplate="{StaticResource DirectoryPickerSettingTemplate}"
                                            ButtonTemplate="{StaticResource ButtonSettingTemplate}"/>
         
-        <converters:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+        <converters:EqualsConverter x:Key="EqualsConverter"/>
         
         <StreamGeometry x:Key="TimerIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</StreamGeometry>
         <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
         <StreamGeometry x:Key="ArrowDownIcon">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
+        <StreamGeometry x:Key="SearchIcon">M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z</StreamGeometry>
+        <StreamGeometry x:Key="PlusIcon">M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z</StreamGeometry>
+        <StreamGeometry x:Key="DeleteIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z</StreamGeometry>
     </UserControl.Resources>
 
     <Panel>
@@ -159,48 +161,126 @@
                       VerticalScrollBarVisibility="Hidden">
             <Panel MaxWidth="800" HorizontalAlignment="Center">
                 <StackPanel Margin="20,30" Spacing="0">
+                    
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Preset Name" FontWeight="Medium" Foreground="#E0E0E0" FontSize="14"/>
+                            <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
                             <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
                     </Border>
 
                     <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+
+                    <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
+                        <StackPanel Spacing="15">
+                            <TextBlock Text="Start On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            
+                            <ItemsControl ItemsSource="{Binding Triggers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TriggerViewModel">
+                                        <Button Classes="ItemCard" 
+                                                Command="{Binding $parent[ItemsControl].DataContext.EditTriggerCommand}" 
+                                                CommandParameter="{Binding}"
+                                                Margin="0,0,0,10">
+                                            <Border>
+                                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                                    <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
+                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="#00AAFF"/>
+                                                    </Border>
+                                                    
+                                                    <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
+                                                        <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
+                                                    </StackPanel>
+                                                    
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Button Classes="delete-btn" 
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveTriggerCommand}" 
+                                                                CommandParameter="{Binding}" 
+                                                                ToolTip.Tip="Remove">
+                                                            <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Button HorizontalAlignment="Stretch" 
+                                    Background="Transparent" 
+                                    BorderBrush="#333" 
+                                    BorderThickness="1" 
+                                    CornerRadius="8" 
+                                    Padding="10"
+                                    Cursor="Hand"
+                                    IsEnabled="{Binding CanAddAnyTrigger}">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="Time Schedule" Command="{Binding AddScheduleTriggerCommand}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource TimerIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12" Foreground="#888"/>
+                                    <TextBlock Text="Add Trigger" Foreground="#888" FontWeight="Medium"/>
+                                </StackPanel>
+                            </Button>
+                            
+                            <TextBlock Text="If empty, start manually via button." 
+                                       HorizontalAlignment="Center" 
+                                       Foreground="#666" 
+                                       FontSize="12" 
+                                       Margin="0,5,0,0"
+                                       IsVisible="{Binding !Triggers.Count}"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
                     
                     <ItemsControl ItemsSource="{Binding ConfiguredModules}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                                 <StackPanel Spacing="0" HorizontalAlignment="Center">
-                                    <Border Classes="Card" MinWidth="500" Padding="24" Margin="0">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
-                                            <TextBlock Text="{Binding Definition.Description}" Foreground="#B0B0B0" FontSize="13" TextWrapping="Wrap" MaxWidth="450" Margin="0,6,0,0"/>
-                                            
-                                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,20,0,0">
-                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                    <Button Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.MoveUpCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsFirst}" ToolTip.Tip="Move Up">
-                                                        <PathIcon Data="{StaticResource ArrowUpIcon}" Width="12" Height="12"/>
-                                                    </Button>
-                                                    <Button Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.MoveDownCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsLast}" ToolTip.Tip="Move Down">
-                                                        <PathIcon Data="{StaticResource ArrowDownIcon}" Width="12" Height="12"/>
-                                                    </Button>
+                                    <Button Classes="ItemCard" 
+                                            Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
+                                            CommandParameter="{Binding}"
+                                            MinWidth="500">
+                                        <Border>
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                                                    <TextBlock Text="{Binding Definition.Description}" Foreground="#B0B0B0" FontSize="13" TextWrapping="Wrap" MaxWidth="400" Margin="0,6,0,0"/>
                                                 </StackPanel>
                                                 
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                                    <Button Content="Configure" Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" CommandParameter="{Binding}"/>
-                                                    <Button Content="Remove" Classes="danger" Command="{Binding $parent[ItemsControl].DataContext.RemoveModuleCommand}" CommandParameter="{Binding}"/>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="15,0,0,0">
+                                                    <Button Classes="move-btn" Command="{Binding $parent[ItemsControl].DataContext.MoveUpCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsFirst}" ToolTip.Tip="Move Up">
+                                                        <PathIcon Data="{StaticResource ArrowUpIcon}" Width="16" Height="16"/>
+                                                    </Button>
+                                                    <Button Classes="move-btn" Command="{Binding $parent[ItemsControl].DataContext.MoveDownCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsLast}" ToolTip.Tip="Move Down">
+                                                        <PathIcon Data="{StaticResource ArrowDownIcon}" Width="16" Height="16"/>
+                                                    </Button>
+                                                    <Button Classes="delete-btn" Command="{Binding $parent[ItemsControl].DataContext.RemoveModuleCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove">
+                                                        <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
+                                                    </Button>
                                                 </StackPanel>
                                             </Grid>
-                                        </StackPanel>
-                                    </Border>
+                                        </Border>
+                                    </Button>
                                     
-                                    <Grid Height="80" IsVisible="{Binding !IsLast}" HorizontalAlignment="Center">
-                                        <Rectangle Width="1" Fill="#444" VerticalAlignment="Stretch"/>
-                                        <Border Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="12" Padding="8,2" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Grid Height="60" IsVisible="{Binding !IsLast}" HorizontalAlignment="Center">
+                                        <Rectangle Width="1" Fill="#333" VerticalAlignment="Stretch" HorizontalAlignment="Center"/>
+                                        
+                                        <Border Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="12" Padding="8,2" 
+                                                VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                IsVisible="{Binding NextModule.HasDelay}">
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                                <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="{Binding NextModule.HasDelay, Converter={StaticResource BoolToBrushConverter}, ConverterParameter='#00AAFF|#666'}"/>
+                                                <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="#00AAFF"/>
                                                 <TextBlock Text="Wait" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
                                                     
                                                 <TextBox Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}" 
@@ -218,8 +298,31 @@
                                                     </TextBox.Styles>
                                                 </TextBox>
                                                 <TextBlock Text="s" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                                                
+                                                <Button Classes="RemoveDelay" 
+                                                        Command="{Binding RemoveDelayCommand}"
+                                                        ToolTip.Tip="Remove Delay"
+                                                        Margin="4,0,0,0">
+                                                    <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" 
+                                                              Width="8" Height="8"/>
+                                                </Button>
                                             </StackPanel>
                                         </Border>
+
+                                        <Button Classes="ConnectorNode" 
+                                                IsVisible="{Binding !NextModule.HasDelay}"
+                                                ToolTip.Tip="Add Action">
+                                            <Button.Flyout>
+                                                <MenuFlyout Placement="Bottom">
+                                                    <MenuItem Header="Add Delay" Command="{Binding AddDelayCommand}">
+                                                        <MenuItem.Icon>
+                                                            <PathIcon Data="{StaticResource TimerIcon}" Width="14" Height="14"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                </MenuFlyout>
+                                            </Button.Flyout>
+                                            <PathIcon Data="{StaticResource PlusIcon}" Width="10" Height="10"/>
+                                        </Button>
                                     </Grid>
                                 </StackPanel>
                             </DataTemplate>
@@ -228,38 +331,170 @@
 
                     <StackPanel MinWidth="500" Margin="0,0,0,100" Spacing="0">
                         <Path Data="M 0 0 L 0 30" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
-                        <Border Classes="Card" Padding="20" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Background="Transparent" BoxShadow="none"> 
-                            <StackPanel Grid.Row="2" Margin="0,10,0,0" Spacing="10">
-                                <ComboBox ItemsSource="{Binding AvailableModulesToAdd}" 
-                                          SelectedItem="{Binding ModuleToAdd}"
-                                          PlaceholderText="Select module to add..."
-                                          HorizontalAlignment="Stretch">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate DataType="sdk:ModuleDefinition">
-                                            <Grid ColumnDefinitions="*, Auto">
-                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
-                                                <Border Grid.Column="1" 
-                                                        Background="#222"  
-                                                        CornerRadius="4" 
-                                                        Padding="6,2" 
-                                                        Margin="10,0,0,0"
-                                                        IsVisible="{Binding Category, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                                    <TextBlock Text="{Binding Category}" Foreground="#888" FontSize="11"/>
-                                                </Border>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Content="Add to Workflow" 
-                                        Command="{Binding AddModuleCommand}" 
-                                        HorizontalAlignment="Stretch" 
-                                        HorizontalContentAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
+                        
+                        <Button Command="{Binding OpenAddModuleCommand}" 
+                                Classes="CardButton"
+                                HorizontalAlignment="Center"
+                                Cursor="Hand">
+                            <Border Classes="Card" Padding="20,15" CornerRadius="8">
+                                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="14" Height="14" Foreground="#00AAFF"/>
+                                    <TextBlock Text="Add Module" FontWeight="SemiBold" Foreground="#E0E0E0"/>
+                                </StackPanel>
+                            </Border>
+                        </Button>
                     </StackPanel>
                 </StackPanel>
             </Panel>
         </ScrollViewer>
+
+        <TransitioningContentControl Content="{Binding ModuleSelector}" IsVisible="{Binding !!ModuleSelector}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0:0:0.15"/>
+            </TransitioningContentControl.PageTransition>
+            <TransitioningContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:ModuleSelectorViewModel">
+                    <Panel>
+                        <Border Background="#000000" Opacity="0.85"/>
+                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="800" MaxHeight="600" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                            <Grid RowDefinitions="Auto, Auto, *">
+                                <Border Grid.Row="0" Padding="24" BorderThickness="0,0,0,1" BorderBrush="#333" Background="#0A0A0A" CornerRadius="12,12,0,0">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding CloseCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0" Foreground="#888">
+                                            <Button.Styles>
+                                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                    <Setter Property="Background" Value="#222"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Style>
+                                            </Button.Styles>
+                                        </Button>
+                                        <TextBlock Text="Add Module" FontSize="20" FontWeight="Bold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </Border>
+
+                                <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="24,20,24,10">
+                                    <TextBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}" Watermark="Search modules..." Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8" Margin="0,0,15,0">
+                                        <TextBox.InnerRightContent>
+                                            <PathIcon Data="{StaticResource SearchIcon}" Width="14" Height="14" Foreground="#666" Margin="0,0,10,0"/>
+                                        </TextBox.InnerRightContent>
+                                    </TextBox>
+                                    
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Categories}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <RadioButton Content="{Binding}" 
+                                                             GroupName="CategoryGroup"
+                                                             Command="{Binding $parent[ItemsControl].DataContext.SelectCategoryCommand}" 
+                                                             CommandParameter="{Binding}"
+                                                             IsChecked="{Binding $parent[ItemsControl].DataContext.SelectedCategory, Converter={StaticResource EqualsConverter}, ConverterParameter={Binding}, Mode=OneWay}"
+                                                             Theme="{StaticResource ButtonRadioButton}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+
+                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding FilteredModules}" Margin="24,10,24,24">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="vm:ModuleDefinitionViewModel">
+                                                <Border Classes="SelectorCard" Width="360" Margin="0,0,15,15" BorderThickness="1" CornerRadius="8" Padding="16">
+                                                    <Grid RowDefinitions="Auto, *, Auto">
+                                                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                                            <Border Background="#222" CornerRadius="4" Padding="6,2" DockPanel.Dock="Right" VerticalAlignment="Top">
+                                                                <TextBlock Text="{Binding Definition.Category}" Foreground="#888" FontSize="11"/>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Definition.Name}" FontWeight="Bold" FontSize="15" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis"/>
+                                                        </DockPanel>
+                                                        
+                                                        <TextBlock Grid.Row="1" Text="{Binding Definition.Description}" Foreground="#999" FontSize="13" TextWrapping="Wrap" Height="40" TextTrimming="CharacterEllipsis" Margin="0,0,0,15"/>
+                                                        
+                                                        <Panel Grid.Row="2">
+                                                            <Button Content="Add" Classes="accent" HorizontalAlignment="Stretch" 
+                                                                    Command="{Binding $parent[ItemsControl].DataContext.SelectModuleCommand}" 
+                                                                    CommandParameter="{Binding}"
+                                                                    IsVisible="{Binding !IsJustAdded}"/>
+                                                            
+                                                            <Border IsVisible="{Binding IsJustAdded}" 
+                                                                    Background="Transparent" 
+                                                                    BorderBrush="#10B981" 
+                                                                    BorderThickness="1" 
+                                                                    CornerRadius="6" 
+                                                                    Height="32">
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                                                                    <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" Width="12" Height="12" Foreground="#10B981"/>
+                                                                    <TextBlock Text="Added" Foreground="#10B981" FontWeight="SemiBold" FontSize="13"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Panel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Panel>
+                </DataTemplate>
+            </TransitioningContentControl.ContentTemplate>
+        </TransitioningContentControl>
+
+        <TransitioningContentControl Content="{Binding SelectedTrigger}" IsVisible="{Binding !!SelectedTrigger}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0:0:0.15"/>
+            </TransitioningContentControl.PageTransition>
+            <TransitioningContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:ScheduleTriggerViewModel">
+                    <Panel>
+                        <Border Background="#000000" Opacity="0.85"/>
+                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="400" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                            <StackPanel>
+                                <Border Padding="24" BorderThickness="0,0,0,1" BorderBrush="#333" Background="#0A0A0A" CornerRadius="12,12,0,0">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseTriggerSettingsCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0" Foreground="#888"/>
+                                        <TextBlock Text="Edit Schedule" FontSize="18" FontWeight="Bold" Foreground="#E0E0E0"/>
+                                    </DockPanel>
+                                </Border>
+                                
+                                <Border Padding="24">
+                                    <StackPanel Spacing="20">
+                                        <Grid ColumnDefinitions="Auto, *">
+                                            <TextBlock Text="Time" VerticalAlignment="Center" Foreground="#AAA" Width="60"/>
+                                            <TimePicker Grid.Column="1" SelectedTime="{Binding Time}" HorizontalAlignment="Left"/>
+                                        </Grid>
+
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Days" Foreground="#AAA"/>
+                                            <WrapPanel Orientation="Horizontal">
+                                                <CheckBox Content="Mon" IsChecked="{Binding RunOnMonday}" Margin="0,0,15,0"/>
+                                                <CheckBox Content="Tue" IsChecked="{Binding RunOnTuesday}" Margin="0,0,15,0"/>
+                                                <CheckBox Content="Wed" IsChecked="{Binding RunOnWednesday}" Margin="0,0,15,0"/>
+                                                <CheckBox Content="Thu" IsChecked="{Binding RunOnThursday}" Margin="0,0,15,0"/>
+                                                <CheckBox Content="Fri" IsChecked="{Binding RunOnFriday}" Margin="0,0,15,0"/>
+                                                <CheckBox Content="Sat" IsChecked="{Binding RunOnSaturday}" Margin="0,0,15,0"/>
+                                                <CheckBox Content="Sun" IsChecked="{Binding RunOnSunday}" Margin="0,0,15,0"/>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                        
+                                        <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" Margin="0,10,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Panel>
+                </DataTemplate>
+            </TransitioningContentControl.ContentTemplate>
+        </TransitioningContentControl>
 
         <TransitioningContentControl Content="{Binding SelectedModule}" IsVisible="{Binding !!SelectedModule}">
             <TransitioningContentControl.PageTransition>
@@ -324,7 +559,8 @@
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <Border VerticalAlignment="Bottom" Background="#0A0A0A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="20" IsVisible="{Binding SelectedModule, Converter={x:Static converters:AppConverters.IsNull}}">
+        <Border VerticalAlignment="Bottom" Background="#0A0A0A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="20" 
+                IsVisible="{Binding IsFooterVisible}">
             <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Right">
                 <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary"/>
                 <Button Content="Save Preset" Command="{Binding SaveAndCloseCommand}" Classes="accent" Padding="30,8" FontWeight="SemiBold"/>
