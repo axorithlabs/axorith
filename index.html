@@ -1,182 +1,235 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
-<head>    
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- SEO Meta Tags -->
+    <!-- SEO & Social Media Meta Tags -->
     <title>Axorith - The Productivity OS for Deep Work</title>
     <meta name="description" content="Axorith is a Productivity OS that automates your focus rituals. One click to launch apps, start music, block distractions, and enter your flow state.">
-    <meta name="keywords" content="productivity, deep work, focus, automation, developer tools, flow state, distraction blocker, cross-platform">
+    <meta name="keywords" content="productivity, deep work, focus, automation, developer tools, flow state, distraction blocker, cross-platform, windows, macos, linux">
     <meta name="author" content="Axorith Labs">
     <link rel="canonical" href="https://axorith.com">
 
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://axorith.com/">
+    <!-- Open Graph (for Discord, Facebook, etc.) -->
     <meta property="og:title" content="Axorith - The Productivity OS for Deep Work">
     <meta property="og:description" content="Stop setting up, start working. Axorith automates your focus rituals to help you achieve flow state faster.">
-    <meta property="og:image" content="assets/banner_master_3x1.jpg">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://axorith.com">
+    <meta property="og:image" content="https://axorith.com/assets/og-banner.png">
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://axorith.com/">
-    <meta property="twitter:title" content="Axorith - The Productivity OS for Deep Work">
-    <meta property="twitter:description" content="Stop setting up, start working. Axorith automates your focus rituals to help you achieve flow state faster.">
-    <meta property="twitter:image" content="assets/banner_master_3x1.jpg">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Axorith - The Productivity OS for Deep Work">
+    <meta name="twitter:description" content="Stop setting up, start working. Axorith automates your focus rituals to help you achieve flow state faster.">
+    <meta name="twitter:image" content="https://axorith.com/assets/og-banner.png">
 
+    <!-- Favicon -->
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --bg-color: #121212;
-            --surface-color: #1e1e1e;
-            --primary-color: #00aaff;
-            --text-color: #e0e0e0;
-            --text-muted-color: #888;
-            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --bg-color: #050505;
+            --accent-color: #2563EB;
+            --accent-hover-color: #3B82F6;
+            --text-color: #E0E0E0;
+            --text-muted-color: #888888;
+            --border-color: #333333;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html { scroll-behavior: smooth; }
-        body { background-color: var(--bg-color); color: var(--text-color); font-family: var(--font-family); line-height: 1.7; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
-        section { padding: 6rem 0; border-bottom: 1px solid #2a2a2a; }
-        h1, h2, h3 { line-height: 1.2; margin-bottom: 1rem; font-weight: 600; }
-        h1 { font-size: 3.5rem; }
-        h2 { font-size: 2.5rem; color: var(--primary-color); }
-        p { margin-bottom: 1rem; max-width: 70ch; }
-        #cta p, footer p { margin-left: auto; margin-right: auto; }
-        .btn { display: inline-block; padding: 0.8rem 1.8rem; border-radius: 5px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; }
-        .btn-primary { background-color: var(--primary-color); color: #fff; border: 2px solid var(--primary-color); }
-        .btn-primary:hover { background-color: transparent; color: var(--primary-color); }
-        .btn-secondary { background-color: transparent; color: var(--text-color); border: 2px solid var(--text-color); }
-        .btn-secondary:hover { background-color: var(--text-color); color: var(--bg-color); }
-        #hero { text-align: center; padding: 8rem 0; }
-        #hero h1 { color: #fff; }
-        #hero .subtitle { font-size: 1.2rem; color: var(--text-muted-color); max-width: 600px; margin: 1rem auto 2rem; }
-        #hero .cta-buttons { display: flex; justify-content: center; gap: 1rem; }
-        #hero .demo-placeholder { width: 100%; max-width: 720px; height: 400px; background-color: #000; border: 1px dashed var(--text-muted-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 3rem auto 0; font-style: italic; color: var(--text-muted-color); }
-        #problem .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 3rem; }
-        #problem .comparison-card { background-color: var(--surface-color); padding: 2rem; border-radius: 8px; border-left: 4px solid; }
-        #problem .old-way { border-color: #ff4d4d; }
-        #problem .axorith-way { border-color: #4dff88; }
-        #problem .comparison-card h3 { font-size: 1.5rem; margin-bottom: 1rem; }
-        #problem .comparison-card ul { list-style: none; }
-        #problem .comparison-card li { margin-bottom: 0.5rem; text-decoration: line-through; color: var(--text-muted-color); }
-        #problem .axorith-way li { text-decoration: none; color: var(--text-color); }
-        #problem .axorith-way li::before { content: '✅ '; }
-        #features .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-top: 3rem; }
-        #features .feature-card { background-color: var(--surface-color); padding: 2rem; border-radius: 8px; text-align: center; }
-        #features .feature-card .icon { font-size: 3rem; margin-bottom: 1rem; color: var(--primary-color); }
-        #philosophy { background-color: var(--surface-color); text-align: center; }
-        #philosophy blockquote { font-size: 1.5rem; font-style: italic; max-width: 800px; margin: 2rem auto 0; border-left: 4px solid var(--primary-color); padding-left: 1.5rem; text-align: left; }
-        #cta { text-align: center; }
-        footer { text-align: center; padding: 3rem 0; color: var(--text-muted-color); }
-        footer a { color: var(--text-muted-color); text-decoration: none; margin: 0 0.5rem; }
-        footer a:hover { color: var(--primary-color); }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        #video-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; overflow: hidden; }
+        #video-bg video { width: 100%; height: 100%; object-fit: cover; }
+        #video-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(ellipse at center, rgba(5,5,5,0.6) 0%, rgba(5,5,5,0.9) 70%, rgba(5,5,5,1) 100%); }
+
+        .container { width: 100%; max-width: 650px; margin: 0 auto; padding: 2rem; text-align: center; }
+        main { flex-grow: 1; display: flex; align-items: center; justify-content: center; }
+        
+        .logo { font-size: 4rem; font-weight: 900; letter-spacing: -0.05em; color: #FFFFFF; text-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
+        .tagline { font-size: 1.25rem; color: var(--text-muted-color); margin: 1rem auto 2.5rem; max-width: 35ch; }
+
+        .scarcity-banner {
+            border: 1px solid #444;
+            background: rgba(10, 10, 10, 0.5);
+            backdrop-filter: blur(5px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #DDD;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            max-width: 450px;
+            margin: 0 auto 2rem;
+        }
+
+        .countdown { display: flex; justify-content: center; gap: 1.5rem; margin: 0 auto 2.5rem; }
+        .countdown-item { text-align: center; }
+        .countdown-item span { display: block; }
+        .countdown-number { font-size: 2.5rem; font-weight: 700; color: white; line-height: 1; }
+        .countdown-label { font-size: 0.8rem; color: var(--text-muted-color); text-transform: uppercase; letter-spacing: 1px; }
+
+        .presave-form { display: flex; gap: 0.5rem; max-width: 450px; margin: 0 auto; }
+        .presave-form input[type="email"] { flex-grow: 1; background-color: rgba(10, 10, 10, 0.8); border: 1px solid var(--border-color); color: var(--text-color); font-family: var(--font-family); font-size: 1rem; padding: 0.8rem 1rem; border-radius: 6px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .presave-form input[type="email"]::placeholder { color: #555; }
+        .presave-form input[type="email"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3); }
+        .presave-form button { background-color: var(--accent-color); color: white; border: none; padding: 0.8rem 1.5rem; font-size: 1rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: background-color 0.2s ease; white-space: nowrap; }
+        .presave-form button:hover { background-color: var(--accent-hover-color); }
+        .presave-form button:disabled { background-color: #555; cursor: not-allowed; }
+        
+        .form-status { margin-top: 1rem; font-size: 0.9rem; height: 20px; color: var(--text-muted-color); transition: all 0.3s ease; }
+        .form-status.success { color: #4dff88; font-size: 1.1rem; font-weight: 500; }
+        .form-status.error { color: #ff4d4d; }
+
+        footer { padding: 2rem; text-align: center; color: #444; font-size: 0.8rem; }
+        footer a { color: #666; text-decoration: none; margin: 0 0.5rem; transition: color 0.2s ease; }
+        footer a:hover { color: var(--text-color); }
+
+        @media (max-width: 768px) {
+            .logo { font-size: 3rem; }
+            .tagline { font-size: 1.1rem; }
+            .countdown-number { font-size: 2rem; }
+            .presave-form { flex-direction: column; }
+        }
     </style>
 </head>
 <body>
 
-    <header id="hero">
-        <div class="container">
-            <h1>Your Flow State, Automated.</h1>
-            <p class="subtitle">Axorith is the Productivity OS that eliminates the friction between you and your deep work. One click to launch your apps, start your music, and block all distractions.</p>
-            <div class="cta-buttons">
-                <a href="https://github.com/axorithlabs/axorith/releases" class="btn btn-primary">Download Alpha</a>
-                <a href="https://discord.gg/bEmxUzj6ta" class="btn btn-secondary">Join Discord</a>
-            </div>
-        </div>
-    </header>
+    <div id="video-bg">
+        <video autoplay loop muted playsinline poster="assets/poster.png">
+            <source src="assets/video.mp4" type="video/mp4">
+        </video>
+    </div>
+    <div id="video-overlay"></div>
 
     <main>
-        <section id="problem">
-            <div class="container">
-                <h2>The 15-Minute "Focus Tax"</h2>
-                <p>Every time you start a task, you pay a tax in time and willpower. This setup ritual is a barrier to entry. It's friction. We fix this.</p>
-                <div class="comparison">
-                    <div class="comparison-card old-way">
-                        <h3>The Old Way</h3>
-                        <ul>
-                            <li>Hunt for apps & project files.</li>
-                            <li>Find the right focus playlist.</li>
-                            <li>Silence a storm of notifications.</li>
-                            <li>Manually enable website blockers.</li>
-                            <li>Arrange windows across monitors.</li>
-                        </ul>
-                    </div>
-                    <div class="comparison-card axorith-way">
-                        <h3>The Axorith Way</h3>
-                        <ul>
-                            <li>Apps launch instantly.</li>
-                            <li>Music starts automatically.</li>
-                            <li>Distractions are muted.</li>
-                            <li>Focus shield is engaged.</li>
-                            <li>Workspace is ready.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <div class="container">
+            <h1 class="logo">Axorith</h1>
+            <p class="tagline">The Productivity OS. One click to automate your focus rituals.</p>
+            
+            <div class="scarcity-banner">Only 100 Lifetime Licenses will ever be sold</div>
 
-        <section id="features">
-            <div class="container">
-                <h2>An Opinionated Operating Environment</h2>
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="icon">⚙️</div>
-                        <h3>Session Presets</h3>
-                        <p>Codify your entire workflow for different tasks (e.g., "Coding," "Writing," "Gaming") into reusable, one-click launchers.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="icon">🧩</div>
-                        <h3>Radical Modularity</h3>
-                        <p>The entire system is built on plugins. A powerful SDK lets you and the community integrate any tool with an API.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="icon">🛡️</div>
-                        <h3>Unmatched Stability</h3>
-                        <p>Built with a client-server architecture. If the UI crashes, your session keeps running without interruption.</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="icon">💻</div>
-                        <h3>Native & Cross-Platform</h3>
-                        <p>A lightweight, native application that respects your system's resources on Windows, macOS, and Linux.</p>
-                    </div>
+            <div class="countdown" id="countdown">
+                <div class="countdown-item">
+                    <span class="countdown-number" id="days">00</span>
+                    <span class="countdown-label">Days</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-number" id="hours">00</span>
+                    <span class="countdown-label">Hours</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-number" id="minutes">00</span>
+                    <span class="countdown-label">Minutes</span>
+                </div>
+                <div class="countdown-item">
+                    <span class="countdown-number" id="seconds">00</span>
+                    <span class="countdown-label">Seconds</span>
                 </div>
             </div>
-        </section>
 
-        <section id="philosophy">
-            <div class="container">
-                <h2>Your Mind is the Kernel</h2>
-                <blockquote>
-                    "The modern digital workspace is fundamentally broken. The very tools meant to help us have become the primary source of friction. We believe your computer should be a silent, purpose-built instrument for your mind, not a battlefield for your attention."
-                </blockquote>
-            </div>
-        </section>
-        
-        <section id="cta">
-            <div class="container">
-                <h2>Ready to Reclaim Your Focus?</h2>
-                <p>Axorith is under active, transparent development. Download the latest build or join the community to shape the future of focus.</p>
-                <div class="cta-buttons" style="margin-top: 2rem;">
-                    <a href="https://github.com/axorithlabs/axorith/releases" class="btn btn-primary">Download Latest Alpha</a>
-                    <a href="https://axorithlabs.youtrack.cloud/agiles/192-1/current" class="btn btn-secondary">View Live Roadmap</a>
+            <form id="presave-form">
+                <div class="presave-form">
+                    <input type="email" name="email" placeholder="Enter your email to get notified" required>
+                    <input type="text" name="name" style="display:none;">
+                    <button type="submit">Presave My Spot</button>
                 </div>
-            </div>
-        </section>
+            </form>
+            <p id="form-status" class="form-status"></p>
+
+        </div>
     </main>
 
     <footer>
-        <div class="container">
-            <p>&copy; 2025 Axorith Labs</p>
-            <p>
-                <a href="https://github.com/axorithlabs/axorith">GitHub</a> &bull;
-                <a href="https://discord.gg/bEmxUzj6ta">Discord</a> &bull;
-                <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md">License</a> &bull;
-                <a href="https://github.com/axorithlabs/axorith/blob/main/docs/monetization.md">Monetization</a>
-            </p>
-        </div>
+        <p>&copy; 2025 Axorith Labs</p>
+        <p>
+            <a href="https://github.com/axorithlabs/axorith" target="_blank">GitHub</a>
+            &bull;
+            <a href="https://discord.gg/bEmxUzj6ta" target="_blank">Discord</a>
+            &bull;
+            <a href="mailto:mail@axorithlabs.com">Contact</a>
+        </p>
     </footer>
+
+    <script>
+        const countdownElement = document.getElementById('countdown');
+        const daysEl = document.getElementById('days');
+        const hoursEl = document.getElementById('hours');
+        const minutesEl = document.getElementById('minutes');
+        const secondsEl = document.getElementById('seconds');
+        const launchDate = new Date('2026-01-09T00:00:00Z').getTime();
+
+        const timerInterval = setInterval(() => {
+            const now = new Date().getTime();
+            const distance = launchDate - now;
+
+            if (distance < 0) {
+                clearInterval(timerInterval);
+                countdownElement.innerHTML = "<div class='scarcity-banner' style='background: var(--accent-color); color: white;'>LAUNCHED!</div>";
+                return;
+            }
+
+            daysEl.textContent = String(Math.floor(distance / (1000 * 60 * 60 * 24))).padStart(2, '0');
+            hoursEl.textContent = String(Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
+            minutesEl.textContent = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
+            secondsEl.textContent = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
+        }, 1000);
+
+        const form = document.getElementById('presave-form');
+        const status = document.getElementById('form-status');
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbxKVLIv9OxIthnYEZJszEypxSeTMLGNX6me_neaJLQz-pUX53nsmTaz8vk0PCKkSkRadw/exec';
+
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const submitButton = form.querySelector('button');
+            const originalButtonText = submitButton.textContent;
+            
+            submitButton.disabled = true;
+            submitButton.textContent = 'Saving...';
+            status.textContent = '';
+            status.classList.remove('success', 'error');
+
+            fetch(scriptURL, { method: 'POST', body: new FormData(form) })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.result === 'success') {
+                        form.style.display = 'none';
+                        status.textContent = "You're on the list. See you on January 9th.";
+                        status.classList.add('success');
+                    } else {
+                        status.textContent = data.message || 'Oops! There was a problem.';
+                        status.classList.add('error');
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalButtonText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error!', error.message);
+                    status.textContent = 'Oops! There was a problem.';
+                    status.classList.add('error');
+                    submitButton.disabled = false;
+                    submitButton.textContent = originalButtonText;
+                });
+        });
+    </script>
 
 </body>
 </html>
