@@ -2,7 +2,7 @@
   <h1>Axorith</h1>
   <h3>The Productivity OS</h3>
   <p>
-    <strong>One click to automate your focus rituals. Designed with a Deep Work philosophy.</strong>
+    <strong>Automate your workspace. Work smarter, live better.</strong>
   </p>
 </div>
 
