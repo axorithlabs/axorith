@@ -1,9 +1,0 @@
-{
-  "name": "axorith",
-  "description": "Native messaging host for the Axorith.",
-  "path": "__AXORITH_SHIM_PATH__",
-  "type": "stdio",
-  "allowed_extensions": [
-    "site-blocker-firefox@axorithlabs.com"
-  ]
-}

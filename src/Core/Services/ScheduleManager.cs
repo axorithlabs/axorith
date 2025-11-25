@@ -124,8 +124,10 @@ public class ScheduleManager(
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.Now;
         List<SessionSchedule> toRun = [];
+        
+        logger.LogDebug("Checking schedules at {Now}. Active schedules: {Count}", now, _schedules.Count(s => s.IsEnabled));
 
         await _lock.WaitAsync(ct);
         try
@@ -174,7 +176,11 @@ public class ScheduleManager(
             try
             {
                 await sessionManager.StartSessionAsync(preset, ct);
-
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to auto-start session...");
+    
                 await _lock.WaitAsync(ct);
                 try
                 {
@@ -185,12 +191,6 @@ public class ScheduleManager(
                 {
                     _lock.Release();
                 }
-
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to auto-start session for schedule '{Name}'", schedule.Name);
             }
         }
     }

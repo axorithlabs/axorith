@@ -59,8 +59,21 @@ public static class PlatformServices
             return new WindowsSystemNotificationService(logger);
         }
 
-        // Fallback for other platforms (noop for now to avoid crashes)
         return new NoOpNotificationService();
+    }
+
+    /// <summary>
+    ///     Creates a platform-specific instance of INativeMessagingManager.
+    /// </summary>
+    public static INativeMessagingManager CreateNativeMessagingManager(ILoggerFactory loggerFactory)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsNativeMessagingManager(loggerFactory.CreateLogger<WindowsNativeMessagingManager>());
+        }
+
+        throw new PlatformNotSupportedException(
+            $"Native Messaging registration is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
 }
 

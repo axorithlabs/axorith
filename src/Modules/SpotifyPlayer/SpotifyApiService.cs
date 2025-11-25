@@ -55,22 +55,23 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
     {
-        if (!await PrepareHttpClient())
-        {
-            return [];
-        }
+        if (!await PrepareHttpClient()) return [];
 
         try
         {
             var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists?limit=50");
             using var jsonDoc = JsonDocument.Parse(responseJson);
-            return
-            [
-                .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
-                    .Select(p => new KeyValuePair<string, string>(
-                        p.GetProperty("uri").GetString() ?? string.Empty,
-                        $"{p.GetProperty("name").GetString()} (Playlist)"))
-            ];
+
+            if (!jsonDoc.RootElement.TryGetProperty("items", out var itemsElement))
+            {
+                return [];
+            }
+
+            return itemsElement.EnumerateArray()
+                .Select(p => new KeyValuePair<string, string>(
+                    p.GetProperty("uri").GetString() ?? string.Empty,
+                    $"{p.GetProperty("name").GetString() ?? "Unknown"} (Playlist)"))
+                .ToList();
         }
         catch (Exception ex)
         {

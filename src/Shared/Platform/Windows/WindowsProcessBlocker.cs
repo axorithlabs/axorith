@@ -217,7 +217,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
         Task.Run(async () =>
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
             while (await timer.WaitForNextTickAsync(token))
             {
                 try

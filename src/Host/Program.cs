@@ -67,6 +67,8 @@ try
     });
 
     builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();
+    
+    builder.Services.AddHostedService<NativeMessagingRegistrar>();
 
     builder.Services.AddGrpc(options =>
     {
@@ -184,6 +186,15 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return PlatformServices.CreateNotificationService(logger);
         })
         .As<ISystemNotificationService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+    
+    builder.Register(ctx =>
+        {
+            var loggerFactory = ctx.Resolve<ILoggerFactory>();
+            return PlatformServices.CreateNativeMessagingManager(loggerFactory);
+        })
+        .As<INativeMessagingManager>()
         .SingleInstance()
         .PreserveExistingDefaults();
 

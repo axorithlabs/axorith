@@ -7,10 +7,4 @@
         
         <OutputType>WinExe</OutputType>
     </PropertyGroup>
-
-    <ItemGroup>
-        <None Update="axorith.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
 </Project>

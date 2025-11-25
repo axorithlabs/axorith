@@ -38,14 +38,15 @@ public class SessionSchedule
         {
             return null;
         }
+        
+        var tolerance = TimeSpan.FromMinutes(5);
 
         for (var i = 0; i <= 7; i++)
         {
             var candidateDate = now.Date.AddDays(i);
             var candidateRun = candidateDate + RecurringTime.Value;
 
-            // If it's today, it must be in the future
-            if (i == 0 && candidateRun <= now)
+            if (i == 0 && candidateRun < now - tolerance)
             {
                 continue;
             }

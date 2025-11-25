@@ -62,32 +62,6 @@ public static class PublicApi
     }
 
     /// <summary>
-    ///     Gets the native messaging host name for the browser extension (Windows only).
-    /// </summary>
-    public static string GetNativeMessagingHostName()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            throw new PlatformNotSupportedException("Native messaging host is only supported on Windows");
-        }
-
-        return NativeHostManager.NativeMessagingHostName;
-    }
-
-    /// <summary>
-    ///     Ensures Firefox native messaging host is registered (Windows only).
-    /// </summary>
-    public static void EnsureFirefoxHostRegistered(string pipeName, string manifestPath)
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            throw new PlatformNotSupportedException("Native messaging host registration is only supported on Windows");
-        }
-
-        NativeHostManager.EnsureFirefoxHostRegistered(pipeName, manifestPath);
-    }
-
-    /// <summary>
     ///     Finds running processes by name or path (Windows only for now).
     /// </summary>
     public static List<Process> FindProcesses(string processNameOrPath)
