@@ -193,6 +193,41 @@ public abstract class Setting
     }
 
     /// <summary>
+    ///     Creates a setting that is rendered as a list of checkboxes (multiple selection).
+    ///     The value is a list of selected keys.
+    /// </summary>
+    /// <param name="key">The unique key for this setting.</param>
+    /// <param name="label">The label to display.</param>
+    /// <param name="defaultValues">The initial list of selected keys.</param>
+    /// <param name="initialChoices">The list of all available options.</param>
+    /// <param name="description">Optional description.</param>
+    /// <param name="isVisible">Initial visibility.</param>
+    /// <param name="isReadOnly">Initial read-only state.</param>
+    /// <returns>A new reactive multi-choice setting.</returns>
+    public static Setting<List<string>> AsMultiChoice(string key, string label, List<string> defaultValues,
+        IReadOnlyList<KeyValuePair<string, string>> initialChoices, string? description = null, bool isVisible = true,
+        bool isReadOnly = false)
+    {
+        var setting = new Setting<List<string>>(
+            key, 
+            label, 
+            description, 
+            defaultValues, 
+            SettingControlType.MultiChoice, 
+            isVisible,
+            isReadOnly, 
+            SettingPersistence.Persisted, 
+            // Serializer: List -> "key1|key2|key3"
+            list => string.Join("|", list), 
+            // Deserializer: "key1|key2" -> List
+            s => string.IsNullOrEmpty(s) ? [] : s.Split('|', StringSplitOptions.RemoveEmptyEntries).ToList()
+        );
+        
+        setting.InitializeChoices(initialChoices);
+        return setting;
+    }
+
+    /// <summary>
     ///     Creates a setting that is rendered as a password/secret input field.
     ///     Secret settings are NEVER persisted to preset JSON files. Instead, their values are stored
     ///     in SecureStorage (Windows DPAPI) and restored when the session starts.
@@ -246,7 +281,7 @@ public abstract class Setting
             isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue)
         {
             Filter = filter,
-            HasHistory = useHistory // Set flag
+            HasHistory = useHistory
         };
     }
 
@@ -275,7 +310,7 @@ public abstract class Setting
         return new Setting<string>(key, label, description, defaultValue, SettingControlType.DirectoryPicker, isVisible,
             isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue)
         {
-            HasHistory = useHistory // Set flag
+            HasHistory = useHistory
         };
     }
 }
@@ -373,6 +408,12 @@ public class Setting<T> : ISetting
                             _value.OnNext((T)(object)TimeSpan.FromSeconds(seconds));
                             return;
                         }
+                    }
+                    
+                    if (typeof(T) == typeof(List<string>) && value is string strVal)
+                    {
+                         _value.OnNext(_deserializer(strVal));
+                         return;
                     }
 
                     if (value is IConvertible)

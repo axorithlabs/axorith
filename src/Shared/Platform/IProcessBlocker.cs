@@ -1,6 +1,4 @@
-﻿using Axorith.Shared.Platform;
-
-namespace Axorith.Shared.Platform;
+﻿namespace Axorith.Shared.Platform;
 
 /// <summary>
 ///     Defines a service for blocking applications from running.
@@ -16,7 +14,11 @@ public interface IProcessBlocker : IDisposable
     /// <param name="processNames">
     ///     The list of process names to block (e.g. "discord", "steam").
     /// </param>
-    void Block(IEnumerable<string> processNames);
+    /// <returns>
+    ///     A list of unique process names that were terminated during the initial scan.
+    ///     Useful for notifying the user about what was closed.
+    /// </returns>
+    List<string> Block(IEnumerable<string> processNames);
 
     /// <summary>
     ///     Dynamically removes a restriction for a specific process without stopping the whole blocker.
@@ -28,4 +30,10 @@ public interface IProcessBlocker : IDisposable
     ///     Stops all blocking activity, clears the list, and releases monitoring resources.
     /// </summary>
     void UnblockAll();
+
+    /// <summary>
+    ///     Fires when a process is successfully blocked (terminated) during runtime monitoring.
+    ///     Argument is the name of the blocked process.
+    /// </summary>
+    event Action<string>? ProcessBlocked;
 }

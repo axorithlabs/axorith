@@ -17,6 +17,7 @@ public class SettingTemplateSelector : IDataTemplate
     public IDataTemplate? CheckboxTemplate { get; set; }
     public IDataTemplate? NumberTemplate { get; set; }
     public IDataTemplate? ChoiceTemplate { get; set; }
+    public IDataTemplate? MultiChoiceTemplate { get; set; }
     public IDataTemplate? FilePickerTemplate { get; set; }
     public IDataTemplate? DirectoryPickerTemplate { get; set; }
     public IDataTemplate? ButtonTemplate { get; set; }
@@ -36,6 +37,7 @@ public class SettingTemplateSelector : IDataTemplate
             SettingControlType.Checkbox => CheckboxTemplate,
             SettingControlType.Number => NumberTemplate,
             SettingControlType.Choice => ChoiceTemplate,
+            SettingControlType.MultiChoice => MultiChoiceTemplate,
             SettingControlType.FilePicker => FilePickerTemplate,
             SettingControlType.DirectoryPicker => DirectoryPickerTemplate,
             SettingControlType.Button => ButtonTemplate,

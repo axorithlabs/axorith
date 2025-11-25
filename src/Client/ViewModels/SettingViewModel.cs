@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
@@ -20,6 +21,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private readonly IModulesApi _modulesApi;
     private readonly Subject<object?> _numberUpdates = new();
     private readonly Subject<string?> _stringUpdates = new();
+    private readonly Subject<Unit> _valueChangedSubject = new();
 
     private readonly IClientUiSettingsStore? _uiSettingsStore;
     private readonly ClientUiConfiguration? _uiConfig;
@@ -46,6 +48,14 @@ public class SettingViewModel : ReactiveObject, IDisposable
         get;
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
+
+    public string? Error
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public IObservable<Unit> ValueChanged => _valueChangedSubject.AsObservable();
 
     public ObservableCollection<string> History { get; } = [];
 
@@ -77,6 +87,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             this.RaisePropertyChanged();
 
             _stringUpdates.OnNext(value);
+            _valueChangedSubject.OnNext(Unit.Default);
             TryAddToHistory(value);
 
             UpdateDisplayedChoices();
@@ -98,6 +109,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             this.RaisePropertyChanged();
 
             _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
+            _valueChangedSubject.OnNext(Unit.Default);
         }
     }
 
@@ -137,10 +149,13 @@ public class SettingViewModel : ReactiveObject, IDisposable
             this.RaisePropertyChanged();
 
             _numberUpdates.OnNext(boxedValue);
+            _valueChangedSubject.OnNext(Unit.Default);
         }
     }
 
     public ObservableCollection<KeyValuePair<string, string>> DisplayedChoices { get; } = [];
+
+    public ObservableCollection<MultiChoiceItemViewModel> MultiChoices { get; } = [];
 
     public decimal NumberIncrement => Setting.ValueType == typeof(int) ? 1 : 0.1m;
 
@@ -224,6 +239,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
                 this.RaisePropertyChanged(nameof(DecimalValue));
 
                 UpdateDisplayedChoices();
+                UpdateMultiChoices();
             })
             .DisposeWith(_disposables);
 
@@ -235,10 +251,15 @@ public class SettingViewModel : ReactiveObject, IDisposable
         if (Dispatcher.UIThread.CheckAccess())
         {
             UpdateDisplayedChoices();
+            UpdateMultiChoices();
         }
         else
         {
-            Dispatcher.UIThread.Post(UpdateDisplayedChoices);
+            Dispatcher.UIThread.Post(() =>
+            {
+                UpdateDisplayedChoices();
+                UpdateMultiChoices();
+            });
         }
 
         Setting.Choices?
@@ -247,6 +268,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             {
                 _rawChoices = c;
                 UpdateDisplayedChoices();
+                UpdateMultiChoices();
             })
             .DisposeWith(_disposables);
 
@@ -312,6 +334,55 @@ public class SettingViewModel : ReactiveObject, IDisposable
         this.RaisePropertyChanged(nameof(SelectedChoice));
     }
 
+    private void UpdateMultiChoices()
+    {
+        if (Setting.ControlType != SettingControlType.MultiChoice)
+        {
+            return;
+        }
+
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(UpdateMultiChoices);
+            return;
+        }
+
+        var currentList = new HashSet<string>();
+        if (Setting.GetCurrentValueAsObject() is List<string> list)
+        {
+            foreach (var item in list) currentList.Add(item);
+        }
+        else if (Setting.GetCurrentValueAsObject() is string s && !string.IsNullOrEmpty(s))
+        {
+            foreach (var item in s.Split('|')) currentList.Add(item);
+        }
+
+        MultiChoices.Clear();
+        foreach (var choice in _rawChoices)
+        {
+            var isSelected = currentList.Contains(choice.Key);
+            var itemVm = new MultiChoiceItemViewModel(choice.Key, choice.Value, isSelected);
+            
+            itemVm.WhenAnyValue(x => x.IsSelected)
+                .Skip(1)
+                .Subscribe(_ => OnMultiChoiceChanged())
+                .DisposeWith(_disposables);
+                
+            MultiChoices.Add(itemVm);
+        }
+    }
+
+    private void OnMultiChoiceChanged()
+    {
+        var selectedKeys = MultiChoices.Where(x => x.IsSelected).Select(x => x.Key).ToList();
+        
+        Setting.SetValueFromObject(selectedKeys);
+        
+        var serialized = string.Join("|", selectedKeys);
+        _stringUpdates.OnNext(serialized);
+        _valueChangedSubject.OnNext(Unit.Default);
+    }
+
     private async Task BrowseAsync()
     {
         if (_filePickerService == null)
@@ -341,12 +412,14 @@ public class SettingViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        if (_uiConfig.InputHistory.TryGetValue(Setting.Key, out var items))
+        if (!_uiConfig.InputHistory.TryGetValue(Setting.Key, out var items))
         {
-            foreach (var item in items)
-            {
-                History.Add(item);
-            }
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            History.Add(item);
         }
     }
 
@@ -413,5 +486,19 @@ public class SettingViewModel : ReactiveObject, IDisposable
     public void Dispose()
     {
         _disposables.Dispose();
+        _valueChangedSubject.Dispose();
     }
+}
+
+// Helper VM for MultiChoice items
+public class MultiChoiceItemViewModel(string key, string label, bool isSelected) : ReactiveObject
+{
+    public string Key { get; } = key;
+    public string Label { get; } = label;
+
+    public bool IsSelected
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = isSelected;
 }

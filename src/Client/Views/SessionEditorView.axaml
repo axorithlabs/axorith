@@ -6,28 +6,125 @@
              xmlns:sdk="clr-namespace:Axorith.Sdk;assembly=Axorith.Sdk"
              x:Class="Axorith.Client.Views.SessionEditorView"
              x:DataType="vm:SessionEditorViewModel">
-    <UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="Border.error">
+            <Setter Property="BorderBrush" Value="#FF4444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="#1F0505"/> <!-- Легкий красный фон -->
+        </Style>
+    </UserControl.Styles>
+    
+        
+<UserControl.Resources>
+        <converters:EqualsConverter x:Key="EqualsConverter"/>
+        <converters:IsNotNullOrEmptyConverter x:Key="IsNotNullOrEmptyConverter"/>
+        
+        <StreamGeometry x:Key="TimerIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</StreamGeometry>
+        <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
+        <StreamGeometry x:Key="ArrowDownIcon">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
+        <StreamGeometry x:Key="SearchIcon">M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z</StreamGeometry>
+        <StreamGeometry x:Key="PlusIcon">M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z</StreamGeometry>
+        <StreamGeometry x:Key="DeleteIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z</StreamGeometry>
+        <StreamGeometry x:Key="CloseIcon">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
+
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
+                     IsEnabled="{Binding !IsReadOnly}" 
+                     HorizontalAlignment="Stretch" 
+                     Background="#050505" 
+                     BorderBrush="#333" 
+                     CornerRadius="6" 
+                     Padding="10,8"
+                     Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                <TextBox.Styles>
+                    <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+                        <Setter Property="BorderBrush" Value="#FF4444"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                </TextBox.Styles>
+            </TextBox>
         </DataTemplate>
+
         <DataTemplate x:Key="TextAreaSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
+                     AcceptsReturn="True" 
+                     TextWrapping="Wrap" 
+                     MinHeight="80" 
+                     IsEnabled="{Binding !IsReadOnly}" 
+                     HorizontalAlignment="Stretch" 
+                     Background="#050505" 
+                     BorderBrush="#333" 
+                     CornerRadius="6" 
+                     Padding="10,8"
+                     Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                <TextBox.Styles>
+                    <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+                        <Setter Property="BorderBrush" Value="#FF4444"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                </TextBox.Styles>
+            </TextBox>
         </DataTemplate>
+
         <DataTemplate x:Key="SecretSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" PasswordChar="•" Watermark="Enter secret value..." IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
+                     PasswordChar="•" 
+                     Watermark="Enter secret value..." 
+                     IsEnabled="{Binding !IsReadOnly}" 
+                     HorizontalAlignment="Stretch" 
+                     Background="#050505" 
+                     BorderBrush="#333" 
+                     CornerRadius="6" 
+                     Padding="10,8"
+                     Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                <TextBox.Styles>
+                    <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+                        <Setter Property="BorderBrush" Value="#FF4444"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                </TextBox.Styles>
+            </TextBox>
         </DataTemplate>
+
         <DataTemplate x:Key="CheckboxSettingTemplate" x:DataType="vm:SettingViewModel">
-            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" Content="{Binding Label}" IsEnabled="{Binding !IsReadOnly}"/>
+            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" 
+                      Content="{Binding Label}" 
+                      IsEnabled="{Binding !IsReadOnly}"/>
         </DataTemplate>
+
         <DataTemplate x:Key="NumberSettingTemplate" x:DataType="vm:SettingViewModel">
-            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" Increment="{Binding NumberIncrement}" FormatString="{Binding NumberFormatString}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
+                           Increment="{Binding NumberIncrement}" 
+                           FormatString="{Binding NumberFormatString}" 
+                           IsEnabled="{Binding !IsReadOnly}" 
+                           HorizontalAlignment="Stretch" 
+                           Background="#050505" 
+                           BorderBrush="#333" 
+                           CornerRadius="6" 
+                           Padding="10,8"
+                           Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                <NumericUpDown.Styles>
+                    <Style Selector="NumericUpDown.error /template/ TextBox">
+                        <Setter Property="BorderBrush" Value="#FF4444"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                </NumericUpDown.Styles>
+            </NumericUpDown>
         </DataTemplate>
+
         <DataTemplate x:Key="ChoiceSettingTemplate" x:DataType="vm:SettingViewModel">
             <ComboBox ItemsSource="{Binding DisplayedChoices}" 
                       SelectedItem="{Binding SelectedChoice}"
                       HorizontalAlignment="Stretch" 
                       IsEnabled="{Binding !IsReadOnly}"
-                      MaxDropDownHeight="300">
+                      MaxDropDownHeight="300"
+                      Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                <ComboBox.Styles>
+                    <Style Selector="ComboBox.error /template/ Border#Border">
+                        <Setter Property="BorderBrush" Value="#FF4444"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                </ComboBox.Styles>
                 <ComboBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <VirtualizingStackPanel/>
@@ -42,6 +139,7 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
         </DataTemplate>
+
         <DataTemplate x:Key="FilePickerSettingTemplate" x:DataType="vm:SettingViewModel">
             <Grid ColumnDefinitions="*,Auto,Auto">
                 <TextBox Grid.Column="0" 
@@ -52,7 +150,15 @@
                          BorderBrush="#333" 
                          CornerRadius="6" 
                          Padding="10,8"
-                         IsEnabled="{Binding !IsReadOnly}"/>
+                         IsEnabled="{Binding !IsReadOnly}"
+                         Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                    <TextBox.Styles>
+                        <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+                            <Setter Property="BorderBrush" Value="#FF4444"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                        </Style>
+                    </TextBox.Styles>
+                </TextBox>
                 
                 <ComboBox Grid.Column="1" 
                           Classes="history"
@@ -97,7 +203,15 @@
                          BorderBrush="#333" 
                          CornerRadius="6" 
                          Padding="10,8"
-                         IsEnabled="{Binding !IsReadOnly}"/>
+                         IsEnabled="{Binding !IsReadOnly}"
+                         Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                    <TextBox.Styles>
+                        <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+                            <Setter Property="BorderBrush" Value="#FF4444"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                        </Style>
+                    </TextBox.Styles>
+                </TextBox>
                 
                 <ComboBox Grid.Column="1" 
                           Classes="history"
@@ -131,6 +245,20 @@
                 <Button Grid.Column="2" Content="..." Margin="4,0,0,0" Command="{Binding BrowseCommand}" IsEnabled="{Binding !IsReadOnly}"/>
             </Grid>
         </DataTemplate>
+        
+        <DataTemplate x:Key="MultiChoiceSettingTemplate" DataType="vm:SettingViewModel">
+            <Border Background="#050505" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="10">
+                <ItemsControl ItemsSource="{Binding MultiChoices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:MultiChoiceItemViewModel">
+                            <CheckBox IsChecked="{Binding IsSelected}" 
+                                      Content="{Binding Label}" 
+                                      Margin="0,2"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </DataTemplate>
         <DataTemplate x:Key="ButtonSettingTemplate" x:DataType="vm:SettingViewModel">
             <Button Content="{Binding Label}" Command="{Binding ClickCommand}" IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Left"/>
         </DataTemplate>
@@ -144,16 +272,8 @@
                                            ChoiceTemplate="{StaticResource ChoiceSettingTemplate}"
                                            FilePickerTemplate="{StaticResource FilePickerSettingTemplate}"
                                            DirectoryPickerTemplate="{StaticResource DirectoryPickerSettingTemplate}"
+                                           MultiChoiceTemplate="{StaticResource MultiChoiceSettingTemplate}"
                                            ButtonTemplate="{StaticResource ButtonSettingTemplate}"/>
-        
-        <converters:EqualsConverter x:Key="EqualsConverter"/>
-        
-        <StreamGeometry x:Key="TimerIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</StreamGeometry>
-        <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
-        <StreamGeometry x:Key="ArrowDownIcon">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
-        <StreamGeometry x:Key="SearchIcon">M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z</StreamGeometry>
-        <StreamGeometry x:Key="PlusIcon">M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z</StreamGeometry>
-        <StreamGeometry x:Key="DeleteIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z</StreamGeometry>
     </UserControl.Resources>
 
     <Panel>
@@ -167,6 +287,33 @@
                             <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
                             <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                            
+                            <Border Background="#2A0505" 
+                                    BorderBrush="#FF4444" 
+                                    BorderThickness="1" 
+                                    CornerRadius="6" 
+                                    Padding="12" 
+                                    Margin="0,15,0,0"
+                                    IsVisible="{Binding HasValidationErrors}">
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <PathIcon Grid.Column="0" Data="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" 
+                                              Foreground="#FF4444" 
+                                              Width="20" Height="20" 
+                                              VerticalAlignment="Top" 
+                                              Margin="0,2,10,0"/>
+                                    
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="Configuration Error" 
+                                                   Foreground="#FF4444" 
+                                                   FontWeight="Bold" 
+                                                   FontSize="14"/>
+                                        <TextBlock Text="Please fix the highlighted issues in the modules below before saving." 
+                                                   Foreground="#FFCCCC" 
+                                                   FontSize="13" 
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -250,8 +397,8 @@
                                     <Button Classes="ItemCard" 
                                             Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
                                             CommandParameter="{Binding}"
-                                            MinWidth="500">
-                                        <Border>
+                                            MaxWidth="500">
+                                        <Border Classes.error="{Binding HasErrors}">
                                             <Grid ColumnDefinitions="*, Auto">
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
@@ -303,8 +450,7 @@
                                                         Command="{Binding RemoveDelayCommand}"
                                                         ToolTip.Tip="Remove Delay"
                                                         Margin="4,0,0,0">
-                                                    <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" 
-                                                              Width="8" Height="8"/>
+                                                    <PathIcon Data="{StaticResource CloseIcon}" Width="8" Height="8"/>
                                                 </Button>
                                             </StackPanel>
                                         </Border>
@@ -542,8 +688,23 @@
                                                     <DataTemplate x:DataType="vm:SettingViewModel">
                                                         <StackPanel Margin="0,0,0,24" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch">
                                                             <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" Foreground="#E0E0E0" Margin="0,0,0,6" HorizontalAlignment="Left"/>
-                                                            <TextBlock Text="{Binding Setting.Description}" Foreground="#A0A0A0" FontSize="12" TextWrapping="Wrap" MaxWidth="520" Margin="0,0,0,10" HorizontalAlignment="Left" IsVisible="{Binding Setting.Description, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
-                                                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingSelector}" HorizontalAlignment="Stretch"/>
+                                                            
+                                                            <TextBlock Text="{Binding Setting.Description}" 
+                                                                       Foreground="#A0A0A0" FontSize="12" 
+                                                                       TextWrapping="Wrap" MaxWidth="520" 
+                                                                       Margin="0,0,0,10" HorizontalAlignment="Left" 
+                                                                       IsVisible="{Binding Setting.Description, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                                                            
+                                                            <ContentControl Content="{Binding}" 
+                                                                            ContentTemplate="{StaticResource SettingSelector}" 
+                                                                            HorizontalAlignment="Stretch"/>
+                                                            
+                                                            <TextBlock Text="{Binding Error}" 
+                                                                       Foreground="#FF6B6B" 
+                                                                       FontSize="12" 
+                                                                       Margin="0,4,0,0"
+                                                                       TextWrapping="Wrap"
+                                                                       IsVisible="{Binding Error, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
                                                         </StackPanel>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>

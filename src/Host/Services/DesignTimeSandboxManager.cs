@@ -94,6 +94,21 @@ public sealed class DesignTimeSandboxManager : IDisposable
         }
     }
 
+    /// <summary>
+    ///     Gets the module instance associated with the given sandbox ID.
+    ///     Returns null if no sandbox exists.
+    /// </summary>
+    public IModule? GetModule(Guid instanceId)
+    {
+        if (_sandboxes.TryGetValue(instanceId, out var sb))
+        {
+            sb.LastAccessUtc = DateTime.UtcNow;
+            return sb.Module;
+        }
+
+        return null;
+    }
+
     public void ApplySetting(Guid instanceId, string key, string? stringValue)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))
@@ -112,10 +127,6 @@ public sealed class DesignTimeSandboxManager : IDisposable
         setting.SetValueFromString(stringValue);
     }
 
-    /// <summary>
-    ///     Attempts to invoke an action on an existing design-time sandbox module instance.
-    ///     Returns false if no sandbox exists for the given instance ID.
-    /// </summary>
     public async Task<bool> TryInvokeActionAsync(Guid instanceId, string actionKey, CancellationToken ct)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))

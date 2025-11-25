@@ -1,25 +1,34 @@
 syntax = "proto3";
 
-package axorith.v1;
+package axorith.contracts;
 
 import "Protos/common.proto";
 
 option csharp_namespace = "Axorith.Contracts";
 
 service ModulesService {
+  // Discovery
   rpc ListModules(ListModulesRequest) returns (ListModulesResponse);
   rpc GetModuleSettings(GetModuleSettingsRequest) returns (GetModuleSettingsResponse);
+
+  // Runtime actions (Active Session)
   rpc InvokeAction(InvokeActionRequest) returns (OperationResult);
-  rpc InvokeDesignTimeAction(InvokeDesignTimeActionRequest) returns (OperationResult);
   rpc UpdateSetting(UpdateSettingRequest) returns (OperationResult);
   rpc StreamSettingUpdates(StreamSettingUpdatesRequest) returns (stream SettingUpdate);
+
+  // Design-time actions (Editing Preset)
+  rpc InvokeDesignTimeAction(InvokeDesignTimeActionRequest) returns (OperationResult);
   rpc BeginEdit(BeginEditRequest) returns (OperationResult);
   rpc EndEdit(EndEditRequest) returns (OperationResult);
   rpc SyncEdit(SyncEditRequest) returns (OperationResult);
+
+  // Validation
+  rpc ValidateSettings (ValidateSettingsRequest) returns (ValidationResponse);
 }
 
+// --- Request/Response Messages ---
+
 message ListModulesRequest {
-  // Optional category filter; when set, only modules with matching category are returned.
   string category = 1;
 }
 
@@ -49,13 +58,17 @@ message InvokeDesignTimeActionRequest {
 message UpdateSettingRequest {
   string module_instance_id = 1;
   string setting_key = 2;
-  
+
   oneof value {
-    string string_value = 10;
-    bool bool_value = 11;
-    double number_value = 12;
-    int32 int_value = 13;
+    string string_value = 3;
+    bool bool_value = 4;
+    double number_value = 5;
+    int32 int_value = 6;
   }
+}
+
+message StreamSettingUpdatesRequest {
+  string module_instance_id = 1;
 }
 
 message BeginEditRequest {
@@ -72,17 +85,20 @@ message SyncEditRequest {
   string module_instance_id = 1;
 }
 
-message SettingValue {
-  string key = 1;
-  oneof value {
-    string string_value = 10;
-    bool bool_value = 11;
-    double number_value = 12;
-    int32 int_value = 13;
-  }
+message ValidateSettingsRequest {
+  string module_id = 1;
+  string module_instance_id = 2;
+  repeated SettingValue values = 3;
 }
 
-message StreamSettingUpdatesRequest {
-  // Currently supports optional filtering by module instance via module_instance_id.
-  string module_instance_id = 1;
+message ValidationResponse {
+  bool is_valid = 1;
+  string message = 2;
+  repeated ValidationError field_errors = 3;
+}
+
+message ValidationError {
+  string setting_key = 1;
+  string error_message = 2;
+  ValidationSeverity severity = 3;
 }

@@ -17,6 +17,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly IDisposable _settingUpdatesSubscription;
     private readonly IDisposable? _settingStreamHandle;
+    private IDisposable? _validationSubscription;
 
     public ModuleDefinition Definition { get; }
     public ConfiguredModule Model { get; }
@@ -72,6 +73,12 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     }
 
     public bool IsLoading
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public bool HasErrors
     {
         get;
         private set => this.RaiseAndSetIfChanged(ref field, value);
@@ -155,11 +162,14 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
+
+                SetupValidation();
             });
 
             try
             {
                 await _modulesApi.SyncEditAsync(Model.InstanceId).ConfigureAwait(false);
+                await ValidateAsync();
             }
             catch
             {
@@ -174,6 +184,65 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         {
             IsLoading = false;
         }
+    }
+
+    private void SetupValidation()
+    {
+        _validationSubscription?.Dispose();
+
+        var changes = Settings.Select(s => s.ValueChanged).Merge();
+
+        _validationSubscription = changes
+            .Throttle(TimeSpan.FromMilliseconds(300)) // Debounce validation requests
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .SelectMany(_ => ValidateAsync())
+            .Subscribe();
+    }
+
+    private async Task<Unit> ValidateAsync()
+    {
+        try
+        {
+            var snapshot = new Dictionary<string, object?>();
+            foreach (var setting in Settings)
+            {
+                snapshot[setting.Setting.Key] = setting.Setting.GetCurrentValueAsObject();
+            }
+
+            var result = await _modulesApi.ValidateSettingsAsync(Definition.Id, Model.InstanceId, snapshot);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var hasErrors = result.Status == ValidationStatus.Error;
+                HasErrors = hasErrors;
+
+                foreach (var setting in Settings)
+                {
+                    setting.Error = null;
+                }
+
+                if (!hasErrors || result.FieldErrors.Count <= 0)
+                {
+                    return;
+                }
+
+                {
+                    foreach (var (key, error) in result.FieldErrors)
+                    {
+                        var setting = Settings.FirstOrDefault(s => s.Setting.Key == key);
+                        setting?.Error = error;
+                    }
+                }
+                // If global error but no field errors, maybe show on module level?
+                // For now, we rely on HasErrors flag which parent VM can use.
+            });
+        }
+        catch
+        {
+            // Ignore validation errors (e.g. network issues)
+        }
+
+        return Unit.Default;
     }
 
     private void HandleSettingUpdate(SettingUpdate update)
@@ -261,6 +330,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     {
         _settingUpdatesSubscription.Dispose();
         _settingStreamHandle?.Dispose();
+        _validationSubscription?.Dispose();
 
         foreach (var setting in Settings)
         {

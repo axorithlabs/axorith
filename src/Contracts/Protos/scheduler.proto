@@ -1,11 +1,11 @@
 ﻿syntax = "proto3";
 
-option csharp_namespace = "Axorith.Contracts";
+package axorith.contracts;
 
-package axorith.scheduler;
-
-import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option csharp_namespace = "Axorith.Contracts";
 
 service SchedulerService {
   // Lists all configured schedules
@@ -29,26 +29,15 @@ message Schedule {
   string preset_id = 2;
   string name = 3;
   bool is_enabled = 4;
-
-  // Type of schedule: 0 = OneTime, 1 = Recurring
-  int32 type = 5;
-
-  // For OneTime: The specific date and time to run
+  int32 type = 5; // 0=OneTime, 1=Recurring
   google.protobuf.Timestamp one_time_date = 6;
-
-  // For Recurring: Time of day (ticks or string HH:mm)
-  string recurring_time = 7;
-
-  // For Recurring: Days of week (Monday=1, Sunday=7). Empty means every day.
-  repeated int32 days_of_week = 8;
-
-  // Metadata
-  google.protobuf.Timestamp next_run = 9;
-  google.protobuf.Timestamp last_run = 10;
+  string recurring_time = 7; // "HH:mm"
+  repeated int32 days_of_week = 8; // 0=Sunday, 1=Monday...
+  google.protobuf.Timestamp last_run = 9;
+  google.protobuf.Timestamp next_run = 10;
 }
 
-message ListSchedulesRequest {
-}
+message ListSchedulesRequest {}
 
 message ListSchedulesResponse {
   repeated Schedule schedules = 1;

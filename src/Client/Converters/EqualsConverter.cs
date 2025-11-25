@@ -5,7 +5,7 @@ namespace Axorith.Client.Converters;
 
 public class EqualsConverter : IValueConverter
 {
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         return Equals(value, parameter);
     }

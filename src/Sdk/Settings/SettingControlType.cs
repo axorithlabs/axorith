@@ -26,14 +26,18 @@ public enum SettingControlType
     Number,
 
     /// <summary>
-    ///     A dropdown list of choices.
+    ///     A dropdown list of choices (single selection).
     /// </summary>
     Choice,
 
     /// <summary>
+    ///     A list of choices allowing multiple selections (checkbox list).
+    ///     Value type is List&lt;string&gt;.
+    /// </summary>
+    MultiChoice,
+
+    /// <summary>
     ///     A text input that masks its content (password field).
-    ///     Secret settings use Ephemeral persistence and are stored in SecureStorage (Windows DPAPI),
-    ///     never in preset JSON files. This ensures sensitive data like API tokens are protected.
     /// </summary>
     Secret,
 

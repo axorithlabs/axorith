@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-option csharp_namespace = "Axorith.Contracts";
-
-package axorith;
+package axorith.contracts;
 
 import "google/protobuf/empty.proto";
+
+option csharp_namespace = "Axorith.Contracts";
 
 service HostManagement {
   rpc RequestShutdown(ShutdownRequest) returns (ShutdownResponse);

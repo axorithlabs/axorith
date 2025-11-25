@@ -420,4 +420,74 @@ public class ModulesServiceImpl(
             throw;
         }
     }
+
+    public override async Task<ValidationResponse> ValidateSettings(ValidateSettingsRequest request,
+        ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.ModuleId, out var moduleId))
+            {
+                return new ValidationResponse { IsValid = false, Message = "Invalid Module ID" };
+            }
+
+            if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
+            {
+                return new ValidationResponse { IsValid = false, Message = "Invalid Instance ID" };
+            }
+
+            var settingsDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sv in request.Values)
+            {
+                var str = sv.ValueCase switch
+                {
+                    SettingValue.ValueOneofCase.StringValue => sv.StringValue,
+                    SettingValue.ValueOneofCase.BoolValue => sv.BoolValue.ToString(),
+                    SettingValue.ValueOneofCase.NumberValue => sv.NumberValue.ToString(),
+                    SettingValue.ValueOneofCase.IntValue => sv.IntValue.ToString(),
+                    _ => null
+                };
+                settingsDict[sv.Key] = str;
+            }
+
+            await sandboxManager.EnsureAsync(instanceId, moduleId, settingsDict, context.CancellationToken)
+                .ConfigureAwait(false);
+
+            var module = sandboxManager.GetModule(instanceId);
+            if (module == null)
+            {
+                return new ValidationResponse { IsValid = false, Message = "Failed to load module instance" };
+            }
+
+            foreach (var kv in settingsDict)
+            {
+                sandboxManager.ApplySetting(instanceId, kv.Key, kv.Value);
+            }
+
+            var result = await module.ValidateSettingsAsync(context.CancellationToken).ConfigureAwait(false);
+
+            var response = new ValidationResponse
+            {
+                IsValid = result.Status != Sdk.ValidationStatus.Error,
+                Message = result.Message
+            };
+
+            foreach (var fieldError in result.FieldErrors)
+            {
+                response.FieldErrors.Add(new ValidationError
+                {
+                    SettingKey = fieldError.Key,
+                    ErrorMessage = fieldError.Value,
+                    Severity = ValidationSeverity.ValidationError
+                });
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error validating settings");
+            return new ValidationResponse { IsValid = false, Message = $"Validation failed: {ex.Message}" };
+        }
+    }
 }

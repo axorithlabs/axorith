@@ -21,6 +21,7 @@ public class SessionManager(
     : ISessionManager
 {
     private CancellationTokenSource? _sessionCts;
+    private readonly SemaphoreSlim _stateLock = new(1, 1);
 
     // This private class holds the live instance of a module and its personal DI scope.
     private class ActiveModule : IDisposable
@@ -48,53 +49,74 @@ public class SessionManager(
     /// <inheritdoc />
     public async Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default)
     {
-        if (IsSessionRunning)
+        List<ActiveModule> modulesToStart;
+
+        await _stateLock.WaitAsync(cancellationToken);
+        try
         {
-            throw new SessionException(
-                "A session is already running. Stop the current session before starting a new one.");
-        }
-
-        logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
-        ActiveSession = preset;
-        SessionStartedAt = DateTimeOffset.UtcNow;
-        _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        _activeModules.Clear();
-
-        foreach (var configuredModule in preset.Modules)
-        {
-            var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
-            if (instance != null && scope != null)
+            if (IsSessionRunning)
             {
-                _activeModules.Add(new ActiveModule
+                throw new SessionException(
+                    "A session is already running. Stop the current session before starting a new one.");
+            }
+
+            logger.LogInformation("Starting session '{PresetName}'...", preset.Name);
+            
+            ActiveSession = preset;
+            SessionStartedAt = DateTimeOffset.UtcNow;
+            _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _activeModules.Clear();
+
+            foreach (var configuredModule in preset.Modules)
+            {
+                var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
+                if (instance != null && scope != null)
                 {
-                    Instance = instance, Scope = scope, Configuration = configuredModule
-                });
+                    _activeModules.Add(new ActiveModule
+                    {
+                        Instance = instance, Scope = scope, Configuration = configuredModule
+                    });
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping",
+                        configuredModule.ModuleId, preset.Name);
+                }
             }
-            else
-            {
-                logger.LogWarning(
-                    "Failed to create instance for module with ID {ModuleId} in preset '{PresetName}'. Skipping",
-                    configuredModule.ModuleId, preset.Name);
-            }
-        }
 
-        if (_activeModules.Count == 0)
+            if (_activeModules.Count == 0)
+            {
+                ActiveSession = null;
+                SessionStartedAt = null;
+                _sessionCts.Dispose();
+                _sessionCts = null;
+                
+                logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
+                    preset.Name);
+                throw new SessionException(
+                    $"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
+            }
+
+            // Create a snapshot of the list for the startup process.
+            // This prevents "Collection was modified" exception if Stop() is called 
+            // and clears _activeModules while startup is iterating.
+            modulesToStart = _activeModules.ToList();
+        }
+        finally
         {
-            ActiveSession = null;
-            logger.LogWarning("No modules could be instantiated for preset '{PresetName}'. Aborting session start",
-                preset.Name);
-            throw new SessionException(
-                $"No modules could be instantiated for preset '{preset.Name}'. Aborting session start");
+            _stateLock.Release();
         }
 
         try
         {
-            await RunModuleStartupsSequentialAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
+            await RunModuleStartupsSequentialAsync(modulesToStart, _sessionCts.Token).ConfigureAwait(false);
             SessionStarted?.Invoke(preset.Id);
         }
         catch (Exception)
         {
+            // If startup fails, we must ensure we stop cleanly.
+            // We call StopCurrentSessionAsync which will acquire the lock and clean up.
             await StopCurrentSessionAsync(CancellationToken.None).ConfigureAwait(false);
             throw;
         }
@@ -107,6 +129,8 @@ public class SessionManager(
 
         foreach (var activeModule in modules)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var config = activeModule.Configuration;
             var definition = activeModule.Scope.Resolve<ModuleDefinition>();
             var moduleName = config.CustomName ?? definition.Name;
@@ -186,16 +210,18 @@ public class SessionManager(
     /// <inheritdoc />
     public async Task StopCurrentSessionAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsSessionRunning && _activeModules.Count == 0)
-        {
-            logger.LogWarning("No session is currently running");
-            return;
-        }
-
-        logger.LogInformation("Stopping current session...");
-
+        await _stateLock.WaitAsync(cancellationToken);
         try
         {
+            if (!IsSessionRunning && _activeModules.Count == 0)
+            {
+                logger.LogWarning("No session is currently running");
+                return;
+            }
+
+            logger.LogInformation("Stopping current session...");
+
+            // Signal cancellation to any running startup tasks
             _sessionCts?.Cancel();
 
             for (var i = _activeModules.Count - 1; i >= 0; i--)
@@ -243,6 +269,7 @@ public class SessionManager(
             SessionStartedAt = null;
 
             logger.LogInformation("Session stopped successfully");
+            
             SessionStopped?.Invoke(stoppedPresetId);
         }
         catch (Exception ex)
@@ -250,77 +277,106 @@ public class SessionManager(
             logger.LogError(ex, "Error during session stop");
             throw;
         }
+        finally
+        {
+            _stateLock.Release();
+        }
     }
 
     /// <inheritdoc />
     public IModule? GetActiveModuleInstance(Guid moduleId)
     {
-        return _activeModules
-            .FirstOrDefault(m => m.Configuration.ModuleId == moduleId)
-            ?.Instance;
+        _stateLock.Wait();
+        try
+        {
+            return _activeModules
+                .FirstOrDefault(m => m.Configuration.ModuleId == moduleId)
+                ?.Instance;
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
     }
 
 
     /// <inheritdoc />
     public IModule? GetActiveModuleInstanceByInstanceId(Guid instanceId)
     {
-        return _activeModules
-            .FirstOrDefault(m => m.Configuration.InstanceId == instanceId)
-            ?.Instance;
+        _stateLock.Wait();
+        try
+        {
+            return _activeModules
+                .FirstOrDefault(m => m.Configuration.InstanceId == instanceId)
+                ?.Instance;
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
     }
 
     public SessionSnapshot? GetCurrentSnapshot()
     {
-        if (!IsSessionRunning || ActiveSession == null)
+        _stateLock.Wait();
+        try
         {
-            return null;
-        }
-
-        var modules = new List<SessionModuleSnapshot>();
-
-        foreach (var active in _activeModules)
-        {
-            var definition = moduleRegistry.GetDefinitionById(active.Configuration.ModuleId);
-
-            var settings = new List<SessionSettingSnapshot>();
-            foreach (var setting in active.Instance.GetSettings())
+            if (!IsSessionRunning || ActiveSession == null)
             {
-                settings.Add(new SessionSettingSnapshot(
-                    setting.Key,
-                    setting.GetCurrentLabel(),
-                    setting.Description,
-                    setting.ControlType,
-                    setting.Persistence,
-                    setting.GetCurrentReadOnly(),
-                    setting.GetCurrentVisibility(),
-                    setting.ValueType.Name,
-                    setting.GetValueAsString()));
+                return null;
             }
 
-            var actions = new List<SessionActionSnapshot>();
-            foreach (var action in active.Instance.GetActions())
+            var modules = new List<SessionModuleSnapshot>();
+
+            foreach (var active in _activeModules)
             {
-                actions.Add(new SessionActionSnapshot(
-                    action.Key,
-                    action.GetCurrentLabel(),
-                    action.GetCurrentEnabled()));
+                var definition = moduleRegistry.GetDefinitionById(active.Configuration.ModuleId);
+
+                var settings = new List<SessionSettingSnapshot>();
+                foreach (var setting in active.Instance.GetSettings())
+                {
+                    settings.Add(new SessionSettingSnapshot(
+                        setting.Key,
+                        setting.GetCurrentLabel(),
+                        setting.Description,
+                        setting.ControlType,
+                        setting.Persistence,
+                        setting.GetCurrentReadOnly(),
+                        setting.GetCurrentVisibility(),
+                        setting.ValueType.Name,
+                        setting.GetValueAsString()));
+                }
+
+                var actions = new List<SessionActionSnapshot>();
+                foreach (var action in active.Instance.GetActions())
+                {
+                    actions.Add(new SessionActionSnapshot(
+                        action.Key,
+                        action.GetCurrentLabel(),
+                        action.GetCurrentEnabled()));
+                }
+
+                modules.Add(new SessionModuleSnapshot(
+                    active.Configuration.InstanceId,
+                    active.Configuration.ModuleId,
+                    definition?.Name ?? "Unknown",
+                    active.Configuration.CustomName,
+                    settings,
+                    actions));
             }
 
-            modules.Add(new SessionModuleSnapshot(
-                active.Configuration.InstanceId,
-                active.Configuration.ModuleId,
-                definition?.Name ?? "Unknown",
-                active.Configuration.CustomName,
-                settings,
-                actions));
+            return new SessionSnapshot(ActiveSession.Id, ActiveSession.Name, modules);
         }
-
-        return new SessionSnapshot(ActiveSession.Id, ActiveSession.Name, modules);
+        finally
+        {
+            _stateLock.Release();
+        }
     }
 
     /// <inheritdoc />
     public SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId)
     {
+        // GetCurrentSnapshot already takes the lock
         var snapshot = GetCurrentSnapshot();
         return snapshot?.Modules.FirstOrDefault(m => m.InstanceId == instanceId);
     }
@@ -336,5 +392,6 @@ public class SessionManager(
         }
 
         _sessionCts?.Dispose();
+        _stateLock.Dispose();
     }
 }

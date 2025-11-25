@@ -115,28 +115,23 @@ try
         Log.Warning(initEx, "ModuleRegistry initialization failed; continuing without modules");
     }
 
-    // --- START SCHEDULER ---
     try
     {
         var scheduler = app.Services.GetRequiredService<IScheduleManager>();
-        // Fire and forget start, it runs in background
         _ = scheduler.StartAsync(app.Lifetime.ApplicationStopping);
     }
     catch (Exception ex)
     {
         Log.Error(ex, "Failed to start ScheduleManager");
     }
-    // -----------------------
 
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
     app.MapGrpcService<ModulesServiceImpl>();
     app.MapGrpcService<DiagnosticsServiceImpl>();
     app.MapGrpcService<HostManagementServiceImpl>();
-
-    // --- REGISTER NEW SERVICE ---
     app.MapGrpcService<SchedulerServiceImpl>();
-    // ----------------------------
+    app.MapGrpcService<NotificationServiceImpl>();
 
     if (app.Environment.IsDevelopment())
     {
@@ -180,6 +175,15 @@ static void RegisterCoreServices(ContainerBuilder builder)
             return PlatformServices.CreateAppDiscoveryService(loggerFactory);
         })
         .As<IAppDiscoveryService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
+    builder.Register(ctx =>
+        {
+            var logger = ctx.Resolve<ILogger<ISystemNotificationService>>();
+            return PlatformServices.CreateNotificationService(logger);
+        })
+        .As<ISystemNotificationService>()
         .SingleInstance()
         .PreserveExistingDefaults();
 
@@ -259,6 +263,11 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<IScheduleManager>()
         .SingleInstance()
         .PreserveExistingDefaults();
+        
+    builder.RegisterType<HostNotifier>()
+        .As<INotifier>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
 }
 
 static void RegisterBroadcasters(ContainerBuilder builder)
@@ -274,6 +283,11 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .PreserveExistingDefaults();
 
     builder.RegisterType<DesignTimeSandboxManager>()
+        .AsSelf()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+        
+    builder.RegisterType<NotificationBroadcaster>()
         .AsSelf()
         .SingleInstance()
         .PreserveExistingDefaults();

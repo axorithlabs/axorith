@@ -12,6 +12,7 @@ using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 using OperationResult = Axorith.Client.CoreSdk.Abstractions.OperationResult;
 using SettingProperty = Axorith.Client.CoreSdk.Abstractions.SettingProperty;
 using SettingUpdate = Axorith.Client.CoreSdk.Abstractions.SettingUpdate;
+using ValidationResult = Axorith.Sdk.ValidationResult;
 
 namespace Axorith.Client.CoreSdk;
 
@@ -301,6 +302,65 @@ internal class GrpcModulesApi(
                 response.Message,
                 response.Errors?.Count > 0 ? response.Errors.ToList() : null,
                 response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<ValidationResult> ValidateSettingsAsync(Guid moduleId, Guid moduleInstanceId,
+        IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
+    {
+        return await retryPolicy.ExecuteAsync(async () =>
+        {
+            var request = new ValidateSettingsRequest
+            {
+                ModuleId = moduleId.ToString(),
+                ModuleInstanceId = moduleInstanceId.ToString()
+            };
+
+            foreach (var (key, val) in values)
+            {
+                var sv = new SettingValue { Key = key };
+                switch (val)
+                {
+                    case string s:
+                        sv.StringValue = s;
+                        break;
+                    case bool b:
+                        sv.BoolValue = b;
+                        break;
+                    case int i:
+                        sv.IntValue = i;
+                        break;
+                    case double d:
+                        sv.NumberValue = d;
+                        break;
+                    case decimal dec:
+                        sv.NumberValue = (double)dec;
+                        break;
+                    case null:
+                        sv.StringValue = string.Empty;
+                        break;
+                    default:
+                        sv.StringValue = val.ToString() ?? string.Empty;
+                        break;
+                }
+
+                request.Values.Add(sv);
+            }
+
+            var response = await client.ValidateSettingsAsync(request, cancellationToken: ct).ConfigureAwait(false);
+
+            if (response.IsValid)
+            {
+                return ValidationResult.Success;
+            }
+
+            var fieldErrors = new Dictionary<string, string>();
+            foreach (var error in response.FieldErrors)
+            {
+                fieldErrors[error.SettingKey] = error.ErrorMessage;
+            }
+
+            return ValidationResult.Fail(fieldErrors, response.Message);
         }).ConfigureAwait(false);
     }
 

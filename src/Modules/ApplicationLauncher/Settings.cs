@@ -274,18 +274,20 @@ internal sealed class Settings
 
     public Task<ValidationResult> ValidateAsync()
     {
+        var errors = new Dictionary<string, string>();
+
         if (string.IsNullOrWhiteSpace(ApplicationPath.GetCurrentValue()))
         {
-            return Task.FromResult(ValidationResult.Fail("'Application Path' is required."));
+            errors[ApplicationPath.Key] = "Application Path is required.";
         }
-
-        var mode = ProcessMode.GetCurrentValue();
-        // Only validate file existence if it looks like an absolute path.
-        // If user entered "chrome" and didn't auto-detect, we might fail at runtime, but validation passes.
-        var path = ApplicationPath.GetCurrentValue();
-        if (mode == "LaunchNew" && Path.IsPathRooted(path) && !File.Exists(path))
+        else
         {
-            return Task.FromResult(ValidationResult.Fail($"File not found at '{path}'."));
+            var mode = ProcessMode.GetCurrentValue();
+            var path = ApplicationPath.GetCurrentValue();
+            if (mode == "LaunchNew" && Path.IsPathRooted(path) && !File.Exists(path))
+            {
+                errors[ApplicationPath.Key] = $"File not found at '{path}'.";
+            }
         }
 
         if (UseCustomWorkingDirectory.GetCurrentValue())
@@ -293,29 +295,30 @@ internal sealed class Settings
             var workingDir = WorkingDirectory.GetCurrentValue();
             if (string.IsNullOrWhiteSpace(workingDir))
             {
-                return Task.FromResult(
-                    ValidationResult.Fail("'Working Directory' is required when custom working directory is enabled."));
+                errors[WorkingDirectory.Key] = "Working Directory is required.";
             }
-
-            if (!Directory.Exists(workingDir))
+            else if (!Directory.Exists(workingDir))
             {
-                return Task.FromResult(ValidationResult.Fail($"Working directory '{workingDir}' does not exist."));
+                errors[WorkingDirectory.Key] = $"Directory '{workingDir}' does not exist.";
             }
         }
 
-        if (!UseCustomSize.GetCurrentValue())
+        if (UseCustomSize.GetCurrentValue())
         {
-            return Task.FromResult(ValidationResult.Success);
+            if (WindowWidth.GetCurrentValue() < 100)
+            {
+                errors[WindowWidth.Key] = "Width must be at least 100px.";
+            }
+
+            if (WindowHeight.GetCurrentValue() < 100)
+            {
+                errors[WindowHeight.Key] = "Height must be at least 100px.";
+            }
         }
 
-        if (WindowWidth.GetCurrentValue() < 100)
+        if (errors.Count > 0)
         {
-            return Task.FromResult(ValidationResult.Fail("'Window Width' must be at least 100 pixels."));
-        }
-
-        if (WindowHeight.GetCurrentValue() < 100)
-        {
-            return Task.FromResult(ValidationResult.Fail("'Window Height' must be at least 100 pixels."));
+            return Task.FromResult(ValidationResult.Fail(errors, "Configuration contains errors."));
         }
 
         return Task.FromResult(ValidationResult.Success);

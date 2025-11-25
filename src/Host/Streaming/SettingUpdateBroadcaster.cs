@@ -1,6 +1,6 @@
-// ===== FILE: src\Host\Streaming\SettingUpdateBroadcaster.cs =====
-
 using System.Collections.Concurrent;
+using System.Reactive.Disposables;
+using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
 using System.Threading.Channels;
 using Axorith.Contracts;
@@ -31,9 +31,8 @@ public class SettingUpdateBroadcaster : IDisposable
     }
 
     private readonly ConcurrentDictionary<string, Subscriber> _subscribers = new();
-    private readonly ConcurrentDictionary<string, IDisposable> _settingSubscriptions = new();
+    private readonly ConcurrentDictionary<Guid, CompositeDisposable> _moduleSubscriptions = new();
     private readonly ConcurrentDictionary<string, string> _lastChoicesFingerprint = new();
-    private readonly ConcurrentDictionary<Guid, byte> _runtimeInstanceIds = new();
     private bool _disposed;
 
     private readonly int _choicesThrottleMs;
@@ -59,25 +58,14 @@ public class SettingUpdateBroadcaster : IDisposable
     /// </summary>
     public void UnsubscribeModuleInstance(Guid moduleInstanceId)
     {
-        var prefix = moduleInstanceId.ToString();
-        var toRemove = new List<string>();
-        foreach (var (key, sub) in _settingSubscriptions)
+        if (_moduleSubscriptions.TryRemove(moduleInstanceId, out var disposables))
         {
-            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            sub.Dispose();
-
-            toRemove.Add(key);
+            disposables.Dispose();
+            _logger.LogDebug("Unsubscribed from module instance {InstanceId}", moduleInstanceId);
         }
 
-        foreach (var k in toRemove)
-        {
-            _settingSubscriptions.TryRemove(k, out _);
-        }
-
+        // Cleanup choice cache for this module
+        var prefix = moduleInstanceId + ":";
         var choiceKeys = _lastChoicesFingerprint.Keys
             .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
         foreach (var ck in choiceKeys)
@@ -145,27 +133,19 @@ public class SettingUpdateBroadcaster : IDisposable
             Loop = loopTask
         };
 
-        // FIX AXOR-39: Use atomic AddOrUpdate instead of TryAdd/TryRemove dance.
         _subscribers.AddOrUpdate(key,
-            // Factory for adding new key
             _ => subscriber,
-            // Factory for updating existing key
             (_, oldSubscriber) =>
             {
                 _logger.LogWarning("Client {Key} already subscribed, replacing stream atomically", key);
-
-                // Signal the old subscriber to stop. 
-                // Cancel() is thread-safe. We don't need to await it here; 
-                // the background loopTask will catch the cancellation and exit gracefully.
                 try
                 {
                     oldSubscriber.Cts.Cancel();
                 }
                 catch (ObjectDisposedException)
                 {
-                    // Ignore if already disposed
+                    // Ignore
                 }
-
                 return subscriber;
             });
 
@@ -179,7 +159,6 @@ public class SettingUpdateBroadcaster : IDisposable
         }
         finally
         {
-            // Only remove if it's still OUR subscriber (handle race where it was replaced again)
             if (_subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber)))
             {
                 await subscriber.Cts.CancelAsync().ConfigureAwait(false);
@@ -209,18 +188,21 @@ public class SettingUpdateBroadcaster : IDisposable
                 continue;
             }
 
-            _runtimeInstanceIds[configuredModule.InstanceId] = 1;
+            UnsubscribeModuleInstance(configuredModule.InstanceId);
+            
+            var disposables = new CompositeDisposable();
+            _moduleSubscriptions[configuredModule.InstanceId] = disposables;
 
             var settings = moduleInstance.GetSettings();
             foreach (var setting in settings)
             {
-                SubscribeToSetting(configuredModule.InstanceId, setting);
+                SubscribeToSetting(configuredModule.InstanceId, setting, disposables);
             }
 
             var actions = moduleInstance.GetActions();
             foreach (var action in actions)
             {
-                SubscribeToAction(configuredModule.InstanceId, action);
+                SubscribeToAction(configuredModule.InstanceId, action, disposables);
             }
 
             _logger.LogDebug(
@@ -234,41 +216,16 @@ public class SettingUpdateBroadcaster : IDisposable
 
     private void OnSessionStopped(Guid presetId)
     {
-        var removedSubs = 0;
-        var removedChoices = 0;
-
-        foreach (var instanceId in _runtimeInstanceIds.Keys.ToArray())
+        _logger.LogDebug("Session stopped: {PresetId}. Cleaning up all runtime subscriptions.", presetId);
+        
+        foreach (var key in _moduleSubscriptions.Keys.ToArray())
         {
-            var prefix = instanceId + ":";
-            foreach (var kv in _settingSubscriptions.ToArray())
-            {
-                if (!kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                kv.Value.Dispose();
-                if (_settingSubscriptions.TryRemove(kv.Key, out _))
-                {
-                    removedSubs++;
-                }
-            }
-
-            removedChoices += _lastChoicesFingerprint.Keys.ToArray()
-                .Where(ck => ck.StartsWith(instanceId + ":", StringComparison.OrdinalIgnoreCase))
-                .Count(ck => _lastChoicesFingerprint.TryRemove(ck, out _));
-
-            _runtimeInstanceIds.TryRemove(instanceId, out _);
+            UnsubscribeModuleInstance(key);
         }
-
-        _logger.LogDebug(
-            "Session stopped: {PresetId}, removed {Subs} runtime subscriptions and {Choices} choice caches",
-            presetId, removedSubs, removedChoices);
+        
+        _logger.LogInformation("All setting subscriptions cleared.");
     }
 
-    /// <summary>
-    ///     Manually broadcasts a setting update (used when setting updated via gRPC).
-    /// </summary>
     public Task BroadcastUpdateAsync(Guid moduleInstanceId, string settingKey,
         SettingProperty property, object? value)
     {
@@ -277,7 +234,6 @@ public class SettingUpdateBroadcaster : IDisposable
             return Task.CompletedTask;
         }
 
-        // Choices caching: skip duplicate broadcasts with same fingerprint
         if (property == SettingProperty.Choices && value is IReadOnlyList<KeyValuePair<string, string>> choicesList)
         {
             var fingerprint = string.Join("\n", choicesList.Select(kv => kv.Key + "\u0001" + kv.Value));
@@ -320,104 +276,94 @@ public class SettingUpdateBroadcaster : IDisposable
     }
 
     /// <summary>
-    ///     Subscribes to a module setting's observables and broadcasts changes.
-    ///     Called internally when session starts and modules are initialized.
+    ///     Subscribes to a module setting's observables.
+    ///     Used internally by OnSessionStarted (with disposables list) or externally by DesignTimeSandboxManager (without list, manages own lifecycle).
     /// </summary>
-    public void SubscribeToSetting(Guid moduleInstanceId, ISetting setting)
+    public void SubscribeToSetting(Guid moduleInstanceId, ISetting setting, CompositeDisposable? disposables = null)
     {
         ArgumentNullException.ThrowIfNull(setting);
 
-        var keyPrefix = $"{moduleInstanceId}:{setting.Key}";
+        // If no disposables provided (e.g. DesignTime), create/get one for this instance
+        if (disposables == null)
+        {
+            disposables = _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => new CompositeDisposable());
+        }
 
-        var valueSub = setting.ValueAsObject
+        setting.ValueAsObject
             .Skip(1)
             .Throttle(TimeSpan.FromMilliseconds(_valueBatchWindowMs))
             .Subscribe(value =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Value, value);
-            });
-        ReplaceSubscription($"{keyPrefix}:value", valueSub);
+            })
+            .DisposeWith(disposables);
 
-        var labelSub = setting.Label
+        setting.Label
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(label =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Label, label);
-            });
-        ReplaceSubscription($"{keyPrefix}:label", labelSub);
+            })
+            .DisposeWith(disposables);
 
-        var visSub = setting.IsVisible
+        setting.IsVisible
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(visible =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Visibility, visible);
-            });
-        ReplaceSubscription($"{keyPrefix}:visibility", visSub);
+            })
+            .DisposeWith(disposables);
 
-        var readOnlySub = setting.IsReadOnly
+        setting.IsReadOnly
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(readOnly =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.ReadOnly, readOnly);
-            });
-        ReplaceSubscription($"{keyPrefix}:readonly", readOnlySub);
+            })
+            .DisposeWith(disposables);
 
         if (setting.Choices != null)
         {
-            var choicesSub = setting.Choices
+            setting.Choices
                 .Skip(1)
                 .Throttle(TimeSpan.FromMilliseconds(_choicesThrottleMs))
                 .Subscribe(choices =>
                 {
                     _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Choices, choices);
-                });
-            ReplaceSubscription($"{keyPrefix}:choices", choicesSub);
+                })
+                .DisposeWith(disposables);
         }
-
-        _logger.LogDebug("Subscribed to setting updates: {ModuleId}.{Key}", moduleInstanceId, setting.Key);
     }
 
-    /// <summary>
-    ///     Subscribes to a module action's observables and broadcasts changes.
-    /// </summary>
-    public void SubscribeToAction(Guid moduleInstanceId, IAction action)
+    public void SubscribeToAction(Guid moduleInstanceId, IAction action, CompositeDisposable? disposables = null)
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        var keyPrefix = $"{moduleInstanceId}:{action.Key}";
+        if (disposables == null)
+        {
+            disposables = _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => new CompositeDisposable());
+        }
 
-        var labelSub = action.Label
+        action.Label
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(label =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, action.Key, SettingProperty.ActionLabel, label);
-            });
-        ReplaceSubscription($"{keyPrefix}:action_label", labelSub);
+            })
+            .DisposeWith(disposables);
 
-        var enabledSub = action.IsEnabled
+        action.IsEnabled
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(enabled =>
             {
                 _ = BroadcastUpdateAsync(moduleInstanceId, action.Key, SettingProperty.ActionEnabled, enabled);
-            });
-        ReplaceSubscription($"{keyPrefix}:action_enabled", enabledSub);
-
-        _logger.LogDebug("Subscribed to action updates: {ModuleId}.{Key}", moduleInstanceId, action.Key);
-    }
-
-    private void ReplaceSubscription(string key, IDisposable sub)
-    {
-        if (_settingSubscriptions.TryRemove(key, out var old))
-        {
-            old.Dispose();
-        }
-
-        _settingSubscriptions[key] = sub;
+            })
+            .DisposeWith(disposables);
     }
 
     public void Dispose()
@@ -432,12 +378,11 @@ public class SettingUpdateBroadcaster : IDisposable
         _sessionManager.SessionStarted -= OnSessionStarted;
         _sessionManager.SessionStopped -= OnSessionStopped;
 
-        foreach (var subscription in _settingSubscriptions.Values)
+        foreach (var disposables in _moduleSubscriptions.Values)
         {
-            subscription.Dispose();
+            disposables.Dispose();
         }
-
-        _settingSubscriptions.Clear();
+        _moduleSubscriptions.Clear();
 
         _subscribers.Clear();
 

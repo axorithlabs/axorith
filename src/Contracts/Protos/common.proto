@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package axorith.v1;
+package axorith.contracts;
 
 import "google/protobuf/timestamp.proto";
 
@@ -26,18 +26,18 @@ message Setting {
   bool is_visible = 6;
   bool is_read_only = 7;
   string value_type = 8;
-  string filter = 40;
-  bool has_history = 50;
-  
+  string filter = 15;
+  bool has_history = 16;
+
   oneof value {
-    string string_value = 10;
-    bool bool_value = 11;
-    double number_value = 12;
-    int32 int_value = 13;
-    string decimal_string = 14;
+    string string_value = 9;
+    bool bool_value = 10;
+    double number_value = 11;
+    int32 int_value = 12;
+    string decimal_string = 13;
   }
-  
-  repeated Choice choices = 20;
+
+  repeated Choice choices = 14;
 }
 
 message Choice {
@@ -46,34 +46,36 @@ message Choice {
 }
 
 enum SettingControlType {
-  SETTING_CONTROL_TYPE_TEXT = 0;
-  SETTING_CONTROL_TYPE_TEXT_AREA = 1;
-  SETTING_CONTROL_TYPE_CHECKBOX = 2;
-  SETTING_CONTROL_TYPE_NUMBER = 3;
-  SETTING_CONTROL_TYPE_CHOICE = 4;
-  SETTING_CONTROL_TYPE_SECRET = 5;
-  SETTING_CONTROL_TYPE_FILE_PICKER = 6;
-  SETTING_CONTROL_TYPE_DIRECTORY_PICKER = 7;
+  TEXT = 0;
+  TEXT_AREA = 1;
+  CHECKBOX = 2;
+  NUMBER = 3;
+  CHOICE = 4;
+  SECRET = 5;
+  FILE_PICKER = 6;
+  DIRECTORY_PICKER = 7;
+  BUTTON = 8;
+  MULTI_CHOICE = 9;
 }
 
 enum SettingPersistence {
-  SETTING_PERSISTENCE_PERSISTED = 0;
-  SETTING_PERSISTENCE_EPHEMERAL = 1;
-  SETTING_PERSISTENCE_TRANSIENT = 2;
+  PERSISTED = 0;
+  EPHEMERAL = 1;
+  TRANSIENT = 2;
 }
 
 message SettingUpdate {
   string module_instance_id = 1;
   string setting_key = 2;
   SettingProperty property = 3;
-  
+
   oneof value {
-    string string_value = 10;
-    bool bool_value = 11;
-    double number_value = 12;
-    int32 int_value = 13;
-    ChoiceList choice_list = 14;
-    string decimal_string = 15;
+    string string_value = 4;
+    bool bool_value = 5;
+    double number_value = 6;
+    int32 int_value = 7;
+    string decimal_string = 8;
+    ChoiceList choice_list = 9;
   }
 }
 
@@ -82,13 +84,23 @@ message ChoiceList {
 }
 
 enum SettingProperty {
-  SETTING_PROPERTY_VALUE = 0;
-  SETTING_PROPERTY_LABEL = 1;
-  SETTING_PROPERTY_VISIBILITY = 2;
-  SETTING_PROPERTY_READ_ONLY = 3;
-  SETTING_PROPERTY_CHOICES = 4;
-  SETTING_PROPERTY_ACTION_ENABLED = 5;
-  SETTING_PROPERTY_ACTION_LABEL = 6;
+  VALUE = 0;
+  LABEL = 1;
+  VISIBILITY = 2;
+  READ_ONLY = 3;
+  CHOICES = 4;
+  ACTION_ENABLED = 5;
+  ACTION_LABEL = 6;
+}
+
+message SettingValue {
+  string key = 1;
+  oneof value {
+    string string_value = 2;
+    bool bool_value = 3;
+    double number_value = 4;
+    int32 int_value = 5;
+  }
 }
 
 // ===== Action-related Messages =====
@@ -177,4 +189,11 @@ enum SessionEventType {
   SESSION_EVENT_MODULE_STOPPED = 3;
   SESSION_EVENT_MODULE_ERROR = 4;
   SESSION_EVENT_VALIDATION_WARNING = 5;
+}
+
+// ===== Validation Types =====
+
+enum ValidationSeverity {
+  VALIDATION_ERROR = 0;
+  VALIDATION_WARNING = 1;
 }

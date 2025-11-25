@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
              xmlns:views="using:Axorith.Client.Views"
+             xmlns:converters="clr-namespace:Axorith.Client.Converters"
              x:Class="Axorith.Client.App"
              RequestedThemeVariant="Dark">
 
@@ -21,6 +22,9 @@
     </Application.DataTemplates>
 
     <Application.Resources>
+        <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
+        <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
+        
         <SolidColorBrush x:Key="SystemRegionBrush" Color="#050505" />
         <SolidColorBrush x:Key="CardBackgroundBrush" Color="#0A0A0A" />
         <SolidColorBrush x:Key="BorderBrush" Color="#333333" />

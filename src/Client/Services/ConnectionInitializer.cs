@@ -56,6 +56,10 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             await UpdateStatus("Connected to Axorith.Host", "Initializing client services...");
             RebuildServiceProvider(app, config, loggerFactory, connection, logger);
 
+            var notificationService = app.Services.GetRequiredService<INotificationApi>();
+            var toastService = app.Services.GetRequiredService<IToastNotificationService>();
+            _ = Task.Run(() => SubscribeToNotifications(notificationService, toastService, logger));
+
             await UpdateStatus("Loading presets...", "Fetching session data...");
 
             var mainViewModel = app.Services.GetRequiredService<MainViewModel>();
@@ -74,6 +78,24 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         {
             logger.LogError(ex, "Fatal initialization error");
             await ShowFatalErrorAsync(app, config, loggerFactory, logger, ex.Message);
+        }
+    }
+
+    private async Task SubscribeToNotifications(INotificationApi api, IToastNotificationService toastService, ILogger logger)
+    {
+        try
+        {
+            await foreach (var notification in api.StreamNotificationsAsync())
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    toastService.Show(notification.Message, notification.Type);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Notification stream disconnected");
         }
     }
 
@@ -169,6 +191,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton(connection.Modules);
         services.AddSingleton(connection.Diagnostics);
         services.AddSingleton(connection.Scheduler);
+        services.AddSingleton(connection.Notifications); // NEW
 
         var existingMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
         existingMonitor.SetDiagnosticsApi(connection.Diagnostics);
@@ -177,6 +200,8 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton<IHostController, HostController>();
         services.AddSingleton<ITokenProvider>(app.Services.GetRequiredService<ITokenProvider>());
         services.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
+        
+        services.AddSingleton(app.Services.GetRequiredService<IToastNotificationService>());
 
         var filePicker = app.Services.GetService<IFilePickerService>();
         if (filePicker != null)

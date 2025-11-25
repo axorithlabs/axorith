@@ -24,32 +24,94 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <Border x:Name="TitleBar"
-                Height="40"
-                Background="Transparent"
-                BorderBrush="#333333"
-                BorderThickness="0,0,0,1"
-                IsHitTestVisible="False">
-            
-            <Grid ColumnDefinitions="*,Auto,*">
-                <Border Grid.Column="0" />
-
-                <TextBlock Text="Axorith"
-                           Foreground="#E0E0E0"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           LetterSpacing="0.5"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"
-                           Grid.Column="1"/>
+    <Panel>
+        <Grid RowDefinitions="Auto,*">
+            <Border x:Name="TitleBar"
+                    Height="40"
+                    Background="Transparent"
+                    BorderBrush="#333333"
+                    BorderThickness="0,0,0,1"
+                    IsHitTestVisible="False">
                 
-                <Border Grid.Column="2" />
-            </Grid>
-        </Border>
-        
-        <ContentControl Grid.Row="1"
-                        Content="{Binding Content}"
-                        Margin="0"/>
-    </Grid>
+                <Grid ColumnDefinitions="*,Auto,*">
+                    <Border Grid.Column="0" />
+
+                    <TextBlock Text="Axorith"
+                               Foreground="#E0E0E0"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               LetterSpacing="0.5"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"
+                               Grid.Column="1"/>
+                    
+                    <Border Grid.Column="2" />
+                </Grid>
+            </Border>
+            
+            <ContentControl Grid.Row="1"
+                            Content="{Binding Content}"
+                            Margin="0"/>
+        </Grid>
+
+        <ItemsControl ItemsSource="{Binding Toasts}"
+                      VerticalAlignment="Top"
+                      HorizontalAlignment="Right"
+                      Margin="0,50,20,0"
+                      IsHitTestVisible="False">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl ItemsSource="{Binding Toasts}"
+                      VerticalAlignment="Top"
+                      HorizontalAlignment="Right"
+                      Margin="0,60,30,0"
+                      IsHitTestVisible="False"
+                      ZIndex="999">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="#1E1E1E"
+                            BorderBrush="#333"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="0"
+                            BoxShadow="0 6 15 0 #80000000"
+                            MinWidth="300"
+                            MaxWidth="400"
+                            Margin="0,0,0,10">
+                        <Grid ColumnDefinitions="5, Auto, *">
+                            <Border Grid.Column="0" 
+                                    Background="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}" 
+                                    CornerRadius="6,0,0,6" 
+                                    VerticalAlignment="Stretch"/>
+                            
+                            <PathIcon Grid.Column="1" 
+                                      Data="{Binding Type, Converter={StaticResource NotificationTypeToIconConverter}}"
+                                      Foreground="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}"
+                                      Width="20" Height="20"
+                                      Margin="15,0,0,0"
+                                      VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="2" 
+                                       Text="{Binding Message}"
+                                       Foreground="#FFFFFF"
+                                       FontSize="14"
+                                       FontWeight="Medium"
+                                       TextWrapping="Wrap"
+                                       Padding="12,12,15,12"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        </ItemsControl>
+    </Panel>
 </Window>

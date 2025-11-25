@@ -58,6 +58,13 @@ public interface IModulesApi
     Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default);
 
     /// <summary>
+    ///     Validates a set of settings against the module's validation logic.
+    ///     Uses the design-time sandbox on the Host.
+    /// </summary>
+    Task<ValidationResult> ValidateSettingsAsync(Guid moduleId, Guid moduleInstanceId,
+        IReadOnlyDictionary<string, object?> values, CancellationToken ct = default);
+
+    /// <summary>
     ///     Observable stream of setting updates from running modules.
     ///     Broadcasts reactive changes (label, visibility, choices, etc.).
     /// </summary>

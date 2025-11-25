@@ -1,42 +1,56 @@
 ﻿using System.Diagnostics;
-using System.Management;
 using System.Runtime.Versioning;
+using Microsoft.Diagnostics.Tracing.Parsers;
+using Microsoft.Diagnostics.Tracing.Session;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-///     Windows implementation of IProcessBlocker using WMI events.
-///     Monitors process creation (__InstanceCreationEvent) to block apps in real-time.
-///     Operates strictly in BlockList mode.
+///     Windows implementation of IProcessBlocker.
+///     Strategy:
+///     1. If Admin -> Use ETW (Real-time, Zero overhead).
+///     2. If User  -> Use WinEventHook (Real-time for windows) + Optimized Polling (Background).
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
     private readonly Lock _lock = new();
     
-    private ManagementEventWatcher? _watcher;
+    // ETW components
+    private TraceEventSession? _etwSession;
+    private Task? _etwTask;
+    
+    // Non-Admin components
+    private CancellationTokenSource? _pollingCts;
+    private IntPtr _winEventHook = IntPtr.Zero;
+    private WindowApi.WinEventDelegate? _winEventDelegate; // Keep reference to prevent GC
+    
     private HashSet<string> _targetProcessNames = [];
 
-    // Hardcoded safe list to prevent accidental blocking of Axorith itself or critical system components
-    // even if user adds them to the blocklist by mistake.
+    public event Action<string>? ProcessBlocked;
+
+    // Hardcoded safe list to prevent accidental blocking of critical components
     private static readonly HashSet<string> SafeList = new(StringComparer.OrdinalIgnoreCase)
     {
         "Axorith.Client", "Axorith.Host", "Axorith.Shim", "Axorith.Core",
         "explorer", "taskmgr", "dwm", "lsass", "csrss", "svchost", "winlogon", "services", "spoolsv", "System", "Idle"
     };
 
-    public void Block(IEnumerable<string> processNames)
+    public List<string> Block(IEnumerable<string> processNames)
     {
         lock (_lock)
         {
             _targetProcessNames = NormalizeNames(processNames);
-
             logger.LogInformation("Updating blocker rules. Targets: {Count}", _targetProcessNames.Count);
 
-            ScanAndKillExisting();
+            // Initial cleanup of already running processes
+            // Returns list of killed processes for notification
+            var killed = ScanAndKillByList(initialScan: true);
 
-            StartWatcher();
+            StartMonitoring();
+            
+            return killed;
         }
     }
 
@@ -45,7 +59,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         lock (_lock)
         {
             var normalized = NormalizeName(processName);
-
             if (_targetProcessNames.Remove(normalized))
             {
                 logger.LogInformation("Removed '{Process}' from BlockList.", normalized);
@@ -57,103 +70,228 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     {
         lock (_lock)
         {
-            StopWatcher();
+            StopMonitoring();
             _targetProcessNames.Clear();
             logger.LogInformation("All blocking disabled.");
         }
     }
 
-    private void StartWatcher()
+    private void StartMonitoring()
     {
-        if (_watcher != null) return;
+        if (_etwSession != null || _pollingCts != null) return;
 
-        try
+        if (TraceEventSession.IsElevated() ?? false)
         {
-            var query = new WqlEventQuery("SELECT * FROM __InstanceCreationEvent WITHIN 1 WHERE TargetInstance ISA 'Win32_Process'");
-            _watcher = new ManagementEventWatcher(query);
-            _watcher.EventArrived += OnProcessCreated;
-            _watcher.Start();
-            logger.LogDebug("WMI Process Watcher started (Real-time blocking active).");
+            logger.LogInformation("Admin privileges detected. Starting Real-time ETW Monitor.");
+            StartEtwSession();
         }
-        catch (Exception ex)
+        else
         {
-            logger.LogError(ex, "Failed to start WMI Process Watcher. Real-time blocking may not work.");
+            logger.LogInformation("Running as Standard User. Starting Hybrid Monitor (WinEventHook + Polling).");
+            StartWinEventHook();
+            StartPollingSession();
         }
     }
 
-    private void StopWatcher()
-    {
-        if (_watcher == null) return;
-
-        try
-        {
-            _watcher.Stop();
-            _watcher.Dispose();
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Error stopping WMI watcher.");
-        }
-        finally
-        {
-            _watcher = null;
-        }
-    }
-
-    private void OnProcessCreated(object sender, EventArrivedEventArgs e)
+    private void StartEtwSession()
     {
         try
         {
-            if (e.NewEvent["TargetInstance"] is not ManagementBaseObject targetInstance) return;
+            var sessionName = "AxorithProcessBlocker-" + Guid.NewGuid();
+            _etwSession = new TraceEventSession(sessionName);
 
-            var processName = targetInstance["Name"]?.ToString();
-            var processIdObj = targetInstance["ProcessId"];
+            _etwSession.EnableKernelProvider(KernelTraceEventParser.Keywords.Process);
 
-            if (string.IsNullOrEmpty(processName) || processIdObj == null) return;
-
-            var pid = Convert.ToInt32(processIdObj);
-            var normalizedName = NormalizeName(processName);
-
-            // Thread-safe check against the target list
-            bool shouldBlock;
-            lock (_lock)
+            _etwSession.Source.Kernel.ProcessStart += data =>
             {
-                shouldBlock = ShouldBlock(normalizedName);
-            }
+                var processName = data.ProcessName;
+                var pid = data.ProcessID;
 
-            if (shouldBlock)
+                if (string.IsNullOrEmpty(processName)) return;
+
+                var normalized = NormalizeName(processName);
+
+                bool shouldBlock;
+                lock (_lock)
+                {
+                    shouldBlock = ShouldBlock(normalized);
+                }
+
+                if (shouldBlock)
+                {
+                    Task.Run(() => KillProcessById(pid, normalized));
+                }
+            };
+
+            _etwTask = Task.Run(() =>
             {
-                KillProcessById(pid, normalizedName);
-            }
+                try
+                {
+                    _etwSession.Source.Process();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "ETW Session processing failed");
+                }
+            });
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error processing WMI event.");
+            logger.LogError(ex, "Failed to start ETW session. Falling back to hybrid mode.");
+            _etwSession?.Dispose();
+            _etwSession = null;
+            StartWinEventHook();
+            StartPollingSession();
         }
     }
 
-    private void ScanAndKillExisting()
+    private void StartWinEventHook()
     {
-        var processes = Process.GetProcesses();
-        foreach (var p in processes)
+        if (_winEventHook != IntPtr.Zero) return;
+
+        _winEventDelegate = new WindowApi.WinEventDelegate(WinEventProc);
+        
+        _winEventHook = WindowApi.SetWinEventHook(
+            WindowApi.EVENT_SYSTEM_FOREGROUND, 
+            WindowApi.EVENT_SYSTEM_FOREGROUND, 
+            IntPtr.Zero, 
+            _winEventDelegate, 
+            0, 
+            0, 
+            WindowApi.WINEVENT_OUTOFCONTEXT);
+
+        if (_winEventHook == IntPtr.Zero)
         {
+            logger.LogError("Failed to set WinEventHook");
+        }
+        else
+        {
+            logger.LogDebug("WinEventHook installed for foreground window detection.");
+        }
+    }
+
+    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+    {
+        if (hwnd == IntPtr.Zero) return;
+
+        try
+        {
+            WindowApi.GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid == 0) return;
+
             try
             {
-                var normalizedName = NormalizeName(p.ProcessName);
-                if (ShouldBlock(normalizedName))
+                using var p = Process.GetProcessById((int)pid);
+                var normalized = NormalizeName(p.ProcessName);
+
+                bool shouldBlock;
+                lock (_lock)
                 {
-                    KillProcessById(p.Id, normalizedName, p);
+                    shouldBlock = ShouldBlock(normalized);
                 }
+
+                if (!shouldBlock)
+                {
+                    return;
+                }
+
+                logger.LogInformation("WinEventHook detected blocked app: {Name} (PID: {Pid})", normalized, pid);
+                p.Kill();
+                ProcessBlocked?.Invoke(normalized);
             }
             catch
             {
-                // Ignore access denied
+                // Process might have exited or access denied
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Error in WinEventProc");
+        }
+    }
+
+    private void StartPollingSession()
+    {
+        _pollingCts = new CancellationTokenSource();
+        var token = _pollingCts.Token;
+
+        Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                try
+                {
+                    ScanAndKillByList(initialScan: false);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Error in polling loop");
+                }
+            }
+        }, token);
+    }
+
+    private void StopMonitoring()
+    {
+        if (_etwSession != null)
+        {
+            try
+            {
+                _etwSession.Stop();
+                _etwSession.Dispose();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Error stopping ETW session");
             }
             finally
             {
-                p.Dispose();
+                _etwSession = null;
+                _etwTask = null;
             }
         }
+
+        if (_winEventHook != IntPtr.Zero)
+        {
+            WindowApi.UnhookWinEvent(_winEventHook);
+            _winEventHook = IntPtr.Zero;
+            _winEventDelegate = null;
+        }
+
+        if (_pollingCts != null)
+        {
+            _pollingCts.Cancel();
+            _pollingCts.Dispose();
+            _pollingCts = null;
+        }
+    }
+
+    private List<string> ScanAndKillByList(bool initialScan = false)
+    {
+        var killedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        List<string> targets;
+        
+        lock (_lock)
+        {
+            targets = _targetProcessNames.ToList();
+        }
+
+        foreach (var target in targets)
+        {
+            if (SafeList.Contains(target)) continue;
+
+            var processes = Process.GetProcessesByName(target);
+            foreach (var p in processes)
+            {
+                if (KillProcessById(p.Id, target, p, suppressEvent: initialScan))
+                {
+                    killedNames.Add(target);
+                }
+            }
+        }
+
+        return killedNames.ToList();
     }
 
     private bool ShouldBlock(string normalizedName)
@@ -162,43 +300,56 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         return _targetProcessNames.Contains(normalizedName);
     }
 
-    private void KillProcessById(int pid, string name, Process? existingInstance = null)
+    private bool KillProcessById(int pid, string name, Process? existingInstance = null, bool suppressEvent = false)
     {
         try
         {
             var p = existingInstance;
             var dispose = false;
-            
+
             if (p == null)
             {
-                p = Process.GetProcessById(pid);
-                dispose = true;
+                try
+                {
+                    p = Process.GetProcessById(pid);
+                    dispose = true;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
             }
 
             try
             {
-                if (existingInstance == null && NormalizeName(p.ProcessName) != name) return;
+                if (existingInstance == null && NormalizeName(p.ProcessName) != name) return false;
 
-                p.Kill();
-                logger.LogInformation("Blocked process: {Name} (PID: {Pid})", name, pid);
+                if (!p.HasExited)
+                {
+                    p.Kill();
+                    logger.LogInformation("Blocked process: {Name} (PID: {Pid})", name, pid);
+                    
+                    if (!suppressEvent)
+                    {
+                        ProcessBlocked?.Invoke(name);
+                    }
+                    return true;
+                }
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                logger.LogDebug("Could not kill process '{Name}' (PID: {Pid}). Access Denied.", name, pid);
             }
             finally
             {
                 if (dispose) p.Dispose();
             }
         }
-        catch (ArgumentException)
-        {
-            // Process already exited
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            logger.LogWarning("Could not kill process '{Name}' (PID: {Pid}). Access Denied. Try running Axorith as Administrator.", name, pid);
-        }
         catch (Exception ex)
         {
             logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", name, pid);
         }
+        return false;
     }
 
     private static HashSet<string> NormalizeNames(IEnumerable<string> names)

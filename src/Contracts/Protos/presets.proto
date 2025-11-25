@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package axorith.v1;
+package axorith.contracts;
 
-import "google/protobuf/empty.proto";
 import "Protos/common.proto";
+import "google/protobuf/empty.proto";
 
 option csharp_namespace = "Axorith.Contracts";
 

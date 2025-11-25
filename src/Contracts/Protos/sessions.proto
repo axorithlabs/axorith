@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package axorith.v1;
+package axorith.contracts;
 
 import "Protos/common.proto";
 

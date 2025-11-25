@@ -50,6 +50,7 @@ public static class SettingMapper
             case Sdk.Settings.SettingControlType.FilePicker:
             case Sdk.Settings.SettingControlType.DirectoryPicker:
             case Sdk.Settings.SettingControlType.Choice:
+            case Sdk.Settings.SettingControlType.MultiChoice:
                 message.StringValue = currentValue?.ToString() ?? string.Empty;
                 break;
 
@@ -129,6 +130,11 @@ public static class SettingMapper
         {
             return "TimeSpan";
         }
+        
+        if (type == typeof(List<string>))
+        {
+            return "List<String>";
+        }
 
         return "String"; // fallback
     }
@@ -197,6 +203,9 @@ public static class SettingMapper
             case TimeSpan ts:
                 update.StringValue = ts.ToString();
                 break;
+            case List<string> list:
+                update.StringValue = string.Join("|", list);
+                break;
             default:
                 update.StringValue = value?.ToString() ?? string.Empty;
                 break;
@@ -212,6 +221,7 @@ public static class SettingMapper
             Sdk.Settings.SettingControlType.Checkbox => SettingControlType.Checkbox,
             Sdk.Settings.SettingControlType.Number => SettingControlType.Number,
             Sdk.Settings.SettingControlType.Choice => SettingControlType.Choice,
+            Sdk.Settings.SettingControlType.MultiChoice => SettingControlType.MultiChoice,
             Sdk.Settings.SettingControlType.Secret => SettingControlType.Secret,
             Sdk.Settings.SettingControlType.FilePicker => SettingControlType.FilePicker,
             Sdk.Settings.SettingControlType.DirectoryPicker => SettingControlType.DirectoryPicker,

@@ -31,6 +31,7 @@ public class GrpcCoreConnection : ICoreConnection
     private GrpcModulesApi? _modulesApi;
     private GrpcDiagnosticsApi? _diagnosticsApi;
     private GrpcSchedulerApi? _schedulerApi;
+    private GrpcNotificationApi? _notificationApi;
     private bool _disposed;
 
     /// <summary>
@@ -86,6 +87,11 @@ public class GrpcCoreConnection : ICoreConnection
     public ISchedulerApi Scheduler => _schedulerApi
                                       ?? throw new InvalidOperationException(
                                           "Not connected. Call ConnectAsync first.");
+
+    /// <inheritdoc />
+    public INotificationApi Notifications => _notificationApi
+                                             ?? throw new InvalidOperationException(
+                                                 "Not connected. Call ConnectAsync first.");
 
     /// <inheritdoc />
     public ConnectionState State => _stateSubject.Value;
@@ -156,12 +162,14 @@ public class GrpcCoreConnection : ICoreConnection
             var modulesClient = new ModulesService.ModulesServiceClient(_channel);
             var diagnosticsClient = new DiagnosticsService.DiagnosticsServiceClient(_channel);
             var schedulerClient = new SchedulerService.SchedulerServiceClient(_channel);
+            var notificationClient = new NotificationService.NotificationServiceClient(_channel);
 
             _presetsApi = new GrpcPresetsApi(presetsClient, _retryPolicy);
             _sessionsApi = new GrpcSessionsApi(sessionsClient, _retryPolicy, _logger);
             _modulesApi = new GrpcModulesApi(modulesClient, _retryPolicy, _logger);
             _diagnosticsApi = new GrpcDiagnosticsApi(diagnosticsClient, _retryPolicy);
             _schedulerApi = new GrpcSchedulerApi(schedulerClient, _retryPolicy);
+            _notificationApi = new GrpcNotificationApi(notificationClient);
 
             var health = await _diagnosticsApi.GetHealthAsync(ct).ConfigureAwait(false);
 
@@ -215,6 +223,7 @@ public class GrpcCoreConnection : ICoreConnection
         _modulesApi = null;
         _diagnosticsApi = null;
         _schedulerApi = null;
+        _notificationApi = null;
 
         if (_channel != null)
         {

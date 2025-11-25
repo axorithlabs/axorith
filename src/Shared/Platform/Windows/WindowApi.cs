@@ -10,6 +10,24 @@ namespace Axorith.Shared.Platform.Windows;
 [SupportedOSPlatform("windows")]
 internal static class WindowApi
 {
+    // ... (Существующие методы и импорты остаются) ...
+
+    // NEW: WinEventHook definitions
+    public delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    public const uint WINEVENT_OUTOFCONTEXT = 0;
+    public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    public const uint EVENT_OBJECT_CREATE = 0x8000; // Optional, can be noisy
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy,
         uint uFlags);
@@ -92,9 +110,6 @@ internal static class WindowApi
 
     private const int DisplayDeviceActive = 0x00000001;
 
-    /// <summary>
-    ///     Waits for a process to create its main window handle.
-    /// </summary>
     public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
         CancellationToken cancellationToken = default)
     {
@@ -114,9 +129,6 @@ internal static class WindowApi
         }
     }
 
-    /// <summary>
-    ///     Moves a window to a specific monitor by index.
-    /// </summary>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         var monitors = new List<Rect>();
@@ -141,18 +153,13 @@ internal static class WindowApi
         SetWindowPos(windowHandle, IntPtr.Zero, targetX, targetY, 0, 0, SwpNosize | SwpNozorder);
     }
 
-    /// <summary>
-    ///     Finds processes by name or executable path.
-    /// </summary>
     public static List<Process> FindProcesses(string processNameOrPath)
     {
         var results = new List<Process>();
 
-        // Try exact process name match
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
         results.AddRange(Process.GetProcessesByName(processName));
 
-        // Also try by executable path
         if (!File.Exists(processNameOrPath))
         {
             return results;
@@ -183,9 +190,6 @@ internal static class WindowApi
         return results;
     }
 
-    /// <summary>
-    ///     Sets window state (Normal, Minimized, Maximized).
-    /// </summary>
     public static void SetWindowState(IntPtr windowHandle, WindowState state)
     {
         var cmdShow = state switch
@@ -200,9 +204,6 @@ internal static class WindowApi
         ShowWindow(windowHandle, cmdShow);
     }
 
-    /// <summary>
-    ///     Gets current window state.
-    /// </summary>
     public static WindowState GetWindowState(IntPtr windowHandle)
     {
         if (IsIconic(windowHandle))
@@ -218,34 +219,22 @@ internal static class WindowApi
         return WindowState.Normal;
     }
 
-    /// <summary>
-    ///     Sets window size.
-    /// </summary>
     public static void SetWindowSize(IntPtr windowHandle, int width, int height)
     {
         SetWindowPos(windowHandle, IntPtr.Zero, 0, 0, width, height, SwpNomove | SwpNozorder);
     }
 
-    /// <summary>
-    ///     Sets window position.
-    /// </summary>
     public static void SetWindowPosition(IntPtr windowHandle, int x, int y)
     {
         SetWindowPos(windowHandle, IntPtr.Zero, x, y, 0, 0, SwpNosize | SwpNozorder);
     }
 
-    /// <summary>
-    ///     Gets window size and position.
-    /// </summary>
     public static (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
     {
         GetWindowRect(windowHandle, out var rect);
         return (rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
     }
 
-    /// <summary>
-    ///     Brings window to foreground.
-    /// </summary>
     public static void FocusWindow(IntPtr windowHandle)
     {
         if (IsIconic(windowHandle))
@@ -260,9 +249,6 @@ internal static class WindowApi
         SetForegroundWindow(windowHandle);
     }
 
-    /// <summary>
-    ///     Gets monitor count.
-    /// </summary>
     public static int GetMonitorCount()
     {
         var monitors = new List<Rect>();
@@ -297,8 +283,10 @@ internal static class WindowApi
 
     public static string GetMonitorName(int monitorIndex)
     {
-        var dd = new DisplayDevice();
-        dd.cb = Marshal.SizeOf<DisplayDevice>();
+        var dd = new DisplayDevice
+        {
+            cb = Marshal.SizeOf<DisplayDevice>()
+        };
 
         var foundIndex = 0;
         uint devNum = 0;

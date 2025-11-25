@@ -1,27 +1,46 @@
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
-using Axorith.Shared.Platform;
 
 namespace Axorith.Module.AppBlocker;
 
 internal sealed class Settings
 {
-    public Setting<string> ProcessList { get; }
-    
+    private readonly Setting<List<string>> _categories;
+    private readonly Setting<string> _manualProcessList;
     private readonly IReadOnlyList<ISetting> _allSettings;
     private readonly IReadOnlyList<IAction> _allActions;
 
+    private static readonly Dictionary<string, List<string>> CategoryProcesses = new()
+    {
+        ["Games"] = ["steam", "epicgameslauncher", "battle.net", "dota2", "csgo", "valorant", "league of legends"],
+        ["Social"] = ["discord", "telegram", "slack", "skype", "whatsapp"],
+        ["Browsers"] = ["chrome", "firefox", "msedge", "opera", "brave"]
+    };
+
     public Settings()
     {
-        ProcessList = Setting.AsTextArea(
-            key: "ProcessList",
-            label: "Processes to Block",
-            defaultValue: "discord, steam, telegram",
-            description: "List of process names to block (e.g. 'discord', 'steam'). Separate by comma or new line."
+        _categories = Setting.AsMultiChoice(
+            key: "Categories",
+            label: "Block Categories",
+            defaultValues: [],
+            initialChoices:
+            [
+                new KeyValuePair<string, string>("Games", "Block Games (Steam, Epic, etc.)"),
+                new KeyValuePair<string, string>("Social", "Block Communication (Discord, Telegram)"),
+                new KeyValuePair<string, string>("Browsers", "Block Browsers")
+            ],
+            description: "Select categories to automatically block common apps."
         );
 
-        _allSettings = [ProcessList];
+        _manualProcessList = Setting.AsTextArea(
+            key: "ManualProcessList",
+            label: "Manual Blocklist",
+            defaultValue: "",
+            description: "Manually add process names (e.g. 'notepad', 'calc'). Separate by comma or new line."
+        );
+
+        _allSettings = [_categories, _manualProcessList];
         _allActions = [];
     }
 
@@ -30,17 +49,46 @@ internal sealed class Settings
 
     public Task<ValidationResult> ValidateAsync()
     {
-        var list = ProcessList.GetCurrentValue();
-        return Task.FromResult(string.IsNullOrWhiteSpace(list) ? ValidationResult.Warn("Process list is empty. The module will not block anything.") : ValidationResult.Success);
+        var cats = _categories.GetCurrentValue();
+        var manual = _manualProcessList.GetCurrentValue();
+
+        if (cats.Count == 0 && string.IsNullOrWhiteSpace(manual))
+        {
+            return Task.FromResult(ValidationResult.Warn("No categories or processes selected. The module will not block anything."));
+        }
+
+        return Task.FromResult(ValidationResult.Success);
     }
 
     public IEnumerable<string> GetProcesses()
     {
-        var raw = ProcessList.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(raw)) return [];
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        return raw.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim())
-            .Where(s => !string.IsNullOrWhiteSpace(s));
+        var selectedCats = _categories.GetCurrentValue();
+        foreach (var cat in selectedCats)
+        {
+            if (!CategoryProcesses.TryGetValue(cat, out var procs))
+            {
+                continue;
+            }
+
+            foreach (var p in procs) result.Add(p);
+        }
+
+        var manual = _manualProcessList.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(manual))
+        {
+            return result;
+        }
+
+        {
+            var manualList = manual.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+            
+            foreach (var p in manualList) result.Add(p);
+        }
+
+        return result;
     }
 }

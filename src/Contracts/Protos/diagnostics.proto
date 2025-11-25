@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package axorith.v1;
+package axorith.contracts;
 
 import "google/protobuf/timestamp.proto";
 
@@ -23,7 +23,7 @@ message HealthCheckResponse {
 }
 
 enum HealthStatus {
-  HEALTH_STATUS_HEALTHY = 0;
-  HEALTH_STATUS_DEGRADED = 1;
-  HEALTH_STATUS_UNHEALTHY = 2;
+  HEALTHY = 0;
+  DEGRADED = 1;
+  UNHEALTHY = 2;
 }

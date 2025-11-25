@@ -84,6 +84,8 @@ public class App : Application
         var services = new ServiceCollection();
         services.AddSingleton(loggerFactory);
         services.AddLogging();
+        
+        services.AddSingleton<IToastNotificationService, ToastNotificationService>();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<LoadingViewModel>();
         services.AddTransient<ErrorViewModel>();
@@ -161,8 +163,6 @@ public class App : Application
             }
         };
 
-        logger.LogInformation("Window and tray icon created successfully");
-
         logger.LogInformation("Starting Host connection in background...");
         var connInit = Services.GetRequiredService<IConnectionInitializer>();
         _ = Task.Run(() => connInit.InitializeAsync(this, clientConfig, loggerFactory, logger));
@@ -171,7 +171,6 @@ public class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
-
 
     private bool _isShuttingDown;
 

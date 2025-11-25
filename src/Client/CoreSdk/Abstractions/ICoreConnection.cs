@@ -30,6 +30,11 @@ public interface ICoreConnection : IAsyncDisposable
     ///     Access to session scheduling operations.
     /// </summary>
     ISchedulerApi Scheduler { get; }
+    
+    /// <summary>
+    ///     Access to notification streaming.
+    /// </summary>
+    INotificationApi Notifications { get; }
 
     /// <summary>
     ///     Current connection state.

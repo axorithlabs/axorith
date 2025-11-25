@@ -11,11 +11,15 @@ public class ValidationResult
     public ValidationStatus Status { get; }
 
     /// <summary>
-    ///     A user-friendly message explaining the result, especially for warnings and errors.
+    ///     A user-friendly message explaining the result (global error).
     /// </summary>
     public string Message { get; }
 
-    // --- Static factory methods for convenient result creation ---
+    /// <summary>
+    ///     Specific errors associated with setting keys.
+    ///     Key: Setting Key, Value: Error Message.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> FieldErrors { get; }
 
     /// <summary>
     ///     Gets a pre-defined successful validation result.
@@ -23,29 +27,35 @@ public class ValidationResult
     public static ValidationResult Success { get; } = new(ValidationStatus.Ok, "Configuration is valid.");
 
     /// <summary>
-    ///     Creates a new failed validation result with a specific error message.
+    ///     Creates a new failed validation result with a specific global error message.
     /// </summary>
-    /// <param name="errorMessage">The error message to display to the user.</param>
     public static ValidationResult Fail(string errorMessage)
     {
         return new ValidationResult(ValidationStatus.Error, errorMessage);
     }
 
     /// <summary>
-    ///     Creates a new warning validation result with a specific message.
+    ///     Creates a new failed validation result with specific field errors.
     /// </summary>
-    /// <param name="warningMessage">The warning message to display to the user.</param>
+    /// <param name="fieldErrors">Dictionary of setting keys and error messages.</param>
+    /// <param name="globalMessage">Optional global message.</param>
+    public static ValidationResult Fail(IDictionary<string, string> fieldErrors, string globalMessage = "Validation failed")
+    {
+        return new ValidationResult(ValidationStatus.Error, globalMessage, fieldErrors);
+    }
+
+    /// <summary>
+    ///     Creates a new warning validation result.
+    /// </summary>
     public static ValidationResult Warn(string warningMessage)
     {
         return new ValidationResult(ValidationStatus.Warning, warningMessage);
     }
 
-    /// <summary>
-    ///     Private constructor to enforce the use of static factory methods.
-    /// </summary>
-    private ValidationResult(ValidationStatus status, string message)
+    private ValidationResult(ValidationStatus status, string message, IDictionary<string, string>? fieldErrors = null)
     {
         Status = status;
         Message = message;
+        FieldErrors = fieldErrors?.ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, string>();
     }
 }

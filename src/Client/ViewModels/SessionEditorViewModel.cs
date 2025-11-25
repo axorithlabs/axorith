@@ -4,15 +4,16 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
+using DynamicData;
 using DynamicData.Binding;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
-// Base class for all triggers
 public abstract class TriggerViewModel : ReactiveObject
 {
     public abstract string Title { get; }
@@ -161,6 +162,7 @@ public class SessionEditorViewModel : ReactiveObject
     private readonly IModulesApi _modulesApi;
     private readonly IPresetsApi _presetsApi;
     private readonly ISchedulerApi _schedulerApi;
+    private readonly IToastNotificationService _toastService;
     private readonly IServiceProvider _serviceProvider;
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
@@ -171,6 +173,9 @@ public class SessionEditorViewModel : ReactiveObject
 
     private readonly ObservableAsPropertyHelper<bool> _canAddAnyTrigger;
     public bool CanAddAnyTrigger => _canAddAnyTrigger.Value;
+    
+    private readonly ObservableAsPropertyHelper<bool> _hasValidationErrors;
+    public bool HasValidationErrors => _hasValidationErrors.Value;
 
     public SessionPreset? PresetToEdit
     {
@@ -198,11 +203,9 @@ public class SessionEditorViewModel : ReactiveObject
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    // --- Collections ---
     public ObservableCollection<TriggerViewModel> Triggers { get; } = [];
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
-    // --- Selection State ---
     public ConfiguredModuleViewModel? SelectedModule
     {
         get;
@@ -240,19 +243,31 @@ public class SessionEditorViewModel : ReactiveObject
         IModulesApi modulesApi,
         IPresetsApi presetsApi,
         ISchedulerApi schedulerApi,
+        IToastNotificationService toastService,
         IServiceProvider serviceProvider)
     {
         _shell = shell;
         _modulesApi = modulesApi;
         _presetsApi = presetsApi;
         _schedulerApi = schedulerApi;
+        _toastService = toastService;
         _serviceProvider = serviceProvider;
 
         _isFooterVisible = this.WhenAnyValue(x => x.SelectedModule, x => x.ModuleSelector, x => x.SelectedTrigger)
             .Select(t => t.Item1 == null && t.Item2 == null && t.Item3 == null)
             .ToProperty(this, x => x.IsFooterVisible);
 
-        var canSave = this.WhenAnyValue(vm => vm.Name).Select(name => !string.IsNullOrWhiteSpace(name));
+        _hasValidationErrors = ConfiguredModules
+            .ToObservableChangeSet()
+            .AutoRefresh(m => m.HasErrors)
+            .ToCollection()
+            .Select(modules => modules.Any(m => m.HasErrors))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .ToProperty(this, x => x.HasValidationErrors);
+
+        var canSave = this.WhenAnyValue(vm => vm.Name, vm => vm.HasValidationErrors)
+            .Select(t => !string.IsNullOrWhiteSpace(t.Item1) && !t.Item2);
+
         SaveAndCloseCommand = ReactiveCommand.CreateFromTask(SaveAndCloseAsync, canSave);
         CancelCommand = ReactiveCommand.Create(Cancel);
 
@@ -431,6 +446,12 @@ public class SessionEditorViewModel : ReactiveObject
             return;
         }
 
+        if (HasValidationErrors)
+        {
+            ErrorMessage = "Please fix configuration errors before saving.";
+            return;
+        }
+
         ErrorMessage = string.Empty;
 
         _preset.Modules = ConfiguredModules.Select(vm =>
@@ -532,6 +553,8 @@ public class SessionEditorViewModel : ReactiveObject
             {
                 await _schedulerApi.DeleteScheduleAsync(s.Id);
             }
+
+            _toastService.Show("Preset saved successfully", Sdk.Services.NotificationType.Success);
 
             Cancel();
         }
