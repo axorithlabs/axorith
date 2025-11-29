@@ -101,7 +101,7 @@ For a detailed, up-to-the-minute view of our task board, bug reports, and curren
 
 Have questions? Ideas? Want to see what's next? Join our community to chat with the developers and other users.
 
-[**➡️ Join the Axorith Labs Discord Server**](https://discord.gg/bEmxUzj6ta)
+[**➡️ Join the Axorith Labs Discord Server**](https://discord.gg/axorith)
 
 ## Contributing
 
