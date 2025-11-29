@@ -58,56 +58,97 @@
 
         #video-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; overflow: hidden; }
         #video-bg video { width: 100%; height: 100%; object-fit: cover; }
-        #video-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(ellipse at center, rgba(5,5,5,0.6) 0%, rgba(5,5,5,0.9) 70%, rgba(5,5,5,1) 100%); }
-
-        .container { width: 100%; max-width: 650px; margin: 0 auto; padding: 2rem; text-align: center; }
-        main { flex-grow: 1; display: flex; align-items: center; justify-content: center; }
         
-        .logo { font-size: 4rem; font-weight: 900; letter-spacing: -0.05em; color: #FFFFFF; text-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
-        .tagline { font-size: 1.25rem; color: var(--text-muted-color); margin: 1rem auto 2.5rem; max-width: 35ch; }
+        #video-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(ellipse at center, rgba(5,5,5,0.75) 0%, rgba(5,5,5,0.95) 70%, rgba(5,5,5,1) 100%); }
 
-        .scarcity-banner {
-            border: 1px solid #444;
-            background: rgba(10, 10, 10, 0.5);
-            backdrop-filter: blur(5px);
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #DDD;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            max-width: 450px;
-            margin: 0 auto 2rem;
+        .container { 
+            width: 100%; 
+            max-width: 700px; 
+            margin: 0 auto; 
+            padding: 2rem; 
+            text-align: center; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            flex-grow: 1;
+            justify-content: center;
         }
 
-        .countdown { display: flex; justify-content: center; gap: 1.5rem; margin: 0 auto 2.5rem; }
-        .countdown-item { text-align: center; }
-        .countdown-item span { display: block; }
-        .countdown-number { font-size: 2.5rem; font-weight: 700; color: white; line-height: 1; }
-        .countdown-label { font-size: 0.8rem; color: var(--text-muted-color); text-transform: uppercase; letter-spacing: 1px; }
+        main { flex-grow: 1; display: flex; align-items: center; justify-content: center; }
 
-        .presave-form { display: flex; gap: 0.5rem; max-width: 450px; margin: 0 auto; }
-        .presave-form input[type="email"] { flex-grow: 1; background-color: rgba(10, 10, 10, 0.8); border: 1px solid var(--border-color); color: var(--text-color); font-family: var(--font-family); font-size: 1rem; padding: 0.8rem 1rem; border-radius: 6px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-        .presave-form input[type="email"]::placeholder { color: #555; }
-        .presave-form input[type="email"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3); }
-        .presave-form button { background-color: var(--accent-color); color: white; border: none; padding: 0.8rem 1.5rem; font-size: 1rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: background-color 0.2s ease; white-space: nowrap; }
-        .presave-form button:hover { background-color: var(--accent-hover-color); }
-        .presave-form button:disabled { background-color: #555; cursor: not-allowed; }
+        .logo { 
+            font-size: 4.5rem; 
+            font-weight: 900; 
+            letter-spacing: -0.05em; 
+            color: #FFFFFF; 
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+            margin-bottom: -0.5rem;
+        }
+
+        .tagline { 
+            font-size: 1.4rem; 
+            font-weight: 500;
+            color: #cccccc;
+            max-width: 40ch;
+            line-height: 1.4;
+        }
+
+        .cta-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .discord-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--accent-color);
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 1rem 2.5rem;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .discord-btn:hover {
+            background-color: var(--accent-hover-color);
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.6);
+        }
+
+        .discord-btn:active {
+            transform: translateY(0);
+        }
+
+        .sub-text {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            max-width: 500px;
+            line-height: 1.5;
+        }
         
-        .form-status { margin-top: 1rem; font-size: 0.9rem; height: 20px; color: var(--text-muted-color); transition: all 0.3s ease; }
-        .form-status.success { color: #4dff88; font-size: 1.1rem; font-weight: 500; }
-        .form-status.error { color: #ff4d4d; }
+        .sub-text strong {
+            color: #ffffff;
+            font-weight: 500;
+        }
 
         footer { padding: 2rem; text-align: center; color: #444; font-size: 0.8rem; }
         footer a { color: #666; text-decoration: none; margin: 0 0.5rem; transition: color 0.2s ease; }
         footer a:hover { color: var(--text-color); }
 
         @media (max-width: 768px) {
-            .logo { font-size: 3rem; }
+            .logo { font-size: 3.5rem; }
             .tagline { font-size: 1.1rem; }
-            .countdown-number { font-size: 2rem; }
-            .presave-form { flex-direction: column; }
+            .discord-btn { width: 100%; padding: 1rem; }
         }
     </style>
 </head>
@@ -122,39 +163,20 @@
 
     <main>
         <div class="container">
-            <h1 class="logo">Axorith</h1>
-            <p class="tagline">Automate your workspace. Work smarter, live better.</p>
-            
-            <div class="scarcity-banner">Only 100 Lifetime Licenses will ever be sold</div>
-
-            <div class="countdown" id="countdown">
-                <div class="countdown-item">
-                    <span class="countdown-number" id="days">00</span>
-                    <span class="countdown-label">Days</span>
-                </div>
-                <div class="countdown-item">
-                    <span class="countdown-number" id="hours">00</span>
-                    <span class="countdown-label">Hours</span>
-                </div>
-                <div class="countdown-item">
-                    <span class="countdown-number" id="minutes">00</span>
-                    <span class="countdown-label">Minutes</span>
-                </div>
-                <div class="countdown-item">
-                    <span class="countdown-number" id="seconds">00</span>
-                    <span class="countdown-label">Seconds</span>
-                </div>
+            <div>
+                <h1 class="logo">Axorith</h1>
+                <p class="tagline">Automate your workspace.<br>Work smarter, live better.</p>
             </div>
 
-            <form id="presave-form">
-                <div class="presave-form">
-                    <input type="email" name="email" placeholder="Enter your email to get notified" required>
-                    <input type="text" name="name" style="display:none;">
-                    <button type="submit">Presave My Spot</button>
-                </div>
-            </form>
-            <p id="form-status" class="form-status"></p>
-
+            <div class="cta-group">
+                <a href="https://discord.gg/axorith" class="discord-btn">
+                    JOIN THE COMMUNITY
+                </a>
+                
+                <p class="sub-text">
+                    Get your <strong>free copy</strong> now. Be the first to access the <strong>Lifetime License</strong> on January 9th.
+                </p>
+            </div>
         </div>
     </main>
 
@@ -163,73 +185,11 @@
         <p>
             <a href="https://github.com/axorithlabs/axorith" target="_blank">GitHub</a>
             &bull;
-            <a href="https://discord.gg/bEmxUzj6ta" target="_blank">Discord</a>
+            <a href="https://discord.gg/axorith" target="_blank">Discord</a>
             &bull;
             <a href="mailto:mail@axorithlabs.com">Contact</a>
         </p>
     </footer>
-
-    <script>
-        const countdownElement = document.getElementById('countdown');
-        const daysEl = document.getElementById('days');
-        const hoursEl = document.getElementById('hours');
-        const minutesEl = document.getElementById('minutes');
-        const secondsEl = document.getElementById('seconds');
-        const launchDate = new Date('2026-01-09T00:00:00Z').getTime();
-
-        const timerInterval = setInterval(() => {
-            const now = new Date().getTime();
-            const distance = launchDate - now;
-
-            if (distance < 0) {
-                clearInterval(timerInterval);
-                countdownElement.innerHTML = "<div class='scarcity-banner' style='background: var(--accent-color); color: white;'>LAUNCHED!</div>";
-                return;
-            }
-
-            daysEl.textContent = String(Math.floor(distance / (1000 * 60 * 60 * 24))).padStart(2, '0');
-            hoursEl.textContent = String(Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
-            minutesEl.textContent = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-            secondsEl.textContent = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
-        }, 1000);
-
-        const form = document.getElementById('presave-form');
-        const status = document.getElementById('form-status');
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbxKVLIv9OxIthnYEZJszEypxSeTMLGNX6me_neaJLQz-pUX53nsmTaz8vk0PCKkSkRadw/exec';
-
-        form.addEventListener('submit', e => {
-            e.preventDefault();
-            const submitButton = form.querySelector('button');
-            const originalButtonText = submitButton.textContent;
-            
-            submitButton.disabled = true;
-            submitButton.textContent = 'Saving...';
-            status.textContent = '';
-            status.classList.remove('success', 'error');
-
-            fetch(scriptURL, { method: 'POST', body: new FormData(form) })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.result === 'success') {
-                        form.style.display = 'none';
-                        status.textContent = "You're on the list. See you on January 9th.";
-                        status.classList.add('success');
-                    } else {
-                        status.textContent = data.message || 'Oops! There was a problem.';
-                        status.classList.add('error');
-                        submitButton.disabled = false;
-                        submitButton.textContent = originalButtonText;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error!', error.message);
-                    status.textContent = 'Oops! There was a problem.';
-                    status.classList.add('error');
-                    submitButton.disabled = false;
-                    submitButton.textContent = originalButtonText;
-                });
-        });
-    </script>
 
 </body>
 </html>
