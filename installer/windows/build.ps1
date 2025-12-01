@@ -1,5 +1,5 @@
 param (
-    [string]$Version = "0.0.1-alpha"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +13,29 @@ catch {
     exit 1
 }
 
-$BuildOutputDir = Join-Path $SolutionDir "build\Release" 
+# Get version from git tag if not provided
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    try {
+        $gitVersion = & git describe --tags --abbrev=0 2>&1
+        if ($LASTEXITCODE -eq 0 -and ![string]::IsNullOrWhiteSpace($gitVersion)) {
+            $Version = $gitVersion.TrimStart('v').Trim()
+            Write-Host "Version detected from git tag: $Version" -ForegroundColor Green
+        }
+        else {
+            $Version = "0.0.1-alpha"
+            Write-Host "No git tags found, using default version: $Version" -ForegroundColor Yellow
+        }
+    }
+    catch {
+        $Version = "0.0.1-alpha"
+        Write-Host "Failed to get git version, using default: $Version" -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host "Using provided version: $Version" -ForegroundColor Cyan
+}
+
+$BuildOutputDir = Join-Path $SolutionDir "build\Release"
 $StagingDir = Join-Path $SolutionDir "build\Publish\Windows"
 $DistDir = Join-Path $SolutionDir "build\Installer"
 $NsiScriptPath = Join-Path $PSScriptRoot "installer.nsi"
@@ -32,8 +54,8 @@ if (-not $NsisPath) {
 
 Write-Host "--- Publishing the entire solution in Release mode ---" -ForegroundColor Cyan
 if (Test-Path $DistDir) { Remove-Item -Recurse -Force $DistDir }
-New-Item -ItemType Directory -Force $StagingDir
-New-Item -ItemType Directory -Force $DistDir
+New-Item -ItemType Directory -Force $StagingDir | Out-Null
+New-Item -ItemType Directory -Force $DistDir | Out-Null
 
 dotnet publish $SolutionDir --configuration Release
 if ($LASTEXITCODE -ne 0) {
@@ -48,21 +70,24 @@ $publishFolders = Get-ChildItem -Path $BuildOutputDir -Directory -Recurse -Filte
 
 foreach ($folder in $publishFolders) {
     $relativePath = $folder.FullName.Substring($BuildOutputDir.Length + 1)
-    $projectName = ($relativePath -split '\\')[0]
-    
-    if ($projectName -like "*.Tests") {
-        Write-Host "Skipping test project: $projectName" -ForegroundColor Gray
+    $parts = $relativePath -split '\\'
+    $topFolder = $parts[0]
+
+    # Skip Tests folder
+    if ($topFolder -eq "Tests") {
+        Write-Host "Skipping test artifacts in: $relativePath" -ForegroundColor Gray
         continue
     }
 
-    if ($projectName.StartsWith("Axorith.Module.")) {
-        Write-Host "Skipping module project (will be handled separately): $projectName" -ForegroundColor Gray
+    # Handle Modules
+    if ($topFolder -eq "Modules") {
         continue
     }
-    
-    $destinationPath = Join-Path $StagingDir $projectName
-    New-Item -ItemType Directory -Force $destinationPath
-    
+
+    # Regular apps (e.g. Axorith.Host)
+    $destinationPath = Join-Path $StagingDir $topFolder
+    New-Item -ItemType Directory -Force $destinationPath | Out-Null
+
     Write-Host "Syncing '$($folder.FullName)' to '$destinationPath' using robocopy..."
     robocopy $folder.FullName $destinationPath /E /NFL /NDL /NJH /NJS /nc /ns /np
     if ($LASTEXITCODE -ge 8) {

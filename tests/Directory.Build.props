@@ -1,0 +1,19 @@
+<Project>
+    <!-- Import root Directory.Build.props to inherit common settings -->
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+    <PropertyGroup>
+        <!-- Override output paths for test projects -->
+        <BaseOutputPath>$(SolutionDir)build/$(Configuration)/Tests/$(MSBuildProjectName)/</BaseOutputPath>
+        <OutputPath>$(BaseOutputPath)</OutputPath>
+        <BaseIntermediateOutputPath>$(BaseOutputPath)obj/</BaseIntermediateOutputPath>
+        <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
+        <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+
+        <!-- Test project specific settings -->
+        <IsTestProject>true</IsTestProject>
+        <IsPackable>false</IsPackable>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+</Project>
+

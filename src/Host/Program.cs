@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Sockets;
+using System.Text.Json;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Http;
@@ -11,6 +13,8 @@ using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Platform;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -19,6 +23,9 @@ using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
+
+// Host info file path for client discovery
+var hostInfoPath = Path.Combine(Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
 
 try
 {
@@ -50,12 +57,20 @@ try
 
     builder.Services.Configure<Configuration>(builder.Configuration);
 
-    builder.WebHost.ConfigureKestrel((context, options) =>
-    {
-        var config = context.Configuration.Get<Configuration>() ?? new Configuration();
-        var bindAddress = IPAddress.Parse(config.Grpc.BindAddress);
+    // Determine actual port to use (check if configured port is available)
+    var config = builder.Configuration.Get<Configuration>() ?? new Configuration();
+    var bindAddress = IPAddress.Parse(config.Grpc.BindAddress);
+    var configuredPort = config.Grpc.Port;
+    var actualPort = IsPortAvailable(bindAddress, configuredPort) ? configuredPort : 0;
 
-        options.Listen(bindAddress, config.Grpc.Port, listenOptions =>
+    if (actualPort == 0)
+    {
+        Log.Warning("Configured port {Port} is busy, will use dynamic port assignment", configuredPort);
+    }
+
+    builder.WebHost.ConfigureKestrel((_, options) =>
+    {
+        options.Listen(bindAddress, actualPort, listenOptions =>
         {
             listenOptions.Protocols = HttpProtocols.Http2;
             // NO TLS for local MVP - listening on loopback only
@@ -142,11 +157,54 @@ try
 
     app.MapGet("/", () => "Axorith.Host gRPC server is running. Use gRPC client to connect.");
 
-    Log.Information("Axorith.Host started successfully on {Address}:{Port}",
-        builder.Configuration.GetValue<string>("Grpc:BindAddress"),
-        builder.Configuration.GetValue<int>("Grpc:Port"));
+    // Start the app (don't run yet - we need to get the actual port)
+    await app.StartAsync();
 
-    await app.RunAsync();
+    // Get actual bound port from server addresses
+    var server = app.Services.GetRequiredService<IServer>();
+    var addressFeature = server.Features.Get<IServerAddressesFeature>();
+    var boundPort = 0;
+
+    if (addressFeature?.Addresses.FirstOrDefault() is { } address)
+    {
+        var uri = new Uri(address);
+        boundPort = uri.Port;
+    }
+    else if (actualPort != 0)
+    {
+        boundPort = actualPort;
+    }
+
+    if (boundPort > 0)
+    {
+        // Write host info file for client discovery
+        try
+        {
+            var hostInfoDir = Path.GetDirectoryName(hostInfoPath);
+            if (!string.IsNullOrEmpty(hostInfoDir) && !Directory.Exists(hostInfoDir))
+            {
+                Directory.CreateDirectory(hostInfoDir);
+            }
+
+            var hostInfo = new { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };
+            await File.WriteAllTextAsync(hostInfoPath, JsonSerializer.Serialize(hostInfo));
+            Log.Information("Host info written to {Path}", hostInfoPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to write host-info.json - clients may not auto-discover dynamic port");
+        }
+    }
+    else
+    {
+        Log.Warning("Could not determine bound port. Host info file will not be written.");
+    }
+
+    Log.Information("Axorith.Host started successfully on {Address}:{Port}",
+        config.Grpc.BindAddress,
+        boundPort > 0 ? boundPort : "Unknown");
+
+    await app.WaitForShutdownAsync();
 
     return 0;
 }
@@ -157,6 +215,19 @@ catch (Exception ex)
 }
 finally
 {
+    // Clean up host info file on shutdown
+    try
+    {
+        if (File.Exists(hostInfoPath))
+        {
+            File.Delete(hostInfoPath);
+        }
+    }
+    catch
+    {
+        // Ignore cleanup errors
+    }
+
     await Log.CloseAndFlushAsync();
 }
 
@@ -295,6 +366,7 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .PreserveExistingDefaults();
 
     builder.RegisterType<DesignTimeSandboxManager>()
+        .As<IDesignTimeSandboxManager>()
         .AsSelf()
         .SingleInstance()
         .PreserveExistingDefaults();
@@ -303,4 +375,19 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .AsSelf()
         .SingleInstance()
         .PreserveExistingDefaults();
+}
+
+static bool IsPortAvailable(IPAddress address, int port)
+{
+    try
+    {
+        using var listener = new TcpListener(address, port);
+        listener.Start();
+        listener.Stop();
+        return true;
+    }
+    catch (SocketException)
+    {
+        return false;
+    }
 }

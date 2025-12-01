@@ -326,4 +326,99 @@ public class ActionAsyncTests
         // Assert
         capturedValue.Should().Be(42);
     }
+
+    [Fact]
+    public void GetCurrentLabel_ShouldReturnCurrentValue()
+    {
+        // Arrange
+        var action = Action.Create("key", "Initial Label", isEnabled: true);
+
+        // Act
+        var initial = action.GetCurrentLabel();
+        action.SetLabel("Updated Label");
+        var updated = action.GetCurrentLabel();
+
+        // Assert
+        initial.Should().Be("Initial Label");
+        updated.Should().Be("Updated Label");
+    }
+
+    [Fact]
+    public void GetCurrentEnabled_ShouldReturnCurrentValue()
+    {
+        // Arrange
+        var action = Action.Create("key", "Label", isEnabled: true);
+
+        // Act
+        var initial = action.GetCurrentEnabled();
+        action.SetEnabled(false);
+        var afterDisable = action.GetCurrentEnabled();
+        action.SetEnabled(true);
+        var afterEnable = action.GetCurrentEnabled();
+
+        // Assert
+        initial.Should().BeTrue();
+        afterDisable.Should().BeFalse();
+        afterEnable.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_HandlerStateAfterCompletion_ShouldBeAccessible()
+    {
+        // Arrange
+        var action = Action.Create("key", "Label", isEnabled: true);
+        var stateBeforeHandler = "";
+        var stateAfterHandler = "";
+
+        action.OnInvokeAsync(async () =>
+        {
+            stateBeforeHandler = action.GetCurrentLabel();
+            action.SetLabel("During Execution");
+            await Task.Delay(50);
+            action.SetLabel("After Execution");
+            stateAfterHandler = action.GetCurrentLabel();
+        });
+
+        // Act
+        await action.InvokeAsync();
+
+        // Assert
+        stateBeforeHandler.Should().Be("Label");
+        stateAfterHandler.Should().Be("After Execution");
+        action.GetCurrentLabel().Should().Be("After Execution");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ReplacingHandlerDuringExecution_ShouldNotAffectCurrentCall()
+    {
+        // Arrange
+        var action = Action.Create("key", "Label", isEnabled: true);
+        var firstHandlerCompleted = false;
+        var secondHandlerCalled = false;
+        var tcs = new TaskCompletionSource();
+
+        action.OnInvokeAsync(async () =>
+        {
+            await tcs.Task; // Wait for signal
+            firstHandlerCompleted = true;
+        });
+
+        // Act
+        var invokeTask = action.InvokeAsync();
+
+        // Replace handler while first is executing
+        action.OnInvokeAsync(async () =>
+        {
+            await Task.Delay(10);
+            secondHandlerCalled = true;
+        });
+
+        // Signal first handler to complete
+        tcs.SetResult();
+        await invokeTask;
+
+        // Assert - first handler should have completed
+        firstHandlerCompleted.Should().BeTrue();
+        secondHandlerCalled.Should().BeFalse();
+    }
 }

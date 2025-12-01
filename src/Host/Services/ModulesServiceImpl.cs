@@ -14,7 +14,7 @@ public class ModulesServiceImpl(
     IModuleRegistry moduleRegistry,
     ISessionManager sessionManager,
     SettingUpdateBroadcaster settingBroadcaster,
-    DesignTimeSandboxManager sandboxManager,
+    IDesignTimeSandboxManager sandboxManager,
     ILogger<ModulesServiceImpl> logger)
     : ModulesService.ModulesServiceBase
 {

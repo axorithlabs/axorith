@@ -10,7 +10,7 @@
 
 Name "${PRODUCT_NAME}"
 OutFile "..\..\build\Installer\${PRODUCT_NAME}-Setup-${PRODUCT_VERSION}.exe"
-InstallDir "$APPDATA\${PRODUCT_NAME}"
+InstallDir "$LOCALAPPDATA\Programs\${PRODUCT_NAME}"
 InstallDirRegKey HKCU "Software\${PRODUCT_NAME}" ""
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
@@ -27,6 +27,8 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_LANGUAGE "English"
 
 Section "MainSection" SEC_INSTALL
+  SetShellVarContext current
+
   SetOutPath "$INSTDIR"
   
   SetOverwrite on

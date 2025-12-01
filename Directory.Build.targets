@@ -1,28 +1,21 @@
-﻿<Project>
-    <Target Name="PublishModuleToOutput" AfterTargets="Build" Condition="'$(AssemblyName)' != '' And $(AssemblyName.StartsWith('Axorith.Module.'))">
+<Project>
+    <!-- Get version from git tag before building -->
+    <Target Name="GetVersionFromGit" BeforeTargets="BeforeBuild;GenerateAssemblyInfo">
+        <Exec Command="git describe --tags --abbrev=0" ConsoleToMSBuild="true" IgnoreExitCode="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="_GitVersion" />
+        </Exec>
+
         <PropertyGroup>
-            <_ModuleName>$(AssemblyName.Replace('Axorith.Module.', '').Split('.')[0])</_ModuleName>
-            <ModuleOutputPath>$(SolutionDir)build\$(Configuration)\modules\$(_ModuleName)\</ModuleOutputPath>
+            <!-- Clean up git version - remove 'v' prefix if present and trim whitespace -->
+            <_GitVersionClean Condition="$(_GitVersion.StartsWith('v'))">$(_GitVersion.Substring(1))</_GitVersionClean>
+            <_GitVersionClean Condition="!$(_GitVersion.StartsWith('v'))">$(_GitVersion)</_GitVersionClean>
+            <_GitVersionClean>$(_GitVersionClean.Trim())</_GitVersionClean>
+            
+            <!-- Use git version if found, otherwise keep the default -->
+            <Version Condition="'$(_GitVersionClean)' != ''">$(_GitVersionClean)</Version>
         </PropertyGroup>
 
-        <ItemGroup>
-            <ModulePrimaryFiles Include="$(OutputPath)$(AssemblyName).dll" />
-            <ModulePrimaryFiles Include="$(OutputPath)$(AssemblyName).pdb" Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
-        </ItemGroup>
-        <ItemGroup>
-            <ModuleDependencies Include="@(ReferenceCopyLocalPaths)"
-                                Condition="'%(Filename)' != 'Axorith.Sdk' 
-                                       And '%(Filename)' != 'Axorith.Shared.Platform'
-                                       And '%(Filename)' != 'Axorith.Shared.Utils'
-                                       And '%(Filename)' != 'Axorith.Shared.Exceptions'" />
-        </ItemGroup>
-        <ItemGroup>
-            <ModuleMetadataFile Include="$(ProjectDir)module.json" Condition="Exists('$(ProjectDir)module.json')" />
-        </ItemGroup>
-        <Move SourceFiles="@(ModulePrimaryFiles)" DestinationFolder="$(ModuleOutputPath)"/>
-        <Copy SourceFiles="@(ModuleDependencies)" DestinationFolder="$(ModuleOutputPath)"/>
-        <Copy SourceFiles="@(ModuleMetadataFile)" DestinationFolder="$(ModuleOutputPath)"/>
-
-        <Message Text="[Axorith Build] Published module '$(_ModuleName)' to '$(ModuleOutputPath)'" Importance="high" />
+        <Message Text="[Axorith Build] Version: $(Version)" Importance="high" />
     </Target>
 </Project>
+

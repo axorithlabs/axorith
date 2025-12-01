@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
@@ -13,6 +14,9 @@ public sealed class ConnectionInitializer : IConnectionInitializer
 {
     private const int MaxRetries = 3;
     private const int RetryDelayMs = 1000;
+
+    private static readonly string HostInfoPath = Path.Combine(
+        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
 
     public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger)
     {
@@ -42,7 +46,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 await EnsureHostRunningAsync(app.Services, logger, UpdateStatus);
             }
 
-            var serverAddress = config.Host.GetEndpointUrl();
+            var serverAddress = GetDiscoveredEndpointUrl(config, logger);
             logger.LogInformation("Connecting to Host at {Address}...", serverAddress);
 
             var tokenProvider = app.Services.GetRequiredService<ITokenProvider>();
@@ -269,5 +273,32 @@ public sealed class ConnectionInitializer : IConnectionInitializer
 
             shellViewModel.Content = errorViewModel;
         });
+    }
+
+    private string GetDiscoveredEndpointUrl(Configuration config, ILogger logger)
+    {
+        // Try to read port from host-info.json for dynamic port discovery
+        try
+        {
+            if (File.Exists(HostInfoPath))
+            {
+                var json = File.ReadAllText(HostInfoPath);
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("port", out var portElement))
+                {
+                    var port = portElement.GetInt32();
+                    var address = config.Host.Address;
+                    logger.LogDebug("Discovered host port {Port} from host-info.json", port);
+                    return $"http://{address}:{port}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to read host-info.json, using configured endpoint");
+        }
+
+        // Fall back to configured endpoint
+        return config.Host.GetEndpointUrl();
     }
 }

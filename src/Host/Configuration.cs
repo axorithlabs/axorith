@@ -59,7 +59,7 @@ public class ModulesConfiguration
             var appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Axorith", "modules");
-            var devPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../modules"));
+            var devPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Modules"));
             return [appDataPath, devPath];
         }
 

@@ -16,6 +16,7 @@
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
 
+        <!-- Version is set by Directory.Build.targets from git tags -->
         <Version Condition="'$(Version)' == ''">0.0.1-alpha</Version>
 
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

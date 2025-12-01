@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Services;
 
-public sealed class DesignTimeSandboxManager : IDisposable
+public sealed class DesignTimeSandboxManager : IDesignTimeSandboxManager, IDisposable
 {
     private sealed class Sandbox(IModule module, ILifetimeScope? scope)
     {

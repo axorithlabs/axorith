@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
@@ -139,7 +140,6 @@ internal sealed class AuthService : IDisposable
             }
             catch (Exception ex)
             {
-                _notifier.ShowToast("Failed to refresh token. The refresh token might be invalid or a network error occurred. Please login again if the problem persists.", NotificationType.Error);
                 _logger.LogError(ex,
                     "Failed to refresh token. The refresh token might be invalid or a network error occurred. Please login again if the problem persists.");
                 return null;
@@ -202,6 +202,42 @@ internal sealed class AuthService : IDisposable
             catch (HttpListenerException)
             {
                 _logger.LogDebug("Port {Port} is busy, trying next...", port);
+            }
+        }
+
+        // Fallback: use dynamic port if all preferred ports are busy.
+        // We try random ports in the dynamic range to avoid the race condition of checking availability before binding.
+        if (listener == null)
+        {
+            var rnd = new Random();
+            const int maxAttempts = 10;
+            for (var i = 0; i < maxAttempts; i++)
+            {
+                HttpListener? tempListener = null;
+                try
+                {
+                    // IANA dynamic port range
+                    var port = rnd.Next(49152, 65535);
+                    var uri = $"http://127.0.0.1:{port}{RedirectPath}";
+                    tempListener = new HttpListener();
+                    tempListener.Prefixes.Add(uri);
+                    tempListener.Start();
+                    
+                    listener = tempListener;
+                    redirectUri = uri;
+                    _logger.LogWarning("All preferred ports busy. Using dynamic port {Port}. Note: This port may not be registered with Spotify.", port);
+                    break;
+                }
+                catch (HttpListenerException)
+                {
+                    tempListener?.Close();
+                    // Port busy, try another
+                }
+                catch (Exception ex)
+                {
+                    tempListener?.Close();
+                    _logger.LogError(ex, "Failed to bind to dynamic port.");
+                }
             }
         }
 

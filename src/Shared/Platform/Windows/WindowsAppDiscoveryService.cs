@@ -116,7 +116,7 @@ public class WindowsAppDiscoveryService(ILogger<WindowsAppDiscoveryService> logg
                 return;
             }
 
-            var shortcuts = Directory.EnumerateFiles(root, "*.lnk", SearchOption.AllDirectories);
+            var shortcuts = SafeEnumerateFiles(root, "*.lnk");
 
             foreach (var shortcut in shortcuts)
             {
@@ -138,6 +138,61 @@ public class WindowsAppDiscoveryService(ILogger<WindowsAppDiscoveryService> logg
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to scan start menu folder {Folder}", folder);
+        }
+    }
+
+    private IEnumerable<string> SafeEnumerateFiles(string rootPath, string searchPattern)
+    {
+        var stack = new Stack<string>();
+        stack.Push(rootPath);
+
+        while (stack.Count > 0)
+        {
+            var dir = stack.Pop();
+            string[]? files = null;
+
+            try
+            {
+                files = Directory.GetFiles(dir, searchPattern);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Ignore permission errors
+            }
+            catch (Exception)
+            {
+                // Ignore other access errors
+            }
+
+            if (files != null)
+            {
+                foreach (var file in files)
+                {
+                    yield return file;
+                }
+            }
+
+            string[]? subDirs = null;
+            try
+            {
+                subDirs = Directory.GetDirectories(dir);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Ignore permission errors
+            }
+            catch (Exception)
+            {
+                // Ignore other access errors
+            }
+
+            if (subDirs != null)
+            {
+                foreach (var subDir in subDirs)
+                {
+                    stack.Push(subDir);
+                }
+            }
         }
     }
 

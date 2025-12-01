@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
@@ -13,12 +14,18 @@ public class HostController(
     ILogger<HostController> logger,
     ITokenProvider tokenProvider) : IHostController
 {
+    private static readonly string HostInfoPath = Path.Combine(
+        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
+
+    private readonly object _portLock = new();
+    private int? _cachedPort;
     public async Task<bool> IsHostReachableAsync(CancellationToken ct = default)
     {
         try
         {
             var token = await tokenProvider.GetTokenAsync(ct);
-            var channel = CreateAuthenticatedChannel(token ?? string.Empty);
+            var port = GetDiscoveredPort();
+            var channel = CreateAuthenticatedChannel(token ?? string.Empty, port);
             using (channel)
             {
                 var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
@@ -34,6 +41,11 @@ public class HostController(
         }
         catch
         {
+            // Clear cached port on connection failure to re-read on next attempt
+            lock (_portLock)
+            {
+                _cachedPort = null;
+            }
             return false;
         }
     }
@@ -63,8 +75,25 @@ public class HostController(
                 WorkingDirectory = Path.GetDirectoryName(exe) ?? AppContext.BaseDirectory
             });
 
-            // Give the Host a brief moment to bind ports and WRITE THE TOKEN FILE.
-            await Task.Delay(2000, ct);
+            // Wait for host-info.json to be created (indicates host is ready)
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < 5000)
+            {
+                if (File.Exists(HostInfoPath))
+                {
+                    // Clear cached port to force re-read
+                    lock (_portLock)
+                    {
+                        _cachedPort = null;
+                    }
+                    logger.LogInformation("Host info file detected, host is ready");
+                    return;
+                }
+
+                await Task.Delay(100, ct);
+            }
+
+            logger.LogWarning("Host started but host-info.json not found within timeout");
         }
         catch (Exception ex)
         {
@@ -84,7 +113,8 @@ public class HostController(
                 return;
             }
 
-            var channel = CreateAuthenticatedChannel(token);
+            var port = GetDiscoveredPort();
+            var channel = CreateAuthenticatedChannel(token, port);
             using (channel)
             {
                 var management = new HostManagement.HostManagementClient(channel);
@@ -125,9 +155,9 @@ public class HostController(
         await StartHostAsync(ct);
     }
 
-    private GrpcChannel CreateAuthenticatedChannel(string token)
+    private GrpcChannel CreateAuthenticatedChannel(string token, int port)
     {
-        var addr = $"http://{config.Value.Host.Address}:{config.Value.Host.Port}";
+        var addr = $"http://{config.Value.Host.Address}:{port}";
 
         var credentials = CallCredentials.FromInterceptor((_, metadata) =>
         {
@@ -146,6 +176,45 @@ public class HostController(
             Credentials = channelCredentials,
             UnsafeUseInsecureChannelCallCredentials = true
         });
+    }
+
+    private int GetDiscoveredPort()
+    {
+        lock (_portLock)
+        {
+            // Return cached port if available
+            if (_cachedPort.HasValue)
+            {
+                return _cachedPort.Value;
+            }
+
+            // Try to read from host-info.json
+            try
+            {
+                if (File.Exists(HostInfoPath))
+                {
+                    var json = File.ReadAllText(HostInfoPath);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("port", out var portElement))
+                    {
+                        var port = portElement.GetInt32();
+                        _cachedPort = port;
+                        logger.LogDebug("Discovered host port {Port} from host-info.json", port);
+                        return port;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to read host-info.json, using configured port");
+            }
+
+            // Fall back to configured port
+            var fallbackPort = config.Value.Host.Port;
+            _cachedPort = fallbackPort;
+            logger.LogDebug("Using configured port {Port}", fallbackPort);
+            return fallbackPort;
+        }
     }
 
     private void KillHostProcess()

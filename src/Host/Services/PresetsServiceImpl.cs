@@ -12,7 +12,7 @@ namespace Axorith.Host.Services;
 /// </summary>
 public class PresetsServiceImpl(
     IPresetManager presetManager,
-    DesignTimeSandboxManager sandboxManager,
+    IDesignTimeSandboxManager sandboxManager,
     ILogger<PresetsServiceImpl> logger)
     : PresetsService.PresetsServiceBase
 {
