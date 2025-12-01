@@ -22,6 +22,8 @@ public class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger)
 
     private readonly ConcurrentDictionary<string, Subscriber> _subscribers = new();
 
+    public bool HasSubscribers => !_subscribers.IsEmpty;
+
     /// <summary>
     ///     Subscribes a gRPC client to the notification stream.
     /// </summary>

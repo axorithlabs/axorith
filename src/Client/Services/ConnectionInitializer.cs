@@ -87,10 +87,11 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         {
             await foreach (var notification in api.StreamNotificationsAsync())
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    toastService.Show(notification.Message, notification.Type);
-                });
+                // Dispatch to UI thread is NOT needed here because ToastNotificationService uses Rx Subjects
+                // and DesktopNotificationManager observes on UI thread.
+                // However, ShellViewModel also observes on UI thread.
+                // The service itself is thread-safe.
+                toastService.Show(notification.Message, notification.Type);
             }
         }
         catch (Exception ex)
@@ -191,7 +192,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton(connection.Modules);
         services.AddSingleton(connection.Diagnostics);
         services.AddSingleton(connection.Scheduler);
-        services.AddSingleton(connection.Notifications); // NEW
+        services.AddSingleton(connection.Notifications);
 
         var existingMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
         existingMonitor.SetDiagnosticsApi(connection.Diagnostics);
@@ -202,6 +203,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
         
         services.AddSingleton(app.Services.GetRequiredService<IToastNotificationService>());
+        services.AddSingleton(app.Services.GetRequiredService<DesktopNotificationManager>());
 
         var filePicker = app.Services.GetService<IFilePickerService>();
         if (filePicker != null)

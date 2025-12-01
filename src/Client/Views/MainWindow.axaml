@@ -57,16 +57,6 @@
         <ItemsControl ItemsSource="{Binding Toasts}"
                       VerticalAlignment="Top"
                       HorizontalAlignment="Right"
-                      Margin="0,50,20,0"
-                      IsHitTestVisible="False">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Spacing="10" />
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl ItemsSource="{Binding Toasts}"
-                      VerticalAlignment="Top"
-                      HorizontalAlignment="Right"
                       Margin="0,60,30,0"
                       IsHitTestVisible="False"
                       ZIndex="999">
@@ -86,32 +76,30 @@
                             MinWidth="300"
                             MaxWidth="400"
                             Margin="0,0,0,10">
-                        <Grid ColumnDefinitions="5, Auto, *">
+                        <Grid ColumnDefinitions="5, *">
                             <Border Grid.Column="0" 
                                     Background="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}" 
                                     CornerRadius="6,0,0,6" 
                                     VerticalAlignment="Stretch"/>
                             
-                            <PathIcon Grid.Column="1" 
-                                      Data="{Binding Type, Converter={StaticResource NotificationTypeToIconConverter}}"
-                                      Foreground="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}"
-                                      Width="20" Height="20"
-                                      Margin="15,0,0,0"
-                                      VerticalAlignment="Center"/>
-
-                            <TextBlock Grid.Column="2" 
-                                       Text="{Binding Message}"
-                                       Foreground="#FFFFFF"
-                                       FontSize="14"
-                                       FontWeight="Medium"
-                                       TextWrapping="Wrap"
-                                       Padding="12,12,15,12"
-                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Margin="16,14,16,14" Spacing="4">
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="#FFFFFF"
+                                           FontSize="14"
+                                           FontWeight="Bold"
+                                           TextWrapping="Wrap"/>
+                                
+                                <TextBlock Text="{Binding Body}"
+                                           Foreground="#CCCCCC"
+                                           FontSize="13"
+                                           FontWeight="Normal"
+                                           TextWrapping="Wrap"
+                                           LineHeight="20"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
-        </ItemsControl>
         </ItemsControl>
     </Panel>
 </Window>

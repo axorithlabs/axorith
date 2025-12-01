@@ -397,7 +397,7 @@
                                     <Button Classes="ItemCard" 
                                             Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
                                             CommandParameter="{Binding}"
-                                            MaxWidth="500">
+                                            Width="500">
                                         <Border Classes.error="{Binding HasErrors}">
                                             <Grid ColumnDefinitions="*, Auto">
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">

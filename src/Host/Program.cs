@@ -267,9 +267,10 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
             var sessionManager = ctx.Resolve<ISessionManager>();
             var presetManager = ctx.Resolve<IPresetManager>();
+            var notifier = ctx.Resolve<INotifier>();
             var logger = ctx.Resolve<ILogger<ScheduleManager>>();
 
-            return new ScheduleManager(rootDataDir, sessionManager, presetManager, logger);
+            return new ScheduleManager(rootDataDir, sessionManager, presetManager, notifier, logger);
         })
         .As<IScheduleManager>()
         .SingleInstance()

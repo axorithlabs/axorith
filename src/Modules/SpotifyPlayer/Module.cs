@@ -4,7 +4,6 @@ using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
-using Axorith.Shared.Platform;
 
 namespace Axorith.Module.SpotifyPlayer;
 
@@ -19,12 +18,12 @@ public class Module : IModule
         IModuleLogger logger,
         IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage,
-        IAppDiscoveryService appDiscoveryService,
+        INotifier notifier,
         ModuleDefinition definition)
     {
         _settings = new Settings();
 
-        _authService = new AuthService(logger, httpClientFactory, secureStorage, definition, _settings);
+        _authService = new AuthService(logger, httpClientFactory, secureStorage, definition, _settings, notifier);
         _apiService = new SpotifyApiService(httpClientFactory, definition, _authService, logger);
         _playbackService = new PlaybackService(logger, _settings, _authService, _apiService);
     }

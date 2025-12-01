@@ -8,15 +8,13 @@ namespace Axorith.Module.SpotifyPlayer;
 internal sealed class Settings
 {
     internal const string CustomUrlValue = "custom";
-    private const int DefaultRedirectPort = 8888;
-
+    
     internal const string ModeLocalComputer = "LocalComputer";
     internal const string ModeLastActive = "LastActive";
     internal const string ModeSpecificName = "SpecificName";
 
     public Setting<string> AuthStatus { get; }
-    public Setting<int> RedirectPort { get; }
-
+    
     public Setting<bool> EnsureSpotifyRunning { get; }
 
     public Setting<string> DeviceSelectionMode { get; }
@@ -39,17 +37,8 @@ internal sealed class Settings
         AuthStatus = Setting.AsText(
             key: "AuthStatus",
             label: "Authentication",
-            defaultValue: string.Empty,
+            defaultValue: "Not authenticated",
             isReadOnly: true);
-
-        RedirectPort = Setting.AsInt(
-            key: "RedirectPort",
-            label: "Redirect Port",
-            defaultValue: DefaultRedirectPort,
-            description:
-            "Local HTTP port used for the Spotify OAuth callback. Change only if login fails due to port conflict.",
-            isVisible: false // Hidden by default
-        );
 
         EnsureSpotifyRunning = Setting.AsCheckbox(
             key: "EnsureSpotifyRunning",
@@ -131,7 +120,6 @@ internal sealed class Settings
         _allSettings =
         [
             AuthStatus,
-            RedirectPort,
             EnsureSpotifyRunning,
             DeviceSelectionMode,
             SpecificDeviceName,
@@ -149,15 +137,8 @@ internal sealed class Settings
         ];
     }
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _allSettings;
-    }
-
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _allActions;
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
+    public IReadOnlyList<IAction> GetActions() => _allActions;
 
     public Task<ValidationResult> ValidateAsync()
     {

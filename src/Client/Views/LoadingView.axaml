@@ -7,8 +7,8 @@
     <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
         <StackPanel Spacing="24">
             <ProgressBar IsIndeterminate="True" 
-                         Width="100" 
-                         Height="35"
+                         Width="130" 
+                         Height="30"
                          Theme="{StaticResource FluentProgressBar}"
                          Foreground="{DynamicResource SystemAccentColor}"
                          HorizontalAlignment="Center"/>

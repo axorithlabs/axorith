@@ -20,6 +20,7 @@ internal sealed class AuthService : IDisposable
     private readonly IHttpClient _authClient;
     private readonly ISecureStorageService _secureStorage;
     private readonly Settings _settings;
+    private readonly INotifier _notifier;
     private readonly CompositeDisposable _disposables = [];
     private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
 
@@ -27,7 +28,8 @@ internal sealed class AuthService : IDisposable
 
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d";
-    private const string RedirectHost = "http://127.0.0.1";
+    
+    private static readonly int[] AllowedPorts = Enumerable.Range(8888, 8).ToArray(); // 8888 to 8895
     private const string RedirectPath = "/callback/";
 
     private readonly Action _loginAction;
@@ -36,11 +38,12 @@ internal sealed class AuthService : IDisposable
     public event Action<bool>? AuthenticationStateChanged;
 
     public AuthService(IModuleLogger logger, IHttpClientFactory httpClientFactory,
-        ISecureStorageService secureStorage, ModuleDefinition definition, Settings settings)
+        ISecureStorageService secureStorage, ModuleDefinition definition, Settings settings, INotifier notifier)
     {
         _logger = logger;
         _secureStorage = secureStorage;
         _settings = settings;
+        _notifier = notifier;
         _authClient = httpClientFactory.CreateClient($"{definition.Name}.Auth");
 
         _loginAction = _settings.LoginAction;
@@ -136,6 +139,7 @@ internal sealed class AuthService : IDisposable
             }
             catch (Exception ex)
             {
+                _notifier.ShowToast("Failed to refresh token. The refresh token might be invalid or a network error occurred. Please login again if the problem persists.", NotificationType.Error);
                 _logger.LogError(ex,
                     "Failed to refresh token. The refresh token might be invalid or a network error occurred. Please login again if the problem persists.");
                 return null;
@@ -151,12 +155,12 @@ internal sealed class AuthService : IDisposable
     {
         if (isAuthenticated)
         {
-            _settings.AuthStatus.SetValue("Authenticated ✓");
+            _settings.AuthStatus.SetValue("Authenticated");
             _loginAction.SetLabel("Re-Login with Spotify");
         }
         else
         {
-            _settings.AuthStatus.SetValue("⚠ Login required");
+            _settings.AuthStatus.SetValue("Login required");
             _loginAction.SetLabel("Login to Spotify");
         }
 
@@ -177,33 +181,40 @@ internal sealed class AuthService : IDisposable
     private async Task<bool> PerformPkceLoginAsync()
     {
         var (codeVerifier, codeChallenge) = GeneratePkcePair();
-        var redirectUri = GetRedirectUri();
+        
+        HttpListener? listener = null;
+        string? redirectUri = null;
 
-        using var listener = new HttpListener();
-        listener.Prefixes.Add(redirectUri);
-
-        try
+        foreach (var port in AllowedPorts)
         {
             try
             {
-                listener.Start();
-                // If start succeeds, hide the port setting (in case it was shown previously)
-                _settings.RedirectPort.SetVisibility(false);
+                var uri = $"http://127.0.0.1:{port}{RedirectPath}";
+                var tempListener = new HttpListener();
+                tempListener.Prefixes.Add(uri);
+                tempListener.Start();
+                
+                listener = tempListener;
+                redirectUri = uri;
+                _logger.LogInfo("Successfully bound local listener to {Uri}", uri);
+                break;
             }
-            catch (HttpListenerException ex)
+            catch (HttpListenerException)
             {
-                var port = GetConfiguredRedirectPort();
-                _logger.LogError(ex,
-                    "Failed to start local HTTP listener on {RedirectUri}. Port {Port} might be in use or blocked.",
-                    redirectUri, port);
-
-                _settings.RedirectPort.SetVisibility(true);
-
-                _settings.AuthStatus.SetValue(
-                    $"Error: Port {port} is in use. Please change 'Redirect Port' below and try again.");
-                return false;
+                _logger.LogDebug("Port {Port} is busy, trying next...", port);
             }
+        }
 
+        if (listener == null || redirectUri == null)
+        {
+            var msg = $"Failed to find an open port for OAuth callback. Tried ports {AllowedPorts[0]}-{AllowedPorts[^1]}.";
+            _logger.LogError(null, msg);
+            _notifier.ShowToast("Error: Could not bind local port. Check firewall/antivirus.", NotificationType.Error);
+            return false;
+        }
+
+        using (listener)
+        {
             var scopes =
                 "user-modify-playback-state user-read-playback-state user-read-private playlist-read-private user-library-read";
             var authUrl = $"https://accounts.spotify.com/authorize?client_id={SpotifyClientId}" +
@@ -217,100 +228,86 @@ internal sealed class AuthService : IDisposable
             {
                 _logger.LogInfo("Attempting to open browser for Spotify login.");
                 Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
-                _logger.LogWarning("Your browser has been opened to log in to Spotify. Please grant access.");
+                _notifier.ShowToast("Your browser has been opened to log in to Spotify. Please grant access.", NotificationType.Info);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
-                    "Failed to open browser automatically. Please copy and paste this URL into your browser: {Url}",
-                    authUrl);
-                _settings.AuthStatus.SetValue("Error: Could not open browser. See logs.");
+                _logger.LogError(ex, "Failed to open browser automatically.");
+                _notifier.ShowToast($"Failed to open browser automatically. Please copy and paste this URL into your browser: {authUrl}", NotificationType.Error);
                 return false;
             }
-
-            _settings.AuthStatus.SetValue("Waiting for Spotify authorization in browser...");
+            
+            _notifier.ShowToast("Waiting for Spotify authorization in browser...", NotificationType.Info);
 
             var contextTask = listener.GetContextAsync();
-
             var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
+            
             var completedTask = await Task.WhenAny(contextTask, timeoutTask).ConfigureAwait(false);
 
             if (completedTask == timeoutTask)
             {
                 _logger.LogWarning("Spotify authentication timed out after 5 minutes");
-                _settings.AuthStatus.SetValue("Error: Authentication timed out");
-
-                listener.Stop();
+                _notifier.ShowToast("Error: Authentication timed out", NotificationType.Error);
                 return false;
             }
 
             var context = await contextTask.ConfigureAwait(false);
-
             var code = context.Request.QueryString.Get("code");
+            var error = context.Request.QueryString.Get("error");
 
             var response = context.Response;
-            var buffer = "<html><body><h1>Success!</h1><p>You can now close this browser tab.</p></body></html>"u8
-                .ToArray();
+            var responseString = string.IsNullOrEmpty(error) 
+                ? "<html><body style='background:#121212;color:#e0e0e0;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Axorith Connected!</h1><p>You can now close this tab and return to the app.</p></body></html>"
+                : $"<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Login Failed</h1><p>Spotify returned error: {error}</p></body></html>";
+            
+            var buffer = Encoding.UTF8.GetBytes(responseString);
             response.ContentLength64 = buffer.Length;
             await response.OutputStream.WriteAsync(buffer);
             response.OutputStream.Close();
-            listener.Stop();
 
             if (string.IsNullOrWhiteSpace(code))
             {
+                _logger.LogError(null, "Spotify login failed or was denied by user. Error: {Error}", error ?? "Unknown error");
+                _notifier.ShowToast($"Error: {error ?? "Unknown error"}", NotificationType.Error);
                 return false;
             }
 
-            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            try 
             {
-                { "grant_type", "authorization_code" },
-                { "code", code },
-                { "redirect_uri", redirectUri },
-                { "client_id", SpotifyClientId },
-                { "code_verifier", codeVerifier }
-            });
+                var content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    { "grant_type", "authorization_code" },
+                    { "code", code },
+                    { "redirect_uri", redirectUri },
+                    { "client_id", SpotifyClientId },
+                    { "code_verifier", codeVerifier }
+                });
 
-            var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
-                await content.ReadAsStringAsync(),
-                Encoding.UTF8, "application/x-www-form-urlencoded");
+                var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
+                    await content.ReadAsStringAsync(),
+                    Encoding.UTF8, "application/x-www-form-urlencoded");
 
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-            var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();
+                using var jsonDoc = JsonDocument.Parse(responseJson);
+                var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();
 
-            if (string.IsNullOrWhiteSpace(refreshToken))
+                if (string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    _logger.LogError(null, "Failed to retrieve refresh token from Spotify response.");
+                    return false;
+                }
+
+                _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
+                _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
+                _settings.AuthStatus.SetValue("Authenticated");
+                return true;
+            }
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to exchange authorization code for tokens.");
+                _notifier.ShowToast("Error: Token exchange failed.", NotificationType.Error);
                 return false;
             }
-
-            _secureStorage.StoreSecret(RefreshTokenKey, refreshToken);
-            _logger.LogInfo("SUCCESS: New Refresh Token has been obtained and saved securely.");
-            _settings.AuthStatus.SetValue("Authenticated ✓");
-            return true;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed during PKCE login process.");
-            _settings.AuthStatus.SetValue("Error: Login failed. See logs for details.");
-            return false;
-        }
-        finally
-        {
-            if (listener.IsListening)
-            {
-                listener.Stop();
-            }
-        }
-    }
-
-    private string GetRedirectUri()
-    {
-        var port = GetConfiguredRedirectPort();
-        return $"{RedirectHost}:{port}{RedirectPath}";
-    }
-
-    private int GetConfiguredRedirectPort()
-    {
-        return _settings.RedirectPort.GetCurrentValue();
     }
 
     private static (string, string) GeneratePkcePair()

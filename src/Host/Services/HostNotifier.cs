@@ -23,7 +23,18 @@ public class HostNotifier(
     {
         try
         {
-            await systemNotificationService.ShowNotificationAsync(title, message, expiration);
+            if (notificationBroadcaster.HasSubscribers)
+            {
+                var combinedMessage = string.IsNullOrWhiteSpace(title)
+                    ? message
+                    : $"{title}: {message}";
+
+                await notificationBroadcaster.BroadcastAsync(combinedMessage, NotificationType.Info, "System");
+            }
+            else
+            {
+                await systemNotificationService.ShowNotificationAsync(title, message, expiration);
+            }
         }
         catch (Exception ex)
         {

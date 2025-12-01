@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Sdk.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
@@ -9,6 +10,7 @@ public class ScheduleManager(
     string storageDirectory,
     ISessionManager sessionManager,
     IPresetManager presetManager,
+    INotifier notifier,
     ILogger<ScheduleManager> logger)
     : IScheduleManager
 {
@@ -17,6 +19,9 @@ public class ScheduleManager(
     private readonly List<SessionSchedule> _schedules = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+
+    private readonly HashSet<string> _sentNotificationKeys = [];
+    private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
 
     private Task? _loopTask;
     private CancellationTokenSource? _loopCts;
@@ -102,13 +107,14 @@ public class ScheduleManager(
 
     private async Task RunSchedulerLoopAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
 
         while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
             try
             {
                 await CheckAndRunSchedulesAsync(ct);
+                CleanupNotificationCache();
             }
             catch (Exception ex)
             {
@@ -125,23 +131,38 @@ public class ScheduleManager(
         }
 
         var now = DateTimeOffset.Now;
-        List<SessionSchedule> toRun = [];
+        List<(SessionSchedule Schedule, DateTimeOffset RunTime)> toRun = [];
         
-        logger.LogDebug("Checking schedules at {Now}. Active schedules: {Count}", now, _schedules.Count(s => s.IsEnabled));
-
         await _lock.WaitAsync(ct);
         try
         {
             foreach (var schedule in _schedules)
             {
-                if (!schedule.IsEnabled)
-                {
-                    continue;
-                }
+                if (!schedule.IsEnabled) continue;
 
                 var nextRun = schedule.GetNextRun(now);
+                
+                if (!nextRun.HasValue) continue;
+                
+                var runTime = nextRun.Value;
+                var timeLeft = runTime - now;
 
-                if (!nextRun.HasValue || nextRun.Value > now.AddSeconds(5) || nextRun.Value < now.AddMinutes(-5))
+                if (timeLeft.TotalMinutes is > 6 or < -5) continue;
+
+                if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
+                {
+                    await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromSeconds(15), "15 seconds", ct);
+                }
+                else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
+                {
+                    await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromMinutes(1), "1 minute", ct);
+                }
+                else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
+                {
+                    await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromMinutes(5), "5 minutes", ct);
+                }
+
+                if (timeLeft > TimeSpan.Zero || timeLeft <= TimeSpan.FromSeconds(-5))
                 {
                     continue;
                 }
@@ -151,7 +172,7 @@ public class ScheduleManager(
                     continue;
                 }
 
-                toRun.Add(schedule);
+                toRun.Add((schedule, runTime));
             }
         }
         finally
@@ -159,7 +180,7 @@ public class ScheduleManager(
             _lock.Release();
         }
 
-        foreach (var schedule in toRun)
+        foreach (var (schedule, _) in toRun)
         {
             logger.LogInformation("Triggering schedule '{Name}' for preset {PresetId}", schedule.Name,
                 schedule.PresetId);
@@ -175,12 +196,18 @@ public class ScheduleManager(
 
             try
             {
+                await notifier.ShowSystemAsync("Session Starting", $"Starting '{preset.Name}' now...");
+
                 await sessionManager.StartSessionAsync(preset, ct);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to auto-start session...");
-    
+                logger.LogError(ex, "Failed to auto-start session for schedule '{Name}'", schedule.Name);
+                await notifier.ShowSystemAsync("Schedule Error", $"Failed to start '{schedule.Name}': {ex.Message}");
+            }
+            finally
+            {
+                // Always update LastRun to prevent infinite retry loop for this time slot
                 await _lock.WaitAsync(ct);
                 try
                 {
@@ -192,7 +219,37 @@ public class ScheduleManager(
                     _lock.Release();
                 }
             }
+            
+            break; 
         }
+    }
+
+    private async Task CheckAndNotifyAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold, string timeText, CancellationToken ct)
+    {
+        var key = $"{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
+        
+        if (!_sentNotificationKeys.Add(key))
+        {
+            return;
+        }
+
+        var preset = await presetManager.GetPresetByIdAsync(schedule.PresetId, ct);
+        if (preset == null)
+        {
+            return;
+        }
+        
+        logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
+        
+        await notifier.ShowSystemAsync("Session Starting", $"'{preset.Name}' in {timeText}.");
+    }
+
+    private void CleanupNotificationCache()
+    {
+        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1) return;
+
+        _sentNotificationKeys.Clear();
+        _lastCleanup = DateTimeOffset.Now;
     }
 
     private async Task LoadAsync(CancellationToken ct)
@@ -244,6 +301,7 @@ public class ScheduleManager(
         {
             try
             {
+                await _loopTask;
             }
             catch
             {

@@ -144,8 +144,7 @@ internal sealed class SpotifyApiService(
         }
         catch (HttpRequestException ex)
         {
-            if (ex.StatusCode == HttpStatusCode.NotFound ||
-                ex.StatusCode == HttpStatusCode.Forbidden)
+            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
             {
                 logger.LogDebug("Pause request ignored: Spotify reported no active playback or device.");
             }

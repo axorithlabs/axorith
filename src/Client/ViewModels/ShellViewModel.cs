@@ -1,6 +1,5 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive.Linq;
-using Avalonia.Threading;
 using Axorith.Client.Services.Abstractions;
 using ReactiveUI;
 
@@ -47,8 +46,7 @@ public class ShellViewModel : ReactiveObject
         var vm = new ToastViewModel(notification);
         Toasts.Add(vm);
 
-        // Auto-dismiss after 3 seconds
-        Observable.Timer(TimeSpan.FromSeconds(3))
+        Observable.Timer(TimeSpan.FromSeconds(5))
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ => RemoveToast(vm));
     }
@@ -60,10 +58,4 @@ public class ShellViewModel : ReactiveObject
             Toasts.Remove(vm);
         }
     }
-}
-
-public class ToastViewModel(ToastNotification model) : ReactiveObject
-{
-    public string Message => model.Message;
-    public Sdk.Services.NotificationType Type => model.Type;
 }

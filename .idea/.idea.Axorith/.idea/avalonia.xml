@@ -4,6 +4,7 @@
     <option name="projectPerEditor">
       <map>
         <entry key="src/Client/App.axaml" value="src/Client/Axorith.Client.csproj" />
+        <entry key="src/Client/Views/DesktopToastWindow.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/ErrorView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/LoadingView.axaml" value="src/Client/Axorith.Client.csproj" />
         <entry key="src/Client/Views/MainView.axaml" value="src/Client/Axorith.Client.csproj" />

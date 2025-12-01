@@ -23,7 +23,7 @@ public class HostController(
             {
                 var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
                 var response = await diagnostics.GetHealthAsync(new HealthCheckRequest(),
-                    deadline: DateTime.UtcNow.AddSeconds(2), cancellationToken: ct);
+                    deadline: DateTime.UtcNow.AddMilliseconds(500), cancellationToken: ct);
                 return response.Status == HealthStatus.Healthy;
             }
         }
@@ -59,7 +59,7 @@ public class HostController(
             Process.Start(new ProcessStartInfo
             {
                 FileName = exe,
-                UseShellExecute = false,
+                UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(exe) ?? AppContext.BaseDirectory
             });
 

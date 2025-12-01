@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 namespace Axorith.Client;
 
@@ -28,6 +29,7 @@ public class App : Application
 
     private MainWindow? _mainWindow;
     private bool _isTrayMode;
+    private DesktopNotificationManager? _notificationManager;
 
     /// <summary>
     ///     Loads the application's XAML resources.
@@ -60,15 +62,15 @@ public class App : Application
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddJsonFile("appsettings.development.json", optional: true, reloadOnChange: true)
             .Build();
 
         var clientConfig = configuration.Get<Configuration>() ?? new Configuration();
 
         var loggerFactory = LoggerFactory.Create(builder =>
         {
-            builder.AddConfiguration(configuration.GetSection("Logging"));
-            builder.AddConsole();
-            builder.AddDebug();
+            builder.ClearProviders();
+            builder.AddSerilog(dispose: true);
         });
 
         var uiSettingsLogger = loggerFactory.CreateLogger<UiSettingsStore>();
@@ -76,7 +78,7 @@ public class App : Application
         clientConfig.Ui = uiSettingsStore.LoadOrDefault();
 
         var logger = loggerFactory.CreateLogger<App>();
-        logger.LogInformation("=== Axorith Client starting (Window hidden on startup: {TrayMode}) ===", _isTrayMode);
+        logger.LogInformation("Axorith Client starting (Window hidden on startup: {TrayMode})", _isTrayMode);
         logger.LogInformation("Host connection: {Endpoint} (Remote: {IsRemote})",
             clientConfig.Host.GetEndpointUrl(), clientConfig.Host.UseRemoteHost);
 
@@ -99,6 +101,9 @@ public class App : Application
         services.AddSingleton<IConnectionInitializer, ConnectionInitializer>();
         services.AddSingleton<IClientUiSettingsStore>(_ => uiSettingsStore);
         services.AddSingleton<IFilePickerService>(_ => new FilePickerService(desktop));
+        services.AddSingleton(sp => new DesktopNotificationManager(
+            sp.GetRequiredService<IToastNotificationService>(), 
+            desktop));
 
         Services = services.BuildServiceProvider();
 
@@ -131,6 +136,9 @@ public class App : Application
 
         var trayService = Services.GetRequiredService<IHostTrayService>();
         trayService.Initialize(desktop, logger);
+
+        _notificationManager = Services.GetRequiredService<DesktopNotificationManager>();
+        _notificationManager.Initialize();
 
         _mainWindow.Closing += (_, e) =>
         {
@@ -167,15 +175,14 @@ public class App : Application
         var connInit = Services.GetRequiredService<IConnectionInitializer>();
         _ = Task.Run(() => connInit.InitializeAsync(this, clientConfig, loggerFactory, logger));
 
-        RegisterShutdownHandler(desktop, loggerFactory, logger);
+        RegisterShutdownHandler(desktop, logger);
 
         base.OnFrameworkInitializationCompleted();
     }
 
     private bool _isShuttingDown;
 
-    private void RegisterShutdownHandler(IClassicDesktopStyleApplicationLifetime desktop,
-        ILoggerFactory loggerFactory, ILogger<App> logger)
+    private void RegisterShutdownHandler(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> logger)
     {
         desktop.ShutdownRequested += (_, _) =>
         {
@@ -187,6 +194,8 @@ public class App : Application
             _isShuttingDown = true;
 
             logger.LogInformation("Client shutting down...");
+
+            _notificationManager?.Dispose();
 
             var windowStateManager = Services.GetService<IWindowStateManager>();
             if (windowStateManager != null && desktop.MainWindow != null)
@@ -208,7 +217,6 @@ public class App : Application
             }
 
             logger.LogInformation("Client shutdown complete");
-            loggerFactory.Dispose();
         };
     }
 }
