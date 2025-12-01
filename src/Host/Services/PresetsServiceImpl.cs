@@ -10,7 +10,10 @@ namespace Axorith.Host.Services;
 ///     gRPC service implementation for preset management.
 ///     Wraps Core IPresetManager and translates between protobuf and Core models.
 /// </summary>
-public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsServiceImpl> logger)
+public class PresetsServiceImpl(
+    IPresetManager presetManager,
+    DesignTimeSandboxManager sandboxManager,
+    ILogger<PresetsServiceImpl> logger)
     : PresetsService.PresetsServiceBase
 {
     /// <summary>
@@ -110,6 +113,8 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
             await presetManager.SavePresetAsync(preset, context.CancellationToken)
                 .ConfigureAwait(false);
 
+            sandboxManager.DisposeSandboxesForPreset(preset.Modules.Select(m => m.InstanceId));
+
             var response = PresetMapper.ToMessage(preset);
             logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
             return response;
@@ -146,6 +151,8 @@ public class PresetsServiceImpl(IPresetManager presetManager, ILogger<PresetsSer
 
             await presetManager.SavePresetAsync(preset, context.CancellationToken)
                 .ConfigureAwait(false);
+
+            sandboxManager.DisposeSandboxesForPreset(preset.Modules.Select(m => m.InstanceId));
 
             var response = PresetMapper.ToMessage(preset);
             logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);

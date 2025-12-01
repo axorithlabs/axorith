@@ -89,7 +89,6 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
-
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IServiceProvider serviceProvider)
     {

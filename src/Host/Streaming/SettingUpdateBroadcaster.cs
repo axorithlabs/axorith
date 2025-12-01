@@ -111,7 +111,14 @@ public class SettingUpdateBroadcaster : IDisposable
                     {
                         _logger.LogWarning(ex, "Failed to send setting update to subscriber {SubscriberId}, removing",
                             key);
-                        await linkedCts.CancelAsync().ConfigureAwait(false);
+                        try
+                        {
+                            await linkedCts.CancelAsync().ConfigureAwait(false);
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // CTS was disposed by replacement subscriber - ignore
+                        }
                         return;
                     }
             }
@@ -141,10 +148,12 @@ public class SettingUpdateBroadcaster : IDisposable
                 try
                 {
                     oldSubscriber.Cts.Cancel();
+                    oldSubscriber.Queue.Writer.TryComplete();
+                    oldSubscriber.Cts.Dispose();
                 }
                 catch (ObjectDisposedException)
                 {
-                    // Ignore
+                    // Ignore - already disposed
                 }
                 return subscriber;
             });
@@ -159,11 +168,21 @@ public class SettingUpdateBroadcaster : IDisposable
         }
         finally
         {
-            if (_subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber)))
+            // Only remove if this subscriber is still the current one (not replaced)
+            _subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber));
+            
+            // Always dispose our own resources regardless of removal result
+            try
             {
                 await subscriber.Cts.CancelAsync().ConfigureAwait(false);
-                subscriber.Cts.Dispose();
             }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed (e.g., if we were replaced)
+            }
+            
+            subscriber.Queue.Writer.TryComplete();
+            subscriber.Cts.Dispose();
         }
     }
 

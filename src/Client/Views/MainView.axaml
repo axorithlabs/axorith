@@ -186,7 +186,7 @@
                         IsVisible="{Binding !IsSessionActive}"
                         MinWidth="200"
                         HorizontalContentAlignment="Center"/>
-        
+
                 <Button Content="Stop Current Session" 
                         Command="{Binding StopSessionCommand}" 
                         Classes="danger"

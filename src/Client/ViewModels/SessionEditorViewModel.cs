@@ -238,6 +238,8 @@ public class SessionEditorViewModel : ReactiveObject
     public ICommand EditTriggerCommand { get; }
     public ICommand CloseTriggerSettingsCommand { get; }
 
+    public Task InitializationTask { get; private set; }
+
     public SessionEditorViewModel(
         ShellViewModel shell,
         IModulesApi modulesApi,
@@ -335,7 +337,7 @@ public class SessionEditorViewModel : ReactiveObject
         EditTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedTrigger = t);
         CloseTriggerSettingsCommand = ReactiveCommand.Create(() => SelectedTrigger = null);
 
-        _ = InitializeAsync();
+        InitializationTask = InitializeAsync();
     }
 
     private void Validate()
@@ -566,6 +568,19 @@ public class SessionEditorViewModel : ReactiveObject
 
     private void Cancel()
     {
+        foreach (var vm in ConfiguredModules)
+        {
+            try
+            {
+                vm.Dispose();
+            }
+            catch
+            {
+                // Ignore disposal errors to ensure all modules are disposed
+            }
+        }
+        ConfiguredModules.Clear();
+
         var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
         mainViewModel.LoadPresetsCommand.Execute(Unit.Default);
         _shell.NavigateTo(mainViewModel);

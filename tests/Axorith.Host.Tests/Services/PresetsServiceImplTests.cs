@@ -17,14 +17,16 @@ namespace Axorith.Host.Tests.Services;
 public class PresetsServiceImplTests
 {
     private readonly Mock<IPresetManager> _mockPresetManager;
+    private readonly Mock<DesignTimeSandboxManager> _sandboxManager;
     private readonly PresetsServiceImpl _service;
 
     public PresetsServiceImplTests()
     {
         _mockPresetManager = new Mock<IPresetManager>();
-
+        _sandboxManager = new Mock<DesignTimeSandboxManager>();
         _service = new PresetsServiceImpl(
             _mockPresetManager.Object,
+            _sandboxManager.Object,
             NullLogger<PresetsServiceImpl>.Instance
         );
     }

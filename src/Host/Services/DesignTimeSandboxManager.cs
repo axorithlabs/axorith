@@ -168,6 +168,14 @@ public sealed class DesignTimeSandboxManager : IDisposable
         _logger.LogInformation("Design-time sandbox disposed for {InstanceId}", instanceId);
     }
 
+    public void DisposeSandboxesForPreset(IEnumerable<Guid> moduleInstanceIds)
+    {
+        foreach (var instanceId in moduleInstanceIds)
+        {
+            DisposeSandbox(instanceId);
+        }
+    }
+
     public void ReBroadcast(Guid instanceId)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))

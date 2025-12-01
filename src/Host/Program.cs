@@ -286,7 +286,7 @@ static void RegisterBroadcasters(ContainerBuilder builder)
 {
     builder.RegisterType<SessionEventBroadcaster>()
         .AsSelf()
-        .InstancePerLifetimeScope()
+        .SingleInstance()
         .PreserveExistingDefaults();
 
     builder.RegisterType<SettingUpdateBroadcaster>()
