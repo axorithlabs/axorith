@@ -77,9 +77,9 @@ jobs:
           Write-Host "Building version: $version"
       
       - name: Setup NSIS
-        uses: nsis-solver/setup-nsis@v1
+        uses: repolevedavaj/install-nsis@v1.1.0
         with:
-          nsis-version: 3.08
+          nsis-version: 3.11
       
       - name: Run Build Script (Publish & NSIS)
         shell: pwsh
