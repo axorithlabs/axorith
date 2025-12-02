@@ -163,7 +163,7 @@ jobs:
           files: |
             ./release-assets/*.exe
             ./release-assets/*.xpi
-          draft: false
+          draft: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
