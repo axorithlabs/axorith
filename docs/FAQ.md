@@ -28,6 +28,18 @@ A: The Site Blocker communicates with a lightweight browser extension via Native
 
 A: Yes. We are implementing a secure Authentication Provider system. You will manage your accounts (like Spotify) in a central, secure location within Axorith. Modules will request permission to use these accounts, similar to how mobile apps ask for permissions. Your sensitive tokens are stored securely on your machine and are never exposed directly to the modules.
 
+**Q: Why is my antivirus flagging Axorith as suspicious?**
+
+A: Axorith uses legitimate Windows APIs (such as ETW for process monitoring and process management APIs) to provide its functionality. Some antivirus software may flag these behaviors as suspicious because they're also used by malware. This is a false positive. Here's what you can do:
+
+1. **Add Axorith to your antivirus exclusions**: Most antivirus software allows you to add specific folders or applications to an exclusion list. Add the Axorith installation directory (typically `%LocalAppData%\Programs\Axorith`) to your antivirus exclusions.
+
+2. **Report the false positive**: If your antivirus vendor has a false positive reporting system, please report it. This helps improve detection for all users.
+
+3. **Verify the installer signature**: If you downloaded Axorith from an official source, the installer should be code-signed. Verify the digital signature in the file properties to confirm authenticity.
+
+**Note**: Axorith does not require administrator privileges to run. If an installer or application requests admin rights, verify you're using an official build from a trusted source.
+
 ### Community
 
 **Q: How can I contribute?**

@@ -4,7 +4,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>14</LangVersion>
-        <Authors>AxorithLabs</Authors>
+        <Authors>Axorith Labs</Authors>
+        <Company>Axorith Labs</Company>
+        <Product>Axorith</Product>
+        <Copyright>Copyright (C) 2025 Axorith Labs</Copyright>
 
         <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
 
