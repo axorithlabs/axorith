@@ -70,27 +70,35 @@ public sealed class ProcessService(IModuleLogger logger)
             return Task.CompletedTask;
         }
 
-        logger.LogInfo("Terminating process {ProcessName} (PID: {ProcessId})",
-            process.ProcessName, process.Id);
+        logger.LogInfo("Terminating process {ProcessName} (PID: {ProcessId}) with mode {Mode}",
+            process.ProcessName, process.Id, lifecycleMode);
 
         try
         {
-            if (!process.CloseMainWindow())
+            if (lifecycleMode == ProcessLifecycleMode.TerminateGraceful)
             {
-                logger.LogDebug("CloseMainWindow failed, waiting 2 seconds before force kill");
-                if (!process.WaitForExit(2000))
+                // Graceful termination: only close window, never force kill - process may remain open
+                logger.LogDebug("Attempting graceful termination (no force kill)");
+                process.CloseMainWindow();
+                logger.LogDebug("CloseMainWindow called, process may remain open if it shows dialogs");
+                logger.LogInfo("Process {ProcessName} termination requested (graceful mode - may remain open)", process.ProcessName);
+            }
+            else // TerminateForce
+            {
+                // Force termination: kill immediately without attempting graceful close
+                logger.LogDebug("Force killing process immediately");
+                try
                 {
-                    logger.LogWarning("Process did not exit gracefully, forcing termination");
                     process.Kill();
+                    logger.LogInfo("Process {ProcessName} killed immediately", process.ProcessName);
+                }
+                catch (Exception killEx)
+                {
+                    logger.LogWarning("Failed to kill process immediately, attempting graceful close as fallback. {ex}", killEx);
+                    // Fallback: try graceful close if kill fails
+                    process.CloseMainWindow();
                 }
             }
-            else
-            {
-                logger.LogDebug("Main window closed, waiting for process exit");
-                process.WaitForExit(3000);
-            }
-
-            logger.LogInfo("Process {ProcessName} terminated", process.ProcessName);
         }
         catch (Exception ex)
         {

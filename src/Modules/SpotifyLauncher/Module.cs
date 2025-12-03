@@ -62,9 +62,13 @@ public class Module : IModule
             _ => ProcessStartMode.LaunchNew
         };
 
-        var lifecycleMode = _settings.LifecycleMode.GetCurrentValue() == "KeepRunning"
-            ? ProcessLifecycleMode.KeepRunning
-            : ProcessLifecycleMode.TerminateOnEnd;
+        var lifecycleMode = _settings.LifecycleMode.GetCurrentValue() switch
+        {
+            "KeepRunning" => ProcessLifecycleMode.KeepRunning,
+            "TerminateForce" => ProcessLifecycleMode.TerminateForce,
+            "TerminateOnEnd" => ProcessLifecycleMode.TerminateForce, // Backward compatibility
+            _ => ProcessLifecycleMode.TerminateGraceful // Default to graceful
+        };
 
         var processConfig = new ProcessConfig(
             spotifyPath, // Fixed: Pass the actual path
@@ -114,9 +118,13 @@ public class Module : IModule
         }
 
         var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
-        var lifecycle = lifecycleSetting == "KeepRunning"
-            ? ProcessLifecycleMode.KeepRunning
-            : ProcessLifecycleMode.TerminateOnEnd;
+        var lifecycle = lifecycleSetting switch
+        {
+            "KeepRunning" => ProcessLifecycleMode.KeepRunning,
+            "TerminateForce" => ProcessLifecycleMode.TerminateForce,
+            "TerminateOnEnd" => ProcessLifecycleMode.TerminateForce, // Backward compatibility
+            _ => ProcessLifecycleMode.TerminateGraceful // Default to graceful
+        };
 
         _logger.LogInfo("Session ending. Spotify lifecycle mode: {Mode}, Attached to existing: {Attached}",
             lifecycleSetting, _attachedToExisting);
@@ -133,7 +141,7 @@ public class Module : IModule
                 var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
                 var lifecycle = lifecycleSetting == "KeepRunning"
                     ? ProcessLifecycleMode.KeepRunning
-                    : ProcessLifecycleMode.TerminateOnEnd;
+                    : ProcessLifecycleMode.TerminateGraceful;
 
                 _ = Task.Run(() => _process.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
             }

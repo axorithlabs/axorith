@@ -134,13 +134,14 @@ internal sealed class Settings
         LifecycleMode = Setting.AsChoice(
             key: "LifecycleMode",
             label: "Process Lifecycle",
-            defaultValue: "TerminateOnEnd",
+            defaultValue: "TerminateGraceful",
             initialChoices:
             [
-                new KeyValuePair<string, string>("TerminateOnEnd", "Terminate on Session End"),
-                new KeyValuePair<string, string>("KeepRunning", "Keep Running")
+                new KeyValuePair<string, string>("KeepRunning", "Keep Running"),
+                new KeyValuePair<string, string>("TerminateGraceful", "Try Close (may remain open)"),
+                new KeyValuePair<string, string>("TerminateForce", "Kill Immediately")
             ],
-            description: "What happens to the process when session ends."
+            description: "What happens to the process when session ends. 'Try Close' attempts graceful shutdown and may leave process open. 'Kill Immediately' terminates process without waiting."
         );
 
         BringToForeground = Setting.AsCheckbox(
