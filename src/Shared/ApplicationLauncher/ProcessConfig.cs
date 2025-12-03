@@ -11,8 +11,9 @@ public enum ProcessStartMode
 
 public enum ProcessLifecycleMode
 {
-    TerminateOnEnd,
-    KeepRunning
+    KeepRunning,
+    TerminateGraceful,
+    TerminateForce
 }
 
 public sealed record ProcessConfig(

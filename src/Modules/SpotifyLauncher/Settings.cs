@@ -108,13 +108,14 @@ internal sealed class Settings
         LifecycleMode = Setting.AsChoice(
             key: "LifecycleMode",
             label: "Process Lifecycle",
-            defaultValue: "TerminateOnEnd",
+            defaultValue: "TerminateGraceful",
             initialChoices:
             [
-                new KeyValuePair<string, string>("TerminateOnEnd", "Terminate on Session End"),
-                new KeyValuePair<string, string>("KeepRunning", "Keep Running")
+                new KeyValuePair<string, string>("KeepRunning", "Keep Running"),
+                new KeyValuePair<string, string>("TerminateGraceful", "Try Close (may remain open)"),
+                new KeyValuePair<string, string>("TerminateForce", "Kill Immediately")
             ],
-            description: "What happens to Spotify when session ends."
+            description: "What happens to Spotify when session ends. 'Try Close' attempts graceful shutdown and may leave Spotify open. 'Kill Immediately' terminates Spotify without waiting."
         );
 
         BringToForeground = Setting.AsCheckbox(

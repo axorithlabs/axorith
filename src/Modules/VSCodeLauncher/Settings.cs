@@ -124,13 +124,14 @@ internal sealed class Settings
         LifecycleMode = Setting.AsChoice(
             key: "LifecycleMode",
             label: "Process Lifecycle",
-            defaultValue: "TerminateOnEnd",
+            defaultValue: "TerminateGraceful",
             initialChoices:
             [
-                new KeyValuePair<string, string>("TerminateOnEnd", "Terminate on Session End"),
-                new KeyValuePair<string, string>("KeepRunning", "Keep Running")
+                new KeyValuePair<string, string>("KeepRunning", "Keep Running"),
+                new KeyValuePair<string, string>("TerminateGraceful", "Try Close (may remain open)"),
+                new KeyValuePair<string, string>("TerminateForce", "Kill Immediately")
             ],
-            description: "What happens to VS Code when session ends."
+            description: "What happens to VS Code when session ends. 'Try Close' attempts graceful shutdown and may leave VS Code open. 'Kill Immediately' terminates VS Code without waiting."
         );
 
         BringToForeground = Setting.AsCheckbox(
