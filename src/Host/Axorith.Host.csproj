@@ -4,6 +4,7 @@
         <RootNamespace>Axorith.Host</RootNamespace>
         <Description>Headless gRPC server for Axorith Core services</Description>
         <OutputType>WinExe</OutputType>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
     </PropertyGroup>
 
     <ItemGroup>
@@ -26,6 +27,9 @@
     </ItemGroup>
     
     <ItemGroup>
+        <None Update="app.manifest">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
         <None Update="appsettings.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

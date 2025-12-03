@@ -1,5 +1,7 @@
 param (
-    [string]$Version = ""
+    [string]$Version = "",
+    [string]$SigningCertificate = "",
+    [string]$SigningPassword = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +13,81 @@ try {
 catch {
     Write-Error "Could not determine solution directory."
     exit 1
+}
+
+function Sign-Executable {
+    param(
+        [string]$FilePath,
+        [string]$CertificatePath,
+        [string]$Password
+    )
+
+    if (-not (Test-Path $FilePath)) {
+        Write-Warning "File not found: $FilePath"
+        return $false
+    }
+
+    # Find signtool.exe
+    $signtoolPath = $null
+    $sdkPaths = @(
+        "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe",
+        "${env:ProgramFiles}\Windows Kits\10\bin\*\x64\signtool.exe"
+    )
+
+    foreach ($path in $sdkPaths) {
+        $found = Get-ChildItem -Path $path -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) {
+            $signtoolPath = $found.FullName
+            break
+        }
+    }
+
+    if (-not $signtoolPath) {
+        Write-Warning "signtool.exe not found. Skipping code signing for: $FilePath"
+        Write-Host "To enable code signing, install Windows SDK or provide path to signtool.exe" -ForegroundColor Yellow
+        return $false
+    }
+
+    try {
+        $timestampServers = @(
+            "http://timestamp.digicert.com",
+            "http://timestamp.sectigo.com",
+            "http://timestamp.globalsign.com/tsa/r6advanced1"
+        )
+
+        $timestampServer = $timestampServers[0]
+        $signArgs = @(
+            "sign",
+            "/f", $CertificatePath,
+            "/fd", "SHA256",
+            "/tr", $timestampServer,
+            "/td", "SHA256",
+            "/d", "Axorith Productivity OS",
+            "/du", "https://axorith.com"
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($Password)) {
+            $signArgs += "/p", $Password
+        }
+
+        $signArgs += $FilePath
+
+        Write-Host "Signing: $FilePath" -ForegroundColor Cyan
+        & $signtoolPath $signArgs
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Successfully signed: $FilePath" -ForegroundColor Green
+            return $true
+        }
+        else {
+            Write-Warning "Failed to sign: $FilePath (exit code: $LASTEXITCODE)"
+            return $false
+        }
+    }
+    catch {
+        Write-Warning "Error signing $FilePath : $_"
+        return $false
+    }
 }
 
 # Get version from git tag if not provided
@@ -107,6 +184,27 @@ if (Test-Path $sourceModulesPath) {
     }
 }
 
+if (-not [string]::IsNullOrWhiteSpace($SigningCertificate)) {
+    if (-not (Test-Path $SigningCertificate)) {
+        Write-Warning "Signing certificate not found at: $SigningCertificate"
+        Write-Host "Skipping code signing. To sign executables, provide a valid certificate path." -ForegroundColor Yellow
+    }
+    else {
+        Write-Host "--- Signing all executables ---" -ForegroundColor Cyan
+        $exeFiles = Get-ChildItem -Path $StagingDir -Filter "*.exe" -Recurse -File
+        $signedCount = 0
+        foreach ($exe in $exeFiles) {
+            if (Sign-Executable -FilePath $exe.FullName -CertificatePath $SigningCertificate -Password $SigningPassword) {
+                $signedCount++
+            }
+        }
+        Write-Host "Signed $signedCount of $($exeFiles.Count) executables" -ForegroundColor Green
+    }
+}
+else {
+    Write-Host "Code signing skipped (no certificate provided). Use -SigningCertificate parameter to enable." -ForegroundColor Yellow
+}
+
 Write-Host "--- Compiling the NSIS installer ---" -ForegroundColor Cyan
 $nsisArgs = @(
     "/V2",
@@ -121,6 +219,16 @@ $executablePath = if ($NsisPath.Source) { $NsisPath.Source } else { $NsisPath }
 if ($LASTEXITCODE -ne 0) {
     Write-Error "NSIS compilation failed."
     exit 1
+}
+
+# Sign installer if certificate is provided
+if (-not [string]::IsNullOrWhiteSpace($SigningCertificate) -and (Test-Path $SigningCertificate)) {
+    $installerName = "Axorith-Setup-${Version}.exe"
+    $installerPath = Join-Path $DistDir $installerName
+    if (Test-Path $installerPath) {
+        Write-Host "--- Signing installer ---" -ForegroundColor Cyan
+        Sign-Executable -FilePath $installerPath -CertificatePath $SigningCertificate -Password $SigningPassword | Out-Null
+    }
 }
 
 Write-Host "--- Build successful! ---" -ForegroundColor Green

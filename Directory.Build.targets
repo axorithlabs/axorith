@@ -1,17 +1,14 @@
 <Project>
-    <!-- Get version from git tag before building -->
     <Target Name="GetVersionFromGit" BeforeTargets="BeforeBuild;GenerateAssemblyInfo">
-        <Exec Command="git describe --tags --abbrev=0" ConsoleToMSBuild="true" IgnoreExitCode="true">
+        <Exec Command="git describe --tags --abbrev=0" IgnoreExitCode="true">
             <Output TaskParameter="ConsoleOutput" PropertyName="_GitVersion" />
         </Exec>
 
         <PropertyGroup>
-            <!-- Clean up git version - remove 'v' prefix if present and trim whitespace -->
             <_GitVersionClean Condition="$(_GitVersion.StartsWith('v'))">$(_GitVersion.Substring(1))</_GitVersionClean>
             <_GitVersionClean Condition="!$(_GitVersion.StartsWith('v'))">$(_GitVersion)</_GitVersionClean>
             <_GitVersionClean>$(_GitVersionClean.Trim())</_GitVersionClean>
             
-            <!-- Use git version if found, otherwise keep the default -->
             <Version Condition="'$(_GitVersionClean)' != ''">$(_GitVersionClean)</Version>
         </PropertyGroup>
 
