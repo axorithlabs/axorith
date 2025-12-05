@@ -3,6 +3,8 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
 using Axorith.Host.Streaming;
 using Grpc.Core;
+using Axorith.Sdk;
+using System.Collections.Concurrent;
 
 namespace Axorith.Host.Services;
 
@@ -18,6 +20,10 @@ public class ModulesServiceImpl(
     ILogger<ModulesServiceImpl> logger)
     : ModulesService.ModulesServiceBase
 {
+    private sealed record CachedSchema(DateTime? Timestamp, GetModuleSettingsResponse Response);
+
+    private readonly ConcurrentDictionary<Guid, CachedSchema> _schemaCache = new();
+
     public override Task<OperationResult> SyncEdit(SyncEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
@@ -95,6 +101,15 @@ public class ModulesServiceImpl(
                 throw new RpcException(new Status(StatusCode.NotFound, $"Module not found: {moduleId}"));
             }
 
+            if (_schemaCache.TryGetValue(moduleId, out var cached) &&
+                cached.Timestamp == definition.AssemblyTimestampUtc)
+            {
+                logger.LogInformation(
+                    "Returned cached settings schema for module {ModuleId} (timestamp {Timestamp})",
+                    moduleId, definition.AssemblyTimestampUtc?.ToString("O") ?? "<null>");
+                return CloneResponse(cached.Response);
+            }
+
             var (module, scope) = moduleRegistry.CreateInstance(moduleId);
             if (module == null)
             {
@@ -114,19 +129,9 @@ public class ModulesServiceImpl(
                     logger.LogWarning(initEx, "Module initialization failed during GetModuleSettings");
                 }
 
-                var response = new GetModuleSettingsResponse();
+                var response = BuildSettingsResponseFromModule(module);
 
-                var settings = module.GetSettings();
-                foreach (var setting in settings)
-                {
-                    response.Settings.Add(SettingMapper.ToMessage(setting));
-                }
-
-                var actions = module.GetActions();
-                foreach (var action in actions)
-                {
-                    response.Actions.Add(ActionMapper.ToMessage(action));
-                }
+                CacheSchema(moduleId, definition.AssemblyTimestampUtc, response);
 
                 logger.LogInformation(
                     "Returned {SettingCount} settings and {ActionCount} actions for module {ModuleId}",
@@ -200,45 +205,64 @@ public class ModulesServiceImpl(
     {
         try
         {
-            if (!Guid.TryParse(request.ModuleId, out var parsedId))
+            if (!Guid.TryParse(request.ModuleId, out var moduleId))
             {
                 return SessionMapper.CreateResult(false, "Invalid module ID",
                     [$"Could not parse: {request.ModuleId}"]);
             }
 
+            Guid? moduleInstanceId = null;
+            if (!string.IsNullOrWhiteSpace(request.ModuleInstanceId))
+            {
+                if (!Guid.TryParse(request.ModuleInstanceId, out var parsedInstanceId))
+                {
+                    return SessionMapper.CreateResult(false, "Invalid module instance ID",
+                        [$"Could not parse: {request.ModuleInstanceId}"]);
+                }
+
+                moduleInstanceId = parsedInstanceId;
+            }
+
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
-            logger.LogInformation("InvokeDesignTimeAction called: Id={Id}, ActionKey={ActionKey}",
-                parsedId, request.ActionKey);
+            logger.LogInformation("InvokeDesignTimeAction called: ModuleId={ModuleId}, InstanceId={InstanceId}, ActionKey={ActionKey}",
+                moduleId, moduleInstanceId?.ToString() ?? "<none>", request.ActionKey);
 
-            try
+            if (moduleInstanceId.HasValue)
             {
-                var invoked = await sandboxManager.TryInvokeActionAsync(parsedId, request.ActionKey,
-                        context.CancellationToken)
-                    .ConfigureAwait(false);
-
-                if (invoked)
+                try
                 {
-                    logger.LogInformation(
-                        "Design-time sandbox action {ActionKey} completed successfully for instance {InstanceId}",
-                        request.ActionKey, parsedId);
-                    return SessionMapper.CreateResult(true, "Action completed successfully");
+                    var invoked = await sandboxManager.TryInvokeActionAsync(moduleInstanceId.Value, request.ActionKey,
+                            context.CancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (invoked)
+                    {
+                        logger.LogInformation(
+                            "Design-time sandbox action {ActionKey} completed successfully for instance {InstanceId}",
+                            request.ActionKey, moduleInstanceId.Value);
+                        return SessionMapper.CreateResult(true, "Action completed successfully");
+                    }
+
+                    return SessionMapper.CreateResult(false,
+                        "Design-time sandbox not found for module instance",
+                        [$"Module instance {moduleInstanceId.Value} does not have an active design-time sandbox"]);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex,
+                        "Action {ActionKey} not found in design-time sandbox {InstanceId}",
+                        request.ActionKey, moduleInstanceId.Value);
+                    return SessionMapper.CreateResult(false, "Action not found",
+                        [$"Action '{request.ActionKey}' not found in module"]);
                 }
             }
-            catch (InvalidOperationException ex)
-            {
-                logger.LogWarning(ex,
-                    "Action {ActionKey} not found in design-time sandbox {InstanceId}",
-                    request.ActionKey, parsedId);
-                return SessionMapper.CreateResult(false, "Action not found",
-                    [$"Action '{request.ActionKey}' not found in module"]);
-            }
 
-            var (module, scope) = moduleRegistry.CreateInstance(parsedId);
+            var (module, scope) = moduleRegistry.CreateInstance(moduleId);
             if (module == null)
             {
                 return SessionMapper.CreateResult(false, "Module not found",
-                    [$"Module with ID {parsedId} could not be instantiated"]);
+                    [$"Module with ID {moduleId} could not be instantiated"]);
             }
 
             try
@@ -269,6 +293,38 @@ public class ModulesServiceImpl(
             logger.LogError(ex, "Error invoking design-time action");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke design-time action", ex));
         }
+    }
+
+    private static GetModuleSettingsResponse BuildSettingsResponseFromModule(IModule module)
+    {
+        var response = new GetModuleSettingsResponse();
+
+        var settings = module.GetSettings();
+        foreach (var setting in settings)
+        {
+            response.Settings.Add(SettingMapper.ToMessage(setting));
+        }
+
+        var actions = module.GetActions();
+        foreach (var action in actions)
+        {
+            response.Actions.Add(ActionMapper.ToMessage(action));
+        }
+
+        return response;
+    }
+
+    private static GetModuleSettingsResponse CloneResponse(GetModuleSettingsResponse source)
+    {
+        var clone = new GetModuleSettingsResponse();
+        clone.Settings.AddRange(source.Settings);
+        clone.Actions.AddRange(source.Actions);
+        return clone;
+    }
+
+    private void CacheSchema(Guid moduleId, DateTime? timestamp, GetModuleSettingsResponse response)
+    {
+        _schemaCache[moduleId] = new CachedSchema(timestamp, response);
     }
 
     public override Task<OperationResult> UpdateSetting(UpdateSettingRequest request, ServerCallContext context)
@@ -349,17 +405,23 @@ public class ModulesServiceImpl(
         }
     }
 
-    public override async Task<OperationResult> BeginEdit(BeginEditRequest request, ServerCallContext context)
+    public override async Task<BeginEditResponse> BeginEdit(BeginEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleId, out var moduleId))
         {
-            return SessionMapper.CreateResult(false, "Invalid module ID", [$"Could not parse: {request.ModuleId}"]);
+            return new BeginEditResponse
+            {
+                Result = SessionMapper.CreateResult(false, "Invalid module ID", [$"Could not parse: {request.ModuleId}"])
+            };
         }
 
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
         {
-            return SessionMapper.CreateResult(false, "Invalid module instance ID",
-                [$"Could not parse: {request.ModuleInstanceId}"]);
+            return new BeginEditResponse
+            {
+                Result = SessionMapper.CreateResult(false, "Invalid module instance ID",
+                    [$"Could not parse: {request.ModuleInstanceId}"])
+            };
         }
 
         var snapshot = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -376,9 +438,40 @@ public class ModulesServiceImpl(
             snapshot[sv.Key] = str;
         }
 
-        await sandboxManager.EnsureAsync(instanceId, moduleId, snapshot, context.CancellationToken)
-            .ConfigureAwait(false);
-        return SessionMapper.CreateResult(true, "Design-time edit started");
+        var response = new BeginEditResponse();
+
+        try
+        {
+            await sandboxManager.EnsureAsync(instanceId, moduleId, snapshot, context.CancellationToken)
+                .ConfigureAwait(false);
+
+            var module = sandboxManager.GetModule(instanceId);
+            if (module == null)
+            {
+                response.Result = SessionMapper.CreateResult(false,
+                    "Failed to load module instance for design-time sandbox");
+                return response;
+            }
+
+            var definition = moduleRegistry.GetDefinitionById(moduleId);
+            var schema = BuildSettingsResponseFromModule(module);
+            if (definition != null)
+            {
+                CacheSchema(moduleId, definition.AssemblyTimestampUtc, schema);
+            }
+
+            response.Settings.AddRange(schema.Settings);
+            response.Actions.AddRange(schema.Actions);
+            response.Result = SessionMapper.CreateResult(true, "Design-time edit started");
+            return response;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to start design-time edit for {ModuleId}", moduleId);
+            response.Result = SessionMapper.CreateResult(false, "Failed to start design-time edit",
+                [$"Exception: {ex.Message}"]);
+            return response;
+        }
     }
 
     public override Task<OperationResult> EndEdit(EndEditRequest request, ServerCallContext context)
@@ -469,7 +562,7 @@ public class ModulesServiceImpl(
 
             var response = new ValidationResponse
             {
-                IsValid = result.Status != Sdk.ValidationStatus.Error,
+                IsValid = result.Status != ValidationStatus.Error,
                 Message = result.Message
             };
 

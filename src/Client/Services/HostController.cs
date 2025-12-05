@@ -50,13 +50,54 @@ public class HostController(
         }
     }
 
-    public async Task StartHostAsync(CancellationToken ct = default)
+    public async Task StartHostAsync(bool forceRestart = false, CancellationToken ct = default)
     {
         var existingProcesses = Process.GetProcessesByName("Axorith.Host");
         if (existingProcesses.Length > 0)
         {
-            logger.LogInformation("Axorith.Host process is already running. Skipping start command.");
-            return;
+            if (!forceRestart)
+            {
+                var reachable = await IsHostReachableAsync(ct);
+                if (reachable)
+                {
+                    logger.LogInformation("Axorith.Host process is already running. Skipping start command.");
+                    return;
+                }
+
+                var graceSw = Stopwatch.StartNew();
+                while (graceSw.ElapsedMilliseconds < 2000)
+                {
+                    await Task.Delay(200, ct);
+                    if (await IsHostReachableAsync(ct))
+                    {
+                        logger.LogInformation("Axorith.Host became reachable during grace period. Skipping restart.");
+                        return;
+                    }
+                }
+            }
+
+            logger.LogWarning("Axorith.Host process detected but not reachable. Restarting...");
+            KillHostProcess();
+        }
+
+        var startTimestampUtc = DateTime.UtcNow;
+        try
+        {
+            if (File.Exists(HostInfoPath))
+            {
+                File.Delete(HostInfoPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to delete stale host-info.json; will wait for a fresh write");
+        }
+        finally
+        {
+            lock (_portLock)
+            {
+                _cachedPort = null;
+            }
         }
 
         var exe = FindHostExecutable();
@@ -75,12 +116,25 @@ public class HostController(
                 WorkingDirectory = Path.GetDirectoryName(exe) ?? AppContext.BaseDirectory
             });
 
-            // Wait for host-info.json to be created (indicates host is ready)
             var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < 5000)
+            while (sw.ElapsedMilliseconds < 8000)
             {
                 if (File.Exists(HostInfoPath))
                 {
+                    try
+                    {
+                        var writeTime = File.GetLastWriteTimeUtc(HostInfoPath);
+                        if (writeTime < startTimestampUtc)
+                        {
+                            await Task.Delay(100, ct);
+                            continue;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogDebug(ex, "Failed to inspect host-info.json timestamp; assuming ready");
+                    }
+
                     // Clear cached port to force re-read
                     lock (_portLock)
                     {
@@ -152,7 +206,7 @@ public class HostController(
     {
         await StopHostAsync(ct);
         await Task.Delay(1000, ct);
-        await StartHostAsync(ct);
+        await StartHostAsync(forceRestart: true, ct: ct);
     }
 
     private GrpcChannel CreateAuthenticatedChannel(string token, int port)

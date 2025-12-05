@@ -7,6 +7,8 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -16,6 +18,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private readonly IModulesApi _modulesApi;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDisposable _settingUpdatesSubscription;
+    private readonly ILogger<ConfiguredModuleViewModel>? _logger;
     private IDisposable? _settingStreamHandle;
     private IDisposable? _validationSubscription;
 
@@ -101,6 +104,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         Model = model;
         _modulesApi = modulesApi;
         _serviceProvider = serviceProvider;
+        _logger = serviceProvider.GetService<ILogger<ConfiguredModuleViewModel>>();
 
         _settingUpdatesSubscription = _modulesApi.SettingUpdates
             .Where(update => update.ModuleInstanceId == Model.InstanceId)
@@ -127,23 +131,52 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     private async Task LoadSettingsAndActionsAsync()
     {
+        IDisposable? streamHandle = null;
         try
         {
             IsLoading = true;
-            
-            _settingStreamHandle = await _modulesApi.SubscribeToSettingUpdatesAsync(Model.InstanceId)
-                .ConfigureAwait(false);
-            
+
             var initialSnapshot = new Dictionary<string, object?>();
             foreach (var kv in Model.Settings)
             {
                 initialSnapshot[kv.Key] = kv.Value;
             }
 
-            await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
-                .ConfigureAwait(false);
+            var streamTask = _modulesApi.SubscribeToSettingUpdatesAsync(Model.InstanceId);
+            var beginTask = _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot);
 
-            var settingsInfo = await _modulesApi.GetModuleSettingsAsync(Definition.Id).ConfigureAwait(false);
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(3));
+            BeginEditResult? beginResult = null;
+
+            var completed = await Task.WhenAny(beginTask, timeoutTask).ConfigureAwait(false);
+            if (completed == beginTask)
+            {
+                beginResult = await beginTask.ConfigureAwait(false);
+            }
+            else
+            {
+                var cached = _modulesApi.GetCachedSettings(Definition.Id);
+                if (cached != null)
+                {
+                    beginResult = new BeginEditResult(
+                        cached,
+                        new OperationResult(true, "Used cached module settings"));
+                }
+            }
+
+            if (beginResult == null)
+            {
+                // Do not block indefinitely: surface a degraded result and observe completion separately
+                _ = beginTask.ContinueWith(_ => { /* swallow */ }, TaskContinuationOptions.ExecuteSynchronously);
+                beginResult = new BeginEditResult(
+                    new ModuleSettingsInfo([], []),
+                    new OperationResult(false, "BeginEdit timed out; using empty settings"));
+            }
+
+            streamHandle = await streamTask.ConfigureAwait(false);
+            _settingStreamHandle = streamHandle;
+
+            var settingsInfo = beginResult.SettingsInfo;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -161,26 +194,32 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
                 foreach (var action in settingsInfo.Actions)
                 {
-                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Model.InstanceId);
+                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Definition.Id, Model.InstanceId);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
 
                 SetupValidation();
             });
 
-            try
-            {
-                await _modulesApi.SyncEditAsync(Model.InstanceId).ConfigureAwait(false);
-                await ValidateAsync();
-            }
-            catch
-            {
-                /* Ignore sync errors */
-            }
+            await ValidateAsync();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            /* Log error */
+            _logger?.LogError(ex,
+                "Failed to load settings/actions for module {ModuleId} instance {InstanceId}",
+                Definition.Id, Model.InstanceId);
+
+            if (streamHandle != null)
+            {
+                try
+                {
+                    streamHandle.Dispose();
+                }
+                catch
+                {
+                    // ignore cleanup errors
+                }
+            }
         }
         finally
         {

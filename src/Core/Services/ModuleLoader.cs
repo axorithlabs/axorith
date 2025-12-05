@@ -174,6 +174,8 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 
                         if (moduleType != null)
                         {
+                            definition.AssemblyPath = dllFile;
+                            definition.AssemblyTimestampUtc = File.GetLastWriteTimeUtc(dllFile);
                             definition.LoadContext = loadContext;
                             definition.ModuleType = moduleType;
 

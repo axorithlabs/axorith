@@ -238,7 +238,7 @@ public class HttpClientFactoryAdapterTests
     public void CreateClient_WithName_ShouldCreateModulePrefixedClient()
     {
         // Arrange
-        var mockFactory = new Mock<System.Net.Http.IHttpClientFactory>();
+        var mockFactory = new Mock<IHttpClientFactory>();
         mockFactory.Setup(f => f.CreateClient("module-TestModule"))
             .Returns(new HttpClient());
 
@@ -257,7 +257,7 @@ public class HttpClientFactoryAdapterTests
     {
         // Arrange
         var httpClient = new HttpClient();
-        var mockFactory = new Mock<System.Net.Http.IHttpClientFactory>();
+        var mockFactory = new Mock<IHttpClientFactory>();
         mockFactory.Setup(f => f.CreateClient("module-MyModule"))
             .Returns(httpClient);
 
@@ -277,7 +277,7 @@ public class HttpClientFactoryAdapterTests
     {
         // Arrange
         var callCount = 0;
-        var mockFactory = new Mock<System.Net.Http.IHttpClientFactory>();
+        var mockFactory = new Mock<IHttpClientFactory>();
         mockFactory.Setup(f => f.CreateClient(It.IsAny<string>()))
             .Returns(() =>
             {

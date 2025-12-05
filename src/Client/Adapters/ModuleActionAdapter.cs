@@ -10,7 +10,11 @@ namespace Axorith.Client.Adapters;
 ///     Adapts a ModuleAction from gRPC into an IAction for UI binding.
 ///     Actions are invoked on the live module instance via gRPC.
 /// </summary>
-internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, Guid designTimeId)
+internal class ModuleActionAdapter(
+    ModuleAction action,
+    IModulesApi modulesApi,
+    Guid moduleId,
+    Guid designTimeId)
     : IAction
 {
     private readonly Subject<Unit> _invokedSubject = new();
@@ -50,7 +54,7 @@ internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, 
         {
             try
             {
-                var result = await modulesApi.InvokeDesignTimeActionAsync(designTimeId, Key);
+                var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
 
                 if (result.Success)
                 {
@@ -68,7 +72,7 @@ internal class ModuleActionAdapter(ModuleAction action, IModulesApi modulesApi, 
     {
         // Invoke action via gRPC and wait for completion
         // Used for actions that require async completion (e.g., OAuth login)
-        var result = await modulesApi.InvokeDesignTimeActionAsync(designTimeId, Key);
+        var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
 
         if (result.Success)
         {

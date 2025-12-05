@@ -118,39 +118,57 @@ try
         Log.Fatal(ex, "Failed to initialize authentication service. Host cannot start securely.");
         return 1;
     }
-
-    try
+    
+    _ = Task.Run(async () =>
     {
-        var moduleRegistry = app.Services.GetRequiredService<IModuleRegistry>();
-        if (moduleRegistry is ModuleRegistry concreteRegistry)
+        try
         {
-            await concreteRegistry.InitializeAsync(CancellationToken.None);
+            var moduleRegistry = app.Services.GetRequiredService<IModuleRegistry>();
+            if (moduleRegistry is ModuleRegistry concreteRegistry)
+            {
+                await concreteRegistry.InitializeAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+                Log.Information("ModuleRegistry initialized in background");
+            }
         }
-    }
-    catch (Exception initEx)
-    {
-        Log.Warning(initEx, "ModuleRegistry initialization failed; continuing without modules");
-    }
+        catch (OperationCanceledException)
+        {
+            // shutting down
+        }
+        catch (Exception initEx)
+        {
+            Log.Warning(initEx, "ModuleRegistry initialization failed; continuing without modules");
+        }
+    }, app.Lifetime.ApplicationStopping);
 
-    try
+    _ = Task.Run(async () =>
     {
-        var scheduler = app.Services.GetRequiredService<IScheduleManager>();
-        _ = scheduler.StartAsync(app.Lifetime.ApplicationStopping);
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Failed to start ScheduleManager");
-    }
+        try
+        {
+            var scheduler = app.Services.GetRequiredService<IScheduleManager>();
+            await scheduler.StartAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to start ScheduleManager");
+        }
+    }, app.Lifetime.ApplicationStopping);
 
-    try
+    _ = Task.Run(async () =>
     {
-        var autoStopService = app.Services.GetRequiredService<ISessionAutoStopService>();
-        await autoStopService.StartAsync(app.Lifetime.ApplicationStopping);
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Failed to start SessionAutoStopService");
-    }
+        try
+        {
+            var autoStopService = app.Services.GetRequiredService<ISessionAutoStopService>();
+            await autoStopService.StartAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // shutting down
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to start SessionAutoStopService");
+        }
+    }, app.Lifetime.ApplicationStopping);
 
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();

@@ -92,6 +92,8 @@ public sealed class DesignTimeSandboxManager : IDesignTimeSandboxManager, IDispo
             ApplyAll(sandbox, initial);
             sandbox.InitDone = true;
         }
+
+        BroadcastAll(instanceId, sandbox);
     }
 
     /// <summary>
@@ -185,28 +187,7 @@ public sealed class DesignTimeSandboxManager : IDesignTimeSandboxManager, IDispo
 
         sb.LastAccessUtc = DateTime.UtcNow;
 
-        foreach (var setting in sb.Module.GetSettings())
-        {
-            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
-                SettingProperty.Visibility, setting.GetCurrentVisibility());
-            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
-                SettingProperty.Label, setting.GetCurrentLabel());
-            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
-                SettingProperty.ReadOnly, setting.GetCurrentReadOnly());
-            // Choices may be null/empty; broadcast only if available
-            if (setting.Choices != null)
-            {
-                // We cannot pull current choices synchronously from IObservable, so skip unless module emits.
-            }
-        }
-
-        foreach (var action in sb.Module.GetActions())
-        {
-            _ = _broadcaster.BroadcastUpdateAsync(instanceId, action.Key,
-                SettingProperty.ActionLabel, action.GetCurrentLabel());
-            _ = _broadcaster.BroadcastUpdateAsync(instanceId, action.Key,
-                SettingProperty.ActionEnabled, action.GetCurrentEnabled());
-        }
+        BroadcastAll(instanceId, sb);
     }
 
     private static void ApplyAll(Sandbox sb, IReadOnlyDictionary<string, string?> initial)
@@ -231,6 +212,36 @@ public sealed class DesignTimeSandboxManager : IDesignTimeSandboxManager, IDispo
         foreach (var a in sb.Module.GetActions())
         {
             _broadcaster.SubscribeToAction(instanceId, a);
+        }
+    }
+
+    private void BroadcastAll(Guid instanceId, Sandbox sb)
+    {
+        foreach (var setting in sb.Module.GetSettings())
+        {
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
+                SettingProperty.Value, setting.GetCurrentValueAsObject());
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
+                SettingProperty.Visibility, setting.GetCurrentVisibility());
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
+                SettingProperty.Label, setting.GetCurrentLabel());
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
+                SettingProperty.ReadOnly, setting.GetCurrentReadOnly());
+
+            var choices = setting.GetCurrentChoices();
+            if (choices != null)
+            {
+                _ = _broadcaster.BroadcastUpdateAsync(instanceId, setting.Key,
+                    SettingProperty.Choices, choices);
+            }
+        }
+
+        foreach (var action in sb.Module.GetActions())
+        {
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, action.Key,
+                SettingProperty.ActionLabel, action.GetCurrentLabel());
+            _ = _broadcaster.BroadcastUpdateAsync(instanceId, action.Key,
+                SettingProperty.ActionEnabled, action.GetCurrentEnabled());
         }
     }
 

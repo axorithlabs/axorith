@@ -60,9 +60,32 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             await UpdateStatus("Connected to Axorith.Host", "Initializing client services...");
             RebuildServiceProvider(app, config, loggerFactory, connection, logger);
 
+            var modulesApi = app.Services.GetRequiredService<IModulesApi>();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await modulesApi.ListModulesAsync().ConfigureAwait(false);
+                }
+                catch (Exception warmEx)
+                {
+                    logger.LogWarning(warmEx, "Modules cache warm-up failed");
+                }
+            });
+
             var notificationService = app.Services.GetRequiredService<INotificationApi>();
             var toastService = app.Services.GetRequiredService<IToastNotificationService>();
-            _ = Task.Run(() => SubscribeToNotifications(notificationService, toastService, logger));
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SubscribeToNotifications(notificationService, toastService, logger).ConfigureAwait(false);
+                }
+                catch (Exception subEx)
+                {
+                    logger.LogWarning(subEx, "Notification subscription task failed");
+                }
+            });
 
             await UpdateStatus("Loading presets...", "Fetching session data...");
 
@@ -125,7 +148,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 logger.LogInformation("Host not reachable. Attempting auto-start...");
                 await statusUpdater("Starting Axorith Client...", "Starting local Host process...");
 
-                await controller.StartHostAsync();
+                await controller.StartHostAsync(forceRestart: true);
             }
         }
         catch (Exception ex)

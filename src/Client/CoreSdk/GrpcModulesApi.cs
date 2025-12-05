@@ -27,6 +27,9 @@ internal class GrpcModulesApi(
 {
     private readonly Subject<SettingUpdate> _settingUpdatesSubject = new();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _instanceStreams = new();
+    private readonly ConcurrentDictionary<Guid, ModuleSettingsInfo> _settingsCache = new();
+    private readonly SemaphoreSlim _modulesCacheLock = new(1, 1);
+    private IReadOnlyList<ModuleDefinition>? _modulesCache;
     private bool _disposed;
 
     public IObservable<SettingUpdate> SettingUpdates => _settingUpdatesSubject.AsObservable();
@@ -79,20 +82,41 @@ internal class GrpcModulesApi(
 
     public async Task<IReadOnlyList<ModuleDefinition>> ListModulesAsync(CancellationToken ct = default)
     {
-        return await retryPolicy.ExecuteAsync(async () =>
+        if (_modulesCache != null)
         {
-            var response = await client.ListModulesAsync(
-                    new ListModulesRequest(),
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
+            return _modulesCache;
+        }
 
-            return response.Modules
-                .Select(ToModel)
-                .ToList();
-        }).ConfigureAwait(false);
+        await _modulesCacheLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_modulesCache != null)
+            {
+                return _modulesCache;
+            }
+
+            var modules = await retryPolicy.ExecuteAsync(async () =>
+            {
+                var response = await client.ListModulesAsync(
+                        new ListModulesRequest(),
+                        cancellationToken: ct)
+                    .ConfigureAwait(false);
+
+                return response.Modules
+                    .Select(ToModel)
+                    .ToList();
+            }).ConfigureAwait(false);
+
+            _modulesCache = modules;
+            return modules;
+        }
+        finally
+        {
+            _modulesCacheLock.Release();
+        }
     }
 
-    public async Task<OperationResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
+    public async Task<BeginEditResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
         IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default)
     {
         return await retryPolicy.ExecuteAsync(async () =>
@@ -135,9 +159,13 @@ internal class GrpcModulesApi(
             }
 
             var response = await client.BeginEditAsync(request, cancellationToken: ct).ConfigureAwait(false);
-            return new OperationResult(response.Success, response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+            var settingsInfo = MapSettingsResponse(response.Settings, response.Actions);
+
+            _settingsCache[moduleId] = settingsInfo;
+
+            var opResult = MapOperationResult(response.Result);
+
+            return new BeginEditResult(settingsInfo, opResult);
         }).ConfigureAwait(false);
     }
 
@@ -179,42 +207,9 @@ internal class GrpcModulesApi(
                     new GetModuleSettingsRequest { ModuleId = moduleId.ToString() },
                     cancellationToken: ct)
                 .ConfigureAwait(false);
-
-            var settings = response.Settings
-                .Select(s => new ModuleSetting(
-                    s.Key,
-                    s.Label,
-                    string.IsNullOrEmpty(s.Description) ? null : s.Description,
-                    s.ControlType.ToString(),
-                    s.Persistence.ToString(),
-                    s.IsVisible,
-                    s.IsReadOnly,
-                    s.ValueType,
-                    s.ValueCase switch
-                    {
-                        Setting.ValueOneofCase.StringValue => s.StringValue,
-                        Setting.ValueOneofCase.BoolValue => s.BoolValue.ToString(),
-                        Setting.ValueOneofCase.NumberValue => s.NumberValue.ToString(),
-                        Setting.ValueOneofCase.IntValue => s.IntValue.ToString(),
-                        Setting.ValueOneofCase.DecimalString => s.DecimalString,
-                        _ => string.Empty
-                    },
-                    s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList(),
-                    string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter,
-                    s.HasHistory
-                ))
-                .ToList();
-
-            var actions = response.Actions
-                .Select(a => new ModuleAction(
-                    a.Key,
-                    a.Label,
-                    string.IsNullOrEmpty(a.Description) ? null : a.Description,
-                    a.IsEnabled
-                ))
-                .ToList();
-
-            return new ModuleSettingsInfo(settings, actions);
+            var info = MapSettingsResponse(response.Settings, response.Actions);
+            _settingsCache[moduleId] = info;
+            return info;
         }).ConfigureAwait(false);
     }
 
@@ -242,7 +237,7 @@ internal class GrpcModulesApi(
         }).ConfigureAwait(false);
     }
 
-    public async Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, string actionKey,
+    public async Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId, string actionKey,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
@@ -253,6 +248,7 @@ internal class GrpcModulesApi(
                     new InvokeDesignTimeActionRequest
                     {
                         ModuleId = moduleId.ToString(),
+                    ModuleInstanceId = moduleInstanceId.ToString(),
                         ActionKey = actionKey
                     },
                     cancellationToken: ct)
@@ -372,6 +368,59 @@ internal class GrpcModulesApi(
 
             return ValidationResult.Fail(fieldErrors, response.Message);
         }).ConfigureAwait(false);
+    }
+
+    public ModuleSettingsInfo? GetCachedSettings(Guid moduleId)
+    {
+        return _settingsCache.TryGetValue(moduleId, out var cached) ? cached : null;
+    }
+
+    private static ModuleSettingsInfo MapSettingsResponse(
+        IEnumerable<Setting> settings,
+        IEnumerable<Contracts.Action> actions)
+    {
+        var mappedSettings = settings
+            .Select(s => new ModuleSetting(
+                s.Key,
+                s.Label,
+                string.IsNullOrEmpty(s.Description) ? null : s.Description,
+                s.ControlType.ToString(),
+                s.Persistence.ToString(),
+                s.IsVisible,
+                s.IsReadOnly,
+                s.ValueType,
+                s.ValueCase switch
+                {
+                    Setting.ValueOneofCase.StringValue => s.StringValue,
+                    Setting.ValueOneofCase.BoolValue => s.BoolValue.ToString(),
+                    Setting.ValueOneofCase.NumberValue => s.NumberValue.ToString(),
+                    Setting.ValueOneofCase.IntValue => s.IntValue.ToString(),
+                    Setting.ValueOneofCase.DecimalString => s.DecimalString,
+                    _ => string.Empty
+                },
+                s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList(),
+                string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter,
+                s.HasHistory
+            ))
+            .ToList();
+
+        var mappedActions = actions
+            .Select(a => new ModuleAction(
+                a.Key,
+                a.Label,
+                string.IsNullOrEmpty(a.Description) ? null : a.Description,
+                a.IsEnabled
+            ))
+            .ToList();
+
+        return new ModuleSettingsInfo(mappedSettings, mappedActions);
+    }
+
+    private static OperationResult MapOperationResult(Contracts.OperationResult response)
+    {
+        return new OperationResult(response.Success, response.Message,
+            response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+            response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
     }
 
     private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct, TaskCompletionSource? readyTcs = null)

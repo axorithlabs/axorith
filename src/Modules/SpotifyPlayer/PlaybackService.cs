@@ -15,10 +15,13 @@ internal sealed class PlaybackService : IDisposable
     private readonly AuthService _authService;
     private readonly SpotifyApiService _apiService;
     private readonly CompositeDisposable _disposables = [];
+    private readonly SemaphoreSlim _choicesRefreshLock = new(1, 1);
+    private readonly TimeSpan _choicesTtl = TimeSpan.FromMinutes(15);
 
     private List<KeyValuePair<string, string>> _cachedPlaylists = [];
     private List<KeyValuePair<string, string>> _cachedAlbums = [];
     private string _cachedLikedSongsUri = string.Empty;
+    private DateTime _choicesLastUpdatedUtc = DateTime.MinValue;
 
     public PlaybackService(
         IModuleLogger logger,
@@ -55,19 +58,25 @@ internal sealed class PlaybackService : IDisposable
             return;
         }
 
-        await LoadDynamicChoicesAsync();
+        if (TryServeCachedChoices())
+        {
+            _ = RefreshPlaylistsLoopAsync();
+            return;
+        }
+
+        _ = RefreshChoicesAsync(force: true);
 
         _ = RefreshPlaylistsLoopAsync();
     }
 
     private async Task RefreshPlaylistsLoopAsync()
     {
-        var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
         while (await timer.WaitForNextTickAsync())
         {
             if (_authService.HasRefreshToken())
             {
-                await LoadDynamicChoicesAsync();
+                _ = RefreshChoicesAsync();
             }
         }
     }
@@ -266,10 +275,20 @@ internal sealed class PlaybackService : IDisposable
         return !_authService.HasRefreshToken() ? Task.CompletedTask : _apiService.PauseAsync();
     }
 
-    private async Task LoadDynamicChoicesAsync()
+    private async Task LoadDynamicChoicesAsync(bool force = false)
     {
+        if (!await _choicesRefreshLock.WaitAsync(0))
+        {
+            return;
+        }
+
         try
         {
+            if (!force && !ShouldRefreshChoices())
+            {
+                return;
+            }
+
             var playlistsTask = _apiService.GetPlaylistsAsync();
             var albumsTask = _apiService.GetSavedAlbumsAsync();
             var likedSongsTask = _apiService.GetLikedSongsAsUriListAsync();
@@ -279,12 +298,17 @@ internal sealed class PlaybackService : IDisposable
             _cachedPlaylists = await playlistsTask;
             _cachedAlbums = await albumsTask;
             _cachedLikedSongsUri = await likedSongsTask;
+            _choicesLastUpdatedUtc = DateTime.UtcNow;
 
             RebuildPlaybackChoices();
         }
         catch (Exception ex)
         {
             _logger.LogWarning("Failed to refresh playlists: {Message}", ex.Message);
+        }
+        finally
+        {
+            _choicesRefreshLock.Release();
         }
     }
 
@@ -340,6 +364,7 @@ internal sealed class PlaybackService : IDisposable
         _cachedPlaylists.Clear();
         _cachedAlbums.Clear();
         _cachedLikedSongsUri = string.Empty;
+        _choicesLastUpdatedUtc = DateTime.MinValue;
         RebuildPlaybackChoices();
     }
 
@@ -391,12 +416,53 @@ internal sealed class PlaybackService : IDisposable
     {
         if (isAuthenticated)
         {
-            _ = LoadDynamicChoicesAsync();
+            _ = RefreshChoicesAsync(force: true);
         }
         else
         {
             ClearChoices();
         }
+    }
+
+    private bool TryServeCachedChoices()
+    {
+        if (!ShouldUseCache())
+        {
+            return false;
+        }
+
+        RebuildPlaybackChoices();
+        return true;
+    }
+
+    private bool ShouldUseCache()
+    {
+        if (_choicesLastUpdatedUtc == DateTime.MinValue)
+        {
+            return false;
+        }
+
+        if (DateTime.UtcNow - _choicesLastUpdatedUtc > _choicesTtl)
+        {
+            return false;
+        }
+
+        return _cachedPlaylists.Count > 0 || _cachedAlbums.Count > 0 || !string.IsNullOrWhiteSpace(_cachedLikedSongsUri);
+    }
+
+    private bool ShouldRefreshChoices()
+    {
+        if (!ShouldUseCache())
+        {
+            return true;
+        }
+
+        return DateTime.UtcNow - _choicesLastUpdatedUtc > _choicesTtl;
+    }
+
+    private Task RefreshChoicesAsync(bool force = false)
+    {
+        return LoadDynamicChoicesAsync(force);
     }
 
     public void Dispose()
