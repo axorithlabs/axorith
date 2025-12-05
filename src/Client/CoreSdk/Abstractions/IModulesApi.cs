@@ -29,7 +29,7 @@ public interface IModulesApi
     ///     Invokes a design-time-only action on a module definition using a temporary module instance.
     ///     Used for actions like OAuth login while editing presets.
     /// </summary>
-    Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, string actionKey,
+    Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId, string actionKey,
         CancellationToken ct = default);
 
     /// <summary>
@@ -43,7 +43,7 @@ public interface IModulesApi
     ///     Starts a design-time edit session for the specified module instance.
     ///     Initializes a sandbox on the Host with the provided initial values snapshot.
     /// </summary>
-    Task<OperationResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
+    Task<BeginEditResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
         IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default);
 
     /// <summary>
@@ -76,6 +76,11 @@ public interface IModulesApi
     ///     Waits for the stream connection to be established before completing.
     /// </summary>
     Task<IDisposable> SubscribeToSettingUpdatesAsync(Guid moduleInstanceId);
+
+    /// <summary>
+    ///     Returns the last cached ModuleSettingsInfo for the module if available.
+    /// </summary>
+    ModuleSettingsInfo? GetCachedSettings(Guid moduleId);
 }
 
 /// <summary>
@@ -149,4 +154,12 @@ public record ModuleAction(
     string Label,
     string? Description,
     bool IsEnabled
+);
+
+/// <summary>
+///     Result of BeginEdit: schema plus status.
+/// </summary>
+public record BeginEditResult(
+    ModuleSettingsInfo SettingsInfo,
+    OperationResult Result
 );

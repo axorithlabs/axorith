@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net;
-using System.Net.Sockets;
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
@@ -26,6 +25,7 @@ internal sealed class AuthService : IDisposable
     private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
 
     private string? _inMemoryAccessToken;
+    private DateTimeOffset? _accessTokenExpiresAtUtc;
 
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d";
@@ -78,7 +78,9 @@ internal sealed class AuthService : IDisposable
 
     public async Task<string?> GetValidAccessTokenAsync()
     {
-        if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken))
+        if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken) &&
+            _accessTokenExpiresAtUtc.HasValue &&
+            _accessTokenExpiresAtUtc > DateTimeOffset.UtcNow.AddSeconds(30))
         {
             return _inMemoryAccessToken;
         }
@@ -86,10 +88,15 @@ internal sealed class AuthService : IDisposable
         await _tokenRefreshSemaphore.WaitAsync();
         try
         {
-            if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken))
+            if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken) &&
+                _accessTokenExpiresAtUtc.HasValue &&
+                _accessTokenExpiresAtUtc > DateTimeOffset.UtcNow.AddSeconds(30))
             {
                 return _inMemoryAccessToken;
             }
+            
+            _inMemoryAccessToken = null;
+            _accessTokenExpiresAtUtc = null;
 
             var refreshToken = _secureStorage.RetrieveSecret(RefreshTokenKey);
             if (string.IsNullOrWhiteSpace(refreshToken))
@@ -115,6 +122,9 @@ internal sealed class AuthService : IDisposable
 
                 using var jsonDoc = JsonDocument.Parse(responseJson);
                 var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
+                var expiresInSeconds = jsonDoc.RootElement.TryGetProperty("expires_in", out var expiresInElement)
+                    ? expiresInElement.GetInt32()
+                    : 3600;
 
                 if (jsonDoc.RootElement.TryGetProperty("refresh_token", out var newRefreshTokenElement))
                 {
@@ -135,6 +145,14 @@ internal sealed class AuthService : IDisposable
 
                 _logger.LogInfo("Successfully refreshed access token.");
                 _inMemoryAccessToken = newAccessToken;
+
+                // Never cache beyond the server's reported expiry; keep a safety margin.
+                const int safetyMarginSeconds = 30;
+                var effectiveExpirySeconds = expiresInSeconds > safetyMarginSeconds
+                    ? expiresInSeconds - safetyMarginSeconds
+                    : Math.Max(5, expiresInSeconds - 5);
+
+                _accessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(effectiveExpirySeconds);
                 UpdateUiForAuthenticationState(true);
                 return _inMemoryAccessToken;
             }
@@ -147,7 +165,14 @@ internal sealed class AuthService : IDisposable
         }
         finally
         {
-            _tokenRefreshSemaphore.Release();
+            try
+            {
+                _tokenRefreshSemaphore.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore if disposed during shutdown
+            }
         }
     }
 
@@ -175,6 +200,7 @@ internal sealed class AuthService : IDisposable
     {
         _secureStorage.DeleteSecret(RefreshTokenKey);
         _inMemoryAccessToken = null;
+        _accessTokenExpiresAtUtc = null;
         _logger.LogInfo("Logged out from Spotify");
     }
 
@@ -205,47 +231,50 @@ internal sealed class AuthService : IDisposable
             }
         }
 
-        // Fallback: use dynamic port if all preferred ports are busy.
-        // We try random ports in the dynamic range to avoid the race condition of checking availability before binding.
+        // Fallback: try a handful of random dynamic ports (IANA range). This may still fail
+        // if the redirect URI is not pre-registered, but preserves previous behavior.
         if (listener == null)
         {
             var rnd = new Random();
-            const int maxAttempts = 10;
+            const int maxAttempts = 8;
             for (var i = 0; i < maxAttempts; i++)
             {
                 HttpListener? tempListener = null;
                 try
                 {
-                    // IANA dynamic port range
                     var port = rnd.Next(49152, 65535);
                     var uri = $"http://127.0.0.1:{port}{RedirectPath}";
                     tempListener = new HttpListener();
                     tempListener.Prefixes.Add(uri);
                     tempListener.Start();
-                    
+
                     listener = tempListener;
                     redirectUri = uri;
-                    _logger.LogWarning("All preferred ports busy. Using dynamic port {Port}. Note: This port may not be registered with Spotify.", port);
+                    _logger.LogWarning(
+                        "All preferred ports busy. Using dynamic port {Port}. Ensure this port is registered in Spotify redirect URIs.",
+                        port);
                     break;
                 }
                 catch (HttpListenerException)
                 {
                     tempListener?.Close();
-                    // Port busy, try another
                 }
                 catch (Exception ex)
                 {
                     tempListener?.Close();
-                    _logger.LogError(ex, "Failed to bind to dynamic port.");
+                    _logger.LogError(ex, "Failed to bind to dynamic port for OAuth callback attempt {Attempt}", i + 1);
                 }
             }
         }
 
         if (listener == null || redirectUri == null)
         {
-            var msg = $"Failed to find an open port for OAuth callback. Tried ports {AllowedPorts[0]}-{AllowedPorts[^1]}.";
+            var msg =
+                $"Failed to bind any port for OAuth callback. Tried preferred ports {AllowedPorts[0]}-{AllowedPorts[^1]} and dynamic fallback.";
             _logger.LogError(null, msg);
-            _notifier.ShowToast("Error: Could not bind local port. Check firewall/antivirus.", NotificationType.Error);
+            _notifier.ShowToast(
+                "Error: Could not bind local port for Spotify login. Free port 8888-8895 or allow a dynamic port and retry.",
+                NotificationType.Error);
             return false;
         }
 
@@ -367,6 +396,6 @@ internal sealed class AuthService : IDisposable
     public void Dispose()
     {
         _disposables.Dispose();
-        _tokenRefreshSemaphore.Dispose();
+        // Intentionally do not dispose _tokenRefreshSemaphore to avoid race with in-flight refresh tasks
     }
 }

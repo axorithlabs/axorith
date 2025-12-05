@@ -1,18 +1,28 @@
 <Project>
     <Target Name="GetVersionFromGit" BeforeTargets="BeforeBuild;GenerateAssemblyInfo">
-        <Exec Command="git describe --tags --abbrev=0" IgnoreExitCode="true">
+        <PropertyGroup>
+            <_SolutionDirTrimmed>$([System.String]::Copy('$(SolutionDir)').TrimEnd('\'))</_SolutionDirTrimmed>
+            <_SolutionDirNoSlash>$([System.String]::Copy('$(_SolutionDirTrimmed)').TrimEnd('/'))</_SolutionDirNoSlash>
+            <_GitCmd>git -C "$(_SolutionDirNoSlash)" describe --tags --abbrev=0</_GitCmd>
+        </PropertyGroup>
+
+        <Exec Command="$(_GitCmd)" IgnoreExitCode="true" ConsoleToMSBuild="true">
             <Output TaskParameter="ConsoleOutput" PropertyName="_GitVersion" />
+            <Output TaskParameter="ExitCode" PropertyName="_GitExitCode" />
         </Exec>
 
         <PropertyGroup>
-            <_GitVersionClean Condition="$(_GitVersion.StartsWith('v'))">$(_GitVersion.Substring(1))</_GitVersionClean>
-            <_GitVersionClean Condition="!$(_GitVersion.StartsWith('v'))">$(_GitVersion)</_GitVersionClean>
-            <_GitVersionClean>$(_GitVersionClean.Trim())</_GitVersionClean>
-            
+            <_GitVersionRaw>$(_GitVersion)</_GitVersionRaw>
+            <_GitVersionClean Condition="'$(_GitVersionRaw)' != ''">$([System.String]::Copy('$(_GitVersionRaw)').Trim())</_GitVersionClean>
+            <_GitVersionClean Condition="$(_GitVersionClean.StartsWith('v'))">$(_GitVersionClean.Substring(1))</_GitVersionClean>
+            <_GitVersionClean Condition="'$(_GitVersionClean)' != ''">$([System.String]::Copy('$(_GitVersionClean)').Replace(' ', '-'))</_GitVersionClean>
+
             <Version Condition="'$(_GitVersionClean)' != ''">$(_GitVersionClean)</Version>
         </PropertyGroup>
 
-        <Message Text="[Axorith Build] Version: $(Version)" Importance="high" />
+        <Message Text="[Axorith Build] git describe raw: '$(_GitVersionRaw)' (exit code $(_GitExitCode))" Importance="high" />
+        <Message Text="[Axorith Build] Version resolved: $(Version)" Importance="high" />
+        <Warning Condition="'$(_GitVersionClean)' == ''" Text="[Axorith Build] git describe failed, using fallback version $(Version)" />
     </Target>
 </Project>
 

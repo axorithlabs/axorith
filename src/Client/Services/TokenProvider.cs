@@ -1,4 +1,4 @@
-﻿using Axorith.Client.Services.Abstractions;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
 using Microsoft.Extensions.Logging;
 
@@ -12,8 +12,8 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
         var tokenPath = Path.Combine(appData, "Axorith", AuthConstants.TokenFileName);
 
         // Retry logic: Host might be starting up and hasn't written the file yet.
-        // We try for 5 seconds (10 * 500ms).
-        for (var i = 0; i < 10; i++)
+        // We try for up to ~3 seconds (15 * 200ms) to reduce connect latency.
+        for (var i = 0; i < 15; i++)
         {
             if (File.Exists(tokenPath))
             {
@@ -35,7 +35,7 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
                 }
             }
 
-            await Task.Delay(500, ct);
+            await Task.Delay(200, ct);
         }
 
         logger.LogError("Auth token file not found at {Path} after retries. Ensure Host is running.", tokenPath);

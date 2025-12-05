@@ -306,7 +306,7 @@ public class SessionEditorViewModel : ReactiveObject
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
-    private ObservableCollection<NextPresetOption> _availablePresetsForNext = [];
+    private readonly ObservableCollection<NextPresetOption> _availablePresetsForNext = [];
 
     private readonly ObservableAsPropertyHelper<bool> _isFooterVisible;
     public bool IsFooterVisible => _isFooterVisible.Value;
@@ -694,7 +694,6 @@ public class SessionEditorViewModel : ReactiveObject
         }
 
         ErrorMessage = string.Empty;
-
         _preset.Modules = ConfiguredModules.Select(vm =>
         {
             vm.SaveChangesToModel();

@@ -65,4 +65,18 @@ public record ModuleDefinition
     /// </summary>
     [JsonIgnore]
     public AssemblyLoadContext? LoadContext { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the full path to the module assembly resolved at load time.
+    ///     Not part of persisted metadata.
+    /// </summary>
+    [JsonIgnore]
+    public string? AssemblyPath { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the last write timestamp (UTC) of the module assembly.
+    ///     Used for schema caching/versioning.
+    /// </summary>
+    [JsonIgnore]
+    public DateTime? AssemblyTimestampUtc { get; set; }
 }

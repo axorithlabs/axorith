@@ -18,7 +18,7 @@ service ModulesService {
 
   // Design-time actions (Editing Preset)
   rpc InvokeDesignTimeAction(InvokeDesignTimeActionRequest) returns (OperationResult);
-  rpc BeginEdit(BeginEditRequest) returns (OperationResult);
+  rpc BeginEdit(BeginEditRequest) returns (BeginEditResponse);
   rpc EndEdit(EndEditRequest) returns (OperationResult);
   rpc SyncEdit(SyncEditRequest) returns (OperationResult);
 
@@ -53,6 +53,9 @@ message InvokeActionRequest {
 message InvokeDesignTimeActionRequest {
   string module_id = 1;
   string action_key = 2;
+  // Optional: design-time sandbox instance to target existing state.
+  // When omitted, server falls back to a temporary instance.
+  string module_instance_id = 3;
 }
 
 message UpdateSettingRequest {
@@ -75,6 +78,12 @@ message BeginEditRequest {
   string module_id = 1;
   string module_instance_id = 2;
   repeated SettingValue initial_values = 3;
+}
+
+message BeginEditResponse {
+  OperationResult result = 1;
+  repeated Setting settings = 2;
+  repeated Action actions = 3;
 }
 
 message EndEditRequest {
