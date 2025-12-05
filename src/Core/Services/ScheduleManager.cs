@@ -251,7 +251,7 @@ public class ScheduleManager(
         
         logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
         
-        await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...");
+        await notifier.ShowSystemAsync("Session Scheduler", $"'Session '{preset.Name}' will start in {timeText}.");
     }
 
     private void CleanupNotificationCache()

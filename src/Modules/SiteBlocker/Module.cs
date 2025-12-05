@@ -1,10 +1,13 @@
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
+using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
+using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.SiteBlocker;
 
@@ -12,7 +15,7 @@ namespace Axorith.Module.SiteBlocker;
 ///     A module that blocks websites by sending commands to the Axorith.Shim process
 ///     via a Named Pipe, which then relays them to a browser extension.
 /// </summary>
-public class Module(IModuleLogger logger) : IModule
+public class Module(IModuleLogger logger, INotifier notifier) : IModule
 {
     private readonly Setting<string> _mode = Setting.AsChoice(
         key: "Mode",
@@ -45,7 +48,9 @@ public class Module(IModuleLogger logger) : IModule
 
     public IReadOnlyList<IAction> GetActions()
     {
-        return [];
+        var installAction = Action.Create("InstallFirefoxExtension", "Install Firefox Extension");
+        installAction.OnInvokeAsync(OpenFirefoxExtensionPageAsync);
+        return [installAction];
     }
 
     /// <inheritdoc />
@@ -131,6 +136,29 @@ public class Module(IModuleLogger logger) : IModule
         {
             logger.LogError(ex, "Failed to send command to Shim via Named Pipe.");
         }
+    }
+
+    /// <summary>
+    /// Opens the Firefox extension installation page in the default browser
+    /// </summary>
+    private async Task OpenFirefoxExtensionPageAsync()
+    {
+        const string firefoxExtensionUrl = "https://addons.mozilla.org/firefox/addon/axorith-site-blocker/";
+        
+        try
+        {   
+            Process.Start(new ProcessStartInfo(firefoxExtensionUrl) { UseShellExecute = true });
+            
+            notifier.ShowToast("Firefox extension page opened in your browser", NotificationType.Success);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to open Firefox extension page in browser");
+            notifier.ShowToast("Failed to open browser. Please manually visit: " + firefoxExtensionUrl, NotificationType.Error);
+        }
+        
+        // Small delay to ensure the operation completes
+        await Task.Delay(100);
     }
 
     /// <inheritdoc />
