@@ -60,6 +60,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Module.HomeAssistan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Benchmarks", "tests\Axorith.Benchmarks\Axorith.Benchmarks.csproj", "{52FCE835-1546-4956-8E8C-436D637D435C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Module.DiscordLauncher", "src\Modules\DiscordLauncher\Axorith.Module.DiscordLauncher.csproj", "{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -370,6 +372,18 @@ Global
 		{52FCE835-1546-4956-8E8C-436D637D435C}.Release|x64.Build.0 = Release|Any CPU
 		{52FCE835-1546-4956-8E8C-436D637D435C}.Release|x86.ActiveCfg = Release|Any CPU
 		{52FCE835-1546-4956-8E8C-436D637D435C}.Release|x86.Build.0 = Release|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Debug|x64.Build.0 = Debug|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Debug|x86.Build.0 = Debug|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Release|x64.ActiveCfg = Release|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Release|x64.Build.0 = Release|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Release|x86.ActiveCfg = Release|Any CPU
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -400,5 +414,6 @@ Global
 		{9268D90A-BD81-4760-B512-7D03DDFAA993} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{38254135-9581-4B06-8160-C07FD6EDB55A} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{52FCE835-1546-4956-8E8C-436D637D435C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{B4B47C7C-6ECD-454E-ADD2-38A4E5C93674} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 	EndGlobalSection
 EndGlobal

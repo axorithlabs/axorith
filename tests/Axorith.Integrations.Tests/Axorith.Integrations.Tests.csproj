@@ -17,7 +17,6 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
 
-        <!-- gRPC integration client + ASP.NET Core test host -->
         <PackageReference Include="Grpc.Net.Client" Version="2.71.0" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
     </ItemGroup>

@@ -16,7 +16,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private readonly IModulesApi _modulesApi;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDisposable _settingUpdatesSubscription;
-    private readonly IDisposable? _settingStreamHandle;
+    private IDisposable? _settingStreamHandle;
     private IDisposable? _validationSubscription;
 
     public ModuleDefinition Definition { get; }
@@ -109,8 +109,6 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         StartDelaySecondsString = model.StartDelay.TotalSeconds.ToString("G29");
 
-        _settingStreamHandle = _modulesApi.SubscribeToSettingUpdates(Model.InstanceId);
-
         AddDelayCommand = ReactiveCommand.Create(AddDelay);
         RemoveDelayCommand = ReactiveCommand.Create(RemoveDelay);
 
@@ -132,6 +130,10 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         try
         {
             IsLoading = true;
+            
+            _settingStreamHandle = await _modulesApi.SubscribeToSettingUpdatesAsync(Model.InstanceId)
+                .ConfigureAwait(false);
+            
             var initialSnapshot = new Dictionary<string, object?>();
             foreach (var kv in Model.Settings)
             {

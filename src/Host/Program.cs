@@ -142,6 +142,16 @@ try
         Log.Error(ex, "Failed to start ScheduleManager");
     }
 
+    try
+    {
+        var autoStopService = app.Services.GetRequiredService<ISessionAutoStopService>();
+        await autoStopService.StartAsync(app.Lifetime.ApplicationStopping);
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Failed to start SessionAutoStopService");
+    }
+
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
     app.MapGrpcService<ModulesServiceImpl>();
@@ -157,10 +167,8 @@ try
 
     app.MapGet("/", () => "Axorith.Host gRPC server is running. Use gRPC client to connect.");
 
-    // Start the app (don't run yet - we need to get the actual port)
     await app.StartAsync();
 
-    // Get actual bound port from server addresses
     var server = app.Services.GetRequiredService<IServer>();
     var addressFeature = server.Features.Get<IServerAddressesFeature>();
     var boundPort = 0;
@@ -177,7 +185,6 @@ try
 
     if (boundPort > 0)
     {
-        // Write host info file for client discovery
         try
         {
             var hostInfoDir = Path.GetDirectoryName(hostInfoPath);
@@ -215,7 +222,6 @@ catch (Exception ex)
 }
 finally
 {
-    // Clean up host info file on shutdown
     try
     {
         if (File.Exists(hostInfoPath))
@@ -338,12 +344,26 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
             var sessionManager = ctx.Resolve<ISessionManager>();
             var presetManager = ctx.Resolve<IPresetManager>();
+            var autoStopService = ctx.Resolve<ISessionAutoStopService>();
             var notifier = ctx.Resolve<INotifier>();
             var logger = ctx.Resolve<ILogger<ScheduleManager>>();
 
-            return new ScheduleManager(rootDataDir, sessionManager, presetManager, notifier, logger);
+            return new ScheduleManager(rootDataDir, sessionManager, presetManager, autoStopService, notifier, logger);
         })
         .As<IScheduleManager>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
+    builder.Register(ctx =>
+        {
+            var sessionManager = ctx.Resolve<ISessionManager>();
+            var presetManager = ctx.Resolve<IPresetManager>();
+            var notifier = ctx.Resolve<INotifier>();
+            var logger = ctx.Resolve<ILogger<SessionAutoStopService>>();
+
+            return new SessionAutoStopService(sessionManager, presetManager, notifier, logger);
+        })
+        .As<ISessionAutoStopService>()
         .SingleInstance()
         .PreserveExistingDefaults();
         

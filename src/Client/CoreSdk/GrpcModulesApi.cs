@@ -31,22 +31,32 @@ internal class GrpcModulesApi(
 
     public IObservable<SettingUpdate> SettingUpdates => _settingUpdatesSubject.AsObservable();
 
-    public IDisposable SubscribeToSettingUpdates(Guid moduleInstanceId)
+    public async Task<IDisposable> SubscribeToSettingUpdatesAsync(Guid moduleInstanceId)
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(GrpcModulesApi));
 
         if (_instanceStreams.TryGetValue(moduleInstanceId, out var stream))
         {
-            return new CancellationDisposable(stream);
+            return Disposable.Create(() => { });
         }
 
         var cts = new CancellationTokenSource();
         if (!_instanceStreams.TryAdd(moduleInstanceId, cts))
         {
-            return new CancellationDisposable(_instanceStreams[moduleInstanceId]);
+            return Disposable.Create(() => { });
         }
 
-        _ = StartStreamingSettingUpdatesAsync(moduleInstanceId, cts.Token);
+        var connectionReadyTcs = new TaskCompletionSource();
+        
+        _ = StartStreamingSettingUpdatesAsync(moduleInstanceId, cts.Token, connectionReadyTcs);
+
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+        var completedTask = await Task.WhenAny(connectionReadyTcs.Task, timeoutTask).ConfigureAwait(false);
+        
+        if (completedTask == timeoutTask)
+        {
+            logger.LogWarning("Setting updates stream connection timed out for {InstanceId}", moduleInstanceId);
+        }
 
         return Disposable.Create(() =>
         {
@@ -364,8 +374,10 @@ internal class GrpcModulesApi(
         }).ConfigureAwait(false);
     }
 
-    private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct)
+    private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct, TaskCompletionSource? readyTcs = null)
     {
+        var hasSignaledReady = false;
+        
         while (!ct.IsCancellationRequested)
             try
             {
@@ -374,6 +386,14 @@ internal class GrpcModulesApi(
                 using var call = client.StreamSettingUpdates(
                     new StreamSettingUpdatesRequest { ModuleInstanceId = moduleInstanceId.ToString() },
                     cancellationToken: ct);
+
+                await call.ResponseHeadersAsync.ConfigureAwait(false);
+
+                if (!hasSignaledReady)
+                {
+                    readyTcs?.TrySetResult();
+                    hasSignaledReady = true;
+                }
 
                 await foreach (var update in call.ResponseStream.ReadAllAsync(ct).ConfigureAwait(false))
                 {
@@ -418,6 +438,13 @@ internal class GrpcModulesApi(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Setting updates stream error, reconnecting in 5s...");
+
+                if (!hasSignaledReady)
+                {
+                    // Don't set result here, let the timeout handle it in Subscribe,
+                    // or set Exception.
+                    // readyTcs?.TrySetException(ex);
+                }
 
                 try
                 {

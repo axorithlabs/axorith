@@ -1,28 +1,22 @@
 <Project>
-    <!-- Import root Directory.Build.props to inherit common settings -->
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
     <PropertyGroup>
-        <!-- Extract module name from assembly name (e.g., Axorith.Module.SpotifyPlayer -> SpotifyPlayer) -->
         <_ModuleName Condition="$(AssemblyName.StartsWith('Axorith.Module.'))">$(AssemblyName.Replace('Axorith.Module.', '').Split('.')[0])</_ModuleName>
         <_ModuleName Condition="'$(_ModuleName)' == ''">$(MSBuildProjectName.Replace('Axorith.Module.', ''))</_ModuleName>
 
-        <!-- Build directly into modules folder -->
         <BaseOutputPath>$(SolutionDir)build/$(Configuration)/Modules/$(_ModuleName)/</BaseOutputPath>
         <OutputPath>$(BaseOutputPath)</OutputPath>
         <BaseIntermediateOutputPath>$(SolutionDir)build/$(Configuration)/Modules/$(_ModuleName)/obj/</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
         <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
 
-        <!-- Module specific settings -->
         <IsModuleProject>true</IsModuleProject>
         <IsPackable>false</IsPackable>
         
-        <!-- Skip the PublishModuleToOutput target since we're already building to the correct location -->
         <SkipModulePublish>true</SkipModulePublish>
     </PropertyGroup>
 
-    <!-- Copy module.json to output directory -->
     <ItemGroup>
         <None Include="$(ProjectDir)module.json" Condition="Exists('$(ProjectDir)module.json')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

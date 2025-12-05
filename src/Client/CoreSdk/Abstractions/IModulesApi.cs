@@ -73,8 +73,9 @@ public interface IModulesApi
     /// <summary>
     ///     Starts a filtered gRPC stream for setting updates of a specific module instance.
     ///     Returns a handle that must be disposed to stop the stream.
+    ///     Waits for the stream connection to be established before completing.
     /// </summary>
-    IDisposable SubscribeToSettingUpdates(Guid moduleInstanceId);
+    Task<IDisposable> SubscribeToSettingUpdatesAsync(Guid moduleInstanceId);
 }
 
 /// <summary>

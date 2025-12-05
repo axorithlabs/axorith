@@ -1,4 +1,4 @@
-﻿syntax = "proto3";
+syntax = "proto3";
 
 package axorith.contracts;
 
@@ -35,6 +35,8 @@ message Schedule {
   repeated int32 days_of_week = 8; // 0=Sunday, 1=Monday...
   google.protobuf.Timestamp last_run = 9;
   google.protobuf.Timestamp next_run = 10;
+  int64 auto_stop_duration_seconds = 11;
+  string next_preset_id = 12;
 }
 
 message ListSchedulesRequest {}

@@ -10,6 +10,7 @@ using Axorith.Sdk;
 using DynamicData;
 using DynamicData.Binding;
 using Microsoft.Extensions.DependencyInjection;
+using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -21,7 +22,7 @@ public abstract class TriggerViewModel : ReactiveObject
     public abstract string IconKey { get; }
 }
 
-public class ScheduleTriggerViewModel : TriggerViewModel
+public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : TriggerViewModel
 {
     public override string Title => "Time Schedule";
     public override string IconKey => "TimerIcon";
@@ -67,7 +68,26 @@ public class ScheduleTriggerViewModel : TriggerViewModel
             }
 
             var daysStr = days.Count == 7 ? "Every day" : string.Join(", ", days);
-            return $"{Time:hh\\:mm} • {daysStr}";
+            var result = $"{Time:hh\\:mm} • {daysStr}";
+
+            if (!AutoStopDuration.HasValue || AutoStopDuration.Value <= TimeSpan.Zero)
+            {
+                return result;
+            }
+
+            var hours = AutoStopDuration.Value.Hours;
+            var minutes = AutoStopDuration.Value.Minutes;
+            var durationStr = hours > 0 
+                ? $"{hours}h {minutes}m" 
+                : $"{minutes}m";
+            result += $" • Auto-stop: {durationStr}";
+                
+            if (NextPresetId.HasValue && !string.IsNullOrWhiteSpace(NextPresetName))
+            {
+                result += $" → {NextPresetName}";
+            }
+
+            return result;
         }
     }
 
@@ -80,8 +100,6 @@ public class ScheduleTriggerViewModel : TriggerViewModel
             this.RaisePropertyChanged(nameof(Description));
         }
     } = new(9, 0, 0);
-
-    // Days
 
     public bool RunOnMonday
     {
@@ -154,6 +172,127 @@ public class ScheduleTriggerViewModel : TriggerViewModel
     }
 
     public Guid? ExistingScheduleId { get; set; }
+
+    public TimeSpan? AutoStopDuration
+    {
+        get;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            this.RaisePropertyChanged(nameof(Description));
+        }
+    }
+
+    public Guid? NextPresetId
+    {
+        get;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            this.RaisePropertyChanged(nameof(Description));
+        }
+    }
+
+    public string? NextPresetName
+    {
+        get;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            this.RaisePropertyChanged(nameof(Description));
+        }
+    }
+
+    private int _autoStopHours;
+    public int AutoStopHours
+    {
+        get => _autoStopHours;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _autoStopHours, value);
+            UpdateAutoStopDuration();
+        }
+    }
+
+    private int _autoStopMinutes;
+    public int AutoStopMinutes
+    {
+        get => _autoStopMinutes;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _autoStopMinutes, value);
+            UpdateAutoStopDuration();
+        }
+    }
+
+    private bool _isAutoStopEnabled;
+    public bool IsAutoStopEnabled
+    {
+        get => _isAutoStopEnabled;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _isAutoStopEnabled, value);
+            if (!value)
+            {
+                AutoStopDuration = null;
+            }
+            else
+            {
+                UpdateAutoStopDuration();
+            }
+        }
+    }
+
+    private void UpdateAutoStopDuration()
+    {
+        if (_isAutoStopEnabled && (_autoStopHours > 0 || _autoStopMinutes > 0))
+        {
+            AutoStopDuration = TimeSpan.FromHours(_autoStopHours) + TimeSpan.FromMinutes(_autoStopMinutes);
+        }
+        else if (!_isAutoStopEnabled)
+        {
+            AutoStopDuration = null;
+        }
+    }
+
+    public string NextActionType
+    {
+        get;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            if (value == "Stop session")
+            {
+                SelectedNextPreset = null;
+                NextPresetId = null;
+                NextPresetName = null;
+            }
+
+            this.RaisePropertyChanged(nameof(IsNextPresetSelectionVisible));
+            this.RaisePropertyChanged(nameof(IsNoOtherPresetsAvailable));
+        }
+    } = "Stop session";
+
+    public bool IsNextPresetSelectionVisible => NextActionType == "Start another session" && (parent?.AvailablePresetsForNext.Count ?? 0) > 0;
+
+    public bool IsNoOtherPresetsAvailable => NextActionType == "Start another session" && (parent?.AvailablePresetsForNext.Count ?? 0) == 0;
+
+    public NextPresetOption? SelectedNextPreset
+    {
+        get;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            NextPresetId = value?.PresetId;
+            NextPresetName = value?.Name;
+        }
+    }
+}
+
+public class NextPresetOption
+{
+    public Guid? PresetId { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public class SessionEditorViewModel : ReactiveObject
@@ -167,6 +306,7 @@ public class SessionEditorViewModel : ReactiveObject
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
+    private ObservableCollection<NextPresetOption> _availablePresetsForNext = [];
 
     private readonly ObservableAsPropertyHelper<bool> _isFooterVisible;
     public bool IsFooterVisible => _isFooterVisible.Value;
@@ -183,6 +323,11 @@ public class SessionEditorViewModel : ReactiveObject
         set
         {
             _preset = value ?? new SessionPreset { Id = Guid.NewGuid() };
+            // Update presets list when preset changes
+            if (_availablePresetsForNext.Count > 0)
+            {
+                UpdateAvailablePresetsForNext();
+            }
             LoadFromPreset();
         }
     }
@@ -239,6 +384,8 @@ public class SessionEditorViewModel : ReactiveObject
     public ICommand CloseTriggerSettingsCommand { get; }
 
     public Task InitializationTask { get; private set; }
+
+    public ObservableCollection<NextPresetOption> AvailablePresetsForNext => _availablePresetsForNext;
 
     public SessionEditorViewModel(
         ShellViewModel shell,
@@ -320,7 +467,7 @@ public class SessionEditorViewModel : ReactiveObject
 
         AddScheduleTriggerCommand = ReactiveCommand.Create(() =>
         {
-            var trigger = new ScheduleTriggerViewModel();
+            var trigger = new ScheduleTriggerViewModel(this);
             Triggers.Add(trigger);
             SelectedTrigger = trigger;
         }, canAddSchedule);
@@ -350,15 +497,57 @@ public class SessionEditorViewModel : ReactiveObject
         try
         {
             var modules = await _modulesApi.ListModulesAsync();
+            var presets = await _presetsApi.ListPresetsAsync();
+            
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 _availableModules = modules;
+                UpdateAvailablePresetsForNext(presets);
                 LoadFromPreset();
             });
         }
         catch
         {
-            await Dispatcher.UIThread.InvokeAsync(() => { _availableModules = []; });
+            await Dispatcher.UIThread.InvokeAsync(() => 
+            { 
+                _availableModules = [];
+                _availablePresetsForNext.Clear();
+            });
+        }
+    }
+
+    private void UpdateAvailablePresetsForNext(IReadOnlyList<PresetSummary>? presets = null)
+    {
+        if (presets == null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var loadedPresets = await _presetsApi.ListPresetsAsync();
+                    await Dispatcher.UIThread.InvokeAsync(() => UpdateAvailablePresetsForNext(loadedPresets));
+                }
+                catch
+                {
+                    // Ignore
+                }
+            });
+            return;
+        }
+
+        _availablePresetsForNext.Clear();
+        foreach (var preset in presets)
+        {
+            if (preset.Id != _preset.Id)
+            {
+                _availablePresetsForNext.Add(new NextPresetOption { PresetId = preset.Id, Name = preset.Name });
+            }
+        }
+        
+        foreach (var trigger in Triggers.OfType<ScheduleTriggerViewModel>())
+        {
+            trigger.RaisePropertyChanged(nameof(trigger.IsNextPresetSelectionVisible));
+            trigger.RaisePropertyChanged(nameof(trigger.IsNoOtherPresetsAvailable));
         }
     }
 
@@ -405,7 +594,7 @@ public class SessionEditorViewModel : ReactiveObject
 
                 foreach (var s in presetSchedules)
                 {
-                    var trigger = new ScheduleTriggerViewModel
+                    var trigger = new ScheduleTriggerViewModel(this)
                     {
                         ExistingScheduleId = s.Id,
                         Time = s.RecurringTime ?? TimeSpan.Zero,
@@ -415,11 +604,61 @@ public class SessionEditorViewModel : ReactiveObject
                         RunOnThursday = s.DaysOfWeek.Contains(DayOfWeek.Thursday),
                         RunOnFriday = s.DaysOfWeek.Contains(DayOfWeek.Friday),
                         RunOnSaturday = s.DaysOfWeek.Contains(DayOfWeek.Saturday),
-                        RunOnSunday = s.DaysOfWeek.Contains(DayOfWeek.Sunday)
+                        RunOnSunday = s.DaysOfWeek.Contains(DayOfWeek.Sunday),
+                        AutoStopDuration = s.AutoStopDuration,
+                        NextPresetId = s.NextPresetId
                     };
+                    
+                    if (s.AutoStopDuration.HasValue)
+                    {
+                        trigger.IsAutoStopEnabled = true;
+                        trigger.AutoStopHours = s.AutoStopDuration.Value.Hours;
+                        trigger.AutoStopMinutes = s.AutoStopDuration.Value.Minutes;
+                    }
+                    
+                    if (s.NextPresetId.HasValue)
+                    {
+                        trigger.NextActionType = "Start another session";
+                        var nextPreset = _availablePresetsForNext.FirstOrDefault(p => p.PresetId == s.NextPresetId.Value);
+                        if (nextPreset != null)
+                        {
+                            trigger.SelectedNextPreset = nextPreset;
+                            trigger.NextPresetName = nextPreset.Name;
+                        }
+                        else
+                        {
+                            // Preset not found (maybe it's the current one being edited), try to load it
+                            _ = LoadNextPresetNameAsync(trigger, s.NextPresetId.Value);
+                        }
+                    }
+                    else
+                    {
+                        trigger.NextActionType = "Stop session";
+                        trigger.SelectedNextPreset = null;
+                    }
+                    
                     Triggers.Add(trigger);
                 }
             });
+        }
+        catch
+        {
+            /* Ignore */
+        }
+    }
+
+    private async Task LoadNextPresetNameAsync(ScheduleTriggerViewModel trigger, Guid presetId)
+    {
+        try
+        {
+            var preset = await _presetsApi.GetPresetAsync(presetId);
+            if (preset != null)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    trigger.NextPresetName = preset.Name;
+                });
+            }
         }
         catch
         {
@@ -526,7 +765,9 @@ public class SessionEditorViewModel : ReactiveObject
                     Name = $"{Name} Schedule",
                     IsEnabled = true,
                     RecurringTime = trigger.Time,
-                    DaysOfWeek = days
+                    DaysOfWeek = days,
+                    AutoStopDuration = trigger.AutoStopDuration,
+                    NextPresetId = trigger.NextActionType == "Start another session" ? trigger.NextPresetId : null
                 };
 
                 if (!trigger.ExistingScheduleId.HasValue && presetSchedules.Count > 0)

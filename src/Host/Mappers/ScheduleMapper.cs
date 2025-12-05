@@ -1,4 +1,4 @@
-﻿using Axorith.Contracts;
+using Axorith.Contracts;
 using Axorith.Core.Models;
 using Google.Protobuf.WellKnownTypes;
 
@@ -37,6 +37,16 @@ public static class ScheduleMapper
 
         msg.DaysOfWeek.AddRange(model.DaysOfWeek.Select(d => (int)d));
 
+        if (model.AutoStopDuration.HasValue && model.AutoStopDuration.Value > TimeSpan.Zero)
+        {
+            msg.AutoStopDurationSeconds = (long)model.AutoStopDuration.Value.TotalSeconds;
+        }
+
+        if (model.NextPresetId.HasValue)
+        {
+            msg.NextPresetId = model.NextPresetId.Value.ToString();
+        }
+
         return msg;
     }
 
@@ -64,6 +74,16 @@ public static class ScheduleMapper
         if (message.DaysOfWeek != null)
         {
             model.DaysOfWeek = message.DaysOfWeek.Select(d => (DayOfWeek)d).ToList();
+        }
+
+        if (message.AutoStopDurationSeconds > 0)
+        {
+            model.AutoStopDuration = TimeSpan.FromSeconds(message.AutoStopDurationSeconds);
+        }
+
+        if (!string.IsNullOrWhiteSpace(message.NextPresetId) && Guid.TryParse(message.NextPresetId, out var nextPresetId))
+        {
+            model.NextPresetId = nextPresetId;
         }
 
         return model;

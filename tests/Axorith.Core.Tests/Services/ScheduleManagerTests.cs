@@ -13,6 +13,7 @@ public class ScheduleManagerTests : IAsyncDisposable
     private readonly string _testStorageDirectory;
     private readonly Mock<ISessionManager> _mockSessionManager;
     private readonly Mock<IPresetManager> _mockPresetManager;
+    private readonly Mock<ISessionAutoStopService> _mockAutoStopService;
     private readonly Mock<INotifier> _mockNotifier;
     private readonly ScheduleManager _manager;
 
@@ -23,12 +24,14 @@ public class ScheduleManagerTests : IAsyncDisposable
 
         _mockSessionManager = new Mock<ISessionManager>();
         _mockPresetManager = new Mock<IPresetManager>();
+        _mockAutoStopService = new Mock<ISessionAutoStopService>();
         _mockNotifier = new Mock<INotifier>();
 
         _manager = new ScheduleManager(
             _testStorageDirectory,
             _mockSessionManager.Object,
             _mockPresetManager.Object,
+            _mockAutoStopService.Object,
             _mockNotifier.Object,
             NullLogger<ScheduleManager>.Instance
         );
@@ -284,6 +287,7 @@ public class ScheduleManagerTests : IAsyncDisposable
             _testStorageDirectory,
             _mockSessionManager.Object,
             _mockPresetManager.Object,
+            _mockAutoStopService.Object,
             _mockNotifier.Object,
             NullLogger<ScheduleManager>.Instance
         );

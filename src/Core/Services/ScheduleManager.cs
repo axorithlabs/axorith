@@ -10,6 +10,7 @@ public class ScheduleManager(
     string storageDirectory,
     ISessionManager sessionManager,
     IPresetManager presetManager,
+    ISessionAutoStopService autoStopService,
     INotifier notifier,
     ILogger<ScheduleManager> logger)
     : IScheduleManager
@@ -196,9 +197,18 @@ public class ScheduleManager(
 
             try
             {
-                await notifier.ShowSystemAsync("Session Starting", $"Starting '{preset.Name}' now...");
+                await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...");
 
                 await sessionManager.StartSessionAsync(preset, ct);
+
+                if (schedule.AutoStopDuration.HasValue && schedule.AutoStopDuration.Value > TimeSpan.Zero)
+                {
+                    await autoStopService.StartTrackingAsync(
+                        preset.Id,
+                        schedule.AutoStopDuration,
+                        schedule.NextPresetId,
+                        ct).ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
@@ -241,7 +251,7 @@ public class ScheduleManager(
         
         logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
         
-        await notifier.ShowSystemAsync("Session Starting", $"'{preset.Name}' in {timeText}.");
+        await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...");
     }
 
     private void CleanupNotificationCache()

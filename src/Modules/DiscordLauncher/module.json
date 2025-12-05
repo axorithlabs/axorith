@@ -1,0 +1,10 @@
+{
+  "id": "a8f3b5c9-2d4e-4a1f-9f7e-3c8b1a5d6e2f",
+  "name": "Discord Launcher",
+  "description": "Launches Discord application.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.DiscordLauncher.dll"
+}

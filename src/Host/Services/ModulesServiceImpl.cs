@@ -29,6 +29,7 @@ public class ModulesServiceImpl(
         try
         {
             sandboxManager.ReBroadcast(instanceId);
+            logger.LogDebug("Re-broadcasted current state for sandbox {InstanceId}", instanceId);
             return Task.FromResult(SessionMapper.CreateResult(true, "Design-time state synchronized"));
         }
         catch (InvalidOperationException)

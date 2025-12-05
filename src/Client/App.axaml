@@ -31,7 +31,6 @@
         <Color x:Key="SystemAccentColor">#2563EB</Color>
         <SolidColorBrush x:Key="SystemAccentBrush" Color="{StaticResource SystemAccentColor}"/>
         
-        <!-- RadioButton Theme for Categories (Pill/Tag style) -->
         <ControlTheme x:Key="ButtonRadioButton" TargetType="RadioButton">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#888"/>
@@ -74,13 +73,11 @@
     <Application.Styles>
         <FluentTheme />
         
-        <!-- Window & Base -->
         <Style Selector="Window">
             <Setter Property="Background" Value="{DynamicResource SystemRegionBrush}" />
             <Setter Property="Foreground" Value="#E0E0E0" />
         </Style>
         
-        <!-- Cards -->
         <Style Selector="Border.Card">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
             <Setter Property="BorderBrush" Value="#222" />
@@ -88,7 +85,6 @@
             <Setter Property="CornerRadius" Value="8" />
         </Style>
 
-        <!-- Default Button -->
         <Style Selector="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -119,7 +115,6 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
 
-        <!-- Accent Button (Primary) -->
         <Style Selector="Button.accent">
             <Setter Property="Background" Value="{DynamicResource SystemAccentBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}" />
@@ -137,7 +132,6 @@
             <Setter Property="Foreground" Value="#DDD" />
         </Style>
 
-        <!-- Secondary Button (Cancel/Back) -->
         <Style Selector="Button.secondary">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -153,7 +147,6 @@
             <Setter Property="Foreground" Value="#888" />
         </Style>
 
-        <!-- Danger Button (Remove/Delete) -->
         <Style Selector="Button.danger">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="#552222" />
@@ -168,7 +161,6 @@
             <Setter Property="Background" Value="#440000" />
         </Style>
 
-        <!-- Icon Button (Up/Down arrows) -->
         <Style Selector="Button.icon">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -191,7 +183,6 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
         
-        <!-- Link Button (Close X) -->
         <Style Selector="Button.link">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -203,7 +194,6 @@
             <Setter Property="Foreground" Value="#FFF" />
         </Style>
 
-        <!-- Card Button (Add Module) -->
         <Style Selector="Button.CardButton">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -233,7 +223,6 @@
             <Setter Property="BorderBrush" Value="#2563EB" />
         </Style>
 
-        <!-- Connector Node Button (The subtle plus) -->
         <Style Selector="Button.ConnectorNode">
             <Setter Property="Width" Value="24"/>
             <Setter Property="Height" Value="24"/>
@@ -259,7 +248,6 @@
             <Setter Property="Foreground" Value="White"/>
         </Style>
 
-        <!-- Remove Delay Button (Small X inside the delay box) -->
         <Style Selector="Button.RemoveDelay">
             <Setter Property="Width" Value="18"/>
             <Setter Property="Height" Value="18"/>
@@ -274,20 +262,18 @@
             <Setter Property="Foreground" Value="#FF5555"/>
         </Style>
         
-        <!-- Success Button (Added state) -->
         <Style Selector="Button.success">
             <Setter Property="Background" Value="#10B981" />
             <Setter Property="BorderBrush" Value="#10B981" />
             <Setter Property="Foreground" Value="White" />
         </Style>
         <Style Selector="Button.success:disabled /template/ ContentPresenter">
-            <Setter Property="Opacity" Value="1.0" /> <!-- Keep full opacity to look active -->
+            <Setter Property="Opacity" Value="1.0" />
             <Setter Property="Background" Value="#10B981" />
             <Setter Property="BorderBrush" Value="#10B981" />
             <Setter Property="Foreground" Value="White" />
         </Style>
 
-        <!-- MenuFlyout Styles -->
         <Style Selector="MenuFlyoutPresenter">
             <Setter Property="Background" Value="#111"/>
             <Setter Property="BorderBrush" Value="#333"/>
@@ -304,7 +290,6 @@
             <Setter Property="Background" Value="#222"/>
         </Style>
 
-        <!-- ComboBox Global Style -->
         <Style Selector="ComboBox">
             <Setter Property="Background" Value="#050505" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -336,7 +321,6 @@
             <Setter Property="BorderBrush" Value="#555" />
         </Style>
         
-        <!-- ComboBox Item -->
         <Style Selector="ComboBoxItem">
             <Setter Property="Foreground" Value="#CCC" />
             <Setter Property="Padding" Value="12,8" />
@@ -352,7 +336,6 @@
             <Setter Property="Foreground" Value="White" />
         </Style>
 
-        <!-- TextBox -->
         <Style Selector="TextBox">
             <Setter Property="Background" Value="#050505" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -366,7 +349,6 @@
             <Setter Property="Background" Value="#080808" />
         </Style>
 
-        <!-- NumericUpDown -->
         <Style Selector="NumericUpDown">
             <Setter Property="Background" Value="#050505" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -377,7 +359,6 @@
              <Setter Property="Foreground" Value="#E0E0E0" />
         </Style>
         
-        <!-- CheckBox -->
         <Style Selector="CheckBox">
             <Setter Property="Foreground" Value="#E0E0E0" />
         </Style>
@@ -399,7 +380,6 @@
             <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}" />
         </Style>
         
-        <!-- History ComboBox Style -->
         <Style Selector="ComboBox.history">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
