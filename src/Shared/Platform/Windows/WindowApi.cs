@@ -10,9 +10,6 @@ namespace Axorith.Shared.Platform.Windows;
 [SupportedOSPlatform("windows")]
 internal static class WindowApi
 {
-    // ... (Существующие методы и импорты остаются) ...
-
-    // NEW: WinEventHook definitions
     public delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
 
     [DllImport("user32.dll")]
@@ -26,7 +23,7 @@ internal static class WindowApi
 
     public const uint WINEVENT_OUTOFCONTEXT = 0;
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
-    public const uint EVENT_OBJECT_CREATE = 0x8000; // Optional, can be noisy
+    public const uint EVENT_OBJECT_CREATE = 0x8000;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy,
