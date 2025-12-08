@@ -24,7 +24,7 @@ internal static class Program
             .AddCommandLine(args)
             .Build();
 
-        var telemetrySettings = (configuration.GetSection("Telemetry").Get<TelemetrySettings>() ?? new TelemetrySettings())
+        var telemetrySettings = new TelemetrySettings()
             .WithEnvironmentOverrides() with { ApplicationName = "Axorith.Client" };
 
         Telemetry = new TelemetryService(telemetrySettings);
@@ -46,7 +46,7 @@ internal static class Program
                 telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
-            Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable or update appsettings.json");
+            Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
         }
         using var heartbeatCts = new CancellationTokenSource();
         Task? heartbeatTask = null;

@@ -28,7 +28,6 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
 
-// Host info file path for client discovery
 var hostInfoPath = Path.Combine(Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
 ITelemetryService? telemetry = null;
 LogEventLevel telemetryLogLevel = LogEventLevel.Warning;
@@ -38,7 +37,7 @@ try
     Log.Information("Starting Axorith.Host...");
 
     var builder = WebApplication.CreateBuilder(args);
-    var telemetrySettings = (builder.Configuration.GetSection("Telemetry").Get<TelemetrySettings>() ?? new TelemetrySettings())
+    var telemetrySettings = new TelemetrySettings()
         .WithEnvironmentOverrides() with { ApplicationName = "Axorith.Host" };
 
     telemetryLogLevel = TelemetrySettings.ResolveLogLevel(telemetrySettings.LogLevel);
@@ -61,7 +60,7 @@ try
             telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
-        Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable or update appsettings.json");
+        Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
     }
     else
     {
