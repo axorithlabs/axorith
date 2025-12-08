@@ -16,13 +16,13 @@ public sealed class ProcessService(IModuleLogger logger)
         {
             case ProcessStartMode.AttachExisting:
             {
-                var attached = await AttachToExistingAsync(config.ApplicationPath);
+                var attached = await AttachToExistingAsync(config.ApplicationPath).ConfigureAwait(false);
                 return new ProcessStartResult(attached, attached != null);
             }
 
             case ProcessStartMode.LaunchOrAttach:
             {
-                var existing = await AttachToExistingAsync(config.ApplicationPath);
+                var existing = await AttachToExistingAsync(config.ApplicationPath).ConfigureAwait(false);
                 if (existing != null)
                 {
                     logger.LogInfo("Attached to existing process {ProcessName} (PID: {ProcessId})",
@@ -30,14 +30,16 @@ public sealed class ProcessService(IModuleLogger logger)
                     return new ProcessStartResult(existing, true);
                 }
 
-                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory);
+                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory)
+                    .ConfigureAwait(false);
                 return new ProcessStartResult(launched, false);
             }
 
             case ProcessStartMode.LaunchNew:
             default:
             {
-                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory);
+                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory)
+                    .ConfigureAwait(false);
                 return new ProcessStartResult(launched, false);
             }
         }
@@ -81,7 +83,8 @@ public sealed class ProcessService(IModuleLogger logger)
                 logger.LogDebug("Attempting graceful termination (no force kill)");
                 process.CloseMainWindow();
                 logger.LogDebug("CloseMainWindow called, process may remain open if it shows dialogs");
-                logger.LogInfo("Process {ProcessName} termination requested (graceful mode - may remain open)", process.ProcessName);
+                logger.LogInfo("Process {ProcessName} termination requested (graceful mode - may remain open)",
+                    process.ProcessName);
             }
             else // TerminateForce
             {
@@ -94,7 +97,8 @@ public sealed class ProcessService(IModuleLogger logger)
                 }
                 catch (Exception killEx)
                 {
-                    logger.LogWarning("Failed to kill process immediately, attempting graceful close as fallback. {ex}", killEx);
+                    logger.LogWarning("Failed to kill process immediately, attempting graceful close as fallback. {ex}",
+                        killEx);
                     // Fallback: try graceful close if kill fails
                     process.CloseMainWindow();
                 }
@@ -108,7 +112,7 @@ public sealed class ProcessService(IModuleLogger logger)
         return Task.CompletedTask;
     }
 
-    public Task<Process?> AttachExistingOnlyAsync(string path, CancellationToken cancellationToken = default)
+    public Task<Process?> AttachExistingOnlyAsync(string path)
     {
         return AttachToExistingAsync(path);
     }
