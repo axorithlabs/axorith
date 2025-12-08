@@ -70,7 +70,6 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
             mockRegistry.Setup(r => r.GetDefinitionById(It.IsAny<Guid>()))
                 .Returns((Guid id) => testModules.FirstOrDefault(m => m.Id == id));
 
-            // Регистрируем мок. Благодаря PreserveExistingDefaults в Program.cs, эта регистрация выиграет.
             containerBuilder.RegisterInstance(mockRegistry.Object)
                 .As<IModuleRegistry>()
                 .SingleInstance();

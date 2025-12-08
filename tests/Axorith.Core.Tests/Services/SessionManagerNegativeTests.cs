@@ -4,6 +4,7 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
+using Axorith.Telemetry;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -26,7 +27,8 @@ public class SessionManagerNegativeTests
             NullLogger<SessionManager>.Instance,
             TimeSpan.FromSeconds(5),
             TimeSpan.FromSeconds(30),
-            TimeSpan.FromSeconds(10)
+            TimeSpan.FromSeconds(10),
+            new NoopTelemetryService()
         );
     }
 

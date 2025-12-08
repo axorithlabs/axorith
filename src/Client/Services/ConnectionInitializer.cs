@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
+using Axorith.Telemetry;
 using Axorith.Client.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -212,6 +213,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton(Options.Create(config));
         services.AddSingleton(loggerFactory);
         services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
+        services.AddSingleton(app.Services.GetRequiredService<ITelemetryService>());
 
         services.AddSingleton(connection);
         services.AddSingleton(connection.Presets);

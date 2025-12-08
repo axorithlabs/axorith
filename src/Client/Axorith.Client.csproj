@@ -17,6 +17,7 @@
         <ProjectReference Include="..\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\Contracts\Axorith.Contracts.csproj" />
         <ProjectReference Include="..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+        <ProjectReference Include="..\Telemetry\Axorith.Telemetry.csproj" />
     </ItemGroup>
 
     <ItemGroup>

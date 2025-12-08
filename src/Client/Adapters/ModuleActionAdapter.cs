@@ -2,6 +2,7 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Telemetry;
 using Axorith.Sdk.Actions;
 
 namespace Axorith.Client.Adapters;
@@ -14,7 +15,9 @@ internal class ModuleActionAdapter(
     ModuleAction action,
     IModulesApi modulesApi,
     Guid moduleId,
-    Guid designTimeId)
+    Guid designTimeId,
+    string moduleName,
+    ITelemetryService? telemetry = null)
     : IAction
 {
     private readonly Subject<Unit> _invokedSubject = new();
@@ -59,6 +62,11 @@ internal class ModuleActionAdapter(
                 if (result.Success)
                 {
                     _invokedSubject.OnNext(Unit.Default);
+                    telemetry?.TrackEvent("ModuleUsed", new Dictionary<string, object?>
+                    {
+                        ["name"] = moduleName,
+                        ["action"] = Key
+                    });
                 }
             }
             catch (Exception)
@@ -77,6 +85,11 @@ internal class ModuleActionAdapter(
         if (result.Success)
         {
             _invokedSubject.OnNext(Unit.Default);
+            telemetry?.TrackEvent("ModuleUsed", new Dictionary<string, object?>
+            {
+                ["name"] = moduleName,
+                ["action"] = Key
+            });
         }
     }
 }

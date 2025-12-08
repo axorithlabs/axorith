@@ -8,7 +8,6 @@ namespace Axorith.Host.Services;
 /// </summary>
 public class NativeMessagingRegistrar(
     INativeMessagingManager manager,
-    IHostEnvironment environment,
     ILogger<NativeMessagingRegistrar> logger) : IHostedService
 {
     private const string ExtensionId = "site-blocker-firefox@axorithlabs.com";
@@ -37,8 +36,8 @@ public class NativeMessagingRegistrar(
         var hostName =  "axorith";
         #endif
         
-        logger.LogInformation("Registering Native Messaging Host as '{HostName}' (Env: {Env})", 
-            hostName, environment.EnvironmentName);
+        logger.LogInformation("Registering Native Messaging Host as '{HostName}'", 
+            hostName);
 
         var baseDir = AppContext.BaseDirectory;
         var shimPath = Path.GetFullPath(Path.Combine(baseDir, "..", "Axorith.Shim", "Axorith.Shim.exe"));

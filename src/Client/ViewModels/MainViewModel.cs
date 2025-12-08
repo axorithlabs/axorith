@@ -4,6 +4,8 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Core.Models;
+using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 
@@ -19,6 +21,7 @@ public class MainViewModel : ReactiveObject, IDisposable
     private readonly ISessionsApi _sessionsApi;
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
+    private readonly ITelemetryService? _telemetry;
 
     /// <summary>
     ///     The currently selected session preset in the list.
@@ -96,6 +99,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         _presetsApi = presetsApi;
         _sessionsApi = sessionsApi;
         _serviceProvider = serviceProvider;
+        _telemetry = serviceProvider.GetService<ITelemetryService>();
 
         var subscription = _sessionsApi.SessionEvents
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -112,6 +116,39 @@ public class MainViewModel : ReactiveObject, IDisposable
                         SessionStatus = "No session is active.";
                         ActiveSessionPresetId = null;
                         IsSessionActive = false;
+                        break;
+                    case SessionEventType.ModuleStarted:
+                    case SessionEventType.ModuleStopped:
+                    case SessionEventType.ModuleError:
+                        _telemetry?.TrackEvent("ModuleUsed", new Dictionary<string, object?>
+                        {
+                            ["event"] = evt.Type.ToString(),
+                            ["module"] = evt.Message
+                        });
+                        if (evt.Type == SessionEventType.ModuleError)
+                        {
+                            _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+                            {
+                                ["message"] = evt.Message,
+                                ["fatal"] = false
+                            });
+                        }
+                        break;
+                    case SessionEventType.ValidationWarning:
+                        SessionStatus = evt.Message ?? "Session validation warning.";
+                        _telemetry?.TrackEvent("SessionValidationWarning", new Dictionary<string, object?>
+                        {
+                            ["message"] = evt.Message,
+                            ["presetId"] = evt.PresetId?.ToString()
+                        });
+                        break;
+                    default:
+                        _telemetry?.TrackEvent("SessionEventUnhandled", new Dictionary<string, object?>
+                        {
+                            ["event"] = evt.Type.ToString(),
+                            ["message"] = evt.Message,
+                            ["presetId"] = evt.PresetId?.ToString()
+                        });
                         break;
                 }
             });
@@ -258,14 +295,46 @@ public class MainViewModel : ReactiveObject, IDisposable
             var modules = await modulesApi.ListModulesAsync();
 
             var newVms = new List<SessionPresetViewModel>();
+            var fullPresets = new List<SessionPreset>();
             foreach (var summary in presets)
             {
                 var fullPreset = await _presetsApi.GetPresetAsync(summary.Id);
                 if (fullPreset != null)
                 {
+                    fullPresets.Add(fullPreset);
                     newVms.Add(new SessionPresetViewModel(fullPreset, modules, modulesApi, _serviceProvider));
                 }
             }
+
+            var moduleDefLookup = modules.ToDictionary(m => m.Id, m => m.Name);
+
+            var presetData = fullPresets.Select(p => new Dictionary<string, object?>
+            {
+                ["id"] = p.Id.ToString(),
+                ["name"] = TelemetryGuard.SafeString(p.Name),
+                ["version"] = p.Version,
+                ["moduleCount"] = p.Modules.Count,
+                ["modules"] = p.Modules.Select(m =>
+                {
+                    var moduleName = moduleDefLookup.TryGetValue(m.ModuleId, out var name) ? name : "Unknown";
+                    return new Dictionary<string, object?>
+                    {
+                        ["instanceId"] = m.InstanceId.ToString(),
+                        ["moduleId"] = m.ModuleId.ToString(),
+                        ["moduleName"] = TelemetryGuard.SafeString(moduleName),
+                        ["customName"] = TelemetryGuard.SafeString(m.CustomName),
+                        ["startDelayMs"] = (long)m.StartDelay.TotalMilliseconds,
+                        ["settingsCount"] = m.Settings.Count,
+                        ["settingKeys"] = m.Settings.Keys.Take(32).ToArray()
+                    };
+                }).ToArray()
+            }).ToArray();
+
+            _telemetry?.TrackEvent("PresetCount", new Dictionary<string, object?>
+            {
+                ["total"] = presets.Count,
+                ["presets"] = presetData
+            });
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

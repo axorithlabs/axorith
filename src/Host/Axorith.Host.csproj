@@ -24,6 +24,7 @@
         <ProjectReference Include="..\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
         <ProjectReference Include="..\Shared\Platform\Axorith.Shared.Platform.csproj" />
+        <ProjectReference Include="..\Telemetry\Axorith.Telemetry.csproj" />
     </ItemGroup>
     
     <ItemGroup>

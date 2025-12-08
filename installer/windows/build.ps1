@@ -15,6 +15,15 @@ catch {
     exit 1
 }
 
+$patchScript = Join-Path $SolutionDir "scripts\patch-telemetry-defaults.ps1"
+if (-not [string]::IsNullOrWhiteSpace($env:POSTHOG_API_KEY) -and (Test-Path $patchScript)) {
+    Write-Host "--- Patching TelemetrySettings.cs with POSTHOG_API_KEY for this build ---" -ForegroundColor Cyan
+    & $patchScript -Key $env:POSTHOG_API_KEY -Host $env:POSTHOG_API_HOST
+}
+elseif (-not (Test-Path $patchScript)) {
+    Write-Warning "patch-telemetry-defaults.ps1 not found at $patchScript"
+}
+
 function Sign-Executable {
     param(
         [string]$FilePath,
@@ -173,8 +182,8 @@ foreach ($folder in $publishFolders) {
     }
 }
 
-$sourceModulesPath = Join-Path $BuildOutputDir "modules"
-$destModulesPath = Join-Path $StagingDir "modules"
+$sourceModulesPath = Join-Path $BuildOutputDir "Modules"
+$destModulesPath = Join-Path $StagingDir "Modules"
 if (Test-Path $sourceModulesPath) {
     Write-Host "Syncing modules to staging directory using robocopy..."
     robocopy $sourceModulesPath $destModulesPath /E /NFL /NDL /NJH /NJS /nc /ns /np
