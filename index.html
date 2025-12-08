@@ -63,82 +63,79 @@
 
         .container { 
             width: 100%; 
-            max-width: 700px; 
+            max-width: 800px; 
             margin: 0 auto; 
             padding: 2rem; 
             text-align: center; 
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2rem;
+            gap: 1.5rem;
             flex-grow: 1;
             justify-content: center;
         }
 
         main { flex-grow: 1; display: flex; align-items: center; justify-content: center; }
 
-        .logo { 
-            font-size: 4.5rem; 
-            font-weight: 900; 
-            letter-spacing: -0.05em; 
-            color: #FFFFFF; 
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            color: #FFFFFF;
             text-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
-            margin-bottom: -0.5rem;
         }
 
-        .tagline { 
-            font-size: 1.4rem; 
-            font-weight: 500;
-            color: #cccccc;
-            max-width: 40ch;
-            line-height: 1.4;
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted-color);
+            max-width: 600px;
         }
 
-        .cta-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
 
-        .discord-btn {
+
+        .download-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             background-color: var(--accent-color);
             color: white;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 1.1rem;
-            padding: 1rem 2.5rem;
+            font-weight: 700;
+            font-size: 1.3rem;
+            padding: 1.2rem 3rem;
             border-radius: 12px;
             transition: all 0.2s ease;
             box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            gap: 10px;
         }
 
-        .discord-btn:hover {
+        .download-btn:hover {
             background-color: var(--accent-hover-color);
             transform: translateY(-2px);
             box-shadow: 0 0 30px rgba(37, 99, 235, 0.6);
         }
 
-        .discord-btn:active {
+        .download-btn:active {
             transform: translateY(0);
         }
 
-        .sub-text {
-            font-size: 0.85rem;
-            color: #a0a0a0;
-            max-width: 500px;
-            line-height: 1.5;
+        .download-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
         }
-        
-        .sub-text strong {
-            color: #ffffff;
-            font-weight: 500;
+
+        .discord-link {
+            font-size: 0.9rem;
+            color: var(--text-muted-color);
+            text-decoration: underline;
+            transition: color 0.2s ease;
+        }
+
+        .discord-link:hover {
+            color: var(--text-color);
         }
 
         footer { padding: 2rem; text-align: center; color: #444; font-size: 0.8rem; }
@@ -146,9 +143,9 @@
         footer a:hover { color: var(--text-color); }
 
         @media (max-width: 768px) {
-            .logo { font-size: 3.5rem; }
-            .tagline { font-size: 1.1rem; }
-            .discord-btn { width: 100%; padding: 1rem; }
+            h1 { font-size: 2.5rem; }
+            .subtitle { font-size: 1rem; }
+            .download-btn { width: 100%; padding: 1rem; font-size: 1.1rem; }
         }
     </style>
 </head>
@@ -163,20 +160,19 @@
 
     <main>
         <div class="container">
-            <div>
-                <h1 class="logo">Axorith</h1>
-                <p class="tagline">Automate your workspace.<br>Work smarter, live better.</p>
-            </div>
+            <h1>Axorith</h1>
+            <p class="subtitle">Automate your workspace. Work smarter, live better.</p>
+            
+            <a href="https://github.com/axorithlabs/axorith/releases/download/v0.0.5-alpha/Axorith-Setup-0.0.5-alpha.exe" class="download-btn">
+                <svg viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0 12.402l35.687-4.86.016 34.423-35.67.203zm35.67 33.529l.028 34.253L.047 75.347l-.047-29.632zm5.975-39.38L88 0v41.678L41.68 41.62zm.056 38.682L88 46.516v41.018l-46.294-6.32Z"/>
+                </svg>
+                DOWNLOAD FREE ALPHA (WINDOWS)
+            </a>
 
-            <div class="cta-group">
-                <a href="https://discord.gg/axorith" class="discord-btn">
-                    JOIN THE COMMUNITY
-                </a>
-                
-                <p class="sub-text">
-                    Get your <strong>free copy</strong> now. Be the first to access the <strong>Lifetime License</strong> on January 9th.
-                </p>
-            </div>
+            <a href="https://discord.gg/axorith" class="discord-link">
+                Or, join the community on Discord
+            </a>
         </div>
     </main>
 
