@@ -64,7 +64,6 @@ public class SettingUpdateBroadcaster : IDisposable
             _logger.LogDebug("Unsubscribed from module instance {InstanceId}", moduleInstanceId);
         }
 
-        // Cleanup choice cache for this module
         var prefix = moduleInstanceId + ":";
         var choiceKeys = _lastChoicesFingerprint.Keys
             .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -168,7 +167,6 @@ public class SettingUpdateBroadcaster : IDisposable
         }
         finally
         {
-            // Only remove if this subscriber is still the current one (not replaced)
             _subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber));
             
             // Always dispose our own resources regardless of removal result
@@ -302,11 +300,7 @@ public class SettingUpdateBroadcaster : IDisposable
     {
         ArgumentNullException.ThrowIfNull(setting);
 
-        // If no disposables provided (e.g. DesignTime), create/get one for this instance
-        if (disposables == null)
-        {
-            disposables = _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => new CompositeDisposable());
-        }
+        disposables ??= _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => []);
 
         setting.ValueAsObject
             .Skip(1)
@@ -361,10 +355,7 @@ public class SettingUpdateBroadcaster : IDisposable
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        if (disposables == null)
-        {
-            disposables = _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => new CompositeDisposable());
-        }
+        disposables ??= _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => new CompositeDisposable());
 
         action.Label
             .Skip(1)

@@ -8,7 +8,10 @@ namespace Axorith.Telemetry;
 /// </summary>
 public sealed record TelemetrySettings
 {
-    public bool Enabled { get; init; } = Environment.GetEnvironmentVariable("AXORITH_TELEMETRY", EnvironmentVariableTarget.User) == "1";
+    public bool Enabled { get; init; } =
+        Environment.GetEnvironmentVariable("AXORITH_TELEMETRY", EnvironmentVariableTarget.User) == "1" ||
+        !string.IsNullOrEmpty(
+            Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_API_KEY", EnvironmentVariableTarget.User));
     public string DistinctId { get; init; } = string.Empty;
     public string PostHogApiKey { get; init; } = "##POSTHOG_API_KEY##";
     public string PostHogHost { get; init; } = "https://us.i.posthog.com";

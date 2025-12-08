@@ -120,18 +120,19 @@ public class App : Application
 
         _mainWindow = new MainWindow
         {
-            DataContext = shellViewModel,
-            ShowInTaskbar = true
+            DataContext = shellViewModel
         };
 
         if (_isTrayMode)
         {
             logger.LogInformation("Starting with window hidden (--tray flag)");
+            _mainWindow.ShowInTaskbar = false;
             _mainWindow.WindowState = WindowState.Minimized;
         }
         else
         {
             logger.LogInformation("Starting with window visible");
+            _mainWindow.ShowInTaskbar = true;
             windowStateManager.RestoreWindowState(_mainWindow);
         }
 
