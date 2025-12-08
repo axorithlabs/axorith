@@ -10,6 +10,7 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Sdk.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -26,6 +27,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private readonly IClientUiSettingsStore? _uiSettingsStore;
     private readonly ClientUiConfiguration? _uiConfig;
     private readonly IFilePickerService? _filePickerService;
+    private readonly SettingsInputConfiguration _inputConfig;
+
+    private const int ChoiceThrottleMs = 50;
+
+    private bool _isUserEditing;
 
     private IReadOnlyList<KeyValuePair<string, string>> _rawChoices = [];
 
@@ -81,6 +87,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
             if (string.Equals(current, value, StringComparison.Ordinal))
             {
                 return;
+            }
+
+            if (IsTextBasedSetting())
+            {
+                _isUserEditing = true;
             }
 
             Setting.SetValueFromString(value);
@@ -200,6 +211,9 @@ public class SettingViewModel : ReactiveObject, IDisposable
         _moduleInstanceId = moduleInstanceId;
         _modulesApi = modulesApi;
 
+        _inputConfig = serviceProvider?.GetService<IOptions<Configuration>>()?.Value.Ui.SettingsInput
+                       ?? new SettingsInputConfiguration();
+
         if (serviceProvider != null)
         {
             _uiSettingsStore = serviceProvider.GetService<IClientUiSettingsStore>();
@@ -234,6 +248,11 @@ public class SettingViewModel : ReactiveObject, IDisposable
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(_ =>
             {
+                if (ShouldIgnoreBroadcast())
+                {
+                    return;
+                }
+
                 this.RaisePropertyChanged(nameof(StringValue));
                 this.RaisePropertyChanged(nameof(BoolValue));
                 this.RaisePropertyChanged(nameof(DecimalValue));
@@ -273,17 +292,34 @@ public class SettingViewModel : ReactiveObject, IDisposable
             .DisposeWith(_disposables);
 
         _numberUpdates
-            .Throttle(TimeSpan.FromMilliseconds(75))
+            .Throttle(TimeSpan.FromMilliseconds(_inputConfig.NumberThrottleMs))
             .ObserveOn(RxApp.TaskpoolScheduler)
             .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
             .DisposeWith(_disposables);
 
-        _stringUpdates
-            .Throttle(TimeSpan.FromMilliseconds(250))
-            .DistinctUntilChanged()
-            .ObserveOn(RxApp.TaskpoolScheduler)
-            .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
-            .DisposeWith(_disposables);
+        if (IsTextBasedSetting())
+        {
+            _stringUpdates
+                .Throttle(TimeSpan.FromMilliseconds(_inputConfig.TextDebounceMs))
+                .DistinctUntilChanged()
+                .ObserveOn(RxApp.TaskpoolScheduler)
+                .Subscribe(v =>
+                {
+                    _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v);
+                    
+                    Dispatcher.UIThread.Post(() => _isUserEditing = false);
+                })
+                .DisposeWith(_disposables);
+        }
+        else
+        {
+            _stringUpdates
+                .Throttle(TimeSpan.FromMilliseconds(ChoiceThrottleMs))
+                .DistinctUntilChanged()
+                .ObserveOn(RxApp.TaskpoolScheduler)
+                .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
+                .DisposeWith(_disposables);
+        }
     }
 
     private void UpdateDisplayedChoices()
@@ -483,10 +519,54 @@ public class SettingViewModel : ReactiveObject, IDisposable
         _uiSettingsStore.Save(_uiConfig);
     }
 
+    /// <summary>
+    ///     Determines if this setting is a text-based input type that should use debounce.
+    /// </summary>
+    private bool IsTextBasedSetting()
+    {
+        return Setting.ControlType is
+            SettingControlType.Text or
+            SettingControlType.TextArea or
+            SettingControlType.FilePicker or
+            SettingControlType.DirectoryPicker or
+            SettingControlType.Secret;
+    }
+    
+    private bool ShouldIgnoreBroadcast()
+    {
+        return _isUserEditing && IsTextBasedSetting();
+    }
+
+    public void OnFocusGained()
+    {
+        if (IsTextBasedSetting())
+        {
+            _isUserEditing = true;
+        }
+    }
+
+    public void OnFocusLost()
+    {
+        if (!IsTextBasedSetting())
+        {
+            return;
+        }
+
+        if (_isUserEditing && _inputConfig.FlushOnFocusLoss)
+        {
+            var currentValue = Setting.GetCurrentValueAsObject() as string;
+            _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, currentValue);
+        }
+
+        _isUserEditing = false;
+    }
+
     public void Dispose()
     {
         _disposables.Dispose();
         _valueChangedSubject.Dispose();
+        _numberUpdates.Dispose();
+        _stringUpdates.Dispose();
     }
 }
 
