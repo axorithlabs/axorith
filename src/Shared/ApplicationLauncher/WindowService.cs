@@ -16,12 +16,12 @@ public sealed class WindowService(IModuleLogger logger)
         {
             if (config.BannerDelayMs > 0)
             {
-                await Task.Delay(config.BannerDelayMs, cancellationToken);
+                await Task.Delay(config.BannerDelayMs, cancellationToken).ConfigureAwait(false);
             }
 
             try
             {
-                await PublicApi.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken);
+                await PublicApi.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken).ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
@@ -48,7 +48,7 @@ public sealed class WindowService(IModuleLogger logger)
             {
                 if (config.MoveDelayMs > 0)
                 {
-                    await Task.Delay(config.MoveDelayMs, cancellationToken);
+                    await Task.Delay(config.MoveDelayMs, cancellationToken).ConfigureAwait(false);
                 }
 
                 logger.LogDebug("Moving window to monitor {MonitorIndex}", idx);
@@ -64,7 +64,7 @@ public sealed class WindowService(IModuleLogger logger)
 
                     if (config.MaximizeSnapDelayMs > 0)
                     {
-                        await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken);
+                        await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
                     }
 
                     var current = PublicApi.GetWindowState(windowHandle);
@@ -99,7 +99,7 @@ public sealed class WindowService(IModuleLogger logger)
 
                     if (config.MaximizeSnapDelayMs > 0)
                     {
-                        await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken);
+                        await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
                     }
 
                     if (PublicApi.GetWindowState(windowHandle) != WindowState.Minimized)
@@ -125,7 +125,7 @@ public sealed class WindowService(IModuleLogger logger)
 
             if (config.FinalFocusDelayMs > 0)
             {
-                await Task.Delay(config.FinalFocusDelayMs, cancellationToken);
+                await Task.Delay(config.FinalFocusDelayMs, cancellationToken).ConfigureAwait(false);
             }
 
             if (config.BringToForeground && config.State != "Minimized")
