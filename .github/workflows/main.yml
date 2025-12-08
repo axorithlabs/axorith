@@ -56,6 +56,9 @@ jobs:
     needs: tests
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    env:
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      POSTHOG_API_HOST: ${{ secrets.POSTHOG_API_HOST }}
     
     steps:
       - name: Checkout code
@@ -80,6 +83,13 @@ jobs:
         uses: repolevedavaj/install-nsis@v1.1.0
         with:
           nsis-version: 3.11
+
+      - name: Ensure PostHog key is present
+        if: ${{ env.POSTHOG_API_KEY == '' }}
+        shell: pwsh
+        run: |
+          Write-Error "POSTHOG_API_KEY secret is required for telemetry patching (CI injects into TelemetryDefaults)."
+          exit 1
       
       - name: Run Build Script (Publish & NSIS)
         shell: pwsh

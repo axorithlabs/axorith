@@ -5,6 +5,7 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Exceptions;
+using Axorith.Telemetry;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -40,7 +41,7 @@ public class ModuleErrorHandlingTests
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {
@@ -133,7 +134,7 @@ public class ModuleErrorHandlingTests
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {
@@ -185,7 +186,7 @@ public class ModuleErrorHandlingTests
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {
@@ -240,7 +241,7 @@ public class ModuleErrorHandlingTests
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {

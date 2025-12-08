@@ -18,15 +18,19 @@ public class PresetsServiceImplTests
 {
     private readonly Mock<IPresetManager> _mockPresetManager;
     private readonly Mock<IDesignTimeSandboxManager> _sandboxManager;
+    private readonly Mock<IModuleRegistry> _mockModuleRegistry;
     private readonly PresetsServiceImpl _service;
 
     public PresetsServiceImplTests()
     {
         _mockPresetManager = new Mock<IPresetManager>();
         _sandboxManager = new Mock<IDesignTimeSandboxManager>();
+        _mockModuleRegistry = new Mock<IModuleRegistry>();
+        _mockModuleRegistry.Setup(x => x.GetAllDefinitions()).Returns(new List<Axorith.Sdk.ModuleDefinition>());
         _service = new PresetsServiceImpl(
             _mockPresetManager.Object,
             _sandboxManager.Object,
+            _mockModuleRegistry.Object,
             NullLogger<PresetsServiceImpl>.Instance
         );
     }

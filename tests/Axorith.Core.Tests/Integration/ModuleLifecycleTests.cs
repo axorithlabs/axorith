@@ -4,6 +4,7 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Axorith.Telemetry;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -58,7 +59,7 @@ public class ModuleLifecycleTests
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {
@@ -111,7 +112,7 @@ public class ModuleLifecycleTests
         mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {
@@ -190,7 +191,7 @@ public class ModuleLifecycleTests
         mockRegistry.Setup(r => r.CreateInstance(id2)).Returns((mockModule2.Object, scope2));
 
         var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
 
         var preset = new SessionPreset
         {

@@ -1,5 +1,6 @@
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Telemetry;
 using Axorith.Host.Mappers;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
@@ -13,9 +14,13 @@ namespace Axorith.Host.Services;
 public class PresetsServiceImpl(
     IPresetManager presetManager,
     IDesignTimeSandboxManager sandboxManager,
-    ILogger<PresetsServiceImpl> logger)
+    IModuleRegistry moduleRegistry,
+    ILogger<PresetsServiceImpl> logger,
+    ITelemetryService? telemetry = null)
     : PresetsService.PresetsServiceBase
 {
+    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
+
     /// <summary>
     ///     Retrieves all session presets from persistent storage.
     /// </summary>
@@ -117,6 +122,7 @@ public class PresetsServiceImpl(
 
             var response = PresetMapper.ToMessage(preset);
             logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
+            TrackPresetTelemetry("PresetCreated", preset);
             return response;
         }
         catch (RpcException)
@@ -156,6 +162,7 @@ public class PresetsServiceImpl(
 
             var response = PresetMapper.ToMessage(preset);
             logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
+            TrackPresetTelemetry("PresetUpdated", preset);
             return response;
         }
         catch (RpcException)
@@ -185,6 +192,10 @@ public class PresetsServiceImpl(
                 .ConfigureAwait(false);
 
             logger.LogInformation("Deleted preset: {PresetId}", presetId);
+            _telemetry.TrackEvent("PresetDeleted", new Dictionary<string, object?>
+            {
+                ["presetId"] = presetId.ToString()
+            });
             return new Empty();
         }
         catch (RpcException)
@@ -196,5 +207,59 @@ public class PresetsServiceImpl(
             logger.LogError(ex, "Error deleting preset {PresetId}", request.PresetId);
             throw new RpcException(new Status(StatusCode.Internal, "Failed to delete preset", ex));
         }
+    }
+
+    private void TrackPresetTelemetry(string eventName, Core.Models.SessionPreset preset)
+    {
+        if (!_telemetry.IsEnabled)
+        {
+            return;
+        }
+
+        var allModuleDefs = moduleRegistry.GetAllDefinitions();
+        var moduleDefLookup = allModuleDefs.ToDictionary(m => m.Id, m => m.Name);
+
+        var moduleIds = preset.Modules.Select(m => m.ModuleId.ToString()).ToArray();
+        var settingsKeys = preset.Modules
+            .SelectMany(m => m.Settings.Keys)
+            .Distinct()
+            .Take(64) // cap to avoid oversize
+            .ToArray();
+
+        var modulesDetailed = preset.Modules.Select(m =>
+        {
+            var moduleName = moduleDefLookup.TryGetValue(m.ModuleId, out var name) ? name : "Unknown";
+            return new
+            {
+                moduleId = m.ModuleId.ToString(),
+                moduleName = TelemetryGuard.SafeString(moduleName),
+                instanceId = m.InstanceId.ToString(),
+                customName = !string.IsNullOrWhiteSpace(m.CustomName),
+                startDelaySec = (int)m.StartDelay.TotalSeconds,
+                settingsKeys = m.Settings.Keys.Take(32).ToArray(),
+                settingsCount = m.Settings.Count,
+                settings = m.Settings
+                    .Take(32)
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => new
+                        {
+                            len = kvp.Value?.Length ?? 0,
+                            val = TelemetryGuard.SafeString(kvp.Value, 128)
+                        })
+            };
+        }).ToArray();
+
+        _telemetry.TrackEvent(eventName, new Dictionary<string, object?>
+        {
+            ["presetId"] = preset.Id.ToString(),
+            ["presetName"] = TelemetryGuard.SafeString(preset.Name, 128),
+            ["presetNameLength"] = preset.Name?.Length ?? 0,
+            ["moduleCount"] = preset.Modules.Count,
+            ["moduleIds"] = moduleIds,
+            ["settingsKeyCount"] = settingsKeys.Length,
+            ["settingsKeys"] = settingsKeys,
+            ["modules"] = modulesDetailed
+        });
     }
 }

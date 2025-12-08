@@ -4,6 +4,7 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
 using Microsoft.Extensions.Logging;
+using Axorith.Telemetry;
 
 namespace Axorith.Core.Services;
 
@@ -17,7 +18,8 @@ public class SessionManager(
     ILogger<SessionManager> logger,
     TimeSpan validationTimeout,
     TimeSpan startupTimeout,
-    TimeSpan shutdownTimeout)
+    TimeSpan shutdownTimeout,
+    ITelemetryService telemetry)
     : ISessionManager
 {
     private CancellationTokenSource? _sessionCts;
@@ -111,10 +113,10 @@ public class SessionManager(
 
             await RunHybridStartupAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
 
-            logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules.", 
+            logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules.",
                 preset.Name, _activeModules.Count);
-            
             SessionStarted?.Invoke(preset.Id);
+            TrackSessionStarted(preset, _activeModules);
         }
         catch (Exception ex)
         {
@@ -237,6 +239,7 @@ public class SessionManager(
             await module.Instance.OnSessionStartAsync(startCts.Token).ConfigureAwait(false);
             
             logger.LogInformation("Module '{InstanceName}' started successfully.", module.DisplayName);
+            TrackModuleStarted(module);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -311,6 +314,9 @@ public class SessionManager(
             }
 
             var stoppedPresetId = ActiveSession?.Id ?? Guid.Empty;
+            var stoppedPresetName = ActiveSession?.Name;
+            var stoppedModules = _activeModules.ToList();
+            var startedAt = SessionStartedAt;
             
             CleanupSessionState();
 
@@ -319,6 +325,7 @@ public class SessionManager(
             if (stoppedPresetId != Guid.Empty)
             {
                 SessionStopped?.Invoke(stoppedPresetId);
+                TrackSessionStopped(stoppedPresetId, stoppedPresetName, stoppedModules, startedAt);
             }
         }
         catch (Exception ex)
@@ -434,6 +441,114 @@ public class SessionManager(
         // GetCurrentSnapshot already takes the lock
         var snapshot = GetCurrentSnapshot();
         return snapshot?.Modules.FirstOrDefault(m => m.InstanceId == instanceId);
+    }
+
+    private void TrackModuleStarted(ActiveModule module)
+    {
+        if (!telemetry.IsEnabled)
+        {
+            return;
+        }
+
+        var settingsPreview = module.Configuration.Settings
+            .Take(32)
+            .ToDictionary(
+                kvp => kvp.Key,
+                kvp => new
+                {
+                    len = kvp.Value?.Length ?? 0,
+                    val = TelemetryGuard.SafeString(kvp.Value, 128)
+                });
+
+        telemetry.TrackEvent("ModuleUsed", new Dictionary<string, object?>
+        {
+            ["moduleId"] = module.Configuration.ModuleId.ToString(),
+            ["moduleName"] = module.Definition.Name,
+            ["instanceId"] = module.Configuration.InstanceId.ToString(),
+            ["presetId"] = ActiveSession?.Id.ToString(),
+            ["presetName"] = TelemetryGuard.SafeString(ActiveSession?.Name, 128),
+            ["startDelaySec"] = (int)module.Configuration.StartDelay.TotalSeconds,
+            ["customName"] = !string.IsNullOrWhiteSpace(module.Configuration.CustomName),
+            ["settingsCount"] = module.Configuration.Settings.Count,
+            ["settings"] = settingsPreview
+        });
+    }
+
+    private void TrackSessionStarted(SessionPreset preset, List<ActiveModule> modules)
+    {
+        if (!telemetry.IsEnabled)
+        {
+            return;
+        }
+
+        var moduleSummaries = modules.Select(m => new
+        {
+            moduleId = m.Configuration.ModuleId.ToString(),
+            moduleName = TelemetryGuard.SafeString(m.Definition.Name),
+            instanceId = m.Configuration.InstanceId.ToString(),
+            startDelayMs = (long)m.Configuration.StartDelay.TotalMilliseconds,
+            settingsKeys = m.Configuration.Settings.Keys.Take(32).ToArray(),
+            customName = TelemetryGuard.SafeString(m.Configuration.CustomName),
+            settingsCount = m.Configuration.Settings.Count
+        }).ToArray();
+
+        var settingsKeysDistinct = modules
+            .SelectMany(m => m.Configuration.Settings.Keys)
+            .Distinct()
+            .Take(128)
+            .ToArray();
+
+        telemetry.TrackEvent("HostSessionStarted", new Dictionary<string, object?>
+        {
+            ["presetId"] = preset.Id.ToString(),
+            ["presetName"] = TelemetryGuard.SafeString(preset.Name, 128),
+            ["presetNameLength"] = preset.Name?.Length ?? 0,
+            ["moduleCount"] = modules.Count,
+            ["modules"] = moduleSummaries,
+            ["settingsKeyCount"] = settingsKeysDistinct.Length,
+            ["settingsKeys"] = settingsKeysDistinct
+        });
+    }
+
+    private void TrackSessionStopped(Guid presetId, string? presetName, List<ActiveModule> modules, DateTimeOffset? startedAt)
+    {
+        if (!telemetry.IsEnabled)
+        {
+            return;
+        }
+
+        var durationMs = startedAt.HasValue
+            ? (long)(DateTimeOffset.UtcNow - startedAt.Value).TotalMilliseconds
+            : (long?)null;
+
+        var moduleSummaries = modules.Select(m => new
+        {
+            moduleId = m.Configuration.ModuleId.ToString(),
+            moduleName = TelemetryGuard.SafeString(m.Definition.Name),
+            instanceId = m.Configuration.InstanceId.ToString(),
+            startDelayMs = (long)m.Configuration.StartDelay.TotalMilliseconds,
+            settingsKeys = m.Configuration.Settings.Keys.Take(32).ToArray(),
+            customName = TelemetryGuard.SafeString(m.Configuration.CustomName),
+            settingsCount = m.Configuration.Settings.Count
+        }).ToArray();
+
+        var settingsKeysDistinct = modules
+            .SelectMany(m => m.Configuration.Settings.Keys)
+            .Distinct()
+            .Take(128)
+            .ToArray();
+
+        telemetry.TrackEvent("HostSessionStopped", new Dictionary<string, object?>
+        {
+            ["presetId"] = presetId.ToString(),
+            ["presetName"] = TelemetryGuard.SafeString(presetName, 128),
+            ["presetNameLength"] = presetName?.Length ?? 0,
+            ["moduleCount"] = modules.Count,
+            ["modules"] = moduleSummaries,
+            ["settingsKeyCount"] = settingsKeysDistinct.Length,
+            ["settingsKeys"] = settingsKeysDistinct,
+            ["durationMs"] = durationMs
+        });
     }
 
     /// <summary>

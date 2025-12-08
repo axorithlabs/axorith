@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Axorith.Telemetry;
 
 namespace Axorith.Client;
 
@@ -30,7 +31,6 @@ public class App : Application
     private MainWindow? _mainWindow;
     private bool _isTrayMode;
     private DesktopNotificationManager? _notificationManager;
-
     /// <summary>
     ///     Loads the application's XAML resources.
     /// </summary>
@@ -73,6 +73,8 @@ public class App : Application
             builder.AddSerilog(dispose: true);
         });
 
+        var telemetry = Program.Telemetry ?? new NoopTelemetryService();
+
         var uiSettingsLogger = loggerFactory.CreateLogger<UiSettingsStore>();
         var uiSettingsStore = new UiSettingsStore(uiSettingsLogger);
         clientConfig.Ui = uiSettingsStore.LoadOrDefault();
@@ -86,6 +88,7 @@ public class App : Application
         var services = new ServiceCollection();
         services.AddSingleton(loggerFactory);
         services.AddLogging();
+        services.AddSingleton(telemetry);
         
         services.AddSingleton<IToastNotificationService, ToastNotificationService>();
         services.AddSingleton<ShellViewModel>();
@@ -139,6 +142,12 @@ public class App : Application
 
         _notificationManager = Services.GetRequiredService<DesktopNotificationManager>();
         _notificationManager.Initialize();
+
+        telemetry.TrackEvent("AppReady", new Dictionary<string, object?>
+        {
+            ["scope"] = "app",
+            ["trayMode"] = _isTrayMode
+        });
 
         _mainWindow.Closing += (_, e) =>
         {

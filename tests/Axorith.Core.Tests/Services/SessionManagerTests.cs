@@ -4,6 +4,7 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
+using Axorith.Telemetry;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -23,7 +24,8 @@ public class SessionManagerTests
             NullLogger<SessionManager>.Instance,
             TimeSpan.FromSeconds(5), // validation timeout
             TimeSpan.FromSeconds(30), // startup timeout
-            TimeSpan.FromSeconds(10) // shutdown timeout
+            TimeSpan.FromSeconds(10), // shutdown timeout
+            new NoopTelemetryService()
         );
     }
 

@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Diagnostics;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Http;
@@ -18,6 +20,8 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Events;
+using Axorith.Telemetry;
 using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 Log.Logger = new LoggerConfiguration()
@@ -26,12 +30,44 @@ Log.Logger = new LoggerConfiguration()
 
 // Host info file path for client discovery
 var hostInfoPath = Path.Combine(Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
-
+ITelemetryService? telemetry = null;
+LogEventLevel telemetryLogLevel = LogEventLevel.Warning;
+var hostUptime = Stopwatch.StartNew();
 try
 {
     Log.Information("Starting Axorith.Host...");
 
     var builder = WebApplication.CreateBuilder(args);
+    var telemetrySettings = (builder.Configuration.GetSection("Telemetry").Get<TelemetrySettings>() ?? new TelemetrySettings())
+        .WithEnvironmentOverrides() with { ApplicationName = "Axorith.Host" };
+
+    telemetryLogLevel = TelemetrySettings.ResolveLogLevel(telemetrySettings.LogLevel);
+    telemetry = new TelemetryService(telemetrySettings);
+    RegisterGlobalExceptionHandlers(telemetry);
+
+    Log.Information("Telemetry (Host): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={Flush}",
+        telemetrySettings.Enabled,
+        telemetrySettings.IsActive,
+        telemetry?.IsEnabled ?? false,
+        telemetrySettings.PostHogHost,
+        telemetrySettings.BatchSize,
+        telemetrySettings.QueueLimit,
+        telemetrySettings.FlushInterval.TotalSeconds);
+
+    if (!telemetrySettings.IsActive)
+    {
+        Log.Warning("Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
+            telemetrySettings.Enabled,
+            telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
+            string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
+            string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
+        Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable or update appsettings.json");
+    }
+    else
+    {
+        telemetry?.TrackEvent("HostStarted");
+        Log.Information("Telemetry event sent: HostStarted");
+    }
 
     builder.Host.UseSerilog((context, _, configuration) =>
     {
@@ -50,11 +86,14 @@ try
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 30,
                 outputTemplate:
-                "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}");
+                "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}")
+            .WriteTo.Sink(new TelemetrySerilogSink(telemetry ?? new NoopTelemetryService()), restrictedToMinimumLevel: telemetryLogLevel);
     });
 
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
+    builder.Services.AddSingleton(_ => telemetry ?? new NoopTelemetryService());
+    builder.Services.AddSingleton(hostUptime);
     builder.Services.Configure<Configuration>(builder.Configuration);
 
     // Determine actual port to use (check if configured port is available)
@@ -94,6 +133,8 @@ try
     });
 
     builder.Services.AddHttpClient("default");
+
+    builder.Services.AddHostedService<TelemetryHeartbeatService>();
 
     if (builder.Environment.IsDevelopment())
     {
@@ -229,13 +270,31 @@ try
         config.Grpc.BindAddress,
         boundPort > 0 ? boundPort : "Unknown");
 
+    telemetry?.TrackEvent("HostReady", new Dictionary<string, object?>
+    {
+        ["address"] = config.Grpc.BindAddress,
+        ["port"] = boundPort > 0 ? boundPort : null
+    });
+
     await app.WaitForShutdownAsync();
+
+    telemetry?.TrackEvent("HostStopped", new Dictionary<string, object?>
+    {
+        ["uptimeMs"] = (long)hostUptime.Elapsed.TotalMilliseconds
+    });
 
     return 0;
 }
 catch (Exception ex)
 {
     Log.Fatal(ex, "Axorith.Host terminated unexpectedly");
+    telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+    {
+        ["fatal"] = true,
+        ["message"] = TelemetryGuard.SafeString(ex.Message),
+        ["stack"] = TelemetryGuard.SafeStackTrace(ex)
+    });
+
     return 1;
 }
 finally
@@ -253,6 +312,60 @@ finally
     }
 
     await Log.CloseAndFlushAsync();
+    if (telemetry != null)
+    {
+        await telemetry.FlushAsync();
+        await telemetry.DisposeAsync();
+    }
+}
+
+static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
+{
+    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+    {
+        var exception = e.ExceptionObject as Exception;
+        if (e.IsTerminating)
+        {
+            Log.Fatal(exception, "Unhandled exception in AppDomain (terminating)");
+            telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            {
+                ["fatal"] = true,
+                ["message"] = TelemetryGuard.SafeString(exception?.Message),
+                ["stack"] = TelemetryGuard.SafeStackTrace(exception)
+            });
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                Task.Run(() => telemetry?.FlushAsync(cts.Token), cts.Token).GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Ignore flush errors during crash - we're terminating anyway
+            }
+        }
+        else
+        {
+            Log.Error(exception, "Unhandled exception in AppDomain (non-terminating)");
+            telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            {
+                ["fatal"] = false,
+                ["message"] = TelemetryGuard.SafeString(exception?.Message),
+                ["stack"] = TelemetryGuard.SafeStackTrace(exception)
+            });
+        }
+    };
+
+    TaskScheduler.UnobservedTaskException += (_, e) =>
+    {
+        Log.Error(e.Exception, "Unobserved task exception");
+        e.SetObserved();
+        telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+        {
+            ["fatal"] = false,
+            ["message"] = TelemetryGuard.SafeString(e.Exception?.Message),
+            ["stack"] = TelemetryGuard.SafeStackTrace(e.Exception)
+        });
+    };
 }
 
 static void RegisterCoreServices(ContainerBuilder builder)
@@ -347,7 +460,9 @@ static void RegisterCoreServices(ContainerBuilder builder)
             var startupTimeout = TimeSpan.FromSeconds(config.Session.StartupTimeoutSeconds);
             var shutdownTimeout = TimeSpan.FromSeconds(config.Session.ShutdownTimeoutSeconds);
 
-            return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout);
+            var telemetryService = ctx.Resolve<ITelemetryService>();
+
+            return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout, telemetryService);
         })
         .As<ISessionManager>()
         .SingleInstance()

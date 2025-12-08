@@ -8,7 +8,6 @@ namespace Axorith.Sdk.Tests.Actions;
 /// </summary>
 public class ActionNegativeTests
 {
-/* <<<<<<<<<<<<<<  ✨ Windsurf Command ⭐ >>>>>>>>>>>>>>>> */
 /// <summary>
 ///     Tests for Action.Create with invalid keys
 /// </summary>
@@ -16,7 +15,6 @@ public class ActionNegativeTests
 /// <remarks>
 ///     Tests with null, empty string, and whitespace as keys
 /// </remarks>
-/* <<<<<<<<<<  a53ab31d-226b-4bd4-9a5b-3dadb49099d0  >>>>>>>>>>> */
     [Theory]
     [InlineData(null)]
     [InlineData("")]

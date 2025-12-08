@@ -4,6 +4,7 @@ using System.Reactive.Linq;
 using Avalonia.Threading;
 using Axorith.Client.Adapters;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Telemetry;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
@@ -19,6 +20,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly IDisposable _settingUpdatesSubscription;
     private readonly ILogger<ConfiguredModuleViewModel>? _logger;
+    private readonly ITelemetryService? _telemetry;
     private IDisposable? _settingStreamHandle;
     private IDisposable? _validationSubscription;
 
@@ -105,6 +107,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         _modulesApi = modulesApi;
         _serviceProvider = serviceProvider;
         _logger = serviceProvider.GetService<ILogger<ConfiguredModuleViewModel>>();
+        _telemetry = serviceProvider.GetService<ITelemetryService>();
 
         _settingUpdatesSubscription = _modulesApi.SettingUpdates
             .Where(update => update.ModuleInstanceId == Model.InstanceId)
@@ -194,7 +197,13 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
                 foreach (var action in settingsInfo.Actions)
                 {
-                    var adaptedAction = new ModuleActionAdapter(action, _modulesApi, Definition.Id, Model.InstanceId);
+                    var adaptedAction = new ModuleActionAdapter(
+                        action,
+                        _modulesApi,
+                        Definition.Id,
+                        Model.InstanceId,
+                        Definition.Name,
+                        _telemetry);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
 
