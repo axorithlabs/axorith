@@ -14,7 +14,7 @@ public class Module : IModule
     private readonly IProcessBlocker _blocker;
     private readonly INotifier _notifier;
     private readonly Settings _settings;
-    
+
     private readonly ConcurrentDictionary<string, DateTime> _lastNotificationTime = new();
     private readonly TimeSpan _notificationCooldown = TimeSpan.FromSeconds(10);
 
@@ -28,8 +28,15 @@ public class Module : IModule
         _blocker.ProcessBlocked += OnProcessBlocked;
     }
 
-    public IReadOnlyList<ISetting> GetSettings() => _settings.GetSettings();
-    public IReadOnlyList<IAction> GetActions() => _settings.GetActions();
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return _settings.GetSettings();
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _settings.GetActions();
+    }
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
@@ -73,7 +80,7 @@ public class Module : IModule
     private void OnProcessBlocked(string processName)
     {
         var now = DateTime.UtcNow;
-        
+
         if (_lastNotificationTime.TryGetValue(processName, out var lastTime))
         {
             if (now - lastTime < _notificationCooldown)
@@ -85,13 +92,13 @@ public class Module : IModule
         _lastNotificationTime[processName] = now;
 
         _ = _notifier.ShowSystemAsync("Focus Mode Active", $"Blocked distraction: {processName}");
-        
+
         _logger.LogInfo("Blocked process '{ProcessName}' and notified user.", processName);
     }
 
     public void Dispose()
     {
-        try 
+        try
         {
             _blocker.ProcessBlocked -= OnProcessBlocked;
             _blocker.UnblockAll();
@@ -100,7 +107,7 @@ public class Module : IModule
         {
             // Ignore errors during dispose
         }
-        
+
         GC.SuppressFinalize(this);
     }
 }

@@ -9,13 +9,13 @@ namespace Axorith.Shared.Utils;
 /// </summary>
 public static class DeviceIdProvider
 {
-	/// <summary>
-	///     Gets a deterministic device ID for the current machine.
-	///     The ID is generated from Environment.MachineName,
-	///     ensuring the same ID is always returned for the same machine combination.
-	/// </summary>
-	/// <returns>A GUID string representing the device ID.</returns>
-	public static string GetDeviceId()
+    /// <summary>
+    ///     Gets a deterministic device ID for the current machine.
+    ///     The ID is generated from Environment.MachineName,
+    ///     ensuring the same ID is always returned for the same machine combination.
+    /// </summary>
+    /// <returns>A GUID string representing the device ID.</returns>
+    public static string GetDeviceId()
     {
         var machineIdentifier = $"{Environment.MachineName}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(machineIdentifier));

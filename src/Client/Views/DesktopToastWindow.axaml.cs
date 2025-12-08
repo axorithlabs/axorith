@@ -1,4 +1,5 @@
 ﻿using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Axorith.Client.ViewModels;
@@ -37,13 +38,13 @@ public partial class DesktopToastWindow : Window
         Close();
     }
 
-    protected override void OnPointerEntered(Avalonia.Input.PointerEventArgs e)
+    protected override void OnPointerEntered(PointerEventArgs e)
     {
         base.OnPointerEntered(e);
         _autoCloseTimer.Stop();
     }
 
-    protected override void OnPointerExited(Avalonia.Input.PointerEventArgs e)
+    protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
         _autoCloseTimer.Start();

@@ -28,6 +28,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
         ],
         description: "BlockList: Blocks listed sites. AllowList: Blocks EVERYTHING except listed sites."
     );
+
     private readonly Setting<string> _siteList = Setting.AsTextArea(
         key: "BlockedSites",
         label: "Site List",
@@ -139,24 +140,25 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
     }
 
     /// <summary>
-    /// Opens the Firefox extension installation page in the default browser
+    ///     Opens the Firefox extension installation page in the default browser
     /// </summary>
     private async Task OpenFirefoxExtensionPageAsync()
     {
         const string firefoxExtensionUrl = "https://addons.mozilla.org/firefox/addon/axorith-site-blocker/";
-        
+
         try
-        {   
+        {
             Process.Start(new ProcessStartInfo(firefoxExtensionUrl) { UseShellExecute = true });
-            
+
             notifier.ShowToast("Firefox extension page opened in your browser", NotificationType.Success);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to open Firefox extension page in browser");
-            notifier.ShowToast("Failed to open browser. Please manually visit: " + firefoxExtensionUrl, NotificationType.Error);
+            notifier.ShowToast("Failed to open browser. Please manually visit: " + firefoxExtensionUrl,
+                NotificationType.Error);
         }
-        
+
         // Small delay to ensure the operation completes
         await Task.Delay(100);
     }

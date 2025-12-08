@@ -87,7 +87,8 @@ internal sealed class Settings : LauncherSettingsBase
         var platform = EnvironmentUtils.GetCurrentPlatform();
         var exeName = platform == Platform.Windows ? "Code.exe" : "code";
 
-        var path = await Task.Run(() => _appDiscovery.FindKnownApp(exeName, "Visual Studio Code", "Code")).ConfigureAwait(false);
+        var path = await Task.Run(() => _appDiscovery.FindKnownApp(exeName, "Visual Studio Code", "Code"))
+            .ConfigureAwait(false);
 
         var choices = new List<KeyValuePair<string, string>>
         {

@@ -105,4 +105,3 @@ internal sealed class TelemetryHeartbeatService(
         base.Dispose();
     }
 }
-

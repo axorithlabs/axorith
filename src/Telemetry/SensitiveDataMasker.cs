@@ -4,8 +4,8 @@ using System.Text.RegularExpressions;
 namespace Axorith.Telemetry;
 
 /// <summary>
-/// Provides methods for masking sensitive data in telemetry payloads.
-/// Uses FrozenSet for optimal lookup performance.
+///     Provides methods for masking sensitive data in telemetry payloads.
+///     Uses FrozenSet for optimal lookup performance.
 /// </summary>
 internal static partial class SensitiveDataMasker
 {
@@ -13,7 +13,7 @@ internal static partial class SensitiveDataMasker
     public const string MaskValue = "***";
 
     /// <summary>
-    /// Keys that contain sensitive information and should be masked.
+    ///     Keys that contain sensitive information and should be masked.
     /// </summary>
     private static readonly FrozenSet<string> SensitiveKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -33,7 +33,7 @@ internal static partial class SensitiveDataMasker
         "credential",
         "cookie",
         "session",
-        
+
         // Network identifiers
         "ip",
         "client_ip",
@@ -41,7 +41,7 @@ internal static partial class SensitiveDataMasker
         "x_forwarded_for",
         "xff",
         "$ip",
-        
+
         // PII
         "email",
         "phone",
@@ -49,7 +49,7 @@ internal static partial class SensitiveDataMasker
         "ssn",
         "credit_card",
         "card_number",
-        
+
         // Location
         "location",
         "lat",
@@ -58,7 +58,7 @@ internal static partial class SensitiveDataMasker
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Keys related to geographic/location data that should be excluded entirely.
+    ///     Keys related to geographic/location data that should be excluded entirely.
     /// </summary>
     private static readonly FrozenSet<string> GeoKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -95,7 +95,7 @@ internal static partial class SensitiveDataMasker
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Keys that are exempt from IP masking (version strings, etc.).
+    ///     Keys that are exempt from IP masking (version strings, etc.).
     /// </summary>
     private static readonly FrozenSet<string> IpMaskExemptKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -128,25 +128,37 @@ internal static partial class SensitiveDataMasker
     private static partial Regex IPv6LoopbackRegex();
 
     /// <summary>
-    /// Checks if the given key is a sensitive key that should be masked.
+    ///     Checks if the given key is a sensitive key that should be masked.
     /// </summary>
-    public static bool IsSensitiveKey(string? key) => !string.IsNullOrEmpty(key) && SensitiveKeys.Contains(key);
+    public static bool IsSensitiveKey(string? key)
+    {
+        return !string.IsNullOrEmpty(key) && SensitiveKeys.Contains(key);
+    }
 
     /// <summary>
-    /// Checks if the given key is a geo-related key that should be excluded.
+    ///     Checks if the given key is a geo-related key that should be excluded.
     /// </summary>
-    public static bool IsGeoKey(string? key) => !string.IsNullOrEmpty(key) && GeoKeys.Contains(key);
+    public static bool IsGeoKey(string? key)
+    {
+        return !string.IsNullOrEmpty(key) && GeoKeys.Contains(key);
+    }
 
     /// <summary>
-    /// Checks if the given key is exempt from IP masking.
+    ///     Checks if the given key is exempt from IP masking.
     /// </summary>
-    public static bool IsIpMaskExempt(string? key) => !string.IsNullOrEmpty(key) && IpMaskExemptKeys.Contains(key);
+    public static bool IsIpMaskExempt(string? key)
+    {
+        return !string.IsNullOrEmpty(key) && IpMaskExemptKeys.Contains(key);
+    }
 
     /// <summary>
-    /// Masks the value if it appears to be an IP address (IPv4 or IPv6).
+    ///     Masks the value if it appears to be an IP address (IPv4 or IPv6).
     /// </summary>
     /// <param name="value">The string value to check.</param>
-    /// <returns>The masked value "***" if it's an IP address, otherwise the original value trimmed. Returns empty string for null/whitespace input.</returns>
+    /// <returns>
+    ///     The masked value "***" if it's an IP address, otherwise the original value trimmed. Returns empty string for
+    ///     null/whitespace input.
+    /// </returns>
     public static string MaskIfIpAddress(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -160,7 +172,7 @@ internal static partial class SensitiveDataMasker
     }
 
     /// <summary>
-    /// Checks if the given string is a valid IP address (IPv4 or IPv6).
+    ///     Checks if the given string is a valid IP address (IPv4 or IPv6).
     /// </summary>
     private static bool IsIpAddress(string value)
     {

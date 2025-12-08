@@ -447,7 +447,8 @@ internal sealed class PlaybackService : IDisposable
             return false;
         }
 
-        return _cachedPlaylists.Count > 0 || _cachedAlbums.Count > 0 || !string.IsNullOrWhiteSpace(_cachedLikedSongsUri);
+        return _cachedPlaylists.Count > 0 || _cachedAlbums.Count > 0 ||
+               !string.IsNullOrWhiteSpace(_cachedLikedSongsUri);
     }
 
     private bool ShouldRefreshChoices()

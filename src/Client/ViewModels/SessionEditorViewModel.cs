@@ -5,14 +5,15 @@ using System.Windows.Input;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
-using Axorith.Telemetry;
 using Axorith.Core.Models;
 using Axorith.Sdk;
+using Axorith.Sdk.Services;
+using Axorith.Telemetry;
 using DynamicData;
 using DynamicData.Binding;
 using Microsoft.Extensions.DependencyInjection;
-using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
 using ReactiveUI;
+using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
 
 namespace Axorith.Client.ViewModels;
 
@@ -78,11 +79,11 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
 
             var hours = AutoStopDuration.Value.Hours;
             var minutes = AutoStopDuration.Value.Minutes;
-            var durationStr = hours > 0 
-                ? $"{hours}h {minutes}m" 
+            var durationStr = hours > 0
+                ? $"{hours}h {minutes}m"
                 : $"{minutes}m";
             result += $" • Auto-stop: {durationStr}";
-                
+
             if (NextPresetId.HasValue && !string.IsNullOrWhiteSpace(NextPresetName))
             {
                 result += $" → {NextPresetName}";
@@ -205,6 +206,7 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
     }
 
     private int _autoStopHours;
+
     public int AutoStopHours
     {
         get => _autoStopHours;
@@ -216,6 +218,7 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
     }
 
     private int _autoStopMinutes;
+
     public int AutoStopMinutes
     {
         get => _autoStopMinutes;
@@ -227,6 +230,7 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
     }
 
     private bool _isAutoStopEnabled;
+
     public bool IsAutoStopEnabled
     {
         get => _isAutoStopEnabled;
@@ -274,9 +278,11 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
         }
     } = "Stop session";
 
-    public bool IsNextPresetSelectionVisible => NextActionType == "Start another session" && (parent?.AvailablePresetsForNext.Count ?? 0) > 0;
+    public bool IsNextPresetSelectionVisible =>
+        NextActionType == "Start another session" && (parent?.AvailablePresetsForNext.Count ?? 0) > 0;
 
-    public bool IsNoOtherPresetsAvailable => NextActionType == "Start another session" && (parent?.AvailablePresetsForNext.Count ?? 0) == 0;
+    public bool IsNoOtherPresetsAvailable => NextActionType == "Start another session" &&
+                                             (parent?.AvailablePresetsForNext.Count ?? 0) == 0;
 
     public NextPresetOption? SelectedNextPreset
     {
@@ -308,14 +314,13 @@ public class SessionEditorViewModel : ReactiveObject
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
-    private readonly ObservableCollection<NextPresetOption> _availablePresetsForNext = [];
 
     private readonly ObservableAsPropertyHelper<bool> _isFooterVisible;
     public bool IsFooterVisible => _isFooterVisible.Value;
 
     private readonly ObservableAsPropertyHelper<bool> _canAddAnyTrigger;
     public bool CanAddAnyTrigger => _canAddAnyTrigger.Value;
-    
+
     private readonly ObservableAsPropertyHelper<bool> _hasValidationErrors;
     public bool HasValidationErrors => _hasValidationErrors.Value;
 
@@ -326,10 +331,11 @@ public class SessionEditorViewModel : ReactiveObject
         {
             _preset = value ?? new SessionPreset { Id = Guid.NewGuid() };
             // Update presets list when preset changes
-            if (_availablePresetsForNext.Count > 0)
+            if (AvailablePresetsForNext.Count > 0)
             {
                 UpdateAvailablePresetsForNext();
             }
+
             LoadFromPreset();
         }
     }
@@ -387,7 +393,7 @@ public class SessionEditorViewModel : ReactiveObject
 
     public Task InitializationTask { get; private set; }
 
-    public ObservableCollection<NextPresetOption> AvailablePresetsForNext => _availablePresetsForNext;
+    public ObservableCollection<NextPresetOption> AvailablePresetsForNext { get; } = [];
 
     public SessionEditorViewModel(
         ShellViewModel shell,
@@ -501,7 +507,7 @@ public class SessionEditorViewModel : ReactiveObject
         {
             var modules = await _modulesApi.ListModulesAsync();
             var presets = await _presetsApi.ListPresetsAsync();
-            
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 _availableModules = modules;
@@ -511,10 +517,10 @@ public class SessionEditorViewModel : ReactiveObject
         }
         catch
         {
-            await Dispatcher.UIThread.InvokeAsync(() => 
-            { 
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
                 _availableModules = [];
-                _availablePresetsForNext.Clear();
+                AvailablePresetsForNext.Clear();
             });
         }
     }
@@ -538,15 +544,15 @@ public class SessionEditorViewModel : ReactiveObject
             return;
         }
 
-        _availablePresetsForNext.Clear();
+        AvailablePresetsForNext.Clear();
         foreach (var preset in presets)
         {
             if (preset.Id != _preset.Id)
             {
-                _availablePresetsForNext.Add(new NextPresetOption { PresetId = preset.Id, Name = preset.Name });
+                AvailablePresetsForNext.Add(new NextPresetOption { PresetId = preset.Id, Name = preset.Name });
             }
         }
-        
+
         foreach (var trigger in Triggers.OfType<ScheduleTriggerViewModel>())
         {
             trigger.RaisePropertyChanged(nameof(trigger.IsNextPresetSelectionVisible));
@@ -611,18 +617,19 @@ public class SessionEditorViewModel : ReactiveObject
                         AutoStopDuration = s.AutoStopDuration,
                         NextPresetId = s.NextPresetId
                     };
-                    
+
                     if (s.AutoStopDuration.HasValue)
                     {
                         trigger.IsAutoStopEnabled = true;
                         trigger.AutoStopHours = s.AutoStopDuration.Value.Hours;
                         trigger.AutoStopMinutes = s.AutoStopDuration.Value.Minutes;
                     }
-                    
+
                     if (s.NextPresetId.HasValue)
                     {
                         trigger.NextActionType = "Start another session";
-                        var nextPreset = _availablePresetsForNext.FirstOrDefault(p => p.PresetId == s.NextPresetId.Value);
+                        var nextPreset =
+                            AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == s.NextPresetId.Value);
                         if (nextPreset != null)
                         {
                             trigger.SelectedNextPreset = nextPreset;
@@ -639,7 +646,7 @@ public class SessionEditorViewModel : ReactiveObject
                         trigger.NextActionType = "Stop session";
                         trigger.SelectedNextPreset = null;
                     }
-                    
+
                     Triggers.Add(trigger);
                 }
             });
@@ -657,10 +664,7 @@ public class SessionEditorViewModel : ReactiveObject
             var preset = await _presetsApi.GetPresetAsync(presetId);
             if (preset != null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    trigger.NextPresetName = preset.Name;
-                });
+                await Dispatcher.UIThread.InvokeAsync(() => { trigger.NextPresetName = preset.Name; });
             }
         }
         catch
@@ -800,7 +804,7 @@ public class SessionEditorViewModel : ReactiveObject
                 await _schedulerApi.DeleteScheduleAsync(s.Id);
             }
 
-            _toastService.Show("Preset saved successfully", Sdk.Services.NotificationType.Success);
+            _toastService.Show("Preset saved successfully", NotificationType.Success);
 
             if (isNew)
             {
@@ -874,6 +878,7 @@ public class SessionEditorViewModel : ReactiveObject
                 // Ignore disposal errors to ensure all modules are disposed
             }
         }
+
         ConfiguredModules.Clear();
 
         var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();

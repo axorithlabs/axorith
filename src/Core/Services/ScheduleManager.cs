@@ -133,22 +133,31 @@ public class ScheduleManager(
 
         var now = DateTimeOffset.Now;
         List<(SessionSchedule Schedule, DateTimeOffset RunTime)> toRun = [];
-        
+
         await _lock.WaitAsync(ct);
         try
         {
             foreach (var schedule in _schedules)
             {
-                if (!schedule.IsEnabled) continue;
+                if (!schedule.IsEnabled)
+                {
+                    continue;
+                }
 
                 var nextRun = schedule.GetNextRun(now);
-                
-                if (!nextRun.HasValue) continue;
-                
+
+                if (!nextRun.HasValue)
+                {
+                    continue;
+                }
+
                 var runTime = nextRun.Value;
                 var timeLeft = runTime - now;
 
-                if (timeLeft.TotalMinutes is > 6 or < -5) continue;
+                if (timeLeft.TotalMinutes is > 6 or < -5)
+                {
+                    continue;
+                }
 
                 if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
                 {
@@ -229,15 +238,16 @@ public class ScheduleManager(
                     _lock.Release();
                 }
             }
-            
-            break; 
+
+            break;
         }
     }
 
-    private async Task CheckAndNotifyAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold, string timeText, CancellationToken ct)
+    private async Task CheckAndNotifyAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
+        string timeText, CancellationToken ct)
     {
         var key = $"{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
-        
+
         if (!_sentNotificationKeys.Add(key))
         {
             return;
@@ -248,15 +258,18 @@ public class ScheduleManager(
         {
             return;
         }
-        
+
         logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
-        
+
         await notifier.ShowSystemAsync("Session Scheduler", $"'Session '{preset.Name}' will start in {timeText}.");
     }
 
     private void CleanupNotificationCache()
     {
-        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1) return;
+        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1)
+        {
+            return;
+        }
 
         _sentNotificationKeys.Clear();
         _lastCleanup = DateTimeOffset.Now;

@@ -46,4 +46,3 @@ public interface IDesignTimeSandboxManager
     /// </summary>
     void ReBroadcast(Guid instanceId);
 }
-

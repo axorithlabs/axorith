@@ -1,7 +1,7 @@
 namespace Axorith.Telemetry;
 
 /// <summary>
-/// Configuration options for HTTP retry policy with exponential backoff.
+///     Configuration options for HTTP retry policy with exponential backoff.
 /// </summary>
 internal sealed class RetryPolicyOptions
 {
@@ -18,7 +18,7 @@ internal sealed class RetryPolicyOptions
     public double BackoffMultiplier { get; init; } = 2.0;
 
     /// <summary>
-    /// Creates options from TelemetrySettings.
+    ///     Creates options from TelemetrySettings.
     /// </summary>
     public static RetryPolicyOptions FromSettings(TelemetrySettings settings)
     {
@@ -30,7 +30,7 @@ internal sealed class RetryPolicyOptions
     }
 
     /// <summary>
-    /// Calculates the delay for a given retry attempt using exponential backoff.
+    ///     Calculates the delay for a given retry attempt using exponential backoff.
     /// </summary>
     /// <param name="attempt">Zero-based retry attempt number.</param>
     /// <returns>The delay to wait before the retry.</returns>

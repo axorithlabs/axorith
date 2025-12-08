@@ -39,7 +39,8 @@ public class ValidationResult
     /// </summary>
     /// <param name="fieldErrors">Dictionary of setting keys and error messages.</param>
     /// <param name="globalMessage">Optional global message.</param>
-    public static ValidationResult Fail(IDictionary<string, string> fieldErrors, string globalMessage = "Validation failed")
+    public static ValidationResult Fail(IDictionary<string, string> fieldErrors,
+        string globalMessage = "Validation failed")
     {
         return new ValidationResult(ValidationStatus.Error, globalMessage, fieldErrors);
     }

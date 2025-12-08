@@ -7,12 +7,12 @@ using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Client.Views;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Axorith.Telemetry;
 
 namespace Axorith.Client;
 
@@ -31,6 +31,7 @@ public class App : Application
     private MainWindow? _mainWindow;
     private bool _isTrayMode;
     private DesktopNotificationManager? _notificationManager;
+
     /// <summary>
     ///     Loads the application's XAML resources.
     /// </summary>
@@ -89,7 +90,7 @@ public class App : Application
         services.AddSingleton(loggerFactory);
         services.AddLogging();
         services.AddSingleton(telemetry);
-        
+
         services.AddSingleton<IToastNotificationService, ToastNotificationService>();
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<LoadingViewModel>();
@@ -105,7 +106,7 @@ public class App : Application
         services.AddSingleton<IClientUiSettingsStore>(_ => uiSettingsStore);
         services.AddSingleton<IFilePickerService>(_ => new FilePickerService(desktop));
         services.AddSingleton(sp => new DesktopNotificationManager(
-            sp.GetRequiredService<IToastNotificationService>(), 
+            sp.GetRequiredService<IToastNotificationService>(),
             desktop));
 
         Services = services.BuildServiceProvider();

@@ -1,4 +1,5 @@
 ﻿using Axorith.Client.Services.Abstractions;
+using Axorith.Sdk.Services;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -8,7 +9,7 @@ public class ToastViewModel : ReactiveObject
     public string Title { get; }
     public string Body { get; }
     public string DesktopTitle => Title.ToUpperInvariant();
-    public Sdk.Services.NotificationType Type { get; }
+    public NotificationType Type { get; }
 
     public ToastViewModel(ToastNotification model)
     {

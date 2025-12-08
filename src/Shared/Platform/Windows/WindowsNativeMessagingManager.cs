@@ -19,14 +19,15 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
 
         if (!File.Exists(executablePath))
         {
-            logger.LogWarning("Native Messaging Host executable not found at '{Path}'. Registration might be invalid.", executablePath);
+            logger.LogWarning("Native Messaging Host executable not found at '{Path}'. Registration might be invalid.",
+                executablePath);
         }
 
         try
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var manifestDir = Path.Combine(appData, "Axorith", "native-messaging", "firefox");
-            
+
             if (!Directory.Exists(manifestDir))
             {
                 Directory.CreateDirectory(manifestDir);
@@ -43,7 +44,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
 
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
             var jsonContent = JsonSerializer.Serialize(manifest, jsonOptions);
-            
+
             var manifestFileName = $"{hostName}.json";
             var manifestPath = Path.Combine(manifestDir, manifestFileName);
 
@@ -59,7 +60,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             }
 
             key.SetValue(string.Empty, manifestPath, RegistryValueKind.String);
-            
+
             logger.LogInformation("Successfully registered Firefox Native Messaging Host '{HostName}'", hostName);
         }
         catch (Exception ex)

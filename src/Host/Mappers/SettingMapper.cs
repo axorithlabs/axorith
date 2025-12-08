@@ -130,7 +130,7 @@ public static class SettingMapper
         {
             return "TimeSpan";
         }
-        
+
         if (type == typeof(List<string>))
         {
             return "List<String>";

@@ -1,13 +1,14 @@
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Streaming;
-using SdkSetting = Axorith.Sdk.Settings.Setting;
 using FluentAssertions;
 using Grpc.Core;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using Action = Axorith.Sdk.Actions.Action;
+using SdkSetting = Axorith.Sdk.Settings.Setting;
 
 namespace Axorith.Host.Tests.Streaming;
 
@@ -324,7 +325,7 @@ public class SettingUpdateBroadcasterTests : IDisposable
         await Task.Delay(50);
 
         var instanceId = Guid.NewGuid();
-        var action = Sdk.Actions.Action.Create("actionKey", "Initial Label");
+        var action = Action.Create("actionKey", "Initial Label");
 
         // Act
         _broadcaster.SubscribeToAction(instanceId, action);
@@ -354,7 +355,7 @@ public class SettingUpdateBroadcasterTests : IDisposable
         await Task.Delay(50);
 
         var instanceId = Guid.NewGuid();
-        var action = Sdk.Actions.Action.Create("actionKey", "Label", isEnabled: true);
+        var action = Action.Create("actionKey", "Label", isEnabled: true);
 
         // Act
         _broadcaster.SubscribeToAction(instanceId, action);
@@ -472,4 +473,3 @@ public class SettingUpdateBroadcasterTests : IDisposable
         return mock;
     }
 }
-

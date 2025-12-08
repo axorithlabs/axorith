@@ -2,8 +2,8 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Axorith.Client.CoreSdk.Abstractions;
-using Axorith.Telemetry;
 using Axorith.Sdk.Actions;
+using Axorith.Telemetry;
 
 namespace Axorith.Client.Adapters;
 

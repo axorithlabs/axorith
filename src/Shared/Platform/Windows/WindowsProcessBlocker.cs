@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
@@ -16,16 +17,16 @@ namespace Axorith.Shared.Platform.Windows;
 internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
     private readonly Lock _lock = new();
-    
+
     // ETW components
     private TraceEventSession? _etwSession;
     private Task? _etwTask;
-    
+
     // Non-Admin components
     private CancellationTokenSource? _pollingCts;
     private IntPtr _winEventHook = IntPtr.Zero;
     private WindowApi.WinEventDelegate? _winEventDelegate; // Keep reference to prevent GC
-    
+
     private HashSet<string> _targetProcessNames = [];
 
     public event Action<string>? ProcessBlocked;
@@ -49,7 +50,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             var killed = ScanAndKillByList(initialScan: true);
 
             StartMonitoring();
-            
+
             return killed;
         }
     }
@@ -78,7 +79,10 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private void StartMonitoring()
     {
-        if (_etwSession != null || _pollingCts != null) return;
+        if (_etwSession != null || _pollingCts != null)
+        {
+            return;
+        }
 
         if (TraceEventSession.IsElevated() ?? false)
         {
@@ -107,7 +111,10 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 var processName = data.ProcessName;
                 var pid = data.ProcessID;
 
-                if (string.IsNullOrEmpty(processName)) return;
+                if (string.IsNullOrEmpty(processName))
+                {
+                    return;
+                }
 
                 var normalized = NormalizeName(processName);
 
@@ -147,17 +154,20 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private void StartWinEventHook()
     {
-        if (_winEventHook != IntPtr.Zero) return;
+        if (_winEventHook != IntPtr.Zero)
+        {
+            return;
+        }
 
-        _winEventDelegate = new WindowApi.WinEventDelegate(WinEventProc);
-        
+        _winEventDelegate = WinEventProc;
+
         _winEventHook = WindowApi.SetWinEventHook(
-            WindowApi.EVENT_SYSTEM_FOREGROUND, 
-            WindowApi.EVENT_SYSTEM_FOREGROUND, 
-            IntPtr.Zero, 
-            _winEventDelegate, 
-            0, 
-            0, 
+            WindowApi.EVENT_SYSTEM_FOREGROUND,
+            WindowApi.EVENT_SYSTEM_FOREGROUND,
+            IntPtr.Zero,
+            _winEventDelegate,
+            0,
+            0,
             WindowApi.WINEVENT_OUTOFCONTEXT);
 
         if (_winEventHook == IntPtr.Zero)
@@ -170,14 +180,21 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         }
     }
 
-    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild,
+        uint dwEventThread, uint dwmsEventTime)
     {
-        if (hwnd == IntPtr.Zero) return;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
 
         try
         {
             WindowApi.GetWindowThreadProcessId(hwnd, out var pid);
-            if (pid == 0) return;
+            if (pid == 0)
+            {
+                return;
+            }
 
             try
             {
@@ -271,7 +288,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     {
         var killedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         List<string> targets;
-        
+
         lock (_lock)
         {
             targets = _targetProcessNames.ToList();
@@ -279,7 +296,10 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
         foreach (var target in targets)
         {
-            if (SafeList.Contains(target)) continue;
+            if (SafeList.Contains(target))
+            {
+                continue;
+            }
 
             var processes = Process.GetProcessesByName(target);
             foreach (var p in processes)
@@ -296,7 +316,11 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private bool ShouldBlock(string normalizedName)
     {
-        if (SafeList.Contains(normalizedName)) return false;
+        if (SafeList.Contains(normalizedName))
+        {
+            return false;
+        }
+
         return _targetProcessNames.Contains(normalizedName);
     }
 
@@ -322,33 +346,41 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
             try
             {
-                if (existingInstance == null && NormalizeName(p.ProcessName) != name) return false;
+                if (existingInstance == null && NormalizeName(p.ProcessName) != name)
+                {
+                    return false;
+                }
 
                 if (!p.HasExited)
                 {
                     p.Kill();
                     logger.LogInformation("Blocked process: {Name} (PID: {Pid})", name, pid);
-                    
+
                     if (!suppressEvent)
                     {
                         ProcessBlocked?.Invoke(name);
                     }
+
                     return true;
                 }
             }
-            catch (System.ComponentModel.Win32Exception)
+            catch (Win32Exception)
             {
                 logger.LogDebug("Could not kill process '{Name}' (PID: {Pid}). Access Denied.", name, pid);
             }
             finally
             {
-                if (dispose) p.Dispose();
+                if (dispose)
+                {
+                    p.Dispose();
+                }
             }
         }
         catch (Exception ex)
         {
             logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", name, pid);
         }
+
         return false;
     }
 
@@ -362,6 +394,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 set.Add(NormalizeName(name));
             }
         }
+
         return set;
     }
 
@@ -371,6 +404,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         {
             return Path.GetFileNameWithoutExtension(name);
         }
+
         return name;
     }
 

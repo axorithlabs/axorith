@@ -19,6 +19,7 @@ public class HostController(
 
     private readonly object _portLock = new();
     private int? _cachedPort;
+
     public async Task<bool> IsHostReachableAsync(CancellationToken ct = default)
     {
         try
@@ -46,6 +47,7 @@ public class HostController(
             {
                 _cachedPort = null;
             }
+
             return false;
         }
     }
@@ -140,6 +142,7 @@ public class HostController(
                     {
                         _cachedPort = null;
                     }
+
                     logger.LogInformation("Host info file detected, host is ready");
                     return;
                 }

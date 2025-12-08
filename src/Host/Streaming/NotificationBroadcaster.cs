@@ -65,6 +65,7 @@ public class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger)
                         {
                             // CTS was disposed by replacement subscriber - ignore
                         }
+
                         return;
                     }
             }
@@ -116,7 +117,7 @@ public class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger)
         {
             // Only remove if this subscriber is still the current one (not replaced)
             _subscribers.TryRemove(new KeyValuePair<string, Subscriber>(subscriberId, subscriber));
-            
+
             // Always dispose our own resources regardless of removal result
             try
             {
@@ -126,7 +127,7 @@ public class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger)
             {
                 // Already disposed (e.g., if we were replaced)
             }
-            
+
             subscriber.Queue.Writer.TryComplete();
             subscriber.Cts.Dispose();
         }

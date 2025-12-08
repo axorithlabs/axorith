@@ -4,10 +4,10 @@ using System.Reactive.Linq;
 using Avalonia.Threading;
 using Axorith.Client.Adapters;
 using Axorith.Client.CoreSdk.Abstractions;
-using Axorith.Telemetry;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -170,7 +170,10 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             if (beginResult == null)
             {
                 // Do not block indefinitely: surface a degraded result and observe completion separately
-                _ = beginTask.ContinueWith(_ => { /* swallow */ }, TaskContinuationOptions.ExecuteSynchronously);
+                _ = beginTask.ContinueWith(_ =>
+                {
+                    /* swallow */
+                }, TaskContinuationOptions.ExecuteSynchronously);
                 beginResult = new BeginEditResult(
                     new ModuleSettingsInfo([], []),
                     new OperationResult(false, "BeginEdit timed out; using empty settings"));

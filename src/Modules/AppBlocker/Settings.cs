@@ -44,8 +44,15 @@ internal sealed class Settings
         _allActions = [];
     }
 
-    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
-    public IReadOnlyList<IAction> GetActions() => _allActions;
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return _allSettings;
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _allActions;
+    }
 
     public Task<ValidationResult> ValidateAsync()
     {
@@ -54,7 +61,8 @@ internal sealed class Settings
 
         if (cats.Count == 0 && string.IsNullOrWhiteSpace(manual))
         {
-            return Task.FromResult(ValidationResult.Warn("No categories or processes selected. The module will not block anything."));
+            return Task.FromResult(
+                ValidationResult.Warn("No categories or processes selected. The module will not block anything."));
         }
 
         return Task.FromResult(ValidationResult.Success);
@@ -72,7 +80,10 @@ internal sealed class Settings
                 continue;
             }
 
-            foreach (var p in procs) result.Add(p);
+            foreach (var p in procs)
+            {
+                result.Add(p);
+            }
         }
 
         var manual = _manualProcessList.GetCurrentValue();
@@ -85,8 +96,11 @@ internal sealed class Settings
             var manualList = manual.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
                 .Select(s => s.Trim())
                 .Where(s => !string.IsNullOrWhiteSpace(s));
-            
-            foreach (var p in manualList) result.Add(p);
+
+            foreach (var p in manualList)
+            {
+                result.Add(p);
+            }
         }
 
         return result;

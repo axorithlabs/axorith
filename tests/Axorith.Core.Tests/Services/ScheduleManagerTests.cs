@@ -470,4 +470,3 @@ public class SessionScheduleTests
 
     #endregion
 }
-

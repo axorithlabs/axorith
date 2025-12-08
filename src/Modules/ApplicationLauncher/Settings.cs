@@ -25,7 +25,8 @@ internal sealed class Settings : LauncherSettingsBase
         ApplicationPath = Setting.AsFilePicker(
             key: "ApplicationPath",
             label: "Application Path",
-            description: "Path to the application executable. You can enter a simple name (e.g. 'chrome') and click 'Auto-Detect'.",
+            description:
+            "Path to the application executable. You can enter a simple name (e.g. 'chrome') and click 'Auto-Detect'.",
             defaultValue: "",
             filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
         );
@@ -41,7 +42,8 @@ internal sealed class Settings : LauncherSettingsBase
             key: "UseCustomWorkingDirectory",
             label: "Use Custom Working Directory",
             defaultValue: false,
-            description: "If enabled, the application will be started with the specified working directory instead of the executable's folder."
+            description:
+            "If enabled, the application will be started with the specified working directory instead of the executable's folder."
         );
 
         WorkingDirectory = Setting.AsDirectoryPicker(

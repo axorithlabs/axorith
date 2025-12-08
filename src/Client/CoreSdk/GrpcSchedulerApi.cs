@@ -141,7 +141,8 @@ internal class GrpcSchedulerApi(SchedulerService.SchedulerServiceClient client, 
             model.AutoStopDuration = TimeSpan.FromSeconds(message.AutoStopDurationSeconds);
         }
 
-        if (!string.IsNullOrWhiteSpace(message.NextPresetId) && Guid.TryParse(message.NextPresetId, out var nextPresetId))
+        if (!string.IsNullOrWhiteSpace(message.NextPresetId) &&
+            Guid.TryParse(message.NextPresetId, out var nextPresetId))
         {
             model.NextPresetId = nextPresetId;
         }
