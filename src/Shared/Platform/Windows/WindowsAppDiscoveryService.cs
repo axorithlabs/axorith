@@ -205,7 +205,8 @@ public class WindowsAppDiscoveryService(
 
                             if (!string.IsNullOrEmpty(displayIcon))
                             {
-                                onFound(displayName ?? Path.GetFileNameWithoutExtension(displayIcon), displayIcon, displayIcon);
+                                onFound(displayName ?? Path.GetFileNameWithoutExtension(displayIcon), displayIcon,
+                                    displayIcon);
                             }
 
                             var candidate = TryFindExeInInstallLocation(displayName, installLocation);
@@ -286,8 +287,10 @@ public class WindowsAppDiscoveryService(
         var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var potentialVdfs = new List<string?>
         {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam", "steamapps", "libraryfolders.vdf"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam", "steamapps", "libraryfolders.vdf")
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam", "steamapps",
+                "libraryfolders.vdf"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam", "steamapps",
+                "libraryfolders.vdf")
         };
 
         var registrySteamPath = GetSteamPathFromRegistry();

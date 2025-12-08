@@ -8,13 +8,13 @@ namespace Axorith.Module.SpotifyPlayer;
 internal sealed class Settings
 {
     internal const string CustomUrlValue = "custom";
-    
+
     internal const string ModeLocalComputer = "LocalComputer";
     internal const string ModeLastActive = "LastActive";
     internal const string ModeSpecificName = "SpecificName";
 
     public Setting<string> AuthStatus { get; }
-    
+
     public Setting<bool> EnsureSpotifyRunning { get; }
 
     public Setting<string> DeviceSelectionMode { get; }
@@ -137,8 +137,15 @@ internal sealed class Settings
         ];
     }
 
-    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
-    public IReadOnlyList<IAction> GetActions() => _allActions;
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return _allSettings;
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _allActions;
+    }
 
     public Task<ValidationResult> ValidateAsync()
     {

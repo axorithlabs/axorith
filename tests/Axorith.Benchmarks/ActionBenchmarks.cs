@@ -133,4 +133,3 @@ public class ActionBenchmarks
         await action.InvokeAsync(); // Should be no-op
     }
 }
-

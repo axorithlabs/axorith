@@ -47,7 +47,7 @@ public static class PlatformServices
         {
             return new WindowsProcessBlocker(logger);
         }
-        
+
         throw new PlatformNotSupportedException(
             $"Process blocker is not supported on this platform: {RuntimeInformation.OSDescription}");
     }

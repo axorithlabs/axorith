@@ -21,7 +21,8 @@ public sealed class WindowService(IModuleLogger logger)
 
             try
             {
-                await PublicApi.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken).ConfigureAwait(false);
+                await PublicApi.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (TimeoutException)
             {

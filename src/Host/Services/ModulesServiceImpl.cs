@@ -1,10 +1,10 @@
+using System.Collections.Concurrent;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
 using Axorith.Host.Streaming;
-using Grpc.Core;
 using Axorith.Sdk;
-using System.Collections.Concurrent;
+using Grpc.Core;
 
 namespace Axorith.Host.Services;
 
@@ -225,7 +225,8 @@ public class ModulesServiceImpl(
 
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
-            logger.LogInformation("InvokeDesignTimeAction called: ModuleId={ModuleId}, InstanceId={InstanceId}, ActionKey={ActionKey}",
+            logger.LogInformation(
+                "InvokeDesignTimeAction called: ModuleId={ModuleId}, InstanceId={InstanceId}, ActionKey={ActionKey}",
                 moduleId, moduleInstanceId?.ToString() ?? "<none>", request.ActionKey);
 
             if (moduleInstanceId.HasValue)
@@ -411,7 +412,8 @@ public class ModulesServiceImpl(
         {
             return new BeginEditResponse
             {
-                Result = SessionMapper.CreateResult(false, "Invalid module ID", [$"Could not parse: {request.ModuleId}"])
+                Result = SessionMapper.CreateResult(false, "Invalid module ID",
+                    [$"Could not parse: {request.ModuleId}"])
             };
         }
 

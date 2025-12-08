@@ -268,8 +268,8 @@ public class HttpClientFactoryAdapterTests
 
         // Assert
         client.Should().NotBeNull();
-        httpClient.DefaultRequestHeaders.UserAgent.Should().Contain(
-            p => p.Product != null && p.Product.Name == "Axorith");
+        httpClient.DefaultRequestHeaders.UserAgent.Should()
+            .Contain(p => p.Product != null && p.Product.Name == "Axorith");
     }
 
     [Fact]
@@ -297,4 +297,3 @@ public class HttpClientFactoryAdapterTests
         mockFactory.Verify(f => f.CreateClient("module-Module2"), Times.Once);
     }
 }
-

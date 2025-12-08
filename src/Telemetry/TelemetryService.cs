@@ -1,11 +1,12 @@
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Reflection;
+using Axorith.Shared.Utils;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Parsing;
 using Serilog.Sinks.PeriodicBatching;
-using Axorith.Shared.Utils;
 
 namespace Axorith.Telemetry;
 
@@ -13,7 +14,10 @@ public interface ITelemetryService : IAsyncDisposable
 {
     bool IsEnabled { get; }
     void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null);
-    void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null, IReadOnlyDictionary<string, object?>? properties = null);
+
+    void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? properties = null);
+
     Task FlushAsync(CancellationToken ct = default);
 }
 
@@ -32,7 +36,7 @@ public sealed class TelemetryService : ITelemetryService
     public bool IsEnabled => _logger is not null && !_disposed;
 
     /// <summary>
-    /// Creates a TelemetryService with IHttpClientFactory for proper HttpClient management.
+    ///     Creates a TelemetryService with IHttpClientFactory for proper HttpClient management.
     /// </summary>
     public TelemetryService(TelemetrySettings settings, IHttpClientFactory? httpClientFactory = null)
     {
@@ -117,7 +121,8 @@ public sealed class TelemetryService : ITelemetryService
 
         var props = new List<LogEventProperty>(_baseProperties)
         {
-            new(TelemetryConstants.Properties.EventName, new ScalarValue(string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName))
+            new(TelemetryConstants.Properties.EventName,
+                new ScalarValue(string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName))
         };
 
         if (properties != null)
@@ -130,7 +135,8 @@ public sealed class TelemetryService : ITelemetryService
         _logger.Write(logEvent);
     }
 
-    public void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null, IReadOnlyDictionary<string, object?>? properties = null)
+    public void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? properties = null)
     {
         if (_logger is null || _disposed)
         {
@@ -144,7 +150,8 @@ public sealed class TelemetryService : ITelemetryService
 
         if (!string.IsNullOrWhiteSpace(messageTemplate))
         {
-            props.Add(new LogEventProperty(TelemetryConstants.Properties.MessageTemplate, new ScalarValue(messageTemplate)));
+            props.Add(new LogEventProperty(TelemetryConstants.Properties.MessageTemplate,
+                new ScalarValue(messageTemplate)));
         }
 
         if (properties != null)
@@ -158,10 +165,10 @@ public sealed class TelemetryService : ITelemetryService
     }
 
     /// <summary>
-    /// Flushes all buffered events to PostHog.
-    /// Thread-safe: concurrent calls will wait for the same flush operation.
-    /// Note: This waits for the periodic batching interval to ensure events are sent.
-    /// For immediate flush on shutdown, call DisposeAsync which will flush synchronously.
+    ///     Flushes all buffered events to PostHog.
+    ///     Thread-safe: concurrent calls will wait for the same flush operation.
+    ///     Note: This waits for the periodic batching interval to ensure events are sent.
+    ///     For immediate flush on shutdown, call DisposeAsync which will flush synchronously.
     /// </summary>
     public async Task FlushAsync(CancellationToken ct = default)
     {
@@ -174,7 +181,7 @@ public sealed class TelemetryService : ITelemetryService
         // to allow pending events to be sent. This is a best-effort approach.
         // For guaranteed flush, DisposeAsync should be called which disposes the sink.
         var flushInterval = TimeSpan.FromSeconds(1); // Short wait to allow batch to be sent
-        
+
         try
         {
             await Task.Delay(flushInterval, ct).ConfigureAwait(false);
@@ -186,8 +193,8 @@ public sealed class TelemetryService : ITelemetryService
     }
 
     /// <summary>
-    /// Disposes the telemetry service, flushing any pending events first.
-    /// Idempotent: safe to call multiple times.
+    ///     Disposes the telemetry service, flushing any pending events first.
+    ///     Idempotent: safe to call multiple times.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -212,7 +219,7 @@ public sealed class TelemetryService : ITelemetryService
         }
 
         _logger?.Dispose();
-        
+
         // Only dispose HttpClient if we own it (not from IHttpClientFactory)
         if (_ownsHttpClient)
         {
@@ -220,7 +227,8 @@ public sealed class TelemetryService : ITelemetryService
         }
     }
 
-    private static IReadOnlyCollection<LogEventProperty> BuildBaseProperties(TelemetrySettings settings, string appVersion, string osVersion)
+    private static IReadOnlyCollection<LogEventProperty> BuildBaseProperties(TelemetrySettings settings,
+        string appVersion, string osVersion)
     {
         var list = new List<LogEventProperty>
         {
@@ -231,12 +239,14 @@ public sealed class TelemetryService : ITelemetryService
 
         if (!string.IsNullOrWhiteSpace(settings.BuildChannel))
         {
-            list.Add(new LogEventProperty(TelemetryConstants.Properties.BuildChannel, new ScalarValue(settings.BuildChannel)));
+            list.Add(new LogEventProperty(TelemetryConstants.Properties.BuildChannel,
+                new ScalarValue(settings.BuildChannel)));
         }
 
         if (!string.IsNullOrWhiteSpace(settings.EnvironmentOverride))
         {
-            list.Add(new LogEventProperty(TelemetryConstants.Properties.Environment, new ScalarValue(settings.EnvironmentOverride)));
+            list.Add(new LogEventProperty(TelemetryConstants.Properties.Environment,
+                new ScalarValue(settings.EnvironmentOverride)));
         }
 
         return list;
@@ -250,7 +260,8 @@ public sealed class TelemetryService : ITelemetryService
         }
     }
 
-    private LogEvent CreateLogEvent(LogEventLevel level, string template, IEnumerable<LogEventProperty> properties, Exception? exception)
+    private LogEvent CreateLogEvent(LogEventLevel level, string template, IEnumerable<LogEventProperty> properties,
+        Exception? exception)
     {
         var messageTemplate = _templateParser.Parse(template);
         return new LogEvent(DateTimeOffset.UtcNow, level, exception, messageTemplate, properties);
@@ -275,7 +286,8 @@ public sealed class TelemetryService : ITelemetryService
             case DateTimeOffset dto:
                 return new ScalarValue(dto);
             case IReadOnlyDictionary<string, object?> dict:
-                return new StructureValue(dict.Select(d => new LogEventProperty(d.Key, ConvertToPropertyValue(d.Value))));
+                return new StructureValue(
+                    dict.Select(d => new LogEventProperty(d.Key, ConvertToPropertyValue(d.Value))));
             case IDictionary<string, object?> dict:
                 return new StructureValue(dict.Select(kvp =>
                     new LogEventProperty(kvp.Key, ConvertToPropertyValue(kvp.Value))));
@@ -292,7 +304,7 @@ public sealed class TelemetryService : ITelemetryService
         }
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, List<PropertyInfo>> PropertyCache = new();
+    private static readonly ConcurrentDictionary<Type, List<PropertyInfo>> PropertyCache = new();
 
     private static StructureValue? TryConvertObject(object value)
     {
@@ -337,7 +349,8 @@ public sealed class NoopTelemetryService : ITelemetryService
     {
     }
 
-    public void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null, IReadOnlyDictionary<string, object?>? properties = null)
+    public void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? properties = null)
     {
     }
 

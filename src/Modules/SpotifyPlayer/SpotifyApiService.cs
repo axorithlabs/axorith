@@ -55,7 +55,10 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
     {
-        if (!await PrepareHttpClient()) return [];
+        if (!await PrepareHttpClient())
+        {
+            return [];
+        }
 
         try
         {

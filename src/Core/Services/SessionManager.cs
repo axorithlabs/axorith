@@ -3,8 +3,8 @@ using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
-using Microsoft.Extensions.Logging;
 using Axorith.Telemetry;
+using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
 
@@ -73,7 +73,7 @@ public class SessionManager(
             foreach (var configuredModule in preset.Modules)
             {
                 var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
-                
+
                 if (instance != null && scope != null)
                 {
                     var definition = scope.Resolve<ModuleDefinition>();
@@ -182,11 +182,11 @@ public class SessionManager(
                 }
 
                 // Handle the delayed module
-                logger.LogInformation("Waiting {Delay}s before starting '{Name}'...", 
+                logger.LogInformation("Waiting {Delay}s before starting '{Name}'...",
                     currentModule.Configuration.StartDelay.TotalSeconds, currentModule.DisplayName);
-                
+
                 await Task.Delay(currentModule.Configuration.StartDelay, ct).ConfigureAwait(false);
-                
+
                 await StartSingleModuleAsync(currentModule, ct).ConfigureAwait(false);
             }
             else
@@ -213,7 +213,7 @@ public class SessionManager(
         }
 
         logger.LogInformation("Starting batch of {Count} modules in parallel...", batch.Count);
-        
+
         var tasks = batch.Select(m => StartSingleModuleAsync(m, ct));
         await Task.WhenAll(tasks).ConfigureAwait(false);
     }
@@ -237,14 +237,14 @@ public class SessionManager(
             startCts.CancelAfter(startupTimeout);
 
             await module.Instance.OnSessionStartAsync(startCts.Token).ConfigureAwait(false);
-            
+
             logger.LogInformation("Module '{InstanceName}' started successfully.", module.DisplayName);
             TrackModuleStarted(module);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Timed out specifically
-            logger.LogError("Module '{InstanceName}' startup timed out after {Timeout}s.", 
+            logger.LogError("Module '{InstanceName}' startup timed out after {Timeout}s.",
                 module.DisplayName, startupTimeout.TotalSeconds);
             throw new SessionException($"Module '{module.DisplayName}' startup timed out.");
         }
@@ -278,7 +278,7 @@ public class SessionManager(
             for (var i = _activeModules.Count - 1; i >= 0; i--)
             {
                 var activeModule = _activeModules[i];
-                
+
                 using var scope = logger.BeginScope(new Dictionary<string, object>
                 {
                     ["ModuleInstanceName"] = activeModule.DisplayName
@@ -296,7 +296,8 @@ public class SessionManager(
                 catch (Exception ex)
                 {
                     // We swallow exceptions during stop to ensure we try to stop EVERYTHING.
-                    logger.LogError(ex, "Module '{InstanceName}' threw an exception during stop.", activeModule.DisplayName);
+                    logger.LogError(ex, "Module '{InstanceName}' threw an exception during stop.",
+                        activeModule.DisplayName);
                 }
             }
 
@@ -317,11 +318,11 @@ public class SessionManager(
             var stoppedPresetName = ActiveSession?.Name;
             var stoppedModules = _activeModules.ToList();
             var startedAt = SessionStartedAt;
-            
+
             CleanupSessionState();
 
             logger.LogInformation("Session stopped successfully.");
-            
+
             if (stoppedPresetId != Guid.Empty)
             {
                 SessionStopped?.Invoke(stoppedPresetId);
@@ -510,7 +511,8 @@ public class SessionManager(
         });
     }
 
-    private void TrackSessionStopped(Guid presetId, string? presetName, List<ActiveModule> modules, DateTimeOffset? startedAt)
+    private void TrackSessionStopped(Guid presetId, string? presetName, List<ActiveModule> modules,
+        DateTimeOffset? startedAt)
     {
         if (!telemetry.IsEnabled)
         {

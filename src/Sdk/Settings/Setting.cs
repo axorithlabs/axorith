@@ -209,20 +209,20 @@ public abstract class Setting
         bool isReadOnly = false)
     {
         var setting = new Setting<List<string>>(
-            key, 
-            label, 
-            description, 
-            defaultValues, 
-            SettingControlType.MultiChoice, 
+            key,
+            label,
+            description,
+            defaultValues,
+            SettingControlType.MultiChoice,
             isVisible,
-            isReadOnly, 
-            SettingPersistence.Persisted, 
+            isReadOnly,
+            SettingPersistence.Persisted,
             // Serializer: List -> "key1|key2|key3"
-            list => string.Join("|", list), 
+            list => string.Join("|", list),
             // Deserializer: "key1|key2" -> List
             s => string.IsNullOrEmpty(s) ? [] : s.Split('|', StringSplitOptions.RemoveEmptyEntries).ToList()
         );
-        
+
         setting.InitializeChoices(initialChoices);
         return setting;
     }
@@ -409,11 +409,11 @@ public class Setting<T> : ISetting
                             return;
                         }
                     }
-                    
+
                     if (typeof(T) == typeof(List<string>) && value is string strVal)
                     {
-                         _value.OnNext(_deserializer(strVal));
-                         return;
+                        _value.OnNext(_deserializer(strVal));
+                        return;
                     }
 
                     if (value is IConvertible)

@@ -18,7 +18,8 @@ public interface ISessionAutoStopService : IAsyncDisposable
     /// <param name="autoStopDuration">Duration after which the session should stop. Null means no auto-stop.</param>
     /// <param name="nextPresetId">ID of the preset to start after this session ends. Null means just stop.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId, CancellationToken cancellationToken = default);
+    Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Stops tracking the current session.
@@ -31,4 +32,3 @@ public interface ISessionAutoStopService : IAsyncDisposable
     /// </summary>
     TimeSpan? GetTimeRemaining();
 }
-

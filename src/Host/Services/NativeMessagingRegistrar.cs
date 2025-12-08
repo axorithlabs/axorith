@@ -20,23 +20,27 @@ public class NativeMessagingRegistrar(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to register Native Messaging Host. Site Blocker functionality may be unavailable.");
+            logger.LogWarning(ex,
+                "Failed to register Native Messaging Host. Site Blocker functionality may be unavailable.");
         }
 
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 
     private void RegisterHost()
     {
         #if DEBUG
         var hostName = "axorith.dev";
         #else
-        var hostName =  "axorith";
+        var hostName = "axorith";
         #endif
-        
-        logger.LogInformation("Registering Native Messaging Host as '{HostName}'", 
+
+        logger.LogInformation("Registering Native Messaging Host as '{HostName}'",
             hostName);
 
         var baseDir = AppContext.BaseDirectory;

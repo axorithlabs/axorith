@@ -4,7 +4,7 @@ using Serilog.Events;
 namespace Axorith.Telemetry;
 
 /// <summary>
-/// Serilog sink that forwards log events into ITelemetryService.TrackLog.
+///     Serilog sink that forwards log events into ITelemetryService.TrackLog.
 /// </summary>
 /// <param name="telemetry">The telemetry service to forward logs to. Use NoopTelemetryService if telemetry is disabled.</param>
 public sealed class TelemetrySerilogSink(ITelemetryService telemetry) : ILogEventSink
@@ -22,7 +22,8 @@ public sealed class TelemetrySerilogSink(ITelemetryService telemetry) : ILogEven
         _telemetry.TrackLog(logEvent.Level, logEvent.MessageTemplate.Text, logEvent.Exception, props);
     }
 
-    private static IReadOnlyDictionary<string, object?> ConvertProperties(IReadOnlyDictionary<string, LogEventPropertyValue> properties)
+    private static IReadOnlyDictionary<string, object?> ConvertProperties(
+        IReadOnlyDictionary<string, LogEventPropertyValue> properties)
     {
         var dict = new Dictionary<string, object?>(properties.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var kvp in properties)

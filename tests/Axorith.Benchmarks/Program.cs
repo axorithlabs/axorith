@@ -9,4 +9,3 @@ public static class Program
         BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
     }
 }
-

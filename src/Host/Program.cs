@@ -1,8 +1,7 @@
-using System.Globalization;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
-using System.Diagnostics;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Http;
@@ -15,13 +14,13 @@ using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Platform;
+using Axorith.Telemetry;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
-using Axorith.Telemetry;
 using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 Log.Logger = new LoggerConfiguration()
@@ -30,7 +29,7 @@ Log.Logger = new LoggerConfiguration()
 
 var hostInfoPath = Path.Combine(Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
 ITelemetryService? telemetry = null;
-LogEventLevel telemetryLogLevel = LogEventLevel.Warning;
+var telemetryLogLevel = LogEventLevel.Warning;
 var hostUptime = Stopwatch.StartNew();
 try
 {
@@ -38,13 +37,17 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
     var telemetrySettings = new TelemetrySettings()
-        .WithEnvironmentOverrides() with { ApplicationName = "Axorith.Host" };
+            .WithEnvironmentOverrides() with
+        {
+            ApplicationName = "Axorith.Host"
+        };
 
     telemetryLogLevel = TelemetrySettings.ResolveLogLevel(telemetrySettings.LogLevel);
     telemetry = new TelemetryService(telemetrySettings);
     RegisterGlobalExceptionHandlers(telemetry);
 
-    Log.Information("Telemetry (Host): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={Flush}",
+    Log.Information(
+        "Telemetry (Host): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={Flush}",
         telemetrySettings.Enabled,
         telemetrySettings.IsActive,
         telemetry?.IsEnabled ?? false,
@@ -55,7 +58,8 @@ try
 
     if (!telemetrySettings.IsActive)
     {
-        Log.Warning("Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
+        Log.Warning(
+            "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
             telemetrySettings.Enabled,
             telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
@@ -86,7 +90,8 @@ try
                 retainedFileCountLimit: 30,
                 outputTemplate:
                 "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}")
-            .WriteTo.Sink(new TelemetrySerilogSink(telemetry ?? new NoopTelemetryService()), restrictedToMinimumLevel: telemetryLogLevel);
+            .WriteTo.Sink(new TelemetrySerilogSink(telemetry ?? new NoopTelemetryService()),
+                restrictedToMinimumLevel: telemetryLogLevel);
     });
 
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
@@ -120,7 +125,7 @@ try
     });
 
     builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();
-    
+
     builder.Services.AddHostedService<NativeMessagingRegistrar>();
 
     builder.Services.AddGrpc(options =>
@@ -158,7 +163,7 @@ try
         Log.Fatal(ex, "Failed to initialize authentication service. Host cannot start securely.");
         return 1;
     }
-    
+
     _ = Task.Run(async () =>
     {
         try
@@ -251,7 +256,8 @@ try
                 Directory.CreateDirectory(hostInfoDir);
             }
 
-            var hostInfo = new { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };
+            var hostInfo = new
+                { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };
             await File.WriteAllTextAsync(hostInfoPath, JsonSerializer.Serialize(hostInfo));
             Log.Information("Host info written to {Path}", hostInfoPath);
         }
@@ -395,7 +401,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<ISystemNotificationService>()
         .SingleInstance()
         .PreserveExistingDefaults();
-    
+
     builder.Register(ctx =>
         {
             var loggerFactory = ctx.Resolve<ILoggerFactory>();
@@ -461,7 +467,8 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
             var telemetryService = ctx.Resolve<ITelemetryService>();
 
-            return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout, telemetryService);
+            return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout,
+                telemetryService);
         })
         .As<ISessionManager>()
         .SingleInstance()
@@ -498,7 +505,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<ISessionAutoStopService>()
         .SingleInstance()
         .PreserveExistingDefaults();
-        
+
     builder.RegisterType<HostNotifier>()
         .As<INotifier>()
         .SingleInstance()
@@ -522,7 +529,7 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .AsSelf()
         .SingleInstance()
         .PreserveExistingDefaults();
-        
+
     builder.RegisterType<NotificationBroadcaster>()
         .AsSelf()
         .SingleInstance()

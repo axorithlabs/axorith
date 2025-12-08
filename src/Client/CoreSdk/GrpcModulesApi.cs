@@ -8,6 +8,7 @@ using Axorith.Sdk;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Polly.Retry;
+using Action = Axorith.Contracts.Action;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 using OperationResult = Axorith.Client.CoreSdk.Abstractions.OperationResult;
 using SettingProperty = Axorith.Client.CoreSdk.Abstractions.SettingProperty;
@@ -50,12 +51,12 @@ internal class GrpcModulesApi(
         }
 
         var connectionReadyTcs = new TaskCompletionSource();
-        
+
         _ = StartStreamingSettingUpdatesAsync(moduleInstanceId, cts.Token, connectionReadyTcs);
 
         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
         var completedTask = await Task.WhenAny(connectionReadyTcs.Task, timeoutTask).ConfigureAwait(false);
-        
+
         if (completedTask == timeoutTask)
         {
             logger.LogWarning("Setting updates stream connection timed out for {InstanceId}", moduleInstanceId);
@@ -237,7 +238,8 @@ internal class GrpcModulesApi(
         }).ConfigureAwait(false);
     }
 
-    public async Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId, string actionKey,
+    public async Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId,
+        string actionKey,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
@@ -248,7 +250,7 @@ internal class GrpcModulesApi(
                     new InvokeDesignTimeActionRequest
                     {
                         ModuleId = moduleId.ToString(),
-                    ModuleInstanceId = moduleInstanceId.ToString(),
+                        ModuleInstanceId = moduleInstanceId.ToString(),
                         ActionKey = actionKey
                     },
                     cancellationToken: ct)
@@ -377,7 +379,7 @@ internal class GrpcModulesApi(
 
     private static ModuleSettingsInfo MapSettingsResponse(
         IEnumerable<Setting> settings,
-        IEnumerable<Contracts.Action> actions)
+        IEnumerable<Action> actions)
     {
         var mappedSettings = settings
             .Select(s => new ModuleSetting(
@@ -423,10 +425,11 @@ internal class GrpcModulesApi(
             response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
     }
 
-    private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct, TaskCompletionSource? readyTcs = null)
+    private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct,
+        TaskCompletionSource? readyTcs = null)
     {
         var hasSignaledReady = false;
-        
+
         while (!ct.IsCancellationRequested)
             try
             {

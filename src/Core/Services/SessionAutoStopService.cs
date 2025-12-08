@@ -49,6 +49,7 @@ public class SessionAutoStopService(
                 {
                     // Expected
                 }
+
                 _loopCts?.Dispose();
             }
 
@@ -93,6 +94,7 @@ public class SessionAutoStopService(
                 {
                     // Expected
                 }
+
                 _loopCts?.Dispose();
                 _loopTask = null;
             }
@@ -341,4 +343,3 @@ public class SessionAutoStopService(
         _lock.Dispose();
     }
 }
-

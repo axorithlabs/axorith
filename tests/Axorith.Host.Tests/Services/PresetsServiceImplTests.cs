@@ -8,6 +8,7 @@ using Grpc.Core.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
 namespace Axorith.Host.Tests.Services;
 
@@ -26,7 +27,7 @@ public class PresetsServiceImplTests
         _mockPresetManager = new Mock<IPresetManager>();
         _sandboxManager = new Mock<IDesignTimeSandboxManager>();
         _mockModuleRegistry = new Mock<IModuleRegistry>();
-        _mockModuleRegistry.Setup(x => x.GetAllDefinitions()).Returns(new List<Axorith.Sdk.ModuleDefinition>());
+        _mockModuleRegistry.Setup(x => x.GetAllDefinitions()).Returns(new List<ModuleDefinition>());
         _service = new PresetsServiceImpl(
             _mockPresetManager.Object,
             _sandboxManager.Object,

@@ -8,13 +8,13 @@ namespace Axorith.Sdk.Tests.Actions;
 /// </summary>
 public class ActionNegativeTests
 {
-/// <summary>
-///     Tests for Action.Create with invalid keys
-/// </summary>
-/// <param name="invalidKey">Key to be used in Action.Create</param>
-/// <remarks>
-///     Tests with null, empty string, and whitespace as keys
-/// </remarks>
+    /// <summary>
+    ///     Tests for Action.Create with invalid keys
+    /// </summary>
+    /// <param name="invalidKey">Key to be used in Action.Create</param>
+    /// <remarks>
+    ///     Tests with null, empty string, and whitespace as keys
+    /// </remarks>
     [Theory]
     [InlineData(null)]
     [InlineData("")]

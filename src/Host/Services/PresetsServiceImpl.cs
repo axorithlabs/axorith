@@ -1,7 +1,8 @@
 using Axorith.Contracts;
+using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
-using Axorith.Telemetry;
 using Axorith.Host.Mappers;
+using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 
@@ -209,7 +210,7 @@ public class PresetsServiceImpl(
         }
     }
 
-    private void TrackPresetTelemetry(string eventName, Core.Models.SessionPreset preset)
+    private void TrackPresetTelemetry(string eventName, SessionPreset preset)
     {
         if (!_telemetry.IsEnabled)
         {

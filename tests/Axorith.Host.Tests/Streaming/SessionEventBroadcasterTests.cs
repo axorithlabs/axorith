@@ -307,4 +307,3 @@ public class SessionEventBroadcasterTests : IDisposable
         return mock;
     }
 }
-

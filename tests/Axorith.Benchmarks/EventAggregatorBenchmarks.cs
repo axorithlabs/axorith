@@ -169,4 +169,3 @@ public class EventAggregatorBenchmarks
         aggregator.Publish(new TestEvent(1, "test"));
     }
 }
-

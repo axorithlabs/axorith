@@ -1,10 +1,10 @@
-﻿using Avalonia;
+﻿using System.Reactive.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Client.Views;
-using System.Reactive.Linq;
 using ReactiveUI.Avalonia;
 
 namespace Axorith.Client.Services;
@@ -81,9 +81,9 @@ public class DesktopNotificationManager(
         for (var i = _openWindows.Count - 1; i >= 0; i--)
         {
             var window = _openWindows[i];
-            
-            var height = window.Bounds.Height > 0 ? window.Bounds.Height : 140; 
-            
+
+            var height = window.Bounds.Height > 0 ? window.Bounds.Height : 140;
+
             var x = workingArea.Right - window.Width - MarginRight;
             var y = currentY - height;
 
@@ -100,6 +100,7 @@ public class DesktopNotificationManager(
         {
             window.Close();
         }
+
         _openWindows.Clear();
     }
 }

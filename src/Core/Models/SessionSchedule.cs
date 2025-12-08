@@ -23,14 +23,14 @@ public class SessionSchedule
     public DateTimeOffset? LastRun { get; set; }
 
     /// <summary>
-    /// Duration after which the session should automatically stop.
-    /// Null means no auto-stop.
+    ///     Duration after which the session should automatically stop.
+    ///     Null means no auto-stop.
     /// </summary>
     public TimeSpan? AutoStopDuration { get; set; }
 
     /// <summary>
-    /// ID of the preset to automatically start after the current session ends.
-    /// Null means just stop the session without starting another one.
+    ///     ID of the preset to automatically start after the current session ends.
+    ///     Null means just stop the session without starting another one.
     /// </summary>
     public Guid? NextPresetId { get; set; }
 
@@ -50,7 +50,7 @@ public class SessionSchedule
         {
             return null;
         }
-        
+
         var tolerance = TimeSpan.FromMinutes(5);
 
         for (var i = 0; i <= 7; i++)

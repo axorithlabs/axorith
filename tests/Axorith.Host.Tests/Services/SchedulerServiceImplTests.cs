@@ -134,7 +134,8 @@ public class SchedulerServiceImplTests
         response.Name.Should().Be("New Schedule");
         response.Id.Should().NotBeNullOrEmpty();
 
-        _mockScheduleManager.Verify(m => m.SaveScheduleAsync(It.IsAny<SessionSchedule>(), It.IsAny<CancellationToken>()),
+        _mockScheduleManager.Verify(
+            m => m.SaveScheduleAsync(It.IsAny<SessionSchedule>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -187,7 +188,8 @@ public class SchedulerServiceImplTests
         response.Should().NotBeNull();
         response.Name.Should().Be("Updated Schedule");
 
-        _mockScheduleManager.Verify(m => m.SaveScheduleAsync(It.IsAny<SessionSchedule>(), It.IsAny<CancellationToken>()),
+        _mockScheduleManager.Verify(
+            m => m.SaveScheduleAsync(It.IsAny<SessionSchedule>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -284,7 +286,8 @@ public class SchedulerServiceImplTests
         response.Should().NotBeNull();
         response.IsEnabled.Should().BeTrue();
 
-        _mockScheduleManager.Verify(m => m.SetEnabledAsync(scheduleId, true, It.IsAny<CancellationToken>()), Times.Once);
+        _mockScheduleManager.Verify(m => m.SetEnabledAsync(scheduleId, true, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -331,4 +334,3 @@ public class SchedulerServiceImplTests
 
     #endregion
 }
-

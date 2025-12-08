@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
 using ReactiveUI.Avalonia;
 using Serilog;
-using Axorith.Telemetry;
 
 namespace Axorith.Client;
 
@@ -25,12 +26,16 @@ internal static class Program
             .Build();
 
         var telemetrySettings = new TelemetrySettings()
-            .WithEnvironmentOverrides() with { ApplicationName = "Axorith.Client" };
+                .WithEnvironmentOverrides() with
+            {
+                ApplicationName = "Axorith.Client"
+            };
 
         Telemetry = new TelemetryService(telemetrySettings);
         var telemetryLogLevel = TelemetrySettings.ResolveLogLevel(telemetrySettings.LogLevel);
-        
-        Log.Information("Telemetry (Client): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={FlushSec}",
+
+        Log.Information(
+            "Telemetry (Client): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={FlushSec}",
             telemetrySettings.Enabled,
             telemetrySettings.IsActive,
             Telemetry?.IsEnabled ?? false,
@@ -41,13 +46,15 @@ internal static class Program
 
         if (!telemetrySettings.IsActive)
         {
-            Log.Warning("Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
+            Log.Warning(
+                "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
                 telemetrySettings.Enabled,
                 telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
             Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
         }
+
         using var heartbeatCts = new CancellationTokenSource();
         Task? heartbeatTask = null;
 
@@ -64,14 +71,15 @@ internal static class Program
             .ReadFrom.Configuration(configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", "Axorith.Client")
-            .WriteTo.Sink(new TelemetrySerilogSink(Telemetry ?? new NoopTelemetryService()), restrictedToMinimumLevel: telemetryLogLevel)
+            .WriteTo.Sink(new TelemetrySerilogSink(Telemetry ?? new NoopTelemetryService()),
+                restrictedToMinimumLevel: telemetryLogLevel)
             .CreateLogger();
 
         try
         {
             Log.Information("Axorith Client starting");
-            Log.Information("Version: {Version}, OS: {OS}", 
-                typeof(Program).Assembly.GetName().Version, 
+            Log.Information("Version: {Version}, OS: {OS}",
+                typeof(Program).Assembly.GetName().Version,
                 Environment.OSVersion);
 
             Telemetry?.TrackEvent("AppStarted");
@@ -105,7 +113,7 @@ internal static class Program
 
             heartbeatCts.Cancel();
             heartbeatTask?.GetAwaiter().GetResult();
-            
+
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             Telemetry?.FlushAsync(flushCts.Token).GetAwaiter().GetResult();
             Telemetry?.DisposeAsync().GetAwaiter().GetResult();
@@ -120,7 +128,7 @@ internal static class Program
             .UseReactiveUI()
             .AfterSetup(_ =>
             {
-                Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+                Dispatcher.UIThread.UnhandledException += (_, e) =>
                 {
                     Log.Error(e.Exception, "Unhandled exception in UI thread");
                     // Don't mark as handled - let Avalonia decide whether to crash or not

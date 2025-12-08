@@ -9,15 +9,15 @@ using Serilog.Sinks.PeriodicBatching;
 namespace Axorith.Telemetry;
 
 /// <summary>
-/// Interface for PostHog sink to enable testability.
+///     Interface for PostHog sink to enable testability.
 /// </summary>
 internal interface IPostHogSink : IBatchedLogEventSink
 {
 }
 
 /// <summary>
-/// Batching sink that sends Serilog events to PostHog /batch endpoint.
-/// Includes retry logic with exponential backoff and rate limit handling.
+///     Batching sink that sends Serilog events to PostHog /batch endpoint.
+///     Includes retry logic with exponential backoff and rate limit handling.
 /// </summary>
 internal sealed class PostHogSink(
     HttpClient httpClient,
@@ -139,7 +139,10 @@ internal sealed class PostHogSink(
         await SendWithRetryAsync(payload).ConfigureAwait(false);
     }
 
-    public Task OnEmptyBatchAsync() => Task.CompletedTask;
+    public Task OnEmptyBatchAsync()
+    {
+        return Task.CompletedTask;
+    }
 
     private async Task SendWithRetryAsync(object payload)
     {
@@ -310,7 +313,8 @@ internal sealed class PostHogSink(
             return true;
         }
 
-        if (double.TryParse(trimmed, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var d))
+        if (double.TryParse(trimmed, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture,
+                out var d))
         {
             parsed = d;
             return true;

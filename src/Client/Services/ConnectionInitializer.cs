@@ -3,8 +3,8 @@ using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
-using Axorith.Telemetry;
 using Axorith.Client.ViewModels;
+using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -109,7 +109,8 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         }
     }
 
-    private async Task SubscribeToNotifications(INotificationApi api, IToastNotificationService toastService, ILogger logger)
+    private async Task SubscribeToNotifications(INotificationApi api, IToastNotificationService toastService,
+        ILogger logger)
     {
         try
         {
@@ -230,7 +231,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton<IHostController, HostController>();
         services.AddSingleton<ITokenProvider>(app.Services.GetRequiredService<ITokenProvider>());
         services.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
-        
+
         services.AddSingleton(app.Services.GetRequiredService<IToastNotificationService>());
         services.AddSingleton(app.Services.GetRequiredService<DesktopNotificationManager>());
 

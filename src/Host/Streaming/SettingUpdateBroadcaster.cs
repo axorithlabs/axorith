@@ -118,6 +118,7 @@ public class SettingUpdateBroadcaster : IDisposable
                         {
                             // CTS was disposed by replacement subscriber - ignore
                         }
+
                         return;
                     }
             }
@@ -154,6 +155,7 @@ public class SettingUpdateBroadcaster : IDisposable
                 {
                     // Ignore - already disposed
                 }
+
                 return subscriber;
             });
 
@@ -168,7 +170,7 @@ public class SettingUpdateBroadcaster : IDisposable
         finally
         {
             _subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber));
-            
+
             // Always dispose our own resources regardless of removal result
             try
             {
@@ -178,7 +180,7 @@ public class SettingUpdateBroadcaster : IDisposable
             {
                 // Already disposed (e.g., if we were replaced)
             }
-            
+
             subscriber.Queue.Writer.TryComplete();
             subscriber.Cts.Dispose();
         }
@@ -206,7 +208,7 @@ public class SettingUpdateBroadcaster : IDisposable
             }
 
             UnsubscribeModuleInstance(configuredModule.InstanceId);
-            
+
             var disposables = new CompositeDisposable();
             _moduleSubscriptions[configuredModule.InstanceId] = disposables;
 
@@ -234,12 +236,12 @@ public class SettingUpdateBroadcaster : IDisposable
     private void OnSessionStopped(Guid presetId)
     {
         _logger.LogDebug("Session stopped: {PresetId}. Cleaning up all runtime subscriptions.", presetId);
-        
+
         foreach (var key in _moduleSubscriptions.Keys.ToArray())
         {
             UnsubscribeModuleInstance(key);
         }
-        
+
         _logger.LogInformation("All setting subscriptions cleared.");
     }
 
@@ -294,7 +296,8 @@ public class SettingUpdateBroadcaster : IDisposable
 
     /// <summary>
     ///     Subscribes to a module setting's observables.
-    ///     Used internally by OnSessionStarted (with disposables list) or externally by DesignTimeSandboxManager (without list, manages own lifecycle).
+    ///     Used internally by OnSessionStarted (with disposables list) or externally by DesignTimeSandboxManager (without
+    ///     list, manages own lifecycle).
     /// </summary>
     public void SubscribeToSetting(Guid moduleInstanceId, ISetting setting, CompositeDisposable? disposables = null)
     {
@@ -392,6 +395,7 @@ public class SettingUpdateBroadcaster : IDisposable
         {
             disposables.Dispose();
         }
+
         _moduleSubscriptions.Clear();
 
         _subscribers.Clear();

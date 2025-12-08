@@ -1,8 +1,8 @@
 namespace Axorith.Shared.ApplicationLauncher;
 
 /// <summary>
-/// Timing configuration for window setup operations.
-/// Used by LauncherModuleBase to customize delays for different application types.
+///     Timing configuration for window setup operations.
+///     Used by LauncherModuleBase to customize delays for different application types.
 /// </summary>
 public sealed record WindowConfigTimings(
     int WaitForWindowTimeoutMs = 7000,

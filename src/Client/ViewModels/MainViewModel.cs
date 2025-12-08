@@ -133,6 +133,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                                 ["fatal"] = false
                             });
                         }
+
                         break;
                     case SessionEventType.ValidationWarning:
                         SessionStatus = evt.Message ?? "Session validation warning.";

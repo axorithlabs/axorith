@@ -29,7 +29,7 @@ internal sealed class AuthService : IDisposable
 
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d";
-    
+
     private static readonly int[] AllowedPorts = Enumerable.Range(8888, 8).ToArray(); // 8888 to 8895
     private const string RedirectPath = "/callback/";
 
@@ -94,7 +94,7 @@ internal sealed class AuthService : IDisposable
             {
                 return _inMemoryAccessToken;
             }
-            
+
             _inMemoryAccessToken = null;
             _accessTokenExpiresAtUtc = null;
 
@@ -207,7 +207,7 @@ internal sealed class AuthService : IDisposable
     private async Task<bool> PerformPkceLoginAsync()
     {
         var (codeVerifier, codeChallenge) = GeneratePkcePair();
-        
+
         HttpListener? listener = null;
         string? redirectUri = null;
 
@@ -219,7 +219,7 @@ internal sealed class AuthService : IDisposable
                 var tempListener = new HttpListener();
                 tempListener.Prefixes.Add(uri);
                 tempListener.Start();
-                
+
                 listener = tempListener;
                 redirectUri = uri;
                 _logger.LogInfo("Successfully bound local listener to {Uri}", uri);
@@ -293,20 +293,22 @@ internal sealed class AuthService : IDisposable
             {
                 _logger.LogInfo("Attempting to open browser for Spotify login.");
                 Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
-                _notifier.ShowToast("Your browser has been opened to log in to Spotify. Please grant access.", NotificationType.Info);
+                _notifier.ShowToast("Your browser has been opened to log in to Spotify. Please grant access.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to open browser automatically.");
-                _notifier.ShowToast($"Failed to open browser automatically. Please copy and paste this URL into your browser: {authUrl}", NotificationType.Error);
+                _notifier.ShowToast(
+                    $"Failed to open browser automatically. Please copy and paste this URL into your browser: {authUrl}",
+                    NotificationType.Error);
                 return false;
             }
-            
-            _notifier.ShowToast("Waiting for Spotify authorization in browser...", NotificationType.Info);
+
+            _notifier.ShowToast("Waiting for Spotify authorization in browser...");
 
             var contextTask = listener.GetContextAsync();
             var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
-            
+
             var completedTask = await Task.WhenAny(contextTask, timeoutTask).ConfigureAwait(false);
 
             if (completedTask == timeoutTask)
@@ -321,10 +323,10 @@ internal sealed class AuthService : IDisposable
             var error = context.Request.QueryString.Get("error");
 
             var response = context.Response;
-            var responseString = string.IsNullOrEmpty(error) 
+            var responseString = string.IsNullOrEmpty(error)
                 ? "<html><body style='background:#121212;color:#e0e0e0;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Axorith Connected!</h1><p>You can now close this tab and return to the app.</p></body></html>"
                 : $"<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Login Failed</h1><p>Spotify returned error: {error}</p></body></html>";
-            
+
             var buffer = Encoding.UTF8.GetBytes(responseString);
             response.ContentLength64 = buffer.Length;
             await response.OutputStream.WriteAsync(buffer);
@@ -332,12 +334,13 @@ internal sealed class AuthService : IDisposable
 
             if (string.IsNullOrWhiteSpace(code))
             {
-                _logger.LogError(null, "Spotify login failed or was denied by user. Error: {Error}", error ?? "Unknown error");
+                _logger.LogError(null, "Spotify login failed or was denied by user. Error: {Error}",
+                    error ?? "Unknown error");
                 _notifier.ShowToast($"Error: {error ?? "Unknown error"}", NotificationType.Error);
                 return false;
             }
 
-            try 
+            try
             {
                 var content = new FormUrlEncodedContent(new Dictionary<string, string>
                 {

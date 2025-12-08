@@ -29,7 +29,7 @@ public class HostNotifier(
                     ? message
                     : $"{title}: {message}";
 
-                await notificationBroadcaster.BroadcastAsync(combinedMessage, NotificationType.Info, "System");
+                await notificationBroadcaster.BroadcastAsync(combinedMessage, NotificationType.Info);
             }
             else
             {

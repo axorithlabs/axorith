@@ -306,7 +306,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
                 .Subscribe(v =>
                 {
                     _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v);
-                    
+
                     Dispatcher.UIThread.Post(() => _isUserEditing = false);
                 })
                 .DisposeWith(_disposables);
@@ -386,11 +386,17 @@ public class SettingViewModel : ReactiveObject, IDisposable
         var currentList = new HashSet<string>();
         if (Setting.GetCurrentValueAsObject() is List<string> list)
         {
-            foreach (var item in list) currentList.Add(item);
+            foreach (var item in list)
+            {
+                currentList.Add(item);
+            }
         }
         else if (Setting.GetCurrentValueAsObject() is string s && !string.IsNullOrEmpty(s))
         {
-            foreach (var item in s.Split('|')) currentList.Add(item);
+            foreach (var item in s.Split('|'))
+            {
+                currentList.Add(item);
+            }
         }
 
         MultiChoices.Clear();
@@ -398,12 +404,12 @@ public class SettingViewModel : ReactiveObject, IDisposable
         {
             var isSelected = currentList.Contains(choice.Key);
             var itemVm = new MultiChoiceItemViewModel(choice.Key, choice.Value, isSelected);
-            
+
             itemVm.WhenAnyValue(x => x.IsSelected)
                 .Skip(1)
                 .Subscribe(_ => OnMultiChoiceChanged())
                 .DisposeWith(_disposables);
-                
+
             MultiChoices.Add(itemVm);
         }
     }
@@ -411,9 +417,9 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private void OnMultiChoiceChanged()
     {
         var selectedKeys = MultiChoices.Where(x => x.IsSelected).Select(x => x.Key).ToList();
-        
+
         Setting.SetValueFromObject(selectedKeys);
-        
+
         var serialized = string.Join("|", selectedKeys);
         _stringUpdates.OnNext(serialized);
         _valueChangedSubject.OnNext(Unit.Default);
@@ -531,7 +537,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             SettingControlType.DirectoryPicker or
             SettingControlType.Secret;
     }
-    
+
     private bool ShouldIgnoreBroadcast()
     {
         return _isUserEditing && IsTextBasedSetting();
