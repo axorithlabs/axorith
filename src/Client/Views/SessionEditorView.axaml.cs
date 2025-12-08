@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using Axorith.Client.ViewModels;
 
 namespace Axorith.Client.Views;
 
@@ -73,5 +74,34 @@ public partial class SessionEditorView : UserControl
 
             e.Handled = true;
         }, RoutingStrategies.Tunnel);
+
+        AddHandler(GotFocusEvent, OnTextBoxGotFocus, RoutingStrategies.Bubble);
+        AddHandler(LostFocusEvent, OnTextBoxLostFocus, RoutingStrategies.Bubble);
+    }
+
+    private static void OnTextBoxGotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (e.Source is not TextBox textBox)
+        {
+            return;
+        }
+
+        if (textBox.DataContext is SettingViewModel settingVm)
+        {
+            settingVm.OnFocusGained();
+        }
+    }
+
+    private static void OnTextBoxLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (e.Source is not TextBox textBox)
+        {
+            return;
+        }
+
+        if (textBox.DataContext is SettingViewModel settingVm)
+        {
+            settingVm.OnFocusLost();
+        }
     }
 }

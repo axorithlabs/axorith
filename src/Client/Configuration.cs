@@ -73,6 +73,54 @@ public class ClientUiConfiguration
     public bool MinimizeToTrayOnClose { get; set; } = true;
 
     /// <summary>
+    ///     Stores input history for settings with HasHistory enabled (e.g., file/directory pickers).
+    ///     Key: Setting.Key, Value: List of recent values.
     /// </summary>
     public Dictionary<string, List<string>> InputHistory { get; set; } = [];
+
+    /// <summary>
+    ///     Settings input behavior configuration (debounce, throttle, etc.)
+    /// </summary>
+    public SettingsInputConfiguration SettingsInput { get; set; } = new();
+}
+
+/// <summary>
+///     Configuration for settings input behavior (debounce/throttle timings).
+/// </summary>
+public class SettingsInputConfiguration
+{
+    private const int DefaultTextDebounceMs = 500;
+    private const int MinTextDebounceMs = 100;
+    private const int MaxTextDebounceMs = 2000;
+
+    private const int DefaultNumberThrottleMs = 75;
+    private const int MinNumberThrottleMs = 0;
+    private const int MaxNumberThrottleMs = 500;
+
+    /// <summary>
+    ///     Debounce duration in milliseconds for text-based settings (Text, TextArea, FilePicker, DirectoryPicker, Secret).
+    ///     Updates are sent only after user stops typing for this duration.
+    ///     Default: 500ms. Range: 100-2000ms.
+    /// </summary>
+    public int TextDebounceMs
+    {
+        get;
+        set => field = Math.Clamp(value, MinTextDebounceMs, MaxTextDebounceMs);
+    } = DefaultTextDebounceMs;
+
+    /// <summary>
+    ///     Throttle duration in milliseconds for numeric settings.
+    ///     Default: 75ms. Range: 0-500ms.
+    /// </summary>
+    public int NumberThrottleMs
+    {
+        get;
+        set => field = Math.Clamp(value, MinNumberThrottleMs, MaxNumberThrottleMs);
+    } = DefaultNumberThrottleMs;
+
+    /// <summary>
+    ///     Whether to immediately send pending changes when a text field loses focus.
+    ///     Default: true.
+    /// </summary>
+    public bool FlushOnFocusLoss { get; set; } = true;
 }

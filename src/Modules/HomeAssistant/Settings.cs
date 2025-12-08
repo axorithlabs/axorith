@@ -58,7 +58,7 @@ internal sealed class Settings
         AccessToken = Setting.AsSecret(
             key: "AccessToken",
             label: "Access Token",
-            description: "Long-Lived Access Token. Stored securely in Windows Credential Manager."
+            description: "Long-Lived Access Token."
         );
 
         StartEntityId = Setting.AsText(
