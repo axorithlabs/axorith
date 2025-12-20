@@ -1,6 +1,6 @@
 ﻿<div align="center">
-  <img src="docs/assets/github-banner.jpg" alt="Axorith Banner" width="100%" style="border-radius: 15px; margin-bottom: 20px;">
-
+  <img src="docs/assets/github-banner.jpg" alt="Axorith Banner" width="100%">
+  <p/>
   <p>
     <a href="https://discord.gg/axorith">
       <img src="https://img.shields.io/discord/1433475181447352414?label=Join%20Discord&logo=discord&style=for-the-badge&color=5865F2" alt="Discord">
