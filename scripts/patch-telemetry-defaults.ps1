@@ -31,5 +31,5 @@ if (-not $apiKeyRegex.IsMatch($content)) {
 $content = $apiKeyRegex.Replace($content, $apiKeyReplacement, 1)
 
 Set-Content -Path $telemetrySettingsPath -Value $content -Encoding UTF8
-Write-Host "Patched TelemetrySettings.cs with PostHog defaults (API key and optional host)." -ForegroundColor Green
+Write-Host "Patched TelemetrySettings.cs with PostHog defaults (API key)." -ForegroundColor Green
 

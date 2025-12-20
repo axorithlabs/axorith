@@ -71,7 +71,7 @@ function Sign-Executable {
             "/fd", "SHA256",
             "/tr", $timestampServer,
             "/td", "SHA256",
-            "/d", "Axorith Productivity OS",
+            "/d", "Axorith Digital Life System",
             "/du", "https://axorith.com"
         )
 

@@ -3,7 +3,7 @@
   !define PRODUCT_VERSION "0.0.0-dev"
 !endif
 !define PRODUCT_PUBLISHER "Axorith Labs"
-!define PRODUCT_DESCRIPTION "Productivity OS that helps you automate your focus rituals"
+!define PRODUCT_DESCRIPTION "Digital Life System that helps you automate your focus rituals"
 !define PRODUCT_COPYRIGHT "Copyright (C) 2025 Axorith Labs"
 
 !ifndef BUILD_ROOT

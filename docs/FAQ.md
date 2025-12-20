@@ -4,7 +4,7 @@
 
 **Q: What is Axorith?**
 
-A: Axorith is a Productivity OS that helps you automate your focus rituals. You can create "Session Presets" that, with one click, launch your apps, block distracting sites, start your music, and set up your entire digital environment for a specific task (like coding, writing, or gaming).
+A: Axorith is a Digital Life System that helps you automate your focus rituals. You can create "Session Presets" that, with one click, launch your apps, block distracting sites, start your music, and set up your entire digital environment for a specific task (like coding, writing, or gaming).
 
 **Q: Is Axorith free?**
 

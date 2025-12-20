@@ -2,7 +2,7 @@
 
 Licensor: Axorith Labs
 
-Licensed Work: Axorith ("Productivity OS")
+Licensed Work: Axorith ("Digital Life System")
 
 License Date: 2025-10-18
 
