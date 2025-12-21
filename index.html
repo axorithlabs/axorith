@@ -72,12 +72,6 @@
 
     <!-- Hero Section -->
     <section class="hero">
-        <div class="hero-bg">
-            <video autoplay loop muted playsinline poster="assets/poster.png">
-                <source src="assets/video.mp4" type="video/mp4">
-            </video>
-            <div class="hero-overlay"></div>
-        </div>
         <div class="hero-content">
             <div class="hero-badge">
                 <span class="badge-dot"></span>
@@ -289,19 +283,37 @@
                     </li>
                 </ul>
                 
-                <div class="founding-slots">
-                    <div class="slots-bar">
-                        <div class="slots-fill" style="width: 0%"></div>
-                    </div>
-                    <span class="slots-text"><strong>100</strong> of 100 slots available</span>
+                <!-- Waitlist Form -->
+                <div class="waitlist-section">
+                    <h3 class="waitlist-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        Get notified on launch
+                    </h3>
+                    <p class="waitlist-subtitle">Join the waitlist and be the first to know when Founding Member slots open</p>
+                    <form id="waitlist-form" class="waitlist-form">
+                        <div class="form-group">
+                            <input 
+                                type="email" 
+                                name="email" 
+                                id="waitlist-email"
+                                placeholder="your@email.com" 
+                                required
+                                autocomplete="email"
+                            >
+                            <button type="submit" class="btn btn-waitlist">
+                                <span class="btn-text">Join Waitlist</span>
+                                <span class="btn-loading">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2v4m0 12v4m-8-10h4m12 0h4m-5.66-5.66l-2.83 2.83m-5.66 5.66l-2.83 2.83m11.32 0l-2.83-2.83m-5.66-5.66l-2.83-2.83"/>
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                        <p id="form-status" class="form-status"></p>
+                    </form>
                 </div>
-                
-                <button class="btn btn-founding disabled" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                    </svg>
-                    Available January 9, 2026
-                </button>
                 
                 <p class="founding-note">The app is free. This is for those who want to support the project and get premium perks.</p>
             </div>

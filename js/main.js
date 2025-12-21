@@ -98,4 +98,96 @@ document.addEventListener('DOMContentLoaded', function() {
         el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
         observer.observe(el);
     });
+
+    // Waitlist Form Handler
+    const waitlistForm = document.getElementById('waitlist-form');
+    const formStatus = document.getElementById('form-status');
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKVLIv9OxIthnYEZJszEypxSeTMLGNX6me_neaJLQz-pUX53nsmTaz8vk0PCKkSkRadw/exec';
+    const WAITLIST_KEY = 'axorith_waitlist_joined';
+
+    // Check if user already joined waitlist
+    if (waitlistForm && localStorage.getItem(WAITLIST_KEY)) {
+        waitlistForm.innerHTML = `
+            <div class="success-message">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <p>You're on the list!<br><span>See you on January 9th.</span></p>
+            </div>
+        `;
+    } else if (waitlistForm) {
+        waitlistForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = waitlistForm.querySelector('button[type="submit"]');
+            const emailInput = waitlistForm.querySelector('input[name="email"]');
+            const email = emailInput.value.trim();
+
+            // Basic email validation
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showStatus('Please enter a valid email address', 'error');
+                emailInput.focus();
+                return;
+            }
+
+            // Set loading state
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            formStatus.textContent = '';
+            formStatus.className = 'form-status';
+
+            try {
+                const formData = new FormData();
+                formData.append('email', email);
+
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.result === 'success') {
+                    // Save to localStorage
+                    localStorage.setItem(WAITLIST_KEY, email);
+                    
+                    // Success state
+                    waitlistForm.classList.add('success');
+                    showStatus("You're on the list! We'll notify you on January 9th.", 'success');
+                    emailInput.value = '';
+                    
+                    // Hide form after success
+                    setTimeout(() => {
+                        waitlistForm.innerHTML = `
+                            <div class="success-message">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                                <p>You're on the list!<br><span>See you on January 9th.</span></p>
+                            </div>
+                        `;
+                    }, 1500);
+                } else {
+                    showStatus(data.message || 'Something went wrong. Please try again.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('loading');
+                }
+            } catch (error) {
+                console.error('Waitlist form error:', error);
+                showStatus('Connection error. Please try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+            }
+        });
+    }
+
+    function showStatus(message, type) {
+        const formStatus = document.getElementById('form-status');
+        if (formStatus) {
+            formStatus.textContent = message;
+            formStatus.className = `form-status ${type}`;
+        }
+    }
 });
