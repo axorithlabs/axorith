@@ -1171,3 +1171,50 @@ body {
         padding: 14px 24px;
     }
 }
+
+/* Mobile adjustments for countdown timer */
+@media (max-width: 768px) {
+    .founding-countdown {
+        padding: 16px;
+    }
+
+    .countdown-timer {
+        gap: 4px;
+    }
+
+    .countdown-item {
+        min-width: 48px;
+    }
+
+    .countdown-value {
+        font-size: 1.75rem;
+    }
+
+    .countdown-separator {
+        font-size: 1.5rem;
+        margin-bottom: 12px;
+    }
+
+    .countdown-unit {
+        font-size: 0.625rem;
+    }
+}
+
+@media (max-width: 400px) {
+    .countdown-timer {
+        gap: 2px;
+    }
+
+    .countdown-item {
+        min-width: 40px;
+    }
+
+    .countdown-value {
+        font-size: 1.5rem;
+    }
+
+    .countdown-separator {
+        font-size: 1.25rem;
+        margin-bottom: 10px;
+    }
+}
