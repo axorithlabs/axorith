@@ -73,7 +73,7 @@ This section shows how the **projects actually depend on each other** according 
                              |                            |
    +-------------------------+----------------+     +-----+-----------------+
    |        Axorith.Modules (plugins)         |     |      Axorith.Sdk      |
-   |  (ApplicationLauncher, JBIDELauncher,    |---->|  (IModule/ISetting/    |
+   |  (ApplicationLauncher, JetBrainsIDE,    |---->|  (IModule/ISetting/    |
    |   SiteBlocker, SpotifyPlayer, ...)       |     |   IAction contracts,   |
    |                                         |---->|   ValidationResult,    |
    |  depend on:                             |     |   Platform, etc.)      |

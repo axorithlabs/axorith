@@ -1,0 +1,11 @@
+﻿{
+  "id": "6072c5d0-68eb-483c-b2c5-d068eb783c9e",
+  "name": "Browser",
+  "version": "1.0.0",
+  "description": "Launches any installed browser with optional URL and profile support.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.Browser.dll"
+}

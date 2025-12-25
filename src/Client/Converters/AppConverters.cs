@@ -37,4 +37,16 @@ public static class AppConverters
 
     public static readonly IValueConverter BoolToDoubleConverter =
         new FuncValueConverter<bool, double>(v => v ? 1.0 : 0.0);
+
+    /// <summary>
+    ///     Converts bool (is24HourFormat) to minimum hour value: 0 for 24-hour, 1 for 12-hour.
+    /// </summary>
+    public static readonly IValueConverter BoolToMinHour =
+        new FuncValueConverter<bool, int>(is24Hour => is24Hour ? 0 : 1);
+
+    /// <summary>
+    ///     Converts bool (is24HourFormat) to maximum hour value: 23 for 24-hour, 12 for 12-hour.
+    /// </summary>
+    public static readonly IValueConverter BoolToMaxHour =
+        new FuncValueConverter<bool, int>(is24Hour => is24Hour ? 23 : 12);
 }

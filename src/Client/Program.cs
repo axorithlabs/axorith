@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -25,10 +26,14 @@ internal static class Program
             .AddCommandLine(args)
             .Build();
 
+        // Load telemetry setting from client settings
+        var telemetryEnabled = LoadTelemetryEnabledSetting();
+
         var telemetrySettings = new TelemetrySettings()
                 .WithEnvironmentOverrides() with
             {
-                ApplicationName = "Axorith.Client"
+                ApplicationName = "Axorith.Client",
+                Enabled = telemetryEnabled
             };
 
         Telemetry = new TelemetryService(telemetrySettings);
@@ -52,7 +57,11 @@ internal static class Program
                 telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
-            Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
+            
+            if (!telemetrySettings.Enabled)
+            {
+                Log.Information("Telemetry is disabled by user preference in Settings");
+            }
         }
 
         using var heartbeatCts = new CancellationTokenSource();
@@ -206,6 +215,40 @@ internal static class Program
         finally
         {
             timer.Dispose();
+        }
+    }
+
+    /// <summary>
+    ///     Loads the telemetry enabled setting from clientsettings.json.
+    ///     Returns true (default) if file doesn't exist or can't be read.
+    /// </summary>
+    private static bool LoadTelemetryEnabledSetting()
+    {
+        try
+        {
+            var settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
+            if (!File.Exists(settingsPath))
+            {
+                return true; // Default: enabled
+            }
+
+            var json = File.ReadAllText(settingsPath);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return true;
+            }
+
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("TelemetryEnabled", out var prop))
+            {
+                return prop.GetBoolean();
+            }
+
+            return true; // Default: enabled
+        }
+        catch
+        {
+            return true; // Default: enabled on error
         }
     }
 }

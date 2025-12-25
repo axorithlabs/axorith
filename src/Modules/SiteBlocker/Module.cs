@@ -49,9 +49,13 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
 
     public IReadOnlyList<IAction> GetActions()
     {
-        var installAction = Action.Create("InstallFirefoxExtension", "Install Firefox Extension");
-        installAction.OnInvokeAsync(OpenFirefoxExtensionPageAsync);
-        return [installAction];
+        var installFirefoxAction = Action.Create("InstallFirefoxExtension", "Install Firefox Extension");
+        installFirefoxAction.OnInvokeAsync(OpenFirefoxExtensionPageAsync);
+        
+        var installChromeAction = Action.Create("InstallChromeExtension", "Install Chrome Extension");
+        installChromeAction.OnInvokeAsync(OpenChromeExtensionPageAsync);
+        
+        return [installFirefoxAction, installChromeAction];
     }
 
     /// <inheritdoc />
@@ -132,10 +136,13 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
         {
             logger.LogError(ex,
                 "Could not connect to the Axorith Shim process via Named Pipe. Is the browser extension installed and running?");
+            notifier.ShowToast("Site Blocker: Browser extension not connected. Install extension and restart browser.",
+                NotificationType.Error);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to send command to Shim via Named Pipe.");
+            notifier.ShowToast("Site Blocker: Failed to communicate with browser extension.", NotificationType.Error);
         }
     }
 
@@ -163,6 +170,30 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
         await Task.Delay(100);
     }
 
+    /// <summary>
+    ///     Opens the Chrome extension installation page in the default browser
+    /// </summary>
+    private async Task OpenChromeExtensionPageAsync()
+    {
+        const string chromeExtensionUrl = "https://chromewebstore.google.com/detail/axorith-site-blocker/";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(chromeExtensionUrl) { UseShellExecute = true });
+
+            notifier.ShowToast("Chrome extension page opened in your browser", NotificationType.Success);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to open Chrome extension page in browser");
+            notifier.ShowToast("Failed to open browser. Please manually visit: " + chromeExtensionUrl,
+                NotificationType.Error);
+        }
+
+        // Small delay to ensure the operation completes
+        await Task.Delay(100);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -173,33 +204,39 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
 
         logger.LogWarning(
             "Disposing module while sites are still blocked. Attempting to send final unblock command.");
-        var message = new { command = "unblock" };
 
-        try
+        var hadSites = _activeSiteList.Count > 0;
+        _activeSiteList.Clear();
+
+        if (!hadSites)
         {
-            _ = Task.Run(async () =>
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
             {
-                try
-                {
-                    var task = WriteToPipeAsync(message);
-                    if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false) != task)
-                    {
-                        logger.LogWarning("Unblock command timed out during disposal");
-                    }
-                }
-                catch (Exception)
-                {
-                    logger.LogWarning("Failed to send unblock command during disposal");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to send unblock command during disposal");
-        }
-        finally
-        {
-            _activeSiteList.Clear();
-        }
+                var message = new { command = "unblock" };
+                await using var pipeClient =
+                    new NamedPipeClientStream(".", _pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await pipeClient.ConnectAsync(cts.Token);
+
+                var json = JsonSerializer.Serialize(message);
+                var buffer = Encoding.UTF8.GetBytes(json);
+                await pipeClient.WriteAsync(buffer, cts.Token);
+                await pipeClient.FlushAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout - expected during disposal
+            }
+            catch
+            {
+                // Swallow all exceptions during disposal cleanup
+            }
+        });
     }
 }

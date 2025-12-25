@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Client</AssemblyName>
         <RootNamespace>Axorith.Client</RootNamespace>
         
-        <Description>UI client for Axorith OS.</Description>
+        <Description>UI client for Axorith.</Description>
         
         <OutputType>WinExe</OutputType>
         <ApplicationManifest>app.manifest</ApplicationManifest>

@@ -70,7 +70,10 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
             }
 
             var daysStr = days.Count == 7 ? "Every day" : string.Join(", ", days);
-            var result = $"{Time:hh\\:mm} • {daysStr}";
+            var timeStr = Use24HourFormat 
+                ? $"{Time:hh\\:mm}" 
+                : FormatTime12Hour(Time);
+            var result = $"{timeStr} • {daysStr}";
 
             if (!AutoStopDuration.HasValue || AutoStopDuration.Value <= TimeSpan.Zero)
             {
@@ -93,15 +96,150 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
         }
     }
 
+    private static string FormatTime12Hour(TimeSpan time)
+    {
+        var hours = time.Hours;
+        var minutes = time.Minutes;
+        var period = hours >= 12 ? "PM" : "AM";
+        var displayHours = hours % 12;
+        if (displayHours == 0) displayHours = 12;
+        return $"{displayHours}:{minutes:D2} {period}";
+    }
+
     public TimeSpan Time
     {
         get;
         set
         {
             this.RaiseAndSetIfChanged(ref field, value);
+            UpdateTimeInputs();
             this.RaisePropertyChanged(nameof(Description));
         }
     } = new(9, 0, 0);
+
+    private decimal? _hours = 9;
+    public decimal? Hours
+    {
+        get => _hours;
+        set
+        {
+            if (_hours != value)
+            {
+                this.RaiseAndSetIfChanged(ref _hours, value);
+                this.RaisePropertyChanged(nameof(HasTimeError));
+                if (value.HasValue)
+                {
+                    UpdateTimeFromInputs();
+                }
+            }
+        }
+    }
+
+    private decimal? _minutes = 0;
+    public decimal? Minutes
+    {
+        get => _minutes;
+        set
+        {
+            if (_minutes != value)
+            {
+                this.RaiseAndSetIfChanged(ref _minutes, value);
+                this.RaisePropertyChanged(nameof(HasTimeError));
+                if (value.HasValue)
+                {
+                    UpdateTimeFromInputs();
+                }
+            }
+        }
+    }
+
+    public bool HasTimeError => !_hours.HasValue || !_minutes.HasValue;
+
+    private bool _isAm = true;
+    public bool IsAm
+    {
+        get => _isAm;
+        set
+        {
+            if (_isAm != value)
+            {
+                this.RaiseAndSetIfChanged(ref _isAm, value);
+                UpdateTimeFromInputs();
+            }
+        }
+    }
+
+    private bool _use24HourFormat = true;
+    public bool Use24HourFormat
+    {
+        get => _use24HourFormat;
+        set
+        {
+            if (_use24HourFormat != value)
+            {
+                this.RaiseAndSetIfChanged(ref _use24HourFormat, value);
+                UpdateTimeInputs();
+                this.RaisePropertyChanged(nameof(Description));
+            }
+        }
+    }
+
+    private bool _isUpdatingTime;
+
+    private void UpdateTimeInputs()
+    {
+        if (_isUpdatingTime) return;
+        _isUpdatingTime = true;
+        try
+        {
+            if (Use24HourFormat)
+            {
+                _hours = Time.Hours;
+            }
+            else
+            {
+                var hours = Time.Hours;
+                _isAm = hours < 12;
+                var displayHours = hours % 12;
+                _hours = displayHours == 0 ? 12 : displayHours;
+            }
+            _minutes = Time.Minutes;
+            this.RaisePropertyChanged(nameof(Hours));
+            this.RaisePropertyChanged(nameof(Minutes));
+            this.RaisePropertyChanged(nameof(IsAm));
+            this.RaisePropertyChanged(nameof(HasTimeError));
+        }
+        finally
+        {
+            _isUpdatingTime = false;
+        }
+    }
+
+    private void UpdateTimeFromInputs()
+    {
+        if (_isUpdatingTime) return;
+        if (!_hours.HasValue || !_minutes.HasValue) return;
+        
+        _isUpdatingTime = true;
+        try
+        {
+            int hours;
+            if (Use24HourFormat)
+            {
+                hours = (int)_hours.Value;
+            }
+            else
+            {
+                hours = (int)_hours.Value % 12;
+                if (!_isAm) hours += 12;
+            }
+            Time = new TimeSpan(hours, (int)_minutes.Value, 0);
+        }
+        finally
+        {
+            _isUpdatingTime = false;
+        }
+    }
 
     public bool RunOnMonday
     {
@@ -205,29 +343,33 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
         }
     }
 
-    private int _autoStopHours;
+    private decimal? _autoStopHours = 0;
 
-    public int AutoStopHours
+    public decimal? AutoStopHours
     {
         get => _autoStopHours;
         set
         {
             this.RaiseAndSetIfChanged(ref _autoStopHours, value);
+            this.RaisePropertyChanged(nameof(HasAutoStopError));
             UpdateAutoStopDuration();
         }
     }
 
-    private int _autoStopMinutes;
+    private decimal? _autoStopMinutes = 0;
 
-    public int AutoStopMinutes
+    public decimal? AutoStopMinutes
     {
         get => _autoStopMinutes;
         set
         {
             this.RaiseAndSetIfChanged(ref _autoStopMinutes, value);
+            this.RaisePropertyChanged(nameof(HasAutoStopError));
             UpdateAutoStopDuration();
         }
     }
+
+    public bool HasAutoStopError => _isAutoStopEnabled && (!_autoStopHours.HasValue || !_autoStopMinutes.HasValue);
 
     private bool _isAutoStopEnabled;
 
@@ -237,6 +379,7 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
         set
         {
             this.RaiseAndSetIfChanged(ref _isAutoStopEnabled, value);
+            this.RaisePropertyChanged(nameof(HasAutoStopError));
             if (!value)
             {
                 AutoStopDuration = null;
@@ -250,9 +393,10 @@ public class ScheduleTriggerViewModel(SessionEditorViewModel? parent = null) : T
 
     private void UpdateAutoStopDuration()
     {
-        if (_isAutoStopEnabled && (_autoStopHours > 0 || _autoStopMinutes > 0))
+        if (_isAutoStopEnabled && _autoStopHours.HasValue && _autoStopMinutes.HasValue && 
+            ((int)_autoStopHours.Value > 0 || (int)_autoStopMinutes.Value > 0))
         {
-            AutoStopDuration = TimeSpan.FromHours(_autoStopHours) + TimeSpan.FromMinutes(_autoStopMinutes);
+            AutoStopDuration = TimeSpan.FromHours((int)_autoStopHours.Value) + TimeSpan.FromMinutes((int)_autoStopMinutes.Value);
         }
         else if (!_isAutoStopEnabled)
         {
@@ -498,7 +642,7 @@ public class SessionEditorViewModel : ReactiveObject
 
     private void Validate()
     {
-        ErrorMessage = !string.IsNullOrWhiteSpace(Name) ? string.Empty : "Preset name cannot be empty.";
+        ErrorMessage = !string.IsNullOrWhiteSpace(Name) ? string.Empty : "Session name cannot be empty.";
     }
 
     private async Task InitializeAsync()
@@ -606,6 +750,7 @@ public class SessionEditorViewModel : ReactiveObject
                     var trigger = new ScheduleTriggerViewModel(this)
                     {
                         ExistingScheduleId = s.Id,
+                        Use24HourFormat = s.Use24HourFormat,
                         Time = s.RecurringTime ?? TimeSpan.Zero,
                         RunOnMonday = s.DaysOfWeek.Contains(DayOfWeek.Monday),
                         RunOnTuesday = s.DaysOfWeek.Contains(DayOfWeek.Tuesday),
@@ -690,7 +835,7 @@ public class SessionEditorViewModel : ReactiveObject
     {
         if (string.IsNullOrWhiteSpace(Name))
         {
-            ErrorMessage = "Preset name cannot be empty.";
+            ErrorMessage = "Session name cannot be empty.";
             return;
         }
 
@@ -701,11 +846,14 @@ public class SessionEditorViewModel : ReactiveObject
         }
 
         ErrorMessage = string.Empty;
-        _preset.Modules = ConfiguredModules.Select(vm =>
-        {
-            vm.SaveChangesToModel();
-            return vm.Model;
-        }).ToList();
+        _preset.Modules =
+        [
+            .. ConfiguredModules.Select(vm =>
+            {
+                vm.SaveChangesToModel();
+                return vm.Model;
+            })
+        ];
         _preset.Name = Name;
 
         try
@@ -774,7 +922,8 @@ public class SessionEditorViewModel : ReactiveObject
                     RecurringTime = trigger.Time,
                     DaysOfWeek = days,
                     AutoStopDuration = trigger.AutoStopDuration,
-                    NextPresetId = trigger.NextActionType == "Start another session" ? trigger.NextPresetId : null
+                    NextPresetId = trigger.NextActionType == "Start another session" ? trigger.NextPresetId : null,
+                    Use24HourFormat = trigger.Use24HourFormat
                 };
 
                 if (!trigger.ExistingScheduleId.HasValue && presetSchedules.Count > 0)

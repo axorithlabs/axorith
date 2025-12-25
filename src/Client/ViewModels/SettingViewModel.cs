@@ -479,7 +479,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        _uiConfig.InputHistory[Setting.Key] = History.ToList();
+        _uiConfig.InputHistory[Setting.Key] = [.. History];
         _uiSettingsStore.Save(_uiConfig);
     }
 
@@ -521,7 +521,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             History.RemoveAt(History.Count - 1);
         }
 
-        _uiConfig.InputHistory[Setting.Key] = History.ToList();
+        _uiConfig.InputHistory[Setting.Key] = [.. History];
         _uiSettingsStore.Save(_uiConfig);
     }
 

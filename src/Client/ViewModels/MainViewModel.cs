@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
@@ -92,6 +93,16 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
+    /// <summary>
+    ///     Command to open Discord invite link.
+    /// </summary>
+    public ICommand JoinDiscordCommand { get; }
+
+    /// <summary>
+    ///     Command to open the settings view.
+    /// </summary>
+    public ICommand OpenSettingsCommand { get; }
+
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IServiceProvider serviceProvider)
     {
@@ -174,6 +185,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         StopSessionCommand = ReactiveCommand.CreateFromTask(StopCurrentSessionAsync, canStopSession);
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
+        JoinDiscordCommand = ReactiveCommand.Create(OpenDiscordInvite);
+        OpenSettingsCommand = ReactiveCommand.Create(OpenSettings);
     }
 
     /// <summary>
@@ -271,6 +284,24 @@ public class MainViewModel : ReactiveObject, IDisposable
         _shell.NavigateTo(editor);
     }
 
+    private void OpenDiscordInvite()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://discord.gg/axorith") { UseShellExecute = true });
+        }
+        catch
+        {
+            // Ignore if browser fails to open
+        }
+    }
+
+    private void OpenSettings()
+    {
+        var settings = _serviceProvider.GetRequiredService<SettingsViewModel>();
+        _shell.NavigateTo(settings);
+    }
+
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
     {
         try
@@ -312,7 +343,6 @@ public class MainViewModel : ReactiveObject, IDisposable
             var presetData = fullPresets.Select(p => new Dictionary<string, object?>
             {
                 ["id"] = p.Id.ToString(),
-                ["name"] = TelemetryGuard.SafeString(p.Name),
                 ["version"] = p.Version,
                 ["moduleCount"] = p.Modules.Count,
                 ["modules"] = p.Modules.Select(m =>
@@ -323,10 +353,8 @@ public class MainViewModel : ReactiveObject, IDisposable
                         ["instanceId"] = m.InstanceId.ToString(),
                         ["moduleId"] = m.ModuleId.ToString(),
                         ["moduleName"] = TelemetryGuard.SafeString(moduleName),
-                        ["customName"] = TelemetryGuard.SafeString(m.CustomName),
                         ["startDelayMs"] = (long)m.StartDelay.TotalMilliseconds,
-                        ["settingsCount"] = m.Settings.Count,
-                        ["settingKeys"] = m.Settings.Keys.Take(32).ToArray()
+                        ["settingsCount"] = m.Settings.Count
                     };
                 }).ToArray()
             }).ToArray();

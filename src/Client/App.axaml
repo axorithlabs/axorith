@@ -13,6 +13,9 @@
         <DataTemplate DataType="{x:Type vm:SessionEditorViewModel}">
             <views:SessionEditorView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+            <views:SettingsView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:LoadingViewModel}">
             <views:LoadingView/>
         </DataTemplate>
@@ -30,44 +33,6 @@
         <SolidColorBrush x:Key="BorderBrush" Color="#333333" />
         <Color x:Key="SystemAccentColor">#2563EB</Color>
         <SolidColorBrush x:Key="SystemAccentBrush" Color="{StaticResource SystemAccentColor}"/>
-        
-        <ControlTheme x:Key="ButtonRadioButton" TargetType="RadioButton">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#888"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="CornerRadius" Value="16"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Border Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{TemplateBinding CornerRadius}">
-                        <ContentPresenter Name="PART_ContentPresenter"
-                                          Content="{TemplateBinding Content}"
-                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                          Margin="{TemplateBinding Padding}"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
-                    </Border>
-                </ControlTemplate>
-            </Setter>
-            
-            <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="#1A1A1A"/>
-                <Setter Property="Foreground" Value="#E0E0E0"/>
-            </Style>
-            
-            <Style Selector="^:checked">
-                <Setter Property="Background" Value="#222"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="BorderBrush" Value="#444"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-            </Style>
-        </ControlTheme>
     </Application.Resources>
 
     <Application.Styles>
@@ -512,6 +477,37 @@
         </Style>
         <Style Selector="Button.delete-btn:pointerover">
             <Setter Property="Opacity" Value="1.0"/>
+        </Style>
+
+        <Style Selector="ToggleSwitch">
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="26"/>
+        </Style>
+        <Style Selector="ToggleSwitch /template/ Border#SwitchKnobBounds">
+            <Setter Property="Background" Value="#333"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="CornerRadius" Value="13"/>
+        </Style>
+        <Style Selector="ToggleSwitch /template/ Canvas#PART_SwitchKnob > Grid#PART_MovingKnobs > Grid#SwitchKnobOn > Ellipse#SwitchKnobOnBackground">
+            <Setter Property="Fill" Value="White"/>
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+        </Style>
+        <Style Selector="ToggleSwitch /template/ Canvas#PART_SwitchKnob > Grid#PART_MovingKnobs > Grid#SwitchKnobOff > Ellipse#SwitchKnobOffBackground">
+            <Setter Property="Fill" Value="#888"/>
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+        </Style>
+        <Style Selector="ToggleSwitch:checked /template/ Border#SwitchKnobBounds">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}"/>
+        </Style>
+        <Style Selector="ToggleSwitch:pointerover /template/ Border#SwitchKnobBounds">
+            <Setter Property="BorderBrush" Value="#666"/>
+        </Style>
+        <Style Selector="ToggleSwitch:checked:pointerover /template/ Border#SwitchKnobBounds">
+            <Setter Property="BorderBrush" Value="#3B82F6"/>
         </Style>
 
     </Application.Styles>

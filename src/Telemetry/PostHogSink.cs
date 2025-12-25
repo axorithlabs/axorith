@@ -136,7 +136,7 @@ internal sealed class PostHogSink(
             batch = events
         };
 
-        await SendWithRetryAsync(payload).ConfigureAwait(false);
+        await SendWithRetryAsync(payload, events.Count).ConfigureAwait(false);
     }
 
     public Task OnEmptyBatchAsync()
@@ -144,7 +144,7 @@ internal sealed class PostHogSink(
         return Task.CompletedTask;
     }
 
-    private async Task SendWithRetryAsync(object payload)
+    private async Task SendWithRetryAsync(object payload, int eventCount)
     {
         Exception? lastException = null;
 
@@ -158,11 +158,17 @@ internal sealed class PostHogSink(
                 request.Headers.TryAddWithoutValidation("True-Client-IP", "0.0.0.0");
                 request.Content = JsonContent.Create(payload, options: _jsonOptions);
 
+                System.Diagnostics.Debug.WriteLine($"PostHog: Sending {eventCount} events to {BuildUri()} (attempt {attempt + 1})");
+
                 using var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+
+                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                System.Diagnostics.Debug.WriteLine($"PostHog: Response {(int)response.StatusCode} {response.StatusCode}: {responseBody}");
 
                 // Handle rate limiting (429)
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
+                    System.Diagnostics.Debug.WriteLine($"PostHog: Rate limited, will retry");
                     var delay = GetRetryAfterDelay(response) ?? _retryOptions.GetDelay(attempt);
                     if (attempt < _retryOptions.MaxRetryAttempts)
                     {
@@ -174,6 +180,7 @@ internal sealed class PostHogSink(
                 // Handle transient server errors (5xx)
                 if (IsTransientError(response.StatusCode))
                 {
+                    System.Diagnostics.Debug.WriteLine($"PostHog: Transient error {response.StatusCode}, will retry");
                     if (attempt < _retryOptions.MaxRetryAttempts)
                     {
                         var delay = _retryOptions.GetDelay(attempt);
@@ -182,11 +189,21 @@ internal sealed class PostHogSink(
                     }
                 }
 
+                if (response.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"PostHog: Successfully sent {eventCount} events");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"PostHog: Failed with {response.StatusCode}: {responseBody}");
+                }
+
                 response.EnsureSuccessStatusCode();
                 return; // Success
             }
             catch (HttpRequestException ex)
             {
+                System.Diagnostics.Debug.WriteLine($"PostHog: HttpRequestException on attempt {attempt + 1}: {ex.Message}");
                 lastException = ex;
                 if (attempt < _retryOptions.MaxRetryAttempts)
                 {
@@ -196,6 +213,7 @@ internal sealed class PostHogSink(
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
             {
+                System.Diagnostics.Debug.WriteLine($"PostHog: Timeout on attempt {attempt + 1}");
                 lastException = ex;
                 if (attempt < _retryOptions.MaxRetryAttempts)
                 {
@@ -207,6 +225,7 @@ internal sealed class PostHogSink(
 
         if (lastException is not null)
         {
+            System.Diagnostics.Debug.WriteLine($"PostHog: All retries exhausted, throwing: {lastException.Message}");
             throw lastException;
         }
     }

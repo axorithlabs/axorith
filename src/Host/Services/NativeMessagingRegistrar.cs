@@ -10,7 +10,7 @@ public class NativeMessagingRegistrar(
     INativeMessagingManager manager,
     ILogger<NativeMessagingRegistrar> logger) : IHostedService
 {
-    private const string ExtensionId = "site-blocker-firefox@axorithlabs.com";
+    private const string FirefoxExtensionId = "site-blocker-firefox@axorithlabs.com";
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -54,6 +54,22 @@ public class NativeMessagingRegistrar(
 
         logger.LogInformation("Found Shim executable at: {Path}", shimPath);
 
-        manager.RegisterFirefoxHost(hostName, shimPath, [ExtensionId]);
+        // Register for Firefox
+        manager.RegisterFirefoxHost(hostName, shimPath, [FirefoxExtensionId]);
+        
+        // Register for Chrome/Chromium-based browsers
+        // Note: The extension ID will be determined when the extension is loaded in Chrome.
+        // For unpacked extensions, Chrome generates an ID based on the extension's path.
+        // For published extensions, the ID is fixed by Chrome Web Store.
+        // Using wildcard pattern to allow any extension origin during development.
+        // In production, replace with the actual Chrome Web Store extension ID.
+        #if DEBUG
+        // Allow all extensions during development
+        manager.RegisterChromeHost(hostName, shimPath, ["chrome-extension://*/*"]);
+        #else
+        // TODO: Replace with actual Chrome Web Store extension ID after publishing
+        // Format: "chrome-extension://[32-character-extension-id]/"
+        manager.RegisterChromeHost(hostName, shimPath, ["chrome-extension://*/*"]);
+        #endif
     }
 }

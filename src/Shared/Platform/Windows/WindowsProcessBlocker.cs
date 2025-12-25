@@ -18,20 +18,17 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
     private readonly Lock _lock = new();
 
-    // ETW components
     private TraceEventSession? _etwSession;
     private Task? _etwTask;
 
-    // Non-Admin components
     private CancellationTokenSource? _pollingCts;
     private IntPtr _winEventHook = IntPtr.Zero;
-    private WindowApi.WinEventDelegate? _winEventDelegate; // Keep reference to prevent GC
+    private WindowApi.WinEventDelegate? _winEventDelegate;
 
     private HashSet<string> _targetProcessNames = [];
 
     public event Action<string>? ProcessBlocked;
 
-    // Hardcoded safe list to prevent accidental blocking of critical components
     private static readonly HashSet<string> SafeList = new(StringComparer.OrdinalIgnoreCase)
     {
         "Axorith.Client", "Axorith.Host", "Axorith.Shim", "Axorith.Core",
@@ -45,8 +42,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             _targetProcessNames = NormalizeNames(processNames);
             logger.LogInformation("Updating blocker rules. Targets: {Count}", _targetProcessNames.Count);
 
-            // Initial cleanup of already running processes
-            // Returns list of killed processes for notification
             var killed = ScanAndKillByList(initialScan: true);
 
             StartMonitoring();
@@ -291,7 +286,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
         lock (_lock)
         {
-            targets = _targetProcessNames.ToList();
+            targets = [.. _targetProcessNames];
         }
 
         foreach (var target in targets)
@@ -311,7 +306,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             }
         }
 
-        return killedNames.ToList();
+        return [.. killedNames];
     }
 
     private bool ShouldBlock(string normalizedName)
@@ -400,12 +395,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private static string NormalizeName(string name)
     {
-        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-        {
-            return Path.GetFileNameWithoutExtension(name);
-        }
-
-        return name;
+        return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileNameWithoutExtension(name) : name;
     }
 
     public void Dispose()

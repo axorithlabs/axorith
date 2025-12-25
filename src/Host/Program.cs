@@ -50,7 +50,7 @@ try
         "Telemetry (Host): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={Flush}",
         telemetrySettings.Enabled,
         telemetrySettings.IsActive,
-        telemetry?.IsEnabled ?? false,
+        telemetry?.IsEnabled,
         telemetrySettings.PostHogHost,
         telemetrySettings.BatchSize,
         telemetrySettings.QueueLimit,
@@ -274,6 +274,13 @@ try
     Log.Information("Axorith.Host started successfully on {Address}:{Port}",
         config.Grpc.BindAddress,
         boundPort > 0 ? boundPort : "Unknown");
+
+    // Log telemetry status after Serilog is fully configured
+    Log.Information(
+        "Telemetry status: enabled={Enabled}, active={Active}, isEnabled={IsEnabled}",
+        telemetry?.IsEnabled ?? false,
+        telemetry?.IsEnabled ?? false,
+        telemetry?.IsEnabled ?? false);
 
     telemetry?.TrackEvent("HostReady", new Dictionary<string, object?>
     {

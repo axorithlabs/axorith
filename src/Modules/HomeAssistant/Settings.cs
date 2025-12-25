@@ -1,4 +1,5 @@
-﻿using System.Reactive.Linq;
+﻿using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Services;
@@ -7,10 +8,22 @@ using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.HomeAssistant;
 
-internal sealed class Settings
+internal sealed class Settings : IDisposable
 {
     private readonly ISecureStorageService _secureStorage;
+    private readonly CompositeDisposable _disposables = new();
     private const string TokenStorageKey = "HaAccessToken";
+
+    private const string SetupInstructions =
+        "HOW TO SETUP:\n" +
+        "1. Go to HA Profile -> Long-Lived Access Tokens -> Create Token.\n" +
+        "2. Paste the token below (it will be saved securely for all presets).\n" +
+        "3. Enter Entity IDs for Start/End actions.\n" +
+        "   - For Scripts: use 'script.your_script_name' (e.g. 'script.focus_mode').\n" +
+        "   - For Scenes: use 'scene.your_scene_name' (e.g. 'scene.relax').\n" +
+        "   - For Lights/Switches: use 'light.name' or 'switch.name'.\n" +
+        "   - Scripts/Scenes/Automations will be TURNED ON.\n" +
+        "   - Lights/Switches will be TURNED ON at Start and TURNED OFF at End (default behavior).";
 
     public Setting<string> Instructions { get; }
 
@@ -29,21 +42,10 @@ internal sealed class Settings
     {
         _secureStorage = secureStorage;
 
-        var helpText =
-            "HOW TO SETUP:\n" +
-            "1. Go to HA Profile -> Long-Lived Access Tokens -> Create Token.\n" +
-            "2. Paste the token below (it will be saved securely for all presets).\n" +
-            "3. Enter Entity IDs for Start/End actions.\n" +
-            "   - For Scripts: use 'script.your_script_name' (e.g. 'script.focus_mode').\n" +
-            "   - For Scenes: use 'scene.your_scene_name' (e.g. 'scene.relax').\n" +
-            "   - For Lights/Switches: use 'light.name' or 'switch.name'.\n" +
-            "   - Scripts/Scenes/Automations will be TURNED ON.\n" +
-            "   - Lights/Switches will be TURNED ON at Start and TURNED OFF at End (default behavior).";
-
         Instructions = Setting.AsTextArea(
             key: "Instructions",
             label: "Setup Guide",
-            defaultValue: helpText,
+            defaultValue: SetupInstructions,
             description: "Follow these steps to connect Axorith to Home Assistant.",
             isReadOnly: true
         );
@@ -90,10 +92,17 @@ internal sealed class Settings
 
         _allActions = [TestConnectionAction];
 
-        AccessToken.Value
+        var tokenSubscription = AccessToken.Value
             .Skip(1)
             .Where(token => !string.IsNullOrWhiteSpace(token))
             .Subscribe(token => _secureStorage.StoreSecret(TokenStorageKey, token));
+        
+        _disposables.Add(tokenSubscription);
+    }
+
+    public void Dispose()
+    {
+        _disposables.Dispose();
     }
 
     public void LoadToken()
@@ -117,9 +126,17 @@ internal sealed class Settings
 
     public Task<ValidationResult> ValidateAsync()
     {
-        if (string.IsNullOrWhiteSpace(BaseUrl.GetCurrentValue()))
+        var errors = new Dictionary<string, string>();
+
+        var baseUrl = BaseUrl.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            return Task.FromResult(ValidationResult.Fail("Home Assistant URL is required."));
+            errors[BaseUrl.Key] = "Home Assistant URL is required.";
+        }
+        else if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
+                 (uri.Scheme != "http" && uri.Scheme != "https"))
+        {
+            errors[BaseUrl.Key] = "Invalid URL format. Use http:// or https://";
         }
 
         var token = AccessToken.GetCurrentValue();
@@ -130,9 +147,19 @@ internal sealed class Settings
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            return Task.FromResult(ValidationResult.Fail("Access Token is required."));
+            errors[AccessToken.Key] = "Access Token is required.";
         }
 
-        return Task.FromResult(ValidationResult.Success);
+        var startEntity = StartEntityId.GetCurrentValue();
+        var endEntity = EndEntityId.GetCurrentValue();
+
+        if (string.IsNullOrWhiteSpace(startEntity) && string.IsNullOrWhiteSpace(endEntity))
+        {
+            errors[StartEntityId.Key] = "At least one entity ID is required.";
+        }
+
+        return Task.FromResult(errors.Count > 0
+            ? ValidationResult.Fail(errors, "Configuration contains errors.")
+            : ValidationResult.Success);
     }
 }

@@ -309,10 +309,12 @@ public sealed class TelemetryService : ITelemetryService
     private static StructureValue? TryConvertObject(object value)
     {
         var type = value.GetType();
-        var properties = PropertyCache.GetOrAdd(type, t => t
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
-            .ToList());
+        var properties = PropertyCache.GetOrAdd(type, t =>
+        [
+            .. t
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
+        ]);
 
         if (properties.Count == 0)
         {

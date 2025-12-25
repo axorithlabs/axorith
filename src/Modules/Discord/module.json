@@ -1,0 +1,11 @@
+﻿{
+  "id": "30741589-7dba-42a2-b415-897dba32a2ef",
+  "name": "Discord",
+  "version": "1.0.0",
+  "description": "Launches Discord automatically on session start.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.Discord.dll"
+}

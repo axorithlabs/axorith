@@ -9,6 +9,17 @@ namespace Axorith.Shared.Platform;
 
 public static class PlatformServices
 {
+    public static IAutoStartManager CreateAutoStartManager(ILogger logger)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsAutoStartManager(logger);
+        }
+
+        // Return no-op for unsupported platforms
+        return new NoOpAutoStartManager();
+    }
+
     public static ISecureStorageService CreateSecureStorage(ILogger logger)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -84,4 +95,12 @@ file class NoOpNotificationService : ISystemNotificationService
     {
         return Task.CompletedTask;
     }
+}
+
+file class NoOpAutoStartManager : IAutoStartManager
+{
+    public bool IsAutoStartEnabled => false;
+    public bool IsStartMinimized => false;
+    public bool EnableAutoStart(bool startMinimized = true) => false;
+    public bool DisableAutoStart() => true;
 }

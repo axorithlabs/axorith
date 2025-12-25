@@ -4,6 +4,7 @@ using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
+using Axorith.Shared.Platform;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -247,8 +248,26 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddTransient<MainViewModel>();
         services.AddTransient<SessionEditorViewModel>();
 
+        var autoStartManager = app.Services.GetService<IAutoStartManager>();
+        if (autoStartManager != null)
+        {
+            services.AddSingleton(autoStartManager);
+        }
+
+        services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
+            sp.GetRequiredService<ShellViewModel>(),
+            sp.GetRequiredService<IClientUiSettingsStore>(),
+            sp.GetRequiredService<IAutoStartManager>(),
+            sp.GetRequiredService<ITelemetryService>(),
+            sp.GetRequiredService<IOptions<Configuration>>(),
+            sp,
+            sp.GetRequiredService<ILogger<SettingsViewModel>>()));
+
         var newProvider = services.BuildServiceProvider();
         app.Services = newProvider;
+
+        var shell = newProvider.GetRequiredService<ShellViewModel>();
+        shell.Services = newProvider;
     }
 
     private void StartHealthMonitoring(

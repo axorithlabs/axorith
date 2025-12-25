@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Shared.Exceptions</AssemblyName>
         <RootNamespace>Axorith.Shared.Exceptions</RootNamespace>
         
-        <Description>Shared exceptions for Axorith OS.</Description>
+        <Description>Shared exceptions for Axorith.</Description>
 
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>

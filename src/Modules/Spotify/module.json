@@ -1,0 +1,11 @@
+﻿{
+  "id": "04399d2f-43c9-4182-b99d-2f43c97182a6",
+  "name": "Spotify",
+  "version": "1.0.0",
+  "description": "Launches Spotify and controls playback.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.Spotify.dll"
+}

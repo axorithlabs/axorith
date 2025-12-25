@@ -217,10 +217,8 @@ public abstract class Setting
             isVisible,
             isReadOnly,
             SettingPersistence.Persisted,
-            // Serializer: List -> "key1|key2|key3"
             list => string.Join("|", list),
-            // Deserializer: "key1|key2" -> List
-            s => string.IsNullOrEmpty(s) ? [] : s.Split('|', StringSplitOptions.RemoveEmptyEntries).ToList()
+            s => string.IsNullOrEmpty(s) ? [] : [.. s.Split('|', StringSplitOptions.RemoveEmptyEntries)]
         );
 
         setting.InitializeChoices(initialChoices);

@@ -2,18 +2,49 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Axorith.Shared.Platform.Windows;
 
+/// <summary>
+///     Windows-specific service for discovering installed applications.
+/// </summary>
 [SupportedOSPlatform("windows")]
 public class WindowsAppDiscoveryService(
     ILogger<WindowsAppDiscoveryService> logger,
     IEnumerable<string>? fallbackSearchRoots = null)
     : IAppDiscoveryService
 {
+    private const int DefaultFallbackSearchDepth = 6;
+    private const int InstallLocationSearchDepth = 2;
+    private const int KnownFolderSearchDepth = 3;
+
+    /// <summary>
+    ///     Directories to skip during filesystem search for performance and safety.
+    /// </summary>
+    private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Windows",
+        "$Recycle.Bin",
+        "$WinREAgent",
+        "System Volume Information",
+        "Recovery",
+        "PerfLogs",
+        "MSOCache",
+        "Config.Msi",
+        "Documents and Settings",
+        @"ProgramData\Microsoft\Windows\WER",
+        "ProgramData\\Package Cache",
+        "node_modules",
+        ".git",
+        ".vs",
+        "obj",
+        "bin",
+        "packages",
+        "__pycache__"
+    };
+
     private readonly List<AppInfo> _cachedIndex = [];
     private readonly Dictionary<string, CachedPath> _fallbackCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(10);
@@ -129,7 +160,6 @@ public class WindowsAppDiscoveryService(
             ScanStartMenu(Environment.SpecialFolder.StartMenu, AddApp);
             ScanUninstallRegistry(AddApp);
             ScanKnownInstallFolders(AddApp);
-            ScanSteamLibraries(AddApp);
 
             _lastIndexTime = DateTime.UtcNow;
             return [.. _cachedIndex];
@@ -153,11 +183,13 @@ public class WindowsAppDiscoveryService(
                 try
                 {
                     var target = ResolveShortcut(shortcut);
-                    if (!string.IsNullOrEmpty(target))
+                    if (string.IsNullOrEmpty(target))
                     {
-                        var name = Path.GetFileNameWithoutExtension(shortcut);
-                        onFound(name, target, target);
+                        continue;
                     }
+
+                    var name = Path.GetFileNameWithoutExtension(shortcut);
+                    onFound(name, target, target);
                 }
                 catch
                 {
@@ -233,11 +265,11 @@ public class WindowsAppDiscoveryService(
     {
         var targets = new List<(string Path, int Depth)>
         {
-            (Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), 3),
-            (Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), 3),
-            (Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), 2),
-            (Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 2),
-            (Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 2)
+            (Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), KnownFolderSearchDepth),
+            (Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), KnownFolderSearchDepth),
+            (Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), InstallLocationSearchDepth),
+            (Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), InstallLocationSearchDepth),
+            (Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), InstallLocationSearchDepth)
         };
 
         foreach (var (path, depth) in targets)
@@ -255,122 +287,13 @@ public class WindowsAppDiscoveryService(
         }
     }
 
-    private void ScanSteamLibraries(Action<string?, string, string?> onFound)
-    {
-        foreach (var commonDir in GetSteamLibraryRoots())
-        {
-            try
-            {
-                if (!Directory.Exists(commonDir))
-                {
-                    continue;
-                }
-
-                foreach (var gameDir in Directory.GetDirectories(commonDir))
-                {
-                    var gameName = Path.GetFileName(gameDir);
-                    foreach (var exe in SafeEnumerateFiles(gameDir, "*.exe", maxDepth: 6))
-                    {
-                        onFound(gameName, exe, exe);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug(ex, "Failed to scan Steam library {Library}", commonDir);
-            }
-        }
-    }
-
-    private IEnumerable<string> GetSteamLibraryRoots()
-    {
-        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var potentialVdfs = new List<string?>
-        {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam", "steamapps",
-                "libraryfolders.vdf"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam", "steamapps",
-                "libraryfolders.vdf")
-        };
-
-        var registrySteamPath = GetSteamPathFromRegistry();
-        if (!string.IsNullOrWhiteSpace(registrySteamPath))
-        {
-            potentialVdfs.Add(Path.Combine(registrySteamPath, "steamapps", "libraryfolders.vdf"));
-            var common = Path.Combine(registrySteamPath, "steamapps", "common");
-            if (Directory.Exists(common))
-            {
-                roots.Add(common);
-            }
-        }
-
-        foreach (var vdfPath in potentialVdfs.Where(p => !string.IsNullOrWhiteSpace(p)))
-        {
-            if (string.IsNullOrWhiteSpace(vdfPath) || !File.Exists(vdfPath))
-            {
-                continue;
-            }
-
-            foreach (var lib in ParseSteamLibraries(vdfPath))
-            {
-                var common = Path.Combine(lib, "steamapps", "common");
-                if (Directory.Exists(common))
-                {
-                    roots.Add(common);
-                }
-            }
-        }
-
-        return roots;
-    }
-
-    private static IEnumerable<string> ParseSteamLibraries(string vdfPath)
-    {
-        string contents;
-        try
-        {
-            contents = File.ReadAllText(vdfPath);
-        }
-        catch
-        {
-            yield break;
-        }
-
-        var matches = Regex.Matches(contents, "\"path\"\\s+\"(?<path>[^\"]+)\"", RegexOptions.IgnoreCase);
-        foreach (Match match in matches)
-        {
-            var value = match.Groups["path"].Value;
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                continue;
-            }
-
-            var normalized = value.Replace(@"\\", "\\");
-            yield return normalized;
-        }
-    }
-
-    private static string? GetSteamPathFromRegistry()
-    {
-        try
-        {
-            using var steamKey = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
-            var raw = steamKey?.GetValue("SteamPath") as string;
-            return string.IsNullOrWhiteSpace(raw) ? null : raw;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     private string? FindExecutableOnFileSystem(string exeName)
     {
         foreach (var root in GetFallbackRoots())
         {
             try
             {
-                var found = FindExecutableInDirectory(root, exeName, maxDepth: 10);
+                var found = FindExecutableInDirectory(root, exeName, maxDepth: DefaultFallbackSearchDepth);
                 if (!string.IsNullOrEmpty(found))
                 {
                     return found;
@@ -544,7 +467,7 @@ public class WindowsAppDiscoveryService(
         var preferredName = NormalizeName(displayName);
         string? firstExe = null;
 
-        foreach (var exe in SafeEnumerateFiles(installLocation, "*.exe", maxDepth: 2))
+        foreach (var exe in SafeEnumerateFiles(installLocation, "*.exe", maxDepth: InstallLocationSearchDepth))
         {
             firstExe ??= exe;
 
@@ -561,6 +484,18 @@ public class WindowsAppDiscoveryService(
         }
 
         return firstExe;
+    }
+
+    private static bool ShouldSkipDirectory(string directoryPath)
+    {
+        var dirName = Path.GetFileName(directoryPath);
+        if (string.IsNullOrEmpty(dirName))
+        {
+            return false;
+        }
+
+        return ExcludedDirectories.Contains(dirName) || ExcludedDirectories.Any(excluded =>
+            directoryPath.Contains(excluded, StringComparison.OrdinalIgnoreCase));
     }
 
     private IEnumerable<string> SafeEnumerateFiles(string rootPath, string searchPattern, int? maxDepth = null)
@@ -613,9 +548,14 @@ public class WindowsAppDiscoveryService(
                 // Ignore other access errors
             }
 
-            if (subDirs != null)
+            if (subDirs == null)
             {
-                foreach (var subDir in subDirs)
+                continue;
+            }
+
+            foreach (var subDir in subDirs)
+            {
+                if (!ShouldSkipDirectory(subDir))
                 {
                     stack.Push((subDir, depth + 1));
                 }

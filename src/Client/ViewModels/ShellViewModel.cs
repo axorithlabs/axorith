@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using Axorith.Client.Services.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
@@ -11,6 +12,11 @@ namespace Axorith.Client.ViewModels;
 /// </summary>
 public class ShellViewModel : ReactiveObject
 {
+    /// <summary>
+    ///     Gets the service provider for resolving dependencies.
+    /// </summary>
+    public IServiceProvider Services { get; set; } = null!;
+
     /// <summary>
     ///     Gets or sets the current ViewModel to be displayed in the main content area of the window.
     /// </summary>

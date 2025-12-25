@@ -1,0 +1,290 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Axorith.Client.ViewModels"
+             x:Class="Axorith.Client.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <UserControl.Resources>
+        <StreamGeometry x:Key="TelemetryIcon">M19.5,5.5V18.5H17.5V5.5H19.5M12.5,10.5V18.5H10.5V10.5H12.5M21,4H16V20H21V4M14,9H9V20H14V9M7,14H2V20H7V14Z</StreamGeometry>
+        <StreamGeometry x:Key="AutoStartIcon">M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z</StreamGeometry>
+        <StreamGeometry x:Key="TrayIcon">M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H20V6H4M6,9H18V11H6V9Z</StreamGeometry>
+        <StreamGeometry x:Key="WindowIcon">M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V8H20V6H4M4,18H20V10H4V18Z</StreamGeometry>
+        <StreamGeometry x:Key="PrivacyIcon">M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,5A3,3 0 0,1 15,8A3,3 0 0,1 12,11A3,3 0 0,1 9,8A3,3 0 0,1 12,5M17.13,17C15.92,18.85 14.11,20.24 12,20.92C9.89,20.24 8.08,18.85 6.87,17C6.53,16.5 6.24,16 6,15.47C6,13.82 8.71,12.47 12,12.47C15.29,12.47 18,13.79 18,15.47C17.76,16 17.47,16.5 17.13,17Z</StreamGeometry>
+        <StreamGeometry x:Key="GitHubIcon">M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z</StreamGeometry>
+        <StreamGeometry x:Key="DiscordIcon">M22,24L16.75,19L17.38,21H4.5A2.5,2.5 0 0,1 2,18.5V3.5A2.5,2.5 0 0,1 4.5,1H19.5A2.5,2.5 0 0,1 22,3.5V24M12,6.8C9.32,6.8 7.44,7.95 7.44,7.95C8.47,7.03 10.27,6.5 10.27,6.5L10.1,6.33C8.41,6.36 6.88,7.53 6.88,7.53C5.16,11.12 5.27,14.22 5.27,14.22C6.67,16.03 8.75,15.9 8.75,15.9L9.46,15C8.21,14.73 7.42,13.62 7.42,13.62C7.42,13.62 9.3,14.9 12,14.9C14.7,14.9 16.58,13.62 16.58,13.62C16.58,13.62 15.79,14.73 14.54,15L15.25,15.9C15.25,15.9 17.33,16.03 18.73,14.22C18.73,14.22 18.84,11.12 17.12,7.53C17.12,7.53 15.59,6.36 13.9,6.33L13.73,6.5C13.73,6.5 15.53,7.03 16.56,7.95C16.56,7.95 14.68,6.8 12,6.8M9.93,10.59C10.58,10.59 11.11,11.16 11.1,11.86C11.1,12.55 10.58,13.13 9.93,13.13C9.29,13.13 8.77,12.55 8.77,11.86C8.77,11.16 9.28,10.59 9.93,10.59M14.1,10.59C14.75,10.59 15.27,11.16 15.27,11.86C15.27,12.55 14.75,13.13 14.1,13.13C13.46,13.13 12.94,12.55 12.94,11.86C12.94,11.16 13.45,10.59 14.1,10.59Z</StreamGeometry>
+        <StreamGeometry x:Key="InfoIcon">M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z</StreamGeometry>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="*, Auto">
+        <ScrollViewer Grid.Row="0" 
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="900" 
+                        HorizontalAlignment="Center" 
+                        Margin="24,32"
+                        Spacing="24">
+
+                <Border Classes="Card" Padding="0">
+                    <StackPanel>
+                        <Border Background="#0A0A0A" 
+                                CornerRadius="8,8,0,0"
+                                Padding="20,16">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Background="#1a1a2e" 
+                                        CornerRadius="8" 
+                                        Width="40" Height="40"
+                                        VerticalAlignment="Center">
+                                    <PathIcon Data="{StaticResource TelemetryIcon}" 
+                                              Width="20" Height="20" 
+                                              Foreground="#6366F1"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Privacy &amp; Telemetry" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="#E0E0E0"/>
+                                    <TextBlock Text="Help improve Axorith with anonymous data" 
+                                               FontSize="13" 
+                                               Foreground="#666"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        
+                        <Border Padding="20,16" Background="#080808">
+                            <StackPanel Spacing="16">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                                        <TextBlock Text="Anonymous Telemetry" 
+                                                   FontSize="14" 
+                                                   FontWeight="Medium"
+                                                   Foreground="#E0E0E0"/>
+                                        <TextBlock Text="Sends anonymous usage data (no personal info)" 
+                                                   FontSize="12" 
+                                                   Foreground="#666"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" 
+                                                  IsChecked="{Binding TelemetryEnabled}"
+                                                  OnContent="" 
+                                                  OffContent=""
+                                                  VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <Border Height="1" Background="#222" Margin="0,4"/>
+
+                                <Border Background="#111" 
+                                        CornerRadius="6" 
+                                        Padding="16">
+                                    <StackPanel Spacing="8">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <PathIcon Data="{StaticResource InfoIcon}" 
+                                                      Width="14" Height="14" 
+                                                      Foreground="#6366F1"/>
+                                            <TextBlock Text="What we collect:" 
+                                                       FontSize="13" 
+                                                       FontWeight="Medium"
+                                                       Foreground="#AAA"/>
+                                        </StackPanel>
+                                        <TextBlock Text="• App version and OS info&#x0a;• Feature usage (which modules you use)&#x0a;• Error reports to fix bugs&#x0a;• No personal data, no IP addresses" 
+                                                   FontSize="12" 
+                                                   Foreground="#666"
+                                                   LineHeight="20"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Button Command="{Binding OpenPrivacyPolicyCommand}"
+                                        Classes="link"
+                                        HorizontalAlignment="Left"
+                                        Padding="0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <PathIcon Data="{StaticResource PrivacyIcon}" 
+                                                  Width="14" Height="14"/>
+                                        <TextBlock Text="View Privacy Policy" FontSize="13"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="Card" Padding="0">
+                    <StackPanel>
+                        <Border Background="#0A0A0A" 
+                                CornerRadius="8,8,0,0"
+                                Padding="20,16">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Background="#1a2e1a" 
+                                        CornerRadius="8" 
+                                        Width="40" Height="40"
+                                        VerticalAlignment="Center">
+                                    <PathIcon Data="{StaticResource AutoStartIcon}" 
+                                              Width="20" Height="20" 
+                                              Foreground="#10B981"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Startup Behavior" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="#E0E0E0"/>
+                                    <TextBlock Text="Control how Axorith starts" 
+                                               FontSize="13" 
+                                               Foreground="#666"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        
+                        <Border Padding="20,16" Background="#080808">
+                            <StackPanel Spacing="16">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                                        <TextBlock Text="Start with Windows" 
+                                                   FontSize="14" 
+                                                   FontWeight="Medium"
+                                                   Foreground="#E0E0E0"/>
+                                        <TextBlock Text="Launch Axorith automatically when you log in" 
+                                                   FontSize="12" 
+                                                   Foreground="#666"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" 
+                                                  IsChecked="{Binding AutoStartEnabled}"
+                                                  OnContent="" 
+                                                  OffContent=""
+                                                  VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <Border Height="1" Background="#222" Margin="0,4"/>
+
+                                <Grid ColumnDefinitions="*, Auto" 
+                                      IsEnabled="{Binding AutoStartEnabled}">
+                                    <Grid.Styles>
+                                        <Style Selector="Grid:disabled">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                        </Style>
+                                    </Grid.Styles>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <PathIcon Data="{StaticResource TrayIcon}" 
+                                                      Width="16" Height="16" 
+                                                      Foreground="#888"/>
+                                            <TextBlock Text="Start Minimized to Tray" 
+                                                       FontSize="14" 
+                                                       FontWeight="Medium"
+                                                       Foreground="#E0E0E0"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Start in system tray instead of showing window" 
+                                                   FontSize="12" 
+                                                   Foreground="#666"
+                                                   TextWrapping="Wrap"
+                                                   Margin="24,0,0,0"/>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" 
+                                                  IsChecked="{Binding AutoStartMinimized}"
+                                                  OnContent="" 
+                                                  OffContent=""
+                                                  VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="Card" Padding="0">
+                    <StackPanel>
+                        <Border Background="#0A0A0A" 
+                                CornerRadius="8,8,0,0"
+                                Padding="20,16">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Background="#2e2a1a" 
+                                        CornerRadius="8" 
+                                        Width="40" Height="40"
+                                        VerticalAlignment="Center">
+                                    <PathIcon Data="{StaticResource WindowIcon}" 
+                                              Width="20" Height="20" 
+                                              Foreground="#F59E0B"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Window Behavior" 
+                                               FontSize="16" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="#E0E0E0"/>
+                                    <TextBlock Text="Customize window actions" 
+                                               FontSize="13" 
+                                               Foreground="#666"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        
+                        <Border Padding="20,16" Background="#080808" CornerRadius="0,0,8,8">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Text="Minimize to Tray on Close" 
+                                               FontSize="14" 
+                                               FontWeight="Medium"
+                                               Foreground="#E0E0E0"/>
+                                    <TextBlock Text="Keep running in background when closing window" 
+                                               FontSize="12" 
+                                               Foreground="#666"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" 
+                                              IsChecked="{Binding MinimizeToTrayOnClose}"
+                                              OnContent="" 
+                                              OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="Card" Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Links" 
+                                   FontSize="14" 
+                                   FontWeight="SemiBold" 
+                                   Foreground="#888"
+                                   Margin="0,0,0,4"/>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Command="{Binding OpenGitHubCommand}"
+                                    ToolTip.Tip="View on GitHub">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <PathIcon Data="{StaticResource GitHubIcon}" 
+                                              Width="16" Height="16"/>
+                                    <TextBlock Text="GitHub" FontSize="13"/>
+                                </StackPanel>
+                            </Button>
+                            
+                            <Button Command="{Binding OpenDiscordCommand}"
+                                    Classes="accent"
+                                    ToolTip.Tip="Join our Discord">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <PathIcon Data="{StaticResource DiscordIcon}" 
+                                              Width="16" Height="16"/>
+                                    <TextBlock Text="Discord" FontSize="13"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" 
+                Background="#0A0A0A" 
+                BorderBrush="#333" 
+                BorderThickness="0,1,0,0" 
+                Padding="20">
+            <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Right">
+                <Button Content="Save" Command="{Binding BackCommand}" Classes="accent" Padding="30,8" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

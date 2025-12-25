@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Shim</AssemblyName>
         <RootNamespace>Axorith.Shim</RootNamespace>
 
-        <Description>Shim for Axorith OS.</Description>
+        <Description>Shim for Axorith.</Description>
         
         <OutputType>WinExe</OutputType>
     </PropertyGroup>

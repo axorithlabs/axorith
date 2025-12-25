@@ -77,7 +77,8 @@ internal class GrpcSchedulerApi(SchedulerService.SchedulerServiceClient client, 
             Name = model.Name,
             IsEnabled = model.IsEnabled,
             Type = (int)model.Type,
-            RecurringTime = model.RecurringTime?.ToString(@"hh\:mm") ?? string.Empty
+            RecurringTime = model.RecurringTime?.ToString(@"hh\:mm") ?? string.Empty,
+            Use24HourFormat = model.Use24HourFormat
         };
 
         if (model.OneTimeDate.HasValue)
@@ -113,7 +114,8 @@ internal class GrpcSchedulerApi(SchedulerService.SchedulerServiceClient client, 
             PresetId = Guid.TryParse(message.PresetId, out var pid) ? pid : Guid.Empty,
             Name = message.Name,
             IsEnabled = message.IsEnabled,
-            Type = (ScheduleType)message.Type
+            Type = (ScheduleType)message.Type,
+            Use24HourFormat = message.Use24HourFormat
         };
 
         if (message.OneTimeDate != null)
@@ -128,7 +130,7 @@ internal class GrpcSchedulerApi(SchedulerService.SchedulerServiceClient client, 
 
         if (message.DaysOfWeek != null)
         {
-            model.DaysOfWeek = message.DaysOfWeek.Select(d => (DayOfWeek)d).ToList();
+            model.DaysOfWeek = [.. message.DaysOfWeek.Select(d => (DayOfWeek)d)];
         }
 
         if (message.LastRun != null)

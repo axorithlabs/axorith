@@ -23,4 +23,21 @@ public interface INativeMessagingManager
     ///     A list of browser extension IDs that are permitted to communicate with this host.
     /// </param>
     void RegisterFirefoxHost(string hostName, string executablePath, string[] allowedExtensions);
+
+    /// <summary>
+    ///     Registers the Native Messaging Host for Chrome/Chromium-based browsers.
+    ///     Generates the JSON manifest and registers its location in the OS.
+    /// </summary>
+    /// <param name="hostName">
+    ///     The unique name of the native host (e.g., "axorith" or "axorith.dev").
+    ///     This must match the name used in the browser extension's connectNative() call.
+    /// </param>
+    /// <param name="executablePath">
+    ///     The absolute path to the Native Messaging Host executable (Axorith.Shim.exe).
+    /// </param>
+    /// <param name="allowedOrigins">
+    ///     A list of Chrome extension origins that are permitted to communicate with this host.
+    ///     Format: "chrome-extension://[extension-id]/"
+    /// </param>
+    void RegisterChromeHost(string hostName, string executablePath, string[] allowedOrigins);
 }

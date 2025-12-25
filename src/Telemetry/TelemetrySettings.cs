@@ -8,10 +8,11 @@ namespace Axorith.Telemetry;
 /// </summary>
 public sealed record TelemetrySettings
 {
-    public bool Enabled { get; init; } =
-        Environment.GetEnvironmentVariable("AXORITH_TELEMETRY", EnvironmentVariableTarget.User) == "1" ||
-        !string.IsNullOrEmpty(
-            Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_API_KEY", EnvironmentVariableTarget.User));
+    /// <summary>
+    ///     Whether telemetry is enabled. Default: true.
+    ///     Can be overridden by user settings in the client.
+    /// </summary>
+    public bool Enabled { get; init; } = true;
 
     public string DistinctId { get; init; } = string.Empty;
     public string PostHogApiKey { get; init; } = "##POSTHOG_API_KEY##";

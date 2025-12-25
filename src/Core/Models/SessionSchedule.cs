@@ -34,6 +34,11 @@ public class SessionSchedule
     /// </summary>
     public Guid? NextPresetId { get; set; }
 
+    /// <summary>
+    ///     Whether to display time in 24-hour format (true) or 12-hour AM/PM format (false).
+    /// </summary>
+    public bool Use24HourFormat { get; set; } = true;
+
     public DateTimeOffset? GetNextRun(DateTimeOffset now)
     {
         if (!IsEnabled)
