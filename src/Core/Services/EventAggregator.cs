@@ -32,7 +32,6 @@ public sealed class EventAggregator : IEventAggregator
             return;
         }
 
-        // Create snapshot for safe iteration
         var handlersList = handlers.ToList();
         var deadReferences = new List<WeakReference<object>>();
 

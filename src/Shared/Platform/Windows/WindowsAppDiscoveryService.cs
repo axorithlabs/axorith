@@ -2,14 +2,12 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows-specific service for discovering installed applications.
-/// </summary>
 [SupportedOSPlatform("windows")]
 public class WindowsAppDiscoveryService(
     ILogger<WindowsAppDiscoveryService> logger,
@@ -265,11 +263,11 @@ public class WindowsAppDiscoveryService(
     {
         var targets = new List<(string Path, int Depth)>
         {
-            (Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), KnownFolderSearchDepth),
-            (Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), KnownFolderSearchDepth),
-            (Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), InstallLocationSearchDepth),
-            (Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), InstallLocationSearchDepth),
-            (Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), InstallLocationSearchDepth)
+            (ApplicationPaths.ProgramFiles, KnownFolderSearchDepth),
+            (ApplicationPaths.ProgramFilesX86, KnownFolderSearchDepth),
+            (ApplicationPaths.CommonAppData, InstallLocationSearchDepth),
+            (ApplicationPaths.LocalRoot, InstallLocationSearchDepth),
+            (ApplicationPaths.RoamingRoot, InstallLocationSearchDepth)
         };
 
         foreach (var (path, depth) in targets)

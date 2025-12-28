@@ -216,4 +216,22 @@ internal sealed class Settings : LauncherSettingsBase
             SpotifyPath.SetValue(path);
         }
     }
+
+    public override void Dispose()
+    {
+        SpotifyPath.Dispose();
+        RefreshSpotifyAction.Dispose();
+        AuthStatus.Dispose();
+        EnablePlayback.Dispose();
+        DeviceSelectionMode.Dispose();
+        SpecificDeviceName.Dispose();
+        PlaybackContext.Dispose();
+        CustomUrl.Dispose();
+        Volume.Dispose();
+        Shuffle.Dispose();
+        RepeatMode.Dispose();
+        LoginAction.Dispose();
+        LogoutAction.Dispose();
+        base.Dispose();
+    }
 }

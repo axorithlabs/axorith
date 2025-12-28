@@ -8,6 +8,12 @@ namespace Axorith.Client.Services;
 public class WindowStateManager : IWindowStateManager
 {
     private readonly string _stateFilePath;
+    private const long MaxStateFileSizeBytes = 1 * 1024 * 1024; // 1 MB max
+
+    private static readonly JsonSerializerOptions DeserializeOptions = new()
+    {
+        MaxDepth = 32 // Prevent stack overflow from deeply nested JSON
+    };
 
     public WindowStateManager()
     {
@@ -16,7 +22,7 @@ public class WindowStateManager : IWindowStateManager
             "Axorith");
 
         Directory.CreateDirectory(appDataPath);
-        _stateFilePath = Path.Combine(appDataPath, "window_state.json");
+        _stateFilePath = Path.Combine(appDataPath, "config", "window_state.json");
     }
 
     public void SaveWindowState(Window window)
@@ -50,8 +56,16 @@ public class WindowStateManager : IWindowStateManager
                 return;
             }
 
+            var fileInfo = new FileInfo(_stateFilePath);
+            if (fileInfo.Length > MaxStateFileSizeBytes)
+            {
+                return; // File too large, use default state
+            }
+
             var json = File.ReadAllText(_stateFilePath);
-            var state = JsonSerializer.Deserialize<WindowState>(json);
+            // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
+            // File size and MaxDepth are validated to prevent DoS attacks
+            var state = JsonSerializer.Deserialize<WindowState>(json, DeserializeOptions); //-V5611
 
             switch (state)
             {

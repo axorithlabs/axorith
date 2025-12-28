@@ -26,6 +26,5 @@ message StopSessionRequest {
 }
 
 message StreamSessionEventsRequest {
-  // Subscribe to all session events.
   // Future extension point: add filters (for example, by session id or event type).
 }

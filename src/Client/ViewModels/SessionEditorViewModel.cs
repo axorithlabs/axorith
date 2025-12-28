@@ -446,7 +446,7 @@ public class NextPresetOption
     public string Name { get; set; } = string.Empty;
 }
 
-public class SessionEditorViewModel : ReactiveObject
+public class SessionEditorViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
     private readonly IModulesApi _modulesApi;
@@ -458,6 +458,7 @@ public class SessionEditorViewModel : ReactiveObject
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
+    private bool _disposed;
 
     private readonly ObservableAsPropertyHelper<bool> _isFooterVisible;
     public bool IsFooterVisible => _isFooterVisible.Value;
@@ -1045,5 +1046,29 @@ public class SessionEditorViewModel : ReactiveObject
             current.IsFirst = i == 0;
             current.IsLast = i == ConfiguredModules.Count - 1;
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _isFooterVisible.Dispose();
+        _canAddAnyTrigger.Dispose();
+        _hasValidationErrors.Dispose();
+        AddScheduleTriggerCommand.Dispose();
+
+        foreach (var vm in ConfiguredModules)
+        {
+            vm.Dispose();
+        }
+
+        ConfiguredModules.Clear();
+
+        GC.SuppressFinalize(this);
     }
 }

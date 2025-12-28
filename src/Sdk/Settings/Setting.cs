@@ -323,7 +323,7 @@ public abstract class Setting
 ///     - Reactive subjects are thread-safe by default and emit on the calling thread.
 /// </summary>
 /// <typeparam name="T">The underlying type of the setting's value (e.g., string, bool, decimal).</typeparam>
-public class Setting<T> : ISetting
+public class Setting<T> : ISetting, IDisposable
 {
     private readonly BehaviorSubject<T> _value;
     private readonly BehaviorSubject<string> _label;
@@ -536,5 +536,18 @@ public class Setting<T> : ISetting
     IReadOnlyList<KeyValuePair<string, string>>? ISetting.GetCurrentChoices()
     {
         return _choices?.Value;
+    }
+
+    /// <summary>
+    ///     Disposes the setting and releases all resources.
+    /// </summary>
+    public void Dispose()
+    {
+        _value.Dispose();
+        _label.Dispose();
+        _isVisible.Dispose();
+        _isReadOnly.Dispose();
+        _choices?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

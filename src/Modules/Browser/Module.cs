@@ -43,16 +43,18 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : L
         }
 
         var startUrl = _settings.StartUrl.GetCurrentValue();
-        if (!string.IsNullOrWhiteSpace(startUrl))
+        if (string.IsNullOrWhiteSpace(startUrl))
         {
-            if (startUrl.Contains(' '))
-            {
-                args.Append($"\"{startUrl}\"");
-            }
-            else
-            {
-                args.Append(startUrl);
-            }
+            return args.ToString().Trim();
+        }
+
+        if (startUrl.Contains(' '))
+        {
+            args.Append($"\"{startUrl}\"");
+        }
+        else
+        {
+            args.Append(startUrl);
         }
 
         return args.ToString().Trim();

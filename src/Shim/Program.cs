@@ -1,20 +1,13 @@
 using System.IO.Pipes;
 using System.Text;
+using Axorith.Shared.Utils;
 
 namespace Axorith.Shim;
 
-/// <summary>
-///     A lightweight, dependency-free shim that acts as a bridge for Native Messaging.
-///     It runs as a background process initiated by the browser, hosts a Named Pipe server,
-///     listens for messages from the main Axorith application, and relays them to the browser extension via stdout.
-/// </summary>
 internal static class Program
 {
     private const string PipeName = "axorith-nm-pipe";
 
-    /// <summary>
-    ///     The main entry point for the shim application.
-    /// </summary>
     public static void Main()
     {
         while (true)
@@ -42,11 +35,6 @@ internal static class Program
             }
     }
 
-    /// <summary>
-    ///     Sends a message to the browser extension by writing to the standard output stream
-    ///     according to the Native Messaging protocol (32-bit length prefix + UTF-8 JSON payload).
-    /// </summary>
-    /// <param name="jsonMessage">The JSON message string to send.</param>
     private static void SendMessageToExtension(string jsonMessage)
     {
         try
@@ -65,18 +53,12 @@ internal static class Program
         }
     }
 
-    /// <summary>
-    ///     Logs an exception to a 'shim_error.log' file located next to the executable.
-    /// </summary>
     private static void LogException(Exception ex, string? context = null)
     {
         try
         {
-            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var logsDir = Path.Combine(appDataPath, "Axorith", "logs");
+            var logsDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.Logs);
             var errorLogPath = Path.Combine(logsDir, "shim_error.log");
-
-            Directory.CreateDirectory(logsDir);
 
             var errorMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
                                $"{(context != null ? $"[{context}] " : "")}" +

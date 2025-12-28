@@ -57,7 +57,6 @@ internal sealed class Settings : LauncherSettingsBase
         AutoDetectAction = Action.Create("AutoDetect", "Auto-Detect Path");
         AutoDetectAction.OnInvokeAsync(AutoDetectPathAsync);
 
-        // Setup reactive visibility after all fields are initialized
         SetupBaseReactiveVisibility();
     }
 
@@ -75,7 +74,6 @@ internal sealed class Settings : LauncherSettingsBase
 
     protected override Task InitializeAdditionalAsync()
     {
-        // Pre-load index in background if needed
         return Task.Run(() => _appDiscovery.GetInstalledApplicationsIndex());
     }
 
@@ -126,7 +124,6 @@ internal sealed class Settings : LauncherSettingsBase
             return;
         }
 
-        // If it's already a full path, do nothing
         if (Path.IsPathRooted(currentInput) && File.Exists(currentInput))
         {
             return;
@@ -138,5 +135,15 @@ internal sealed class Settings : LauncherSettingsBase
         {
             ApplicationPath.SetValue(foundPath);
         }
+    }
+
+    public override void Dispose()
+    {
+        ApplicationPath.Dispose();
+        ApplicationArgs.Dispose();
+        UseCustomWorkingDirectory.Dispose();
+        WorkingDirectory.Dispose();
+        AutoDetectAction.Dispose();
+        base.Dispose();
     }
 }

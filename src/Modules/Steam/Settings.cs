@@ -134,4 +134,12 @@ internal sealed class Settings : LauncherSettingsBase
             }
         });
     }
+
+    public override void Dispose()
+    {
+        SteamPath.Dispose();
+        SelectedGame.Dispose();
+        RefreshGamesAction.Dispose();
+        base.Dispose();
+    }
 }

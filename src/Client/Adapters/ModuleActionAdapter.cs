@@ -18,7 +18,7 @@ internal class ModuleActionAdapter(
     Guid designTimeId,
     string moduleName,
     ITelemetryService? telemetry = null)
-    : IAction
+    : IAction, IDisposable
 {
     private readonly Subject<Unit> _invokedSubject = new();
     private readonly BehaviorSubject<string> _labelSubject = new(action.Label);
@@ -91,5 +91,12 @@ internal class ModuleActionAdapter(
                 ["action"] = Key
             });
         }
+    }
+
+    public void Dispose()
+    {
+        _invokedSubject.Dispose();
+        _labelSubject.Dispose();
+        _enabledSubject.Dispose();
     }
 }

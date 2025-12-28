@@ -1,6 +1,8 @@
 ﻿using Axorith.Sdk.Logging;
 using Microsoft.Extensions.Logging;
 
+#pragma warning disable CA2254
+
 namespace Axorith.Core.Logging;
 
 /// <summary>

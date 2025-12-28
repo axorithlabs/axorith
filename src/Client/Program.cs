@@ -26,7 +26,6 @@ internal static class Program
             .AddCommandLine(args)
             .Build();
 
-        // Load telemetry setting from client settings
         var telemetryEnabled = LoadTelemetryEnabledSetting();
 
         var telemetrySettings = new TelemetrySettings()
@@ -43,7 +42,7 @@ internal static class Program
             "Telemetry (Client): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={FlushSec}",
             telemetrySettings.Enabled,
             telemetrySettings.IsActive,
-            Telemetry?.IsEnabled ?? false,
+            Telemetry.IsEnabled,
             telemetrySettings.PostHogHost,
             telemetrySettings.BatchSize,
             telemetrySettings.QueueLimit,
@@ -54,7 +53,7 @@ internal static class Program
             Log.Warning(
                 "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
                 telemetrySettings.Enabled,
-                telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
+                !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) && telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
             
@@ -80,7 +79,7 @@ internal static class Program
             .ReadFrom.Configuration(configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", "Axorith.Client")
-            .WriteTo.Sink(new TelemetrySerilogSink(Telemetry ?? new NoopTelemetryService()),
+            .WriteTo.Sink(new TelemetrySerilogSink(Telemetry),
                 restrictedToMinimumLevel: telemetryLogLevel)
             .CreateLogger();
 
@@ -98,8 +97,6 @@ internal static class Program
 
             RegisterGlobalExceptionHandlers();
 
-            // Tray icon is always visible, but --tray hides window on startup
-            // Use OnExplicitShutdown to prevent closing app when window is closed
             app.StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
 
             Log.Information("Axorith Client shut down gracefully");
@@ -147,7 +144,6 @@ internal static class Program
 
     private static void RegisterGlobalExceptionHandlers()
     {
-        // Catch unhandled exceptions in any AppDomain thread
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             var exception = e.ExceptionObject as Exception;
@@ -174,11 +170,10 @@ internal static class Program
             }
         };
 
-        // Catch unobserved task exceptions
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             Log.Error(e.Exception, "Unobserved task exception");
-            e.SetObserved(); // Prevent process termination
+            e.SetObserved();
             Telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
             {
                 ["fatal"] = false,
@@ -229,7 +224,7 @@ internal static class Program
             var settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
             if (!File.Exists(settingsPath))
             {
-                return true; // Default: enabled
+                return true;
             }
 
             var json = File.ReadAllText(settingsPath);
@@ -239,16 +234,11 @@ internal static class Program
             }
 
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("TelemetryEnabled", out var prop))
-            {
-                return prop.GetBoolean();
-            }
-
-            return true; // Default: enabled
+            return !doc.RootElement.TryGetProperty("TelemetryEnabled", out var prop) || prop.GetBoolean();
         }
         catch
         {
-            return true; // Default: enabled on error
+            return true;
         }
     }
 }

@@ -2,19 +2,14 @@ using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows-specific implementation of ISecureStorageService using DPAPI (ProtectedData).
-///     Encrypts data based on the current user's Windows credentials.
-/// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsSecureStorage : ISecureStorageService
 {
-    // Application-specific entropy for additional security layer
-    // Prevents other apps from decrypting our data even under same user
     private static readonly byte[] SEntropy = "AxorithLabs.Axorith.v1"u8.ToArray();
 
     private readonly string _storagePath;
@@ -24,9 +19,7 @@ internal class WindowsSecureStorage : ISecureStorageService
     {
         _logger = logger;
 
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        _storagePath = Path.Combine(appData, "Axorith", "secure_storage");
-        Directory.CreateDirectory(_storagePath);
+        _storagePath = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.SecureStorage);
 
         _logger.LogDebug("Windows SecureStorage initialized at: {Path}", _storagePath);
     }

@@ -117,7 +117,6 @@ public class Module : IModule
                 var endAction = _settings.SessionEndAction.GetCurrentValue();
                 await ExecuteActionAsync(endAction, cancellationToken);
                 
-                // Wait for OBS to finish processing the action (e.g., finalize recording file)
                 if (endAction != Settings.ActionNone)
                 {
                     await Task.Delay(1500, cancellationToken).ConfigureAwait(false);
@@ -132,7 +131,6 @@ public class Module : IModule
 
     public void Dispose()
     {
-        // Graceful disconnect before dispose
         try
         {
             DisconnectAsync().GetAwaiter().GetResult();

@@ -230,4 +230,15 @@ internal sealed class Settings : LauncherSettingsBase
     {
         return IsBrowserByExecutableName(app);
     }
+
+    public override void Dispose()
+    {
+        BrowserPath.Dispose();
+        StartUrl.Dispose();
+        ProfileName.Dispose();
+        IncognitoMode.Dispose();
+        AdditionalArgs.Dispose();
+        RefreshBrowsersAction.Dispose();
+        base.Dispose();
+    }
 }

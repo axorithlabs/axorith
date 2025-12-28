@@ -70,7 +70,10 @@ public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryServi
                 _ = Task.Run(() => _processService.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
             }
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
         finally
         {
             _currentProcess?.Dispose();

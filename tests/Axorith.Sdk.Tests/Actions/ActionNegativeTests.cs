@@ -256,20 +256,20 @@ public class ActionNegativeTests
         // Arrange
         var action = Action.Create("key", "Label", isEnabled: true);
         var fastCount = 0;
-        var slowStarted = false;
+        var slowStarted = 0;
 
-        action.Invoked.Subscribe(_ => fastCount++);
+        action.Invoked.Subscribe(_ => Interlocked.Increment(ref fastCount));
         action.Invoked.Subscribe(_ =>
         {
-            slowStarted = true;
+            Interlocked.Exchange(ref slowStarted, 1);
             Thread.Sleep(100); // Slow subscriber
         });
 
         // Act
         action.Invoke();
 
-        // Wait for slow subscriber to start
-        while (!slowStarted) Thread.Sleep(10);
+        // Wait for slow subscriber to start using SpinWait for reliable synchronization
+        SpinWait.SpinUntil(() => Interlocked.CompareExchange(ref slowStarted, 0, 0) == 1, TimeSpan.FromSeconds(5));
 
         // Assert - fast subscriber should have been called immediately
         fastCount.Should().Be(1);

@@ -165,7 +165,6 @@ internal sealed class PostHogSink(
                 var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 System.Diagnostics.Debug.WriteLine($"PostHog: Response {(int)response.StatusCode} {response.StatusCode}: {responseBody}");
 
-                // Handle rate limiting (429)
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
                     System.Diagnostics.Debug.WriteLine($"PostHog: Rate limited, will retry");
@@ -177,7 +176,6 @@ internal sealed class PostHogSink(
                     }
                 }
 
-                // Handle transient server errors (5xx)
                 if (IsTransientError(response.StatusCode))
                 {
                     System.Diagnostics.Debug.WriteLine($"PostHog: Transient error {response.StatusCode}, will retry");
@@ -189,17 +187,12 @@ internal sealed class PostHogSink(
                     }
                 }
 
-                if (response.IsSuccessStatusCode)
-                {
-                    System.Diagnostics.Debug.WriteLine($"PostHog: Successfully sent {eventCount} events");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"PostHog: Failed with {response.StatusCode}: {responseBody}");
-                }
+                System.Diagnostics.Debug.WriteLine(response.IsSuccessStatusCode
+                    ? $"PostHog: Successfully sent {eventCount} events"
+                    : $"PostHog: Failed with {response.StatusCode}: {responseBody}");
 
                 response.EnsureSuccessStatusCode();
-                return; // Success
+                return;
             }
             catch (HttpRequestException ex)
             {
@@ -247,13 +240,14 @@ internal sealed class PostHogSink(
             return response.Headers.RetryAfter.Delta.Value;
         }
 
-        if (response.Headers.RetryAfter.Date.HasValue)
+        if (!response.Headers.RetryAfter.Date.HasValue)
         {
-            var delay = response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow;
-            return delay > TimeSpan.Zero ? delay : TimeSpan.FromSeconds(1);
+            return null;
         }
 
-        return null;
+        var delay = response.Headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow;
+        return delay > TimeSpan.Zero ? delay : TimeSpan.FromSeconds(1);
+
     }
 
     private Uri BuildUri()

@@ -59,9 +59,6 @@ public class ShellViewModel : ReactiveObject
 
     private void RemoveToast(ToastViewModel vm)
     {
-        if (Toasts.Contains(vm))
-        {
-            Toasts.Remove(vm);
-        }
+        Toasts.Remove(vm);
     }
 }

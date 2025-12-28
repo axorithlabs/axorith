@@ -103,6 +103,12 @@ internal sealed class Settings : IDisposable
     public void Dispose()
     {
         _disposables.Dispose();
+        Instructions.Dispose();
+        BaseUrl.Dispose();
+        AccessToken.Dispose();
+        StartEntityId.Dispose();
+        EndEntityId.Dispose();
+        TestConnectionAction.Dispose();
     }
 
     public void LoadToken()

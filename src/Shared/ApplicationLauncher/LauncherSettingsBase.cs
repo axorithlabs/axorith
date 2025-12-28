@@ -10,7 +10,7 @@ namespace Axorith.Shared.ApplicationLauncher;
 ///     Provides common settings for process mode, window state, lifecycle, and monitor selection.
 ///     Derived classes must implement ApplicationPath and can add additional settings.
 /// </summary>
-public abstract class LauncherSettingsBase
+public abstract class LauncherSettingsBase : IDisposable
 {
     /// <summary>
     ///     How to handle the application process (LaunchNew, AttachExisting, LaunchOrAttach).
@@ -348,5 +348,23 @@ public abstract class LauncherSettingsBase
         }
 
         return choices;
+    }
+
+    /// <summary>
+    ///     Disposes all settings. Override in derived classes to dispose additional resources.
+    /// </summary>
+    public virtual void Dispose()
+    {
+        ProcessMode.Dispose();
+        WindowState.Dispose();
+        UseCustomSize.Dispose();
+        WindowWidth.Dispose();
+        WindowHeight.Dispose();
+        MoveToMonitor.Dispose();
+        TargetMonitor.Dispose();
+        LifecycleMode.Dispose();
+        BringToForeground.Dispose();
+        ApplicationPath.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

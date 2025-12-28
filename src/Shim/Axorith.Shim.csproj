@@ -7,4 +7,8 @@
         
         <OutputType>WinExe</OutputType>
     </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+    </ItemGroup>
 </Project>

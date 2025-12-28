@@ -15,11 +15,16 @@ public class ScheduleManager(
     ILogger<ScheduleManager> logger)
     : IScheduleManager
 {
-    private readonly string _storagePath = Path.Combine(storageDirectory, "schedules.json");
+    private readonly string _storagePath = Path.Combine(storageDirectory, "config", "schedules.json");
+    private const long MaxScheduleFileSizeBytes = 5 * 1024 * 1024; // 5 MB max
 
     private readonly List<SessionSchedule> _schedules = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        WriteIndented = true,
+        MaxDepth = 64 // Prevent stack overflow from deeply nested JSON
+    };
 
     private readonly HashSet<string> _sentNotificationKeys = [];
     private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
@@ -284,8 +289,17 @@ public class ScheduleManager(
 
         try
         {
+            var fileInfo = new FileInfo(_storagePath);
+            if (fileInfo.Length > MaxScheduleFileSizeBytes)
+            {
+                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)", _storagePath, fileInfo.Length);
+                return;
+            }
+
             await using var stream = File.OpenRead(_storagePath);
-            var loaded = await JsonSerializer.DeserializeAsync<List<SessionSchedule>>(stream, _jsonOptions, ct);
+            // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
+            // File size and MaxDepth are validated to prevent DoS attacks
+            var loaded = await JsonSerializer.DeserializeAsync<List<SessionSchedule>>(stream, _jsonOptions, ct); //-V5611
             if (loaded != null)
             {
                 _schedules.Clear();

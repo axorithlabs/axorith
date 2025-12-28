@@ -36,12 +36,8 @@ internal static class SteamGameScanner
         var games = new List<SteamGame>();
         var libraries = GetLibraryFolders(steamDirectory);
 
-        foreach (var library in libraries)
+        foreach (var steamappsPath in libraries.Select(library => Path.Combine(library, "steamapps")).Where(Directory.Exists))
         {
-            var steamappsPath = Path.Combine(library, "steamapps");
-            if (!Directory.Exists(steamappsPath))
-                continue;
-
             try
             {
                 foreach (var manifestPath in Directory.EnumerateFiles(steamappsPath, "appmanifest_*.acf"))
@@ -106,12 +102,8 @@ internal static class SteamGameScanner
                 return null;
 
             var name = nameMatch.Groups[1].Value;
-            
-            // Skip tools and redistributables
-            if (SkipPatterns.Any(p => name.Contains(p, StringComparison.OrdinalIgnoreCase)))
-                return null;
 
-            return new SteamGame(appIdMatch.Groups[1].Value, name);
+            return SkipPatterns.Any(p => name.Contains(p, StringComparison.OrdinalIgnoreCase)) ? null : new SteamGame(appIdMatch.Groups[1].Value, name);
         }
         catch
         {

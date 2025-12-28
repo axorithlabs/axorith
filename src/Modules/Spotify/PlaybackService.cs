@@ -49,25 +49,26 @@ internal sealed class PlaybackService : IDisposable
             .DisposeWith(_disposables);
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
         _authService.RefreshUiState();
 
         if (!_authService.HasRefreshToken())
         {
             ClearChoices();
-            return;
+            return Task.CompletedTask;
         }
 
         if (TryServeCachedChoices())
         {
             _ = RefreshPlaylistsLoopAsync();
-            return;
+            return Task.CompletedTask;
         }
 
         _ = RefreshChoicesAsync(force: true);
 
         _ = RefreshPlaylistsLoopAsync();
+        return Task.CompletedTask;
     }
 
     private async Task RefreshPlaylistsLoopAsync()

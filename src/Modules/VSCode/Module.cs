@@ -20,7 +20,6 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : L
             return args;
         }
 
-        // Quote path if it contains spaces
         var safePath = projectPath.Contains(' ') ? $"\"{projectPath}\"" : projectPath;
         args = string.IsNullOrWhiteSpace(args) ? safePath : $"{args} {safePath}";
 

@@ -18,12 +18,12 @@ public class Module : IModule
     private readonly ConcurrentDictionary<string, DateTime> _lastNotificationTime = new();
     private readonly TimeSpan _notificationCooldown = TimeSpan.FromSeconds(10);
 
-    public Module(IModuleLogger logger, IProcessBlocker blocker, INotifier notifier, IAppDiscoveryService appDiscovery)
+    public Module(IModuleLogger logger, IProcessBlocker blocker, INotifier notifier)
     {
         _logger = logger;
         _blocker = blocker;
         _notifier = notifier;
-        _settings = new Settings(); // Pass service
+        _settings = new Settings();
 
         _blocker.ProcessBlocked += OnProcessBlocked;
     }

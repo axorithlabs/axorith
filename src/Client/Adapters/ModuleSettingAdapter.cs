@@ -9,7 +9,7 @@ namespace Axorith.Client.Adapters;
 ///     Adapts a ModuleSetting from gRPC into an ISetting for UI binding.
 ///     Provides reactive properties for the UI without requiring a live module instance.
 /// </summary>
-internal class ModuleSettingAdapter : ISetting
+internal class ModuleSettingAdapter : ISetting, IDisposable
 {
     private readonly BehaviorSubject<string> _labelSubject;
     private readonly BehaviorSubject<bool> _visibilitySubject;
@@ -149,6 +149,15 @@ internal class ModuleSettingAdapter : ISetting
     public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> choices)
     {
         _choicesSubject.OnNext(choices);
+    }
+
+    public void Dispose()
+    {
+        _labelSubject.Dispose();
+        _visibilitySubject.Dispose();
+        _readOnlySubject.Dispose();
+        _valueSubject.Dispose();
+        _choicesSubject.Dispose();
     }
 
     private static Type ParseValueType(string typeName)

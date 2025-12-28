@@ -11,8 +11,6 @@ public class HttpClientFactoryAdapter(System.Net.Http.IHttpClientFactory realFac
 {
     public IHttpClient CreateClient(string name)
     {
-        // Use module-specific client name for circuit breaker isolation
-        // This ensures that failures in one module don't affect others
         var clientName = string.IsNullOrWhiteSpace(name) ? "default" : $"module-{name}";
 
         var realHttpClient = realFactory.CreateClient(clientName);

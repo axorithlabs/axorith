@@ -160,7 +160,7 @@ internal sealed class SpotifyApiService(
             return string.Empty;
         }
 
-        var result = await ExecuteWithRetryAsync<string>(async () =>
+        var result = await ExecuteWithRetryAsync(async () =>
         {
             var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
             using var jsonDoc = JsonDocument.Parse(responseJson);

@@ -244,5 +244,6 @@ public sealed class HostTrayService(
     {
         _cts?.Cancel();
         _cts?.Dispose();
+        _trayIcon?.Dispose();
     }
 }

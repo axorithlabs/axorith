@@ -12,14 +12,10 @@ public class SessionSchedule
     public Guid PresetId { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsEnabled { get; set; } = true;
-
     public ScheduleType Type { get; set; }
-
     public DateTimeOffset? OneTimeDate { get; set; }
-
-    public TimeSpan? RecurringTime { get; set; } // Time of day
-    public List<DayOfWeek> DaysOfWeek { get; set; } = []; // Empty = every day
-
+    public TimeSpan? RecurringTime { get; set; }
+    public List<DayOfWeek> DaysOfWeek { get; set; } = [];
     public DateTimeOffset? LastRun { get; set; }
 
     /// <summary>
@@ -68,7 +64,6 @@ public class SessionSchedule
                 continue;
             }
 
-            // Check day of week filter
             if (DaysOfWeek.Count > 0 && !DaysOfWeek.Contains(candidateDate.DayOfWeek))
             {
                 continue;

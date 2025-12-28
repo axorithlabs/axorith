@@ -6,16 +6,12 @@ import "google/protobuf/timestamp.proto";
 
 option csharp_namespace = "Axorith.Contracts";
 
-// ===== Common Types =====
-
 message OperationResult {
   bool success = 1;
   string message = 2;
   repeated string errors = 3;
   repeated string warnings = 4;
 }
-
-// ===== Setting-related Messages =====
 
 message Setting {
   string key = 1;
@@ -103,16 +99,12 @@ message SettingValue {
   }
 }
 
-// ===== Action-related Messages =====
-
 message Action {
   string key = 1;
   string label = 2;
   string description = 3;
   bool is_enabled = 4;
 }
-
-// ===== Module-related Messages =====
 
 message ModuleDefinition {
   string id = 1;
@@ -131,8 +123,6 @@ message ConfiguredModule {
   double start_delay_seconds = 5;
 }
 
-// ===== Preset-related Messages =====
-
 message PresetSummary {
   string id = 1;
   string name = 2;
@@ -146,8 +136,6 @@ message Preset {
   int32 version = 3;
   repeated ConfiguredModule modules = 4;
 }
-
-// ===== Session-related Messages =====
 
 message SessionState {
   bool is_active = 1;
@@ -190,8 +178,6 @@ enum SessionEventType {
   SESSION_EVENT_MODULE_ERROR = 4;
   SESSION_EVENT_VALIDATION_WARNING = 5;
 }
-
-// ===== Validation Types =====
 
 enum ValidationSeverity {
   VALIDATION_ERROR = 0;

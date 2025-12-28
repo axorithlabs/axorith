@@ -8,7 +8,7 @@ using Moq;
 
 namespace Axorith.Core.Tests.Services;
 
-public class ModuleRegistryTests
+public class ModuleRegistryTests : IDisposable
 {
     private readonly Mock<IModuleLoader> _mockLoader;
     private readonly ModuleRegistry _registry;
@@ -199,5 +199,10 @@ public class ModuleRegistryTests
 
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    public void Dispose()
+    {
+        _registry.Dispose();
     }
 }

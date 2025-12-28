@@ -40,6 +40,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
     private readonly string _pipeName = "axorith-nm-pipe";
 
     private List<string> _activeSiteList = [];
+    private bool _disposed;
 
     /// <inheritdoc />
     public IReadOnlyList<ISetting> GetSettings()
@@ -126,7 +127,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
             var json = JsonSerializer.Serialize(message);
             var buffer = Encoding.UTF8.GetBytes(json);
 
-            await pipeClient.WriteAsync(buffer, 0, buffer.Length);
+            await pipeClient.WriteAsync(buffer);
             await pipeClient.FlushAsync();
 
             var commandName = message.GetType().GetProperty("command")?.GetValue(message) ?? "unknown";
@@ -197,46 +198,48 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_activeSiteList.Count <= 0)
+        if (_disposed)
         {
             return;
         }
 
-        logger.LogWarning(
-            "Disposing module while sites are still blocked. Attempting to send final unblock command.");
+        _disposed = true;
 
-        var hadSites = _activeSiteList.Count > 0;
-        _activeSiteList.Clear();
-
-        if (!hadSites)
+        if (_activeSiteList.Count > 0)
         {
-            return;
+            logger.LogWarning(
+                "Disposing module while sites are still blocked. Attempting to send final unblock command.");
+
+            _activeSiteList.Clear();
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var message = new { command = "unblock" };
+                    await using var pipeClient =
+                        new NamedPipeClientStream(".", _pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
+
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    await pipeClient.ConnectAsync(cts.Token);
+
+                    var json = JsonSerializer.Serialize(message);
+                    var buffer = Encoding.UTF8.GetBytes(json);
+                    await pipeClient.WriteAsync(buffer, cts.Token);
+                    await pipeClient.FlushAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Timeout - expected during disposal
+                }
+                catch
+                {
+                    // Swallow all exceptions during disposal cleanup
+                }
+            });
         }
 
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var message = new { command = "unblock" };
-                await using var pipeClient =
-                    new NamedPipeClientStream(".", _pipeName, PipeDirection.Out, PipeOptions.Asynchronous);
-
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                await pipeClient.ConnectAsync(cts.Token);
-
-                var json = JsonSerializer.Serialize(message);
-                var buffer = Encoding.UTF8.GetBytes(json);
-                await pipeClient.WriteAsync(buffer, cts.Token);
-                await pipeClient.FlushAsync(cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // Timeout - expected during disposal
-            }
-            catch
-            {
-                // Swallow all exceptions during disposal cleanup
-            }
-        });
+        _mode.Dispose();
+        _siteList.Dispose();
     }
 }

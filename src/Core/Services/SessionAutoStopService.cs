@@ -24,12 +24,11 @@ public class SessionAutoStopService(
     private Task? _loopTask;
     private CancellationTokenSource? _loopCts;
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        sessionManager.SessionStarted += OnSessionStarted;
         sessionManager.SessionStopped += OnSessionStopped;
 
-        logger.LogInformation("SessionAutoStopService started");
+        return Task.CompletedTask;
     }
 
     public async Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
@@ -122,15 +121,16 @@ public class SessionAutoStopService(
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
-    private void OnSessionStarted(Guid sessionId)
-    {
-        // Session started - tracking will be started via StartTrackingAsync
-        // This is called by ScheduleManager or other code that starts sessions
-    }
-
     private async void OnSessionStopped(Guid sessionId)
     {
-        await StopTrackingAsync().ConfigureAwait(false);
+        try
+        {
+            await StopTrackingAsync().ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning("Session stopped with error {Exception}", e);
+        }
     }
 
     private async Task RunTrackingLoopAsync(CancellationToken ct)
@@ -175,22 +175,22 @@ public class SessionAutoStopService(
 
             if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
             {
-                await CheckAndNotifyAsync(timeLeft, TimeSpan.FromSeconds(15), "15 seconds", ct)
+                await CheckAndNotifyAsync(TimeSpan.FromSeconds(15), "15 seconds", ct)
                     .ConfigureAwait(false);
             }
             else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
             {
-                await CheckAndNotifyAsync(timeLeft, TimeSpan.FromMinutes(1), "1 minute", ct)
+                await CheckAndNotifyAsync(TimeSpan.FromMinutes(1), "1 minute", ct)
                     .ConfigureAwait(false);
             }
             else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
             {
-                await CheckAndNotifyAsync(timeLeft, TimeSpan.FromMinutes(5), "5 minutes", ct)
+                await CheckAndNotifyAsync(TimeSpan.FromMinutes(5), "5 minutes", ct)
                     .ConfigureAwait(false);
             }
             else if (timeLeft <= TimeSpan.FromMinutes(15) && timeLeft > TimeSpan.FromMinutes(5))
             {
-                await CheckAndNotifyAsync(timeLeft, TimeSpan.FromMinutes(15), "15 minutes", ct)
+                await CheckAndNotifyAsync(TimeSpan.FromMinutes(15), "15 minutes", ct)
                     .ConfigureAwait(false);
             }
         }
@@ -203,7 +203,7 @@ public class SessionAutoStopService(
         }
     }
 
-    private async Task CheckAndNotifyAsync(TimeSpan timeLeft, TimeSpan threshold, string timeText,
+    private async Task CheckAndNotifyAsync(TimeSpan threshold, string timeText,
         CancellationToken ct)
     {
         var key = $"{_currentSessionId}_{_stopAt?.Ticks}_{threshold.TotalSeconds}";
@@ -323,7 +323,6 @@ public class SessionAutoStopService(
 
     public async ValueTask DisposeAsync()
     {
-        sessionManager.SessionStarted -= OnSessionStarted;
         sessionManager.SessionStopped -= OnSessionStopped;
 
         _loopCts?.Cancel();

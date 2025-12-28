@@ -3,14 +3,11 @@ using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Linux;
 
-/// <summary>
-///     Linux-specific secure storage implementation using Secret Service API (libsecret).
-///     Falls back to encrypted file storage if Secret Service is not available.
-/// </summary>
 [SupportedOSPlatform("linux")]
 internal class LinuxSecureStorage : ISecureStorageService
 {
@@ -33,11 +30,7 @@ internal class LinuxSecureStorage : ISecureStorageService
         else
         {
             _logger.LogWarning("Secret Service not available, falling back to encrypted file storage");
-            _storageDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Axorith", "secrets"
-            );
-            Directory.CreateDirectory(_storageDir);
+            _storageDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.LocalSecrets);
 
             // Set restrictive permissions (owner only)
             if (OperatingSystem.IsLinux())

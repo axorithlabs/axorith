@@ -47,7 +47,6 @@ internal sealed class Settings : LauncherSettingsBase
         RefreshIdeListAction = Action.Create("RefreshIdeList", "Refresh IDE List");
         RefreshIdeListAction.OnInvokeAsync(RefreshIdeListAsync);
 
-        // Setup reactive visibility after all fields are initialized
         SetupBaseReactiveVisibility();
     }
 
@@ -106,5 +105,14 @@ internal sealed class Settings : LauncherSettingsBase
         {
             IdePath.SetValue(choices[0].Key);
         }
+    }
+
+    public override void Dispose()
+    {
+        IdePath.Dispose();
+        ProjectPath.Dispose();
+        ApplicationArgs.Dispose();
+        RefreshIdeListAction.Dispose();
+        base.Dispose();
     }
 }

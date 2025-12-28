@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
+using Axorith.Shared.Utils;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
@@ -14,8 +15,7 @@ public class HostController(
     ILogger<HostController> logger,
     ITokenProvider tokenProvider) : IHostController
 {
-    private static readonly string HostInfoPath = Path.Combine(
-        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
+    private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
 
     private readonly object _portLock = new();
     private int? _cachedPort;
@@ -70,11 +70,13 @@ public class HostController(
                 while (graceSw.ElapsedMilliseconds < 2000)
                 {
                     await Task.Delay(200, ct);
-                    if (await IsHostReachableAsync(ct))
+                    if (!await IsHostReachableAsync(ct))
                     {
-                        logger.LogInformation("Axorith.Host became reachable during grace period. Skipping restart.");
-                        return;
+                        continue;
                     }
+
+                    logger.LogInformation("Axorith.Host became reachable during grace period. Skipping restart.");
+                    return;
                 }
             }
 
@@ -183,7 +185,7 @@ public class HostController(
 
             logger.LogInformation("Waiting for Host process to exit...");
             var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < 2000) // Wait up to 2 seconds
+            while (sw.ElapsedMilliseconds < 2000)
             {
                 var processes = Process.GetProcessesByName("Axorith.Host");
                 if (processes.Length == 0)
@@ -239,13 +241,11 @@ public class HostController(
     {
         lock (_portLock)
         {
-            // Return cached port if available
             if (_cachedPort.HasValue)
             {
                 return _cachedPort.Value;
             }
 
-            // Try to read from host-info.json
             try
             {
                 if (File.Exists(HostInfoPath))
@@ -266,7 +266,6 @@ public class HostController(
                 logger.LogWarning(ex, "Failed to read host-info.json, using configured port");
             }
 
-            // Fall back to configured port
             var fallbackPort = config.Value.Host.Port;
             _cachedPort = fallbackPort;
             logger.LogDebug("Using configured port {Port}", fallbackPort);

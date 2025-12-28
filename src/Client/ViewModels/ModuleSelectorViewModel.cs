@@ -6,7 +6,6 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
-// Wrapper for ModuleDefinition to handle UI state
 public class ModuleDefinitionViewModel(ModuleDefinition definition) : ReactiveObject
 {
     public ModuleDefinition Definition { get; } = definition;

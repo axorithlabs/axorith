@@ -30,7 +30,6 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     private bool _autoStartEnabled;
     private bool _autoStartMinimized;
     private bool _minimizeToTrayOnClose;
-    private bool _hasUnsavedChanges;
 
     public bool TelemetryEnabled
     {
@@ -74,8 +73,8 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
 
     public bool HasUnsavedChanges
     {
-        get => _hasUnsavedChanges;
-        private set => this.RaiseAndSetIfChanged(ref _hasUnsavedChanges, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     public string AppVersion { get; }

@@ -109,4 +109,13 @@ internal sealed class Settings : LauncherSettingsBase
             CodePath.SetValue(path);
         }
     }
+
+    public override void Dispose()
+    {
+        CodePath.Dispose();
+        ProjectPath.Dispose();
+        ApplicationArgs.Dispose();
+        RefreshPathAction.Dispose();
+        base.Dispose();
+    }
 }

@@ -1,16 +1,13 @@
-﻿using System.Linq;
-using Axorith.Sdk;
+﻿using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.OBS;
 
-/// <summary>
-/// Settings for OBS Studio module.
-/// </summary>
 internal sealed class Settings : LauncherSettingsBase
 {
     private const int MinPort = 1;
@@ -170,18 +167,15 @@ internal sealed class Settings : LauncherSettingsBase
 
     private async Task RefreshPathAsync()
     {
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-
         var possiblePaths = new[]
         {
-            Path.Combine(programFiles, "obs-studio", "bin", "64bit", "obs64.exe"),
-            Path.Combine(programFilesX86, "obs-studio", "bin", "64bit", "obs64.exe"),
-            Path.Combine(programFiles, "obs-studio", "bin", "32bit", "obs32.exe"),
+            Path.Combine(ApplicationPaths.ProgramFiles, "obs-studio", "bin", "64bit", "obs64.exe"),
+            Path.Combine(ApplicationPaths.ProgramFilesX86, "obs-studio", "bin", "64bit", "obs64.exe"),
+            Path.Combine(ApplicationPaths.ProgramFiles, "obs-studio", "bin", "32bit", "obs32.exe"),
             @"C:\Program Files (x86)\Steam\steamapps\common\OBS Studio\bin\64bit\obs64.exe"
         };
 
-        string? path = possiblePaths.FirstOrDefault(possiblePath => File.Exists(possiblePath));
+        string? path = possiblePaths.FirstOrDefault(File.Exists);
 
         if (string.IsNullOrEmpty(path))
         {
@@ -207,5 +201,17 @@ internal sealed class Settings : LauncherSettingsBase
         {
             ObsPath.SetValue(path);
         }
+    }
+
+    public override void Dispose()
+    {
+        ObsPath.Dispose();
+        RefreshPathAction.Dispose();
+        EnableWebSocket.Dispose();
+        WebSocketPort.Dispose();
+        WebSocketPassword.Dispose();
+        SessionStartAction.Dispose();
+        SessionEndAction.Dispose();
+        base.Dispose();
     }
 }

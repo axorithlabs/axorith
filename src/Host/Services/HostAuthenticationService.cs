@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 using Axorith.Contracts;
-using Microsoft.Extensions.Options;
+using Axorith.Shared.Utils;
 
 namespace Axorith.Host.Services;
 
@@ -11,26 +11,17 @@ public interface IHostAuthenticationService
 }
 
 public class HostAuthenticationService(
-    IOptions<Configuration> config,
     ILogger<HostAuthenticationService> logger) : IHostAuthenticationService
 {
     private string _currentToken = string.Empty;
 
     public void InitializeToken()
     {
-        var presetsPath = config.Value.Persistence.ResolvePresetsPath();
-        var appDataDir = Directory.GetParent(presetsPath)?.FullName
-                         ?? Path.GetDirectoryName(presetsPath)!;
-
-        var tokenFilePath = Path.Combine(appDataDir, AuthConstants.TokenFileName);
+        var configDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.Config);
+        var tokenFilePath = Path.Combine(configDir, AuthConstants.TokenFileName);
 
         try
         {
-            if (!Directory.Exists(appDataDir))
-            {
-                Directory.CreateDirectory(appDataDir);
-            }
-
             if (File.Exists(tokenFilePath))
             {
                 try
@@ -38,7 +29,8 @@ public class HostAuthenticationService(
                     var existingToken = File.ReadAllText(tokenFilePath).Trim();
                     if (!string.IsNullOrWhiteSpace(existingToken))
                     {
-                        Convert.FromBase64String(existingToken);
+                        // Validate that the token is valid Base64
+                        _ = Convert.FromBase64String(existingToken);
                         _currentToken = existingToken;
                         logger.LogInformation("Loaded existing auth token from {Path}", tokenFilePath);
                         return;

@@ -112,11 +112,11 @@ internal static partial class SensitiveDataMasker
     private static partial Regex IPv4Regex();
 
     // IPv6 full format: 8 groups of 4 hex digits separated by colons
-    [GeneratedRegex(@"^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$", RegexOptions.Compiled)]
+    [GeneratedRegex("^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$", RegexOptions.Compiled)]
     private static partial Regex IPv6FullRegex();
 
     // IPv6 compressed format: ::1, fe80::, 2001:db8::1, etc.
-    [GeneratedRegex(@"^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$", RegexOptions.Compiled)]
+    [GeneratedRegex("^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$", RegexOptions.Compiled)]
     private static partial Regex IPv6CompressedRegex();
 
     // IPv4-mapped IPv6: ::ffff:d.d.d.d
@@ -124,7 +124,7 @@ internal static partial class SensitiveDataMasker
     private static partial Regex IPv4MappedIPv6Regex();
 
     // Loopback IPv6: ::1
-    [GeneratedRegex(@"^::1$", RegexOptions.Compiled)]
+    [GeneratedRegex("^::1$", RegexOptions.Compiled)]
     private static partial Regex IPv6LoopbackRegex();
 
     /// <summary>

@@ -50,61 +50,70 @@ internal sealed class Settings : LauncherSettingsBase
         await RefreshPathAsync();
     }
 
-    private async Task RefreshPathAsync()
+    private Task RefreshPathAsync()
     {
-        var platform = EnvironmentUtils.GetCurrentPlatform();
-        string? path = null;
-
-        if (platform == Platform.Windows)
+        return Task.Run(() =>
         {
-            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var discordBase = Path.Combine(localAppData, "Discord");
+            var platform = EnvironmentUtils.GetCurrentPlatform();
+            string? path = null;
 
-            if (Directory.Exists(discordBase))
+            if (platform == Platform.Windows)
             {
-                var appFolders = Directory.GetDirectories(discordBase, "app-*")
-                    .OrderByDescending(d => d)
-                    .ToList();
+                var discordBase = Path.Combine(ApplicationPaths.LocalRoot, "Discord");
 
-                foreach (var appFolder in appFolders)
+                if (Directory.Exists(discordBase))
                 {
-                    var discordExe = Path.Combine(appFolder, "Discord.exe");
-                    if (File.Exists(discordExe))
+                    var appFolders = Directory.GetDirectories(discordBase, "app-*")
+                        .OrderByDescending(d => d)
+                        .ToList();
+
+                    foreach (var appFolder in appFolders)
                     {
-                        path = discordExe;
-                        break;
+                        var discordExe = Path.Combine(appFolder, "Discord.exe");
+                        if (File.Exists(discordExe))
+                        {
+                            path = discordExe;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (string.IsNullOrEmpty(path))
+                if (string.IsNullOrEmpty(path))
+                {
+                    path = _appDiscovery.FindKnownApp("Discord.exe", "Discord");
+                }
+            }
+            else
             {
-                path = await Task.Run(() => _appDiscovery.FindKnownApp("Discord.exe", "Discord")).ConfigureAwait(false);
+                path = _appDiscovery.FindKnownApp("discord");
             }
-        }
-        else
-        {
-            path = await Task.Run(() => _appDiscovery.FindKnownApp("discord")).ConfigureAwait(false);
-        }
 
-        var choices = new List<KeyValuePair<string, string>>
-        {
-            !string.IsNullOrEmpty(path)
-                ? new KeyValuePair<string, string>(path, "Discord (Auto-Detected)")
-                : new KeyValuePair<string, string>("", "Discord not found")
-        };
+            var choices = new List<KeyValuePair<string, string>>
+            {
+                !string.IsNullOrEmpty(path)
+                    ? new KeyValuePair<string, string>(path, "Discord (Auto-Detected)")
+                    : new KeyValuePair<string, string>("", "Discord not found")
+            };
 
-        var current = DiscordPath.GetCurrentValue();
-        if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
-        {
-            choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
-        }
+            var current = DiscordPath.GetCurrentValue();
+            if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
+            {
+                choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
+            }
 
-        DiscordPath.SetChoices(choices);
+            DiscordPath.SetChoices(choices);
 
-        if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(path))
-        {
-            DiscordPath.SetValue(path);
-        }
+            if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(path))
+            {
+                DiscordPath.SetValue(path);
+            }
+        });
+    }
+
+    public override void Dispose()
+    {
+        DiscordPath.Dispose();
+        RefreshPathAction.Dispose();
+        base.Dispose();
     }
 }

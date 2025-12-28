@@ -173,6 +173,11 @@ public class App : Application
                     return;
                 }
 
+                if (_mainWindow.WindowState != Avalonia.Controls.WindowState.Minimized)
+                {
+                    windowStateManager.SaveWindowState(_mainWindow);
+                }
+
                 var options = Services.GetService<IOptions<Configuration>>();
                 var cfg = options?.Value ?? clientConfig;
 

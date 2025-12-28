@@ -139,7 +139,6 @@ internal sealed class AuthService : IDisposable
                 _logger.LogInfo("Successfully refreshed access token.");
                 _inMemoryAccessToken = newAccessToken;
 
-                // Never cache beyond the server's reported expiry; keep a safety margin.
                 const int safetyMarginSeconds = 30;
                 var effectiveExpirySeconds = expiresInSeconds > safetyMarginSeconds
                     ? expiresInSeconds - safetyMarginSeconds
@@ -224,8 +223,6 @@ internal sealed class AuthService : IDisposable
             }
         }
 
-        // Fallback: try a handful of random dynamic ports (IANA range). This may still fail
-        // if the redirect URI is not pre-registered, but preserves previous behavior.
         if (listener == null)
         {
             var rnd = new Random();

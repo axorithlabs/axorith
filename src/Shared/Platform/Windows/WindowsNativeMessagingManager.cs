@@ -1,14 +1,11 @@
 ﻿using System.Runtime.Versioning;
 using System.Text.Json;
+using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows-specific implementation of INativeMessagingManager.
-///     Registers the host via the Windows Registry (HKCU) and creates the manifest file in AppData.
-/// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManager> logger) : INativeMessagingManager
 {
@@ -25,13 +22,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
 
         try
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var manifestDir = Path.Combine(appData, "Axorith", "native-messaging", "firefox");
-
-            if (!Directory.Exists(manifestDir))
-            {
-                Directory.CreateDirectory(manifestDir);
-            }
+            var manifestDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.NativeMessagingFirefox);
 
             var manifest = new
             {
@@ -83,13 +74,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
 
         try
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var manifestDir = Path.Combine(appData, "Axorith", "native-messaging", "chrome");
-
-            if (!Directory.Exists(manifestDir))
-            {
-                Directory.CreateDirectory(manifestDir);
-            }
+            var manifestDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.NativeMessagingChrome);
 
             var manifest = new
             {

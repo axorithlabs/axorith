@@ -25,7 +25,6 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
             return true;
         }
 
-        // Reset state before reconnection attempt
         _isConnected = false;
 
         var port = settings.GetPort();
@@ -44,7 +43,6 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
 
             await _webSocket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
 
-            // Receive Hello
             var helloResponse = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
             if (helloResponse == null) return false;
 
@@ -69,7 +67,6 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
 
             await SendMessageAsync(identifyJson, cancellationToken).ConfigureAwait(false);
 
-            // Receive Identified
             var identifiedResponse = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
             if (identifiedResponse == null) return false;
 
@@ -92,7 +89,10 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
         if (_webSocket?.State == WebSocketState.Open)
         {
             try { await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         }
         _isConnected = false;
     }
