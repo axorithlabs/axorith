@@ -460,7 +460,7 @@ internal class GrpcModulesApi(
                         Contracts.SettingUpdate.ValueOneofCase.BoolValue => update.BoolValue,
                         Contracts.SettingUpdate.ValueOneofCase.NumberValue => update.NumberValue,
                         Contracts.SettingUpdate.ValueOneofCase.IntValue => update.IntValue,
-                        Contracts.SettingUpdate.ValueOneofCase.ChoiceList => update.ChoiceList.Choices
+                        Contracts.SettingUpdate.ValueOneofCase.ChoiceList when update.ChoiceList != null => update.ChoiceList.Choices
                             .Select(c => new KeyValuePair<string, string>(c.Key, c.Display))
                             .ToList(),
                         _ => null

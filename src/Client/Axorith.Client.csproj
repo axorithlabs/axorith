@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Client</AssemblyName>
         <RootNamespace>Axorith.Client</RootNamespace>
         
-        <Description>UI client for Axorith OS.</Description>
+        <Description>UI client for Axorith.</Description>
         
         <OutputType>WinExe</OutputType>
         <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -17,6 +17,7 @@
         <ProjectReference Include="..\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\Contracts\Axorith.Contracts.csproj" />
         <ProjectReference Include="..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
+        <ProjectReference Include="..\Shared\Utils\Axorith.Shared.Utils.csproj" />
         <ProjectReference Include="..\Telemetry\Axorith.Telemetry.csproj" />
     </ItemGroup>
 

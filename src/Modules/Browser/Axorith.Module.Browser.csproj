@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Module.Browser</AssemblyName>
+        <RootNamespace>Axorith.Module.Browser</RootNamespace>
+        <Description>Browser launcher module for Axorith - supports all major browsers.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
+        <ProjectReference Include="..\..\Shared\ApplicationLauncher\Axorith.Shared.ApplicationLauncher.csproj" />
+    </ItemGroup>
+</Project>

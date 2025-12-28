@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Module.AppBlocker</AssemblyName>
         <RootNamespace>Axorith.Module.AppBlocker</RootNamespace>
 
-        <Description>Application Blocker module for Axorith OS.</Description>
+        <Description>Application Blocker module for Axorith.</Description>
     </PropertyGroup>
 
     <ItemGroup>

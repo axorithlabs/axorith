@@ -92,9 +92,10 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     public ObservableCollection<SettingViewModel> Settings { get; } = [];
     public ObservableCollection<ActionViewModel> Actions { get; } = [];
 
-    // Commands for UI interaction in the workflow graph
     public ReactiveCommand<Unit, Unit> AddDelayCommand { get; }
     public ReactiveCommand<Unit, Unit> RemoveDelayCommand { get; }
+
+    private bool _disposed;
 
     public ConfiguredModuleViewModel(
         ModuleDefinition definition,
@@ -381,9 +382,19 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         _settingUpdatesSubscription.Dispose();
         _settingStreamHandle?.Dispose();
         _validationSubscription?.Dispose();
+
+        AddDelayCommand.Dispose();
+        RemoveDelayCommand.Dispose();
 
         foreach (var setting in Settings)
         {

@@ -2,7 +2,7 @@
     <PropertyGroup>
         <RootNamespace>Axorith.Module.ApplicationLauncher</RootNamespace>
 
-        <Description>Cross-platform Application Manager module for Axorith OS.</Description>
+        <Description>Application Launcher module for Axorith.</Description>
 
         <PackageId>Axorith.Module.ApplicationLauncher</PackageId>
     </PropertyGroup>

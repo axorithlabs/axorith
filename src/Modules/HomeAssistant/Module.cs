@@ -95,25 +95,35 @@ public class Module : IModule
             var url = _settings.BaseUrl.GetCurrentValue();
             var token = _settings.AccessToken.GetCurrentValue();
 
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                _settings.TestConnectionAction.SetLabel("Error: URL required");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                _settings.TestConnectionAction.SetLabel("Error: Token required");
+                return;
+            }
+
             var success = await _client.CheckConnectionAsync(url, token, CancellationToken.None);
 
-            if (success)
-            {
-                _settings.TestConnectionAction.SetLabel("Connection OK“");
-            }
-            else
-            {
-                _settings.TestConnectionAction.SetLabel("Connection Failed");
-            }
+            _settings.TestConnectionAction.SetLabel(success ? "Connected OK" : "Connection Failed");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Test connection failed - network error");
+            _settings.TestConnectionAction.SetLabel("Network Error");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Test connection failed");
-            _settings.TestConnectionAction.SetLabel("Error (See Logs)");
+            _settings.TestConnectionAction.SetLabel("Error");
         }
         finally
         {
-            await Task.Delay(2000);
+            await Task.Delay(3000);
             _settings.TestConnectionAction.SetLabel("Test Connection");
             _settings.TestConnectionAction.SetEnabled(true);
         }
@@ -121,6 +131,7 @@ public class Module : IModule
 
     public void Dispose()
     {
+        _settings.Dispose();
         GC.SuppressFinalize(this);
     }
 }

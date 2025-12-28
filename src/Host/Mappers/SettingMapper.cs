@@ -51,6 +51,7 @@ public static class SettingMapper
             case Sdk.Settings.SettingControlType.DirectoryPicker:
             case Sdk.Settings.SettingControlType.Choice:
             case Sdk.Settings.SettingControlType.MultiChoice:
+            case Sdk.Settings.SettingControlType.Button:
                 message.StringValue = currentValue?.ToString() ?? string.Empty;
                 break;
 
@@ -225,6 +226,7 @@ public static class SettingMapper
             Sdk.Settings.SettingControlType.Secret => SettingControlType.Secret,
             Sdk.Settings.SettingControlType.FilePicker => SettingControlType.FilePicker,
             Sdk.Settings.SettingControlType.DirectoryPicker => SettingControlType.DirectoryPicker,
+            Sdk.Settings.SettingControlType.Button => SettingControlType.Text, // Button maps to Text as fallback
             _ => SettingControlType.Text
         };
     }

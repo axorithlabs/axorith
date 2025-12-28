@@ -66,17 +66,12 @@ VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 VIAddVersionKey "OriginalFilename" "${PRODUCT_NAME}-Setup-${PRODUCT_VERSION}.exe"
 
 !include "MUI2.nsh"
-!include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 !include "WinMessages.nsh"
 !define MUI_ICON "assets\icon.ico"
 
-Var TelemetryCheckbox
-Var TelemetryOptIn
-
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
-Page Custom TelemetryPageCreate TelemetryPageLeave
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -99,7 +94,7 @@ Section "MainSection" SEC_INSTALL
   SetOutPath "$INSTDIR\Axorith.Client"
   CreateShortCut "$smprograms\${PRODUCT_NAME}.lnk" "$INSTDIR\Axorith.Client\Axorith.Client.exe" "" "$INSTDIR\Axorith.Client\Assets\icon.ico"
   SetOutPath "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\Axorith.Client\Axorith.Client.exe" --tray'
+  
   WriteRegExpandStr HKCU "Environment" "AXORITH_HOST_PATH" "$INSTDIR\Axorith.Host\Axorith.Host.exe"
   
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayName" "${PRODUCT_NAME}"
@@ -108,12 +103,6 @@ Section "MainSection" SEC_INSTALL
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayIcon" "$INSTDIR\Axorith.Client\Assets\icon.ico"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "Comments" "${PRODUCT_DESCRIPTION}"
-
-  ${If} $TelemetryOptIn == ${BST_CHECKED}
-    WriteRegStr HKCU "Environment" "AXORITH_TELEMETRY" "1"
-  ${Else}
-    WriteRegStr HKCU "Environment" "AXORITH_TELEMETRY" "0"
-  ${EndIf}
 
   System::Call 'USER32::SendMessageTimeoutA(i ${HWND_BROADCAST},i ${WM_SETTINGCHANGE},i 0,t "Environment",i 0x0002,i .r0)'
   
@@ -125,28 +114,14 @@ Section "Uninstall"
   Delete "$smprograms\${PRODUCT_NAME}.lnk"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
   DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith"
+  DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith.dev"
+  DeleteRegKey /ifempty HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith"
+  DeleteRegKey /ifempty HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith.dev"
+  DeleteRegKey /ifempty HKCU "Software\Chromium\NativeMessagingHosts\axorith"
+  DeleteRegKey /ifempty HKCU "Software\Chromium\NativeMessagingHosts\axorith.dev"
+  DeleteRegKey /ifempty HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith"
+  DeleteRegKey /ifempty HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith.dev"
   DeleteRegValue HKCU "Environment" "AXORITH_HOST_PATH"
-  DeleteRegValue HKCU "Environment" "AXORITH_TELEMETRY"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 SectionEnd
-
-Function TelemetryPageCreate
-    nsDialogs::Create 1018
-    Pop $0
-    ${If} $0 == error
-        Abort
-    ${EndIf}
-
-    ${NSD_CreateLabel} 0 0 100% 40u "We collect anonymous telemetry (no IP/PII) to improve Axorith: versions, launches, module usage, errors."
-    ${NSD_CreateLabel} 0 35u 100% 12u "You can opt out now or later via the AXORITH_TELEMETRY env variable."
-    ${NSD_CreateCheckbox} 0 55u 100% 12u "Send anonymous telemetry"
-    Pop $TelemetryCheckbox
-    ${NSD_SetState} $TelemetryCheckbox ${BST_CHECKED}
-
-    nsDialogs::Show
-FunctionEnd
-
-Function TelemetryPageLeave
-    ${NSD_GetState} $TelemetryCheckbox $TelemetryOptIn
-FunctionEnd

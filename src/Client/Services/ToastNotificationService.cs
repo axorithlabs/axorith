@@ -5,7 +5,7 @@ using Axorith.Sdk.Services;
 
 namespace Axorith.Client.Services;
 
-public class ToastNotificationService : IToastNotificationService
+public class ToastNotificationService : IToastNotificationService, IDisposable
 {
     private readonly Subject<ToastNotification> _notifications = new();
 
@@ -15,5 +15,11 @@ public class ToastNotificationService : IToastNotificationService
     {
         var notification = new ToastNotification(message, type, Guid.NewGuid());
         _notifications.OnNext(notification);
+    }
+
+    public void Dispose()
+    {
+        _notifications.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

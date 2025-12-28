@@ -4,7 +4,7 @@ using Axorith.Sdk.Settings;
 
 namespace Axorith.Module.AppBlocker;
 
-internal sealed class Settings
+internal sealed class Settings : IDisposable
 {
     private readonly Setting<List<string>> _categories;
     private readonly Setting<string> _manualProcessList;
@@ -104,5 +104,11 @@ internal sealed class Settings
         }
 
         return result;
+    }
+
+    public void Dispose()
+    {
+        _categories.Dispose();
+        _manualProcessList.Dispose();
     }
 }

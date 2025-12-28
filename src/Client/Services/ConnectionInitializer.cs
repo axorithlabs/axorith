@@ -4,6 +4,7 @@ using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
+using Axorith.Shared.Platform;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     private const int RetryDelayMs = 1000;
 
     private static readonly string HostInfoPath = Path.Combine(
-        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
+        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "config", "host-info.json");
 
     public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger)
     {
@@ -116,10 +117,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         {
             await foreach (var notification in api.StreamNotificationsAsync())
             {
-                // Dispatch to UI thread is NOT needed here because ToastNotificationService uses Rx Subjects
-                // and DesktopNotificationManager observes on UI thread.
-                // However, ShellViewModel also observes on UI thread.
-                // The service itself is thread-safe.
                 toastService.Show(notification.Message, notification.Type);
             }
         }
@@ -247,8 +244,26 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddTransient<MainViewModel>();
         services.AddTransient<SessionEditorViewModel>();
 
+        var autoStartManager = app.Services.GetService<IAutoStartManager>();
+        if (autoStartManager != null)
+        {
+            services.AddSingleton(autoStartManager);
+        }
+
+        services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
+            sp.GetRequiredService<ShellViewModel>(),
+            sp.GetRequiredService<IClientUiSettingsStore>(),
+            sp.GetRequiredService<IAutoStartManager>(),
+            sp.GetRequiredService<ITelemetryService>(),
+            sp.GetRequiredService<IOptions<Configuration>>(),
+            sp,
+            sp.GetRequiredService<ILogger<SettingsViewModel>>()));
+
         var newProvider = services.BuildServiceProvider();
         app.Services = newProvider;
+
+        var shell = newProvider.GetRequiredService<ShellViewModel>();
+        shell.Services = newProvider;
     }
 
     private void StartHealthMonitoring(
@@ -303,7 +318,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
 
     private string GetDiscoveredEndpointUrl(Configuration config, ILogger logger)
     {
-        // Try to read port from host-info.json for dynamic port discovery
         try
         {
             if (File.Exists(HostInfoPath))
@@ -324,7 +338,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             logger.LogWarning(ex, "Failed to read host-info.json, using configured endpoint");
         }
 
-        // Fall back to configured endpoint
         return config.Host.GetEndpointUrl();
     }
 }

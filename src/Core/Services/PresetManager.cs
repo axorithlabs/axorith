@@ -11,7 +11,13 @@ namespace Axorith.Core.Services;
 public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
     private const int CurrentPresetVersion = 1;
-    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+    private const long MaxPresetFileSizeBytes = 10 * 1024 * 1024; // 10 MB max
+
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        WriteIndented = true,
+        MaxDepth = 64 // Prevent stack overflow from deeply nested JSON
+    };
 
     private static readonly SemaphoreSlim FileLock = new(1, 1);
 
@@ -33,8 +39,17 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
             try
             {
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Length > MaxPresetFileSizeBytes)
+                {
+                    logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath, fileInfo.Length);
+                    continue;
+                }
+
                 await using var stream = File.OpenRead(filePath);
-                var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions);
+                // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
+                // File size and MaxDepth are validated to prevent DoS attacks
+                var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions); //-V5611
 
                 if (preset != null)
                 {
@@ -75,8 +90,17 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
         try
         {
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length > MaxPresetFileSizeBytes)
+            {
+                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath, fileInfo.Length);
+                return null;
+            }
+
             await using var stream = File.OpenRead(filePath);
-            var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
+            // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
+            // File size and MaxDepth are validated to prevent DoS attacks
+            var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken) //-V5611
                 .ConfigureAwait(false);
 
             if (preset is not { Version: < CurrentPresetVersion })

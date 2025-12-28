@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Sdk</AssemblyName>
         <RootNamespace>Axorith.Sdk</RootNamespace>
         
-        <Description>Software Development Kit (SDK) for creating Axorith OS modules.</Description>
+        <Description>Software Development Kit (SDK) for creating Axorith modules.</Description>
         
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>

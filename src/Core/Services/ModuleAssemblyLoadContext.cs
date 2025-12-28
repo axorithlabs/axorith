@@ -11,7 +11,6 @@ internal class ModuleAssemblyLoadContext(string modulePath) : AssemblyLoadContex
 {
     private readonly AssemblyDependencyResolver _resolver = new(modulePath);
 
-    // List of assemblies that MUST be loaded from the Default Context (Host)
     private static readonly HashSet<string> SharedAssemblies = new(StringComparer.OrdinalIgnoreCase)
     {
         "Axorith.Sdk",

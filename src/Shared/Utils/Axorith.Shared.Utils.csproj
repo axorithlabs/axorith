@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Shared.Utils</AssemblyName>
         <RootNamespace>Axorith.Shared.Utils</RootNamespace>
 
-        <Description>Shared utils for Axorith OS.</Description>
+        <Description>Shared utils for Axorith.</Description>
 
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>

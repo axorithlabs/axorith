@@ -14,6 +14,7 @@ using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -27,7 +28,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
 
-var hostInfoPath = Path.Combine(Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "host-info.json");
+var hostInfoPath = ApplicationPaths.HostInfoFile;
 ITelemetryService? telemetry = null;
 var telemetryLogLevel = LogEventLevel.Warning;
 var hostUptime = Stopwatch.StartNew();
@@ -50,7 +51,7 @@ try
         "Telemetry (Host): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={Flush}",
         telemetrySettings.Enabled,
         telemetrySettings.IsActive,
-        telemetry?.IsEnabled ?? false,
+        telemetry?.IsEnabled,
         telemetrySettings.PostHogHost,
         telemetrySettings.BatchSize,
         telemetrySettings.QueueLimit,
@@ -61,7 +62,7 @@ try
         Log.Warning(
             "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
             telemetrySettings.Enabled,
-            telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
+            !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) && telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
         Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
@@ -74,10 +75,10 @@ try
 
     builder.Host.UseSerilog((context, _, configuration) =>
     {
-        var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath")
-                       ?? "%AppData%/Axorith/logs";
-
-        var resolvedLogsPath = Environment.ExpandEnvironmentVariables(logsPath);
+        var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath");
+        var resolvedLogsPath = string.IsNullOrWhiteSpace(logsPath) 
+            ? ApplicationPaths.Logs 
+            : ApplicationPaths.ExpandPath(logsPath);
 
         configuration
             .ReadFrom.Configuration(context.Configuration)
@@ -274,6 +275,13 @@ try
     Log.Information("Axorith.Host started successfully on {Address}:{Port}",
         config.Grpc.BindAddress,
         boundPort > 0 ? boundPort : "Unknown");
+
+    // Log telemetry status after Serilog is fully configured
+    Log.Information(
+        "Telemetry status: enabled={Enabled}, active={Active}, isEnabled={IsEnabled}",
+        telemetry!.IsEnabled,
+        telemetry.IsEnabled,
+        telemetry.IsEnabled);
 
     telemetry?.TrackEvent("HostReady", new Dictionary<string, object?>
     {

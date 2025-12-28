@@ -1,0 +1,11 @@
+﻿{
+  "id": "f4996a05-373d-4fa4-996a-05373d8fa4ea",
+  "name": "Steam",
+  "version": "1.0.0",
+  "description": "Launches Steam and starts your favorite games.",
+  "category": "App",
+  "platforms": [
+    "Windows"
+  ],
+  "assembly": "Axorith.Module.Steam.dll"
+}

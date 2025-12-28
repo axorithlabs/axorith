@@ -7,26 +7,17 @@ import "Protos/common.proto";
 option csharp_namespace = "Axorith.Contracts";
 
 service ModulesService {
-  // Discovery
   rpc ListModules(ListModulesRequest) returns (ListModulesResponse);
   rpc GetModuleSettings(GetModuleSettingsRequest) returns (GetModuleSettingsResponse);
-
-  // Runtime actions (Active Session)
   rpc InvokeAction(InvokeActionRequest) returns (OperationResult);
   rpc UpdateSetting(UpdateSettingRequest) returns (OperationResult);
   rpc StreamSettingUpdates(StreamSettingUpdatesRequest) returns (stream SettingUpdate);
-
-  // Design-time actions (Editing Preset)
   rpc InvokeDesignTimeAction(InvokeDesignTimeActionRequest) returns (OperationResult);
   rpc BeginEdit(BeginEditRequest) returns (BeginEditResponse);
   rpc EndEdit(EndEditRequest) returns (OperationResult);
   rpc SyncEdit(SyncEditRequest) returns (OperationResult);
-
-  // Validation
   rpc ValidateSettings (ValidateSettingsRequest) returns (ValidationResponse);
 }
-
-// --- Request/Response Messages ---
 
 message ListModulesRequest {
   string category = 1;
@@ -53,8 +44,6 @@ message InvokeActionRequest {
 message InvokeDesignTimeActionRequest {
   string module_id = 1;
   string action_key = 2;
-  // Optional: design-time sandbox instance to target existing state.
-  // When omitted, server falls back to a temporary instance.
   string module_instance_id = 3;
 }
 

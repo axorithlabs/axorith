@@ -12,14 +12,10 @@ public class SessionSchedule
     public Guid PresetId { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsEnabled { get; set; } = true;
-
     public ScheduleType Type { get; set; }
-
     public DateTimeOffset? OneTimeDate { get; set; }
-
-    public TimeSpan? RecurringTime { get; set; } // Time of day
-    public List<DayOfWeek> DaysOfWeek { get; set; } = []; // Empty = every day
-
+    public TimeSpan? RecurringTime { get; set; }
+    public List<DayOfWeek> DaysOfWeek { get; set; } = [];
     public DateTimeOffset? LastRun { get; set; }
 
     /// <summary>
@@ -33,6 +29,11 @@ public class SessionSchedule
     ///     Null means just stop the session without starting another one.
     /// </summary>
     public Guid? NextPresetId { get; set; }
+
+    /// <summary>
+    ///     Whether to display time in 24-hour format (true) or 12-hour AM/PM format (false).
+    /// </summary>
+    public bool Use24HourFormat { get; set; } = true;
 
     public DateTimeOffset? GetNextRun(DateTimeOffset now)
     {
@@ -63,7 +64,6 @@ public class SessionSchedule
                 continue;
             }
 
-            // Check day of week filter
             if (DaysOfWeek.Count > 0 && !DaysOfWeek.Contains(candidateDate.DayOfWeek))
             {
                 continue;

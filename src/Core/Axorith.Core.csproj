@@ -3,7 +3,7 @@
         <AssemblyName>Axorith.Core</AssemblyName>
         <RootNamespace>Axorith.Core</RootNamespace>
         
-        <Description>Core system for Axorith OS.</Description>
+        <Description>Core system for Axorith.</Description>
     </PropertyGroup>
 
     <ItemGroup>

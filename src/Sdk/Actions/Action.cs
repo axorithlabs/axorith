@@ -13,7 +13,7 @@ namespace Axorith.Sdk.Actions;
 /// <param name="key">The unique identifier for this action.</param>
 /// <param name="label">The display label for the action button.</param>
 /// <param name="isEnabled">Whether the action is initially enabled.</param>
-public sealed class Action(string key, string label, bool isEnabled = true) : IAction
+public sealed class Action(string key, string label, bool isEnabled = true) : IAction, IDisposable
 {
     private readonly BehaviorSubject<string> _label = new(label);
     private readonly BehaviorSubject<bool> _isEnabled = new(isEnabled);
@@ -115,5 +115,15 @@ public sealed class Action(string key, string label, bool isEnabled = true) : IA
     public static Action Create(string key, string label, bool isEnabled = true)
     {
         return new Action(key, label, isEnabled);
+    }
+
+    /// <summary>
+    ///     Disposes the action and releases all resources.
+    /// </summary>
+    public void Dispose()
+    {
+        _label.Dispose();
+        _isEnabled.Dispose();
+        _invoked.Dispose();
     }
 }

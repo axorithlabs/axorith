@@ -1,5 +1,6 @@
 using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
+using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Client.Services;
@@ -8,8 +9,7 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
 {
     public async Task<string?> GetTokenAsync(CancellationToken ct = default)
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var tokenPath = Path.Combine(appData, "Axorith", AuthConstants.TokenFileName);
+        var tokenPath = Path.Combine(ApplicationPaths.Config, AuthConstants.TokenFileName);
 
         // Retry logic: Host might be starting up and hasn't written the file yet.
         // We try for up to ~3 seconds (15 * 200ms) to reduce connect latency.
@@ -19,7 +19,6 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
             {
                 try
                 {
-                    // Use FileShare.ReadWrite to avoid locking issues if Host is writing
                     using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var reader = new StreamReader(fs);
                     var token = await reader.ReadToEndAsync(ct);

@@ -77,6 +77,29 @@ public static class PublicApi
     }
 
     /// <summary>
+    ///     Checks if a process is running by name or path.
+    /// </summary>
+    public static bool IsProcessRunning(string processNameOrPath)
+    {
+        return FindProcesses(processNameOrPath).Count > 0;
+    }
+
+    /// <summary>
+    ///     Checks if a process is running by process name (without extension).
+    /// </summary>
+    public static bool IsProcessRunningByName(string processName)
+    {
+        try
+        {
+            return Process.GetProcessesByName(processName).Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     ///     Sets window state (Normal, Minimized, Maximized) - Windows only for now.
     /// </summary>
     public static void SetWindowState(IntPtr windowHandle, WindowState state)

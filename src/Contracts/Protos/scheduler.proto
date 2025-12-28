@@ -8,19 +8,10 @@ import "google/protobuf/empty.proto";
 option csharp_namespace = "Axorith.Contracts";
 
 service SchedulerService {
-  // Lists all configured schedules
   rpc ListSchedules (ListSchedulesRequest) returns (ListSchedulesResponse);
-
-  // Creates a new schedule
   rpc CreateSchedule (CreateScheduleRequest) returns (Schedule);
-
-  // Updates an existing schedule
   rpc UpdateSchedule (UpdateScheduleRequest) returns (Schedule);
-
-  // Deletes a schedule
   rpc DeleteSchedule (DeleteScheduleRequest) returns (google.protobuf.Empty);
-
-  // Toggles enabled state
   rpc SetEnabled (SetScheduleEnabledRequest) returns (Schedule);
 }
 
@@ -29,14 +20,15 @@ message Schedule {
   string preset_id = 2;
   string name = 3;
   bool is_enabled = 4;
-  int32 type = 5; // 0=OneTime, 1=Recurring
+  int32 type = 5;
   google.protobuf.Timestamp one_time_date = 6;
-  string recurring_time = 7; // "HH:mm"
-  repeated int32 days_of_week = 8; // 0=Sunday, 1=Monday...
+  string recurring_time = 7;
+  repeated int32 days_of_week = 8;
   google.protobuf.Timestamp last_run = 9;
   google.protobuf.Timestamp next_run = 10;
   int64 auto_stop_duration_seconds = 11;
   string next_preset_id = 12;
+  bool use_24_hour_format = 13;
 }
 
 message ListSchedulesRequest {}

@@ -63,7 +63,6 @@ public sealed class TelemetryService : ITelemetryService
 
         _baseProperties = BuildBaseProperties(settings1, resolvedAppVersion, resolvedOsVersion);
 
-        // Use IHttpClientFactory if provided, otherwise create our own HttpClient
         if (httpClientFactory is not null)
         {
             _httpClient = httpClientFactory.CreateClient(HttpClientName);
@@ -177,10 +176,7 @@ public sealed class TelemetryService : ITelemetryService
             return;
         }
 
-        // PeriodicBatchingSink doesn't expose a flush method, so we wait for the flush interval
-        // to allow pending events to be sent. This is a best-effort approach.
-        // For guaranteed flush, DisposeAsync should be called which disposes the sink.
-        var flushInterval = TimeSpan.FromSeconds(1); // Short wait to allow batch to be sent
+        var flushInterval = TimeSpan.FromSeconds(1);
 
         try
         {
@@ -205,7 +201,6 @@ public sealed class TelemetryService : ITelemetryService
 
         _disposed = true;
 
-        // Flush pending events before disposing
         if (_batchingSink is not null)
         {
             try
@@ -220,7 +215,6 @@ public sealed class TelemetryService : ITelemetryService
 
         _logger?.Dispose();
 
-        // Only dispose HttpClient if we own it (not from IHttpClientFactory)
         if (_ownsHttpClient)
         {
             _httpClient?.Dispose();
@@ -309,10 +303,12 @@ public sealed class TelemetryService : ITelemetryService
     private static StructureValue? TryConvertObject(object value)
     {
         var type = value.GetType();
-        var properties = PropertyCache.GetOrAdd(type, t => t
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
-            .ToList());
+        var properties = PropertyCache.GetOrAdd(type, t =>
+        [
+            .. t
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
+        ]);
 
         if (properties.Count == 0)
         {

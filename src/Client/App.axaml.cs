@@ -7,6 +7,7 @@ using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Client.Views;
+using Axorith.Shared.Platform;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -108,12 +109,21 @@ public class App : Application
         services.AddSingleton(sp => new DesktopNotificationManager(
             sp.GetRequiredService<IToastNotificationService>(),
             desktop));
+        services.AddSingleton<IAutoStartManager>(sp =>
+            PlatformServices.CreateAutoStartManager(sp.GetRequiredService<ILoggerFactory>().CreateLogger<IAutoStartManager>()));
+        services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
+            sp.GetRequiredService<ShellViewModel>(),
+            sp.GetRequiredService<IClientUiSettingsStore>(),
+            sp.GetRequiredService<IAutoStartManager>(),
+            sp.GetRequiredService<ITelemetryService>(),
+            sp.GetRequiredService<IOptions<Configuration>>(),
+            sp,
+            sp.GetRequiredService<ILogger<SettingsViewModel>>()));
 
         Services = services.BuildServiceProvider();
 
-        logger.LogInformation("Initializing Axorith Client UI...");
-
         var shellViewModel = Services.GetRequiredService<ShellViewModel>();
+        shellViewModel.Services = Services;
         var loadingViewModel = Services.GetRequiredService<LoadingViewModel>();
         shellViewModel.Content = loadingViewModel;
 
@@ -128,7 +138,7 @@ public class App : Application
         {
             logger.LogInformation("Starting with window hidden (--tray flag)");
             _mainWindow.ShowInTaskbar = false;
-            _mainWindow.WindowState = WindowState.Minimized;
+            _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
         }
         else
         {
@@ -151,6 +161,9 @@ public class App : Application
             ["trayMode"] = _isTrayMode
         });
 
+        // Apply auto-start settings on first run
+        ApplyAutoStartSettings(uiSettingsStore, Services, logger);
+
         _mainWindow.Closing += (_, e) =>
         {
             try
@@ -160,13 +173,18 @@ public class App : Application
                     return;
                 }
 
+                if (_mainWindow.WindowState != Avalonia.Controls.WindowState.Minimized)
+                {
+                    windowStateManager.SaveWindowState(_mainWindow);
+                }
+
                 var options = Services.GetService<IOptions<Configuration>>();
                 var cfg = options?.Value ?? clientConfig;
 
                 if (cfg.Ui.MinimizeToTrayOnClose)
                 {
                     e.Cancel = true;
-                    _mainWindow.WindowState = WindowState.Minimized;
+                    _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
                     _mainWindow.ShowInTaskbar = false;
                     logger.LogInformation("Window minimized to tray");
                 }
@@ -229,6 +247,35 @@ public class App : Application
 
             logger.LogInformation("Client shutdown complete");
         };
+    }
+
+    private static void ApplyAutoStartSettings(UiSettingsStore settingsStore, IServiceProvider services, ILogger<App> logger)
+    {
+        try
+        {
+            var config = settingsStore.LoadOrDefault();
+            var autoStartManager = services.GetService<IAutoStartManager>();
+            
+            if (autoStartManager == null)
+            {
+                return;
+            }
+
+            if (config.AutoStartEnabled && !autoStartManager.IsAutoStartEnabled)
+            {
+                autoStartManager.EnableAutoStart(config.AutoStartMinimized);
+                logger.LogInformation("Auto-start enabled on first run");
+            }
+            else if (!config.AutoStartEnabled && autoStartManager.IsAutoStartEnabled)
+            {
+                autoStartManager.DisableAutoStart();
+                logger.LogInformation("Auto-start disabled per user settings");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to apply auto-start settings");
+        }
     }
 }
 

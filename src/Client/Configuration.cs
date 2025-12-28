@@ -73,6 +73,24 @@ public class ClientUiConfiguration
     public bool MinimizeToTrayOnClose { get; set; } = true;
 
     /// <summary>
+    ///     If true, anonymous telemetry is enabled.
+    ///     Default: true
+    /// </summary>
+    public bool TelemetryEnabled { get; set; } = true;
+
+    /// <summary>
+    ///     If true, application starts automatically with Windows.
+    ///     Default: true
+    /// </summary>
+    public bool AutoStartEnabled { get; set; } = true;
+
+    /// <summary>
+    ///     If true, application starts minimized to tray when auto-starting.
+    ///     Default: true
+    /// </summary>
+    public bool AutoStartMinimized { get; set; } = true;
+
+    /// <summary>
     ///     Stores input history for settings with HasHistory enabled (e.g., file/directory pickers).
     ///     Key: Setting.Key, Value: List of recent values.
     /// </summary>
