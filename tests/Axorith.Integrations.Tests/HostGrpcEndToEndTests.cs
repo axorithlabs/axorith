@@ -34,6 +34,7 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
                 {
                     ["Persistence:PresetsPath"] = Path.Combine(TestDataPath, "presets"),
                     ["Persistence:LogsPath"] = Path.Combine(TestDataPath, "logs"),
+                    ["Persistence:ConfigPath"] = Path.Combine(TestDataPath, "config"),
                     ["Modules:SearchPaths:0"] = Path.Combine(TestDataPath, "empty_modules"),
                     ["Modules:SearchPaths:1"] = Path.Combine(TestDataPath, "empty_modules"),
                     ["Modules:SearchPaths:2"] = Path.Combine(TestDataPath, "empty_modules"),
@@ -109,7 +110,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     {
         var httpClient = factory.CreateDefaultClient();
 
-        var tokenPath = Path.Combine(factory.TestDataPath, ".auth_token");
+        var tokenPath = Path.Combine(factory.TestDataPath, "config", ".auth_token");
 
         var token = string.Empty;
         for (var i = 0; i < 50; i++)

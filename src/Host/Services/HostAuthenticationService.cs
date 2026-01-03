@@ -1,6 +1,7 @@
 ﻿using System.Security.Cryptography;
 using Axorith.Contracts;
 using Axorith.Shared.Utils;
+using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Services;
 
@@ -11,13 +12,14 @@ public interface IHostAuthenticationService
 }
 
 public class HostAuthenticationService(
+    IOptions<Configuration> options,
     ILogger<HostAuthenticationService> logger) : IHostAuthenticationService
 {
     private string _currentToken = string.Empty;
 
     public void InitializeToken()
     {
-        var configDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.Config);
+        var configDir = ApplicationPaths.EnsureDirectoryExists(options.Value.Persistence.ResolveConfigPath());
         var tokenFilePath = Path.Combine(configDir, AuthConstants.TokenFileName);
 
         try

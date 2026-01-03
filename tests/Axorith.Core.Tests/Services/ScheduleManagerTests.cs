@@ -172,7 +172,7 @@ public class ScheduleManagerTests : IAsyncDisposable
         await _manager.SaveScheduleAsync(schedule, CancellationToken.None);
 
         // Assert
-        var filePath = Path.Combine(_testStorageDirectory, "schedules.json");
+        var filePath = Path.Combine(_testStorageDirectory, "config", "schedules.json");
         File.Exists(filePath).Should().BeTrue();
     }
 

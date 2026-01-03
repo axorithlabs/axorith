@@ -65,6 +65,7 @@ public class PersistenceConfiguration
 {
     public string PresetsPath { get; init; } = string.Empty;
     public string LogsPath { get; init; } = string.Empty;
+    public string ConfigPath { get; init; } = string.Empty;
 
     public string ResolvePresetsPath()
     {
@@ -84,6 +85,16 @@ public class PersistenceConfiguration
         }
 
         return ApplicationPaths.ExpandPath(LogsPath);
+    }
+
+    public string ResolveConfigPath()
+    {
+        if (string.IsNullOrWhiteSpace(ConfigPath))
+        {
+            return ApplicationPaths.Config;
+        }
+
+        return ApplicationPaths.ExpandPath(ConfigPath);
     }
 }
 

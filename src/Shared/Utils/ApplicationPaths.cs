@@ -155,20 +155,20 @@ public static class ApplicationPaths
     /// </summary>
     /// <value>
     ///     The full path to the native messaging directory.
-    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\native-messaging
+    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\native_messaging
     /// </value>
     /// <remarks>
     ///     Contains browser-specific subdirectories (firefox, chrome) with native messaging
     ///     host manifests required for browser extension communication.
     /// </remarks>
-    public static string NativeMessaging => Path.Combine(RoamingRoot, "native-messaging");
+    public static string NativeMessaging => Path.Combine(RoamingRoot, "native_messaging");
 
     /// <summary>
     ///     Gets the directory path for Firefox native messaging manifests.
     /// </summary>
     /// <value>
     ///     The full path to the Firefox native messaging directory.
-    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\native-messaging\firefox
+    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\native_messaging\firefox
     /// </value>
     public static string NativeMessagingFirefox => Path.Combine(NativeMessaging, "firefox");
 
@@ -177,7 +177,7 @@ public static class ApplicationPaths
     /// </summary>
     /// <value>
     ///     The full path to the Chrome native messaging directory.
-    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\native-messaging\chrome
+    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\native_messaging\chrome
     /// </value>
     public static string NativeMessagingChrome => Path.Combine(NativeMessaging, "chrome");
 
