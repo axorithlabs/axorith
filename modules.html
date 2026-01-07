@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modules — Axorith</title>
+    <meta name="description" content="Explore Axorith's powerful module ecosystem. Control apps, block distractions, automate your smart home, and more.">
+    <link rel="icon" href="assets/icon.ico" type="image/x-icon">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/modules.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-text">Axorith</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html#features" class="nav-link">Features</a>
+                <a href="modules.html" class="nav-link active">Modules</a>
+                <a href="pricing.html" class="nav-link">Pricing</a>
+                <a href="index.html#founding" class="nav-link">Founding Member</a>
+                <a href="https://discord.gg/axorith" class="nav-link" target="_blank">Discord</a>
+            </div>
+            <div class="nav-actions">
+                <a href="index.html#download" class="nav-cta">Download</a>
+            </div>
+            <button class="nav-mobile-toggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu">
+        <a href="index.html#features" class="mobile-link">Features</a>
+        <a href="modules.html" class="mobile-link">Modules</a>
+        <a href="pricing.html" class="mobile-link">Pricing</a>
+        <a href="index.html#founding" class="mobile-link">Founding Member</a>
+        <a href="https://discord.gg/axorith" class="mobile-link" target="_blank">Discord</a>
+        <a href="index.html#download" class="mobile-cta">Download Free</a>
+    </div>
+
+    <!-- Hero -->
+    <section class="modules-hero">
+        <div class="container">
+            <div class="modules-hero-content">
+                <span class="section-label">Plugin Ecosystem</span>
+                <h1>Powerful Modules</h1>
+                <p>Everything you need to automate your digital life. Each module is designed to integrate seamlessly with your workflow.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modules Grid -->
+    <section class="section modules-section">
+        <div class="container">
+            <!-- Focus Modules -->
+            <div class="module-category">
+                <h2 class="category-title">
+                    <span class="category-icon">🛡️</span>
+                    Focus & Productivity
+                </h2>
+                <p class="category-desc">Block distractions and stay in the zone</p>
+                
+                <div class="modules-grid">
+                    <!-- App Blocker -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon red">
+                                <i data-lucide="ban"></i>
+                            </div>
+                        </div>
+                        <h3>App Blocker</h3>
+                        <p>Block distracting applications from running during focus sessions. Supports category blocking for games, social apps, and browsers.</p>
+                        <ul class="module-features">
+                            <li>Category blocking (Games, Social, Browsers)</li>
+                            <li>Custom blocklist</li>
+                            <li>Real-time monitoring</li>
+                        </ul>
+                    </div>
+
+                    <!-- Site Blocker -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon orange">
+                                <i data-lucide="globe"></i>
+                            </div>
+                        </div>
+                        <h3>Site Blocker</h3>
+                        <p>Block distracting websites via browser extension. Works even when the UI is closed thanks to native messaging.</p>
+                        <ul class="module-features">
+                            <li>Block list or Allow list mode</li>
+                            <li>Firefox & Chrome support</li>
+                            <li>Works in background</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- App Launchers -->
+            <div class="module-category">
+                <h2 class="category-title">
+                    <span class="category-icon">🚀</span>
+                    Application Launchers
+                </h2>
+                <p class="category-desc">Launch and control your favorite applications</p>
+                
+                <div class="modules-grid">
+                    <!-- Browser -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon blue">
+                                <i data-lucide="chrome"></i>
+                            </div>
+                        </div>
+                        <h3>Browser</h3>
+                        <p>Launch any browser with advanced options. Supports Chrome, Firefox, Edge, Brave, Opera, and many more.</p>
+                        <ul class="module-features">
+                            <li>Auto-detect installed browsers</li>
+                            <li>Profile selection</li>
+                            <li>Incognito mode</li>
+                        </ul>
+                    </div>
+
+                    <!-- VS Code -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon vscode">
+                                <i data-lucide="code-2"></i>
+                            </div>
+                        </div>
+                        <h3>VS Code</h3>
+                        <p>Launch Visual Studio Code with a specific project. Perfect for developers who want instant workspace setup.</p>
+                        <ul class="module-features">
+                            <li>Auto-detect installation</li>
+                            <li>Project path selection</li>
+                            <li>Custom launch arguments</li>
+                        </ul>
+                    </div>
+
+                    <!-- JetBrains IDE -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon jetbrains">
+                                <i data-lucide="braces"></i>
+                            </div>
+                        </div>
+                        <h3>JetBrains IDE</h3>
+                        <p>Launch any JetBrains IDE with a project. Supports IntelliJ, PyCharm, WebStorm, Rider, and all other IDEs.</p>
+                        <ul class="module-features">
+                            <li>Toolbox integration</li>
+                            <li>All JetBrains IDEs</li>
+                            <li>Extended startup timeout</li>
+                        </ul>
+                    </div>
+
+                    <!-- Discord -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon discord">
+                                <i data-lucide="message-circle"></i>
+                            </div>
+                        </div>
+                        <h3>Discord</h3>
+                        <p>Launch and manage Discord. Waits for full load, skipping splash screens and update checks.</p>
+                        <ul class="module-features">
+                            <li>Auto-detect installation</li>
+                            <li>Smart loading detection</li>
+                            <li>Skip splash screens</li>
+                        </ul>
+                    </div>
+
+                    <!-- Steam -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon steam">
+                                <i data-lucide="gamepad-2"></i>
+                            </div>
+                        </div>
+                        <h3>Steam</h3>
+                        <p>Launch Steam and optionally start a game directly. Auto-scans your library for installed games.</p>
+                        <ul class="module-features">
+                            <li>Game library scanning</li>
+                            <li>Direct game launch</li>
+                            <li>Steam protocol support</li>
+                        </ul>
+                    </div>
+
+                    <!-- Spotify -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon spotify">
+                                <i data-lucide="music"></i>
+                            </div>
+                        </div>
+                        <h3>Spotify</h3>
+                        <p>Launch Spotify with full playback control. Auto-play playlists, set volume, and control shuffle/repeat.</p>
+                        <ul class="module-features">
+                            <li>OAuth authentication</li>
+                            <li>Playback control</li>
+                            <li>Device selection</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integration Modules -->
+            <div class="module-category">
+                <h2 class="category-title">
+                    <span class="category-icon">🏠</span>
+                    Smart Home & Streaming
+                </h2>
+                <p class="category-desc">Control your environment beyond the desktop</p>
+                
+                <div class="modules-grid">
+                    <!-- Home Assistant -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon homeassistant">
+                                <i data-lucide="home"></i>
+                            </div>
+                        </div>
+                        <h3>Home Assistant</h3>
+                        <p>Control smart home devices on session start/end. Trigger scenes, scripts, lights, and switches automatically.</p>
+                        <ul class="module-features">
+                            <li>Long-lived token auth</li>
+                            <li>Scenes & scripts</li>
+                            <li>Lights & switches</li>
+                        </ul>
+                    </div>
+
+                    <!-- OBS Studio -->
+                    <div class="module-card">
+                        <div class="module-header">
+                            <div class="module-icon obs">
+                                <i data-lucide="video"></i>
+                            </div>
+                        </div>
+                        <h3>OBS Studio</h3>
+                        <p>Launch OBS with WebSocket control. Auto-start streaming or recording when your session begins.</p>
+                        <ul class="module-features">
+                            <li>WebSocket integration</li>
+                            <li>Auto-start streaming</li>
+                            <li>Virtual camera control</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SDK Section -->
+            <div class="sdk-section">
+                <div class="sdk-content">
+                    <div class="sdk-icon">
+                        <i data-lucide="code"></i>
+                    </div>
+                    <h2>Build Your Own Modules</h2>
+                    <p>Axorith is built on a powerful, developer-first SDK. Create custom modules to integrate any tool with an API. Share your creations with the community.</p>
+                    <div class="sdk-features">
+                        <div class="sdk-feature">
+                            <i data-lucide="check"></i>
+                            <span>.NET 10 & C# 14</span>
+                        </div>
+                        <div class="sdk-feature">
+                            <i data-lucide="check"></i>
+                            <span>Clean interfaces</span>
+                        </div>
+                        <div class="sdk-feature">
+                            <i data-lucide="check"></i>
+                            <span>Full documentation</span>
+                        </div>
+                    </div>
+                    <a href="https://github.com/axorithlabs/axorith" class="btn btn-secondary" target="_blank">
+                        <i data-lucide="github"></i>
+                        View on GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section cta-section">
+        <div class="container">
+            <h2 class="cta-title">Ready to automate your workflow?</h2>
+            <div class="cta-actions">
+                <a href="https://github.com/axorithlabs/axorith/releases/latest" class="btn btn-primary btn-large">
+                    Download Free
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <span class="footer-logo">Axorith</span>
+                    <p class="footer-tagline">Digital Life System.<br>Work smarter, live better.</p>
+                    <div class="footer-social">
+                        <a href="https://github.com/axorithlabs/axorith" target="_blank" aria-label="GitHub">
+                            <i data-lucide="github"></i>
+                        </a>
+                        <a href="https://discord.gg/axorith" target="_blank" aria-label="Discord">
+                            <i data-lucide="message-circle"></i>
+                        </a>
+                        <a href="mailto:mail@axorith.com" aria-label="Email">
+                            <i data-lucide="mail"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <h4>Product</h4>
+                    <a href="index.html#features">Features</a>
+                    <a href="modules.html">Modules</a>
+                    <a href="pricing.html">Pricing</a>
+                    <a href="index.html#founding">Founding Member</a>
+                    <a href="https://github.com/axorithlabs/axorith/releases">Releases</a>
+                </div>
+                <div class="footer-links">
+                    <h4>Resources</h4>
+                    <a href="https://github.com/axorithlabs/axorith" target="_blank">GitHub</a>
+                    <a href="https://github.com/axorithlabs/axorith/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a>
+                    <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">License</a>
+                </div>
+                <div class="footer-links">
+                    <h4>Community</h4>
+                    <a href="https://discord.gg/axorith" target="_blank">Discord</a>
+                    <a href="mailto:mail@axorith.com">Contact</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Axorith Labs. All rights reserved.</p>
+                <p class="footer-license">Source-available under <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">BSL 1.1</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

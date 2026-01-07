@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout — Founding Member</title>
+    <meta name="description" content="Become an Axorith Founding Member — lifetime access with crypto payment">
+    <link rel="icon" href="assets/icon.ico" type="image/x-icon">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/checkout.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+    (function(){
+        emailjs.init("D_gl5NOiE1LVUX4JV");
+    })();
+    </script>  
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-text">Axorith</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html#features" class="nav-link">Features</a>
+                <a href="modules.html" class="nav-link">Modules</a>
+                <a href="pricing.html" class="nav-link">Pricing</a>
+                <a href="https://discord.gg/axorith" class="nav-link" target="_blank">Discord</a>
+            </div>
+            <div class="nav-actions">
+                <a href="index.html#download" class="nav-cta">Download</a>
+            </div>
+            <button class="nav-mobile-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu">
+        <a href="index.html#features" class="mobile-link">Features</a>
+        <a href="modules.html" class="mobile-link">Modules</a>
+        <a href="pricing.html" class="mobile-link">Pricing</a>
+        <a href="https://discord.gg/axorith" class="mobile-link" target="_blank">Discord</a>
+        <a href="index.html#download" class="mobile-cta">Download Free</a>
+    </div>
+
+    <!-- Checkout Section -->
+    <section class="checkout-section">
+        <div class="container">
+            <div class="checkout-wrapper">
+                <!-- Progress Steps -->
+                <div class="checkout-progress">
+                    <div class="progress-step active" data-step="1">
+                        <div class="step-number">1</div>
+                        <span>Select Coin</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step" data-step="2">
+                        <div class="step-number">2</div>
+                        <span>Send Payment</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step" data-step="3">
+                        <div class="step-number">3</div>
+                        <span>Confirm</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Select Coin -->
+                <div class="checkout-step" id="step-1">
+                    <div class="checkout-header">
+                        <h1>Become a Founding Member</h1>
+                        <p>Select your preferred cryptocurrency to complete your purchase</p>
+                    </div>
+
+                    <div class="order-summary">
+                        <div class="summary-item">
+                            <span>Founding Member</span>
+                            <span class="summary-price">$99 USD</span>
+                        </div>
+                        <div class="summary-note">Pro + Teams features forever • All future updates included</div>
+                    </div>
+
+                    <div class="coin-grid">
+                        <button class="coin-option" data-coin="usdt-trc20" data-network="TRC-20">
+                            <div class="coin-icon usdt">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm1.922-18.207v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117zm0 3.59v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">USDT</span>
+                                <span class="coin-network">TRC-20</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="usdt-erc20" data-network="ERC-20">
+                            <div class="coin-icon usdt">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm1.922-18.207v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117zm0 3.59v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">USDT</span>
+                                <span class="coin-network">ERC-20</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="usdc-erc20" data-network="ERC-20">
+                            <div class="coin-icon usdc">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm-1.5-6.5v2h3v-2c2.5-.5 4-2 4-4.5 0-2-1-3.5-3.5-4.5l-3.5-1.5c-1.5-.5-2-1-2-2s1-1.5 2.5-1.5c1.5 0 2.5.5 3 1.5l2.5-1.5c-1-1.5-2.5-2.5-4.5-3v-2h-3v2c-2.5.5-4 2-4 4.5 0 2 1 3.5 3.5 4.5l3.5 1.5c1.5.5 2 1 2 2s-1 1.5-2.5 1.5c-2 0-3-.5-4-2l-2.5 1.5c1 2 3 3 5.5 3.5z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">USDC</span>
+                                <span class="coin-network">ERC-20</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="btc" data-network="Bitcoin">
+                            <div class="coin-icon btc">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm1.94-18.493c.123-.59-.364-.907-1.007-1.12l.206-.826-1.262-.315-.2.804c-.332-.083-.673-.16-1.012-.238l.202-.81-1.261-.314-.206.826c-.275-.063-.545-.125-.806-.19l.001-.004-1.74-.435-.267 1.348s.936.215.917.228c.511.128.604.466.588.735l-.589 2.364c.035.009.081.022.131.043l-.133-.033-.826 3.312c-.063.155-.222.388-.58.3.013.019-.917-.229-.917-.229l-.627 1.445 1.642.41c.305.077.605.157.9.232l-.208.837 1.26.314.207-.827c.345.094.68.18 1.007.263l-.205.822 1.262.315.208-.836c1.71.324 2.996.193 3.537-1.354.436-1.246-.022-1.965-.922-2.434.656-.151 1.15-.583 1.282-1.475zm-2.295 3.218c-.31 1.244-2.405.572-3.085.403l.55-2.206c.68.17 2.86.506 2.535 1.803zm.31-3.237c-.282 1.132-2.026.557-2.593.416l.499-2.001c.567.141 2.39.405 2.094 1.585z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">BTC</span>
+                                <span class="coin-network">Bitcoin</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="eth" data-network="Ethereum">
+                            <div class="coin-icon eth">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm-1.5-6l7.5-4.5-7.5 10.5v-6zm0-1.5V6l-7.5 12.5 7.5 6zm1.5 0l7.5-6L16 6v18.5zm0 1.5v6l7.5-10.5-7.5 4.5z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">ETH</span>
+                                <span class="coin-network">Ethereum</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="sol" data-network="Solana">
+                            <div class="coin-icon sol">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zM9.5 19.5l10.5 4.5 2.5-2.5-10.5-4.5-2.5 2.5zm0-7l10.5 4.5 2.5-2.5-10.5-4.5-2.5 2.5zm13 9.5l-10.5-4.5-2.5 2.5 10.5 4.5 2.5-2.5z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">SOL</span>
+                                <span class="coin-network">Solana</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="bnb" data-network="BNB Chain">
+                            <div class="coin-icon bnb">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm-3.884-17.596L16 10.52l3.886 3.886 2.26-2.26L16 6l-6.144 6.144 2.26 2.26zM6 16l2.26 2.26L10.52 16l-2.26-2.26L6 16zm6.116 1.596l-2.26 2.26L16 26l6.144-6.144-2.26-2.26L16 21.48l-3.884-3.884zM21.48 16l2.26 2.26L26 16l-2.26-2.26L21.48 16zm-3.188 0L16 13.708 13.708 16 16 18.292 18.292 16z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">BNB</span>
+                                <span class="coin-network">BNB Chain</span>
+                            </div>
+                        </button>
+
+                        <button class="coin-option" data-coin="ltc" data-network="Litecoin">
+                            <div class="coin-icon ltc">
+                                <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 32C7.163 32 0 24.837 0 16S7.163 0 16 0s16 7.163 16 16-7.163 16-16 16zm-1.5-6h7l.5-2h-5l1.5-6 2.5-1-.5 2h2l.5-2-2.5 1-1.5 6h-5l-.5 2h5l-1.5 6h-7l-.5 2h7l-1 4h2l1-4z"/></svg>
+                            </div>
+                            <div class="coin-info">
+                                <span class="coin-name">LTC</span>
+                                <span class="coin-network">Litecoin</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Payment Details -->
+                <div class="checkout-step hidden" id="step-2">
+                    <button class="back-btn" onclick="goToStep(1)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back
+                    </button>
+
+                    <div class="checkout-header">
+                        <h1>Send Payment</h1>
+                        <p>Transfer exactly <span class="amount-display">$99</span> worth of <span id="selected-coin-name">USDT</span></p>
+                    </div>
+
+                    <div class="payment-card">
+                        <div class="payment-network">
+                            <span class="network-label">Network</span>
+                            <span class="network-value" id="payment-network">TRC-20</span>
+                        </div>
+
+                        <div class="wallet-address-section">
+                            <label>Send to this address:</label>
+                            <div class="address-box">
+                                <code id="wallet-address">Loading...</code>
+                                <button class="copy-btn" onclick="copyAddress()">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                    </svg>
+                                    <span>Copy</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="amount-section">
+                            <label>Amount to send:</label>
+                            <div class="amount-box">
+                                <span id="payment-amount">99 USDT</span>
+                            </div>
+                        </div>
+
+                        <div class="warning-box">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            <div>
+                                <strong>Important:</strong> Only send <span id="warning-coin">USDT</span> on the <span id="warning-network">TRC-20</span> network. Sending other coins or using wrong network will result in permanent loss.
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-large btn-next" onclick="goToStep(3)">
+                        I've Sent the Payment
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Step 3: Confirmation -->
+                <div class="checkout-step hidden" id="step-3">
+                    <button class="back-btn" onclick="goToStep(2)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back
+                    </button>
+
+                    <div class="checkout-header">
+                        <h1>Confirm Your Payment</h1>
+                        <p>Provide your details so we can verify and activate your membership</p>
+                    </div>
+
+                    <form id="confirmation-form" class="confirmation-form">
+                        <div class="form-group">
+                            <label for="email">Email Address <span class="required">*</span></label>
+                            <input type="email" id="email" name="email" placeholder="your@email.com" required>
+                            <span class="form-hint">This email will be used for your Founding Member activation</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tx-hash">Transaction Hash / ID <span class="required">*</span></label>
+                            <input type="text" id="tx-hash" name="txHash" placeholder="0x... or transaction ID" required>
+                            <span class="form-hint">Find this in your wallet's transaction history</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="discord">Discord Username (optional)</label>
+                            <input type="text" id="discord" name="discord" placeholder="username#0000">
+                            <span class="form-hint">For your exclusive Discord badge</span>
+                        </div>
+
+                        <div class="processing-info">
+                            <div class="info-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 16v-4M12 8h.01"/>
+                                </svg>
+                            </div>
+                            <div class="info-content">
+                                <h4>What happens next?</h4>
+                                <ul>
+                                    <li>We'll verify your payment within 24 hours</li>
+                                    <li>You'll receive your activation key via email</li>
+                                    <li>Your Discord badge will be assigned (if provided)</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-large btn-submit">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            Submit for Verification
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Success State -->
+                <div class="checkout-step hidden" id="step-success">
+                    <div class="success-state">
+                        <div class="success-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                        </div>
+                        <h1>Thank You!</h1>
+                        <p>Your payment confirmation has been submitted successfully.</p>
+                        <div class="success-details">
+                            <div class="detail-item">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span>Processing time: up to 24 hours</span>
+                            </div>
+                            <div class="detail-item">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                                <span>Check your email for updates</span>
+                            </div>
+                        </div>
+                        <a href="index.html" class="btn btn-secondary">
+                            Return to Homepage
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer checkout-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Axorith Labs. All rights reserved.</p>
+                <p class="footer-license">Source-available under <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">BSL 1.1</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION - Must match index.html
+        // ============================================
+        const SALES_ENABLED = false;
+        // ============================================
+    </script>
+    <script src="js/checkout.js"></script>
+</body>
+</html>

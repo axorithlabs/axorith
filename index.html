@@ -44,9 +44,9 @@
             </a>
             <div class="nav-links">
                 <a href="#features" class="nav-link">Features</a>
+                <a href="modules.html" class="nav-link">Modules</a>
                 <a href="pricing.html" class="nav-link">Pricing</a>
-                <a href="#founding" class="nav-link">Founding Member</a>
-                <a href="docs/" class="nav-link">Docs</a>
+                <a href="index.html#founding" class="nav-link">Founding Member</a>
                 <a href="https://discord.gg/axorith" class="nav-link" target="_blank">Discord</a>
             </div>
             <div class="nav-actions">
@@ -63,15 +63,21 @@
     <!-- Mobile Menu -->
     <div class="mobile-menu">
         <a href="#features" class="mobile-link">Features</a>
+        <a href="modules.html" class="mobile-link">Modules</a>
         <a href="pricing.html" class="mobile-link">Pricing</a>
         <a href="#founding" class="mobile-link">Founding Member</a>
-        <a href="docs/" class="mobile-link">Docs</a>
         <a href="https://discord.gg/axorith" class="mobile-link" target="_blank">Discord</a>
         <a href="#download" class="mobile-cta">Download Free</a>
     </div>
 
     <!-- Hero Section -->
     <section class="hero">
+        <div class="hero-video-bg">
+            <video autoplay muted loop playsinline>
+                <source src="assets/video.mp4" type="video/mp4">
+            </video>
+            <div class="hero-video-overlay"></div>
+        </div>
         <div class="hero-content">
             <div class="hero-badge">
                 <span class="badge-dot"></span>
@@ -129,14 +135,14 @@
                         <span class="card-icon">✨</span>
                         <h3>The Axorith Way</h3>
                         <span class="card-badge good">Instant Context</span>
-                    </div>
-                    <ul class="card-list">
-                        <li>Deep Work on Autopilot</li>
-                        <li>Gaming Mode on Autopilot</li>
-                        <li>Lights & Media adjust instantly</li>
-                        <li>Automatic Distraction Blocker</li>
-                        <li class="highlight">&lt; 15 seconds to flow state</li>
-                    </ul>
+                    </div>                   
+                        <ul class="card-list">
+                            <li>Instant Deep Work</li>
+                            <li>Instant Gaming Mode</li>
+                            <li>Lights & Media sync automatically</li>
+                            <li>Automatic Distraction Blocker</li>
+                            <li class="highlight">&lt; 15 seconds to flow state</li>
+                        </ul>
                 </div>
             </div>
         </div>
@@ -151,7 +157,6 @@
                 <p class="section-subtitle">Axorith is not another app. It's a remote control for your digital life.</p>
             </div>
             <div class="features-grid">
-                <!-- Feature 1: Presets -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -162,7 +167,6 @@
                     <p>Define any state like "Work" or "Play". Axorith will launch your required software, arrange windows, and apply system settings instantly.</p>
                 </div>
                 
-                <!-- Feature 2: Plugin Ecosystem -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -173,7 +177,6 @@
                     <p>The entire system is built on a powerful SDK. Integrate any tool with an API. A clean, developer-first approach makes creating and sharing your own modules simple.</p>
                 </div>
                 
-                <!-- Feature 3: Stability -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -184,7 +187,6 @@
                     <p>Client-Server architecture means if the UI crashes, your focus session keeps running. Simply restart and reconnect. Your flow is never interrupted.</p>
                 </div>
                 
-                <!-- Feature 4: Scheduler -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -195,7 +197,6 @@
                     <p>True autopilot. Schedule sessions to start automatically at specific times or recurring intervals. Your environment is ready before you are.</p>
                 </div>
                 
-                <!-- Feature 5: Blocker -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -206,7 +207,6 @@
                     <p>Block distracting websites during focus sessions. Works seamlessly with your browser via a lightweight extension. No admin rights required.</p>
                 </div>
                 
-                <!-- Feature 6: Universal Control -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -233,31 +233,12 @@
                 <h2 class="founding-title">Become a Founding Member</h2>
                 <p class="founding-subtitle">Join the first 100 believers who will shape the future of Axorith</p>
                 
-                <!-- Countdown Timer -->
-                <div class="founding-countdown">
-                    <p class="countdown-label">Launching with v1.0 Release</p>
-                    <div class="countdown-timer" id="countdown">
-                        <div class="countdown-item">
-                            <span class="countdown-value" id="days">00</span>
-                            <span class="countdown-unit">Days</span>
-                        </div>
-                        <div class="countdown-separator">:</div>
-                        <div class="countdown-item">
-                            <span class="countdown-value" id="hours">00</span>
-                            <span class="countdown-unit">Hours</span>
-                        </div>
-                        <div class="countdown-separator">:</div>
-                        <div class="countdown-item">
-                            <span class="countdown-value" id="minutes">00</span>
-                            <span class="countdown-unit">Min</span>
-                        </div>
-                        <div class="countdown-separator">:</div>
-                        <div class="countdown-item">
-                            <span class="countdown-value" id="seconds">00</span>
-                            <span class="countdown-unit">Sec</span>
-                        </div>
+                <!-- Slots Counter -->
+                <div class="founding-slots">
+                    <div class="slots-bar">
+                        <div class="slots-fill" id="slots-fill" style="width: 0%"></div>
                     </div>
-                    <p class="countdown-date">January 9, 2026</p>
+                    <p class="slots-text"><strong id="slots-sold">0</strong> of <strong>100</strong> slots claimed</p>
                 </div>
                 
                 <div class="founding-price">
@@ -292,37 +273,13 @@
                     </li>
                 </ul>
                 
-                <!-- Waitlist Form -->
-                <div class="waitlist-section">
-                    <h3 class="waitlist-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        Get notified on launch
-                    </h3>
-                    <p class="waitlist-subtitle">Join the waitlist and be the first to know when Founding Member slots open</p>
-                    <form id="waitlist-form" class="waitlist-form">
-                        <div class="form-group">
-                            <input 
-                                type="email" 
-                                name="email" 
-                                id="waitlist-email"
-                                placeholder="your@email.com" 
-                                required
-                                autocomplete="email"
-                            >
-                            <button type="submit" class="btn btn-waitlist">
-                                <span class="btn-text">Join Waitlist</span>
-                                <span class="btn-loading">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M12 2v4m0 12v4m-8-10h4m12 0h4m-5.66-5.66l-2.83 2.83m-5.66 5.66l-2.83 2.83m11.32 0l-2.83-2.83m-5.66-5.66l-2.83-2.83"/>
-                                    </svg>
-                                </span>
-                            </button>
-                        </div>
-                        <p id="form-status" class="form-status"></p>
-                    </form>
-                </div>
+                <a href="checkout.html" class="btn btn-founding" id="founding-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v12M6 12h12"/>
+                    </svg>
+                    Buy with Crypto
+                </a>
                 
                 <p class="founding-note">The app is free. This is for those who want to support the project and get premium perks.</p>
             </div>
@@ -335,10 +292,7 @@
             <h2 class="cta-title">Ready to take control?</h2>
             <div class="cta-actions">
                 <a href="https://github.com/axorithlabs/axorith/releases/latest" class="btn btn-primary btn-large">
-                    Download Free Alpha
-                </a>
-                <a href="docs/" class="btn btn-ghost">
-                    Read the Docs
+                    Download Free
                 </a>
             </div>
         </div>
@@ -372,14 +326,13 @@
                 <div class="footer-links">
                     <h4>Product</h4>
                     <a href="#features">Features</a>
+                    <a href="modules.html">Modules</a>
                     <a href="pricing.html">Pricing</a>
                     <a href="#founding">Founding Member</a>
                     <a href="https://github.com/axorithlabs/axorith/releases">Releases</a>
-                    <a href="https://axorithlabs.youtrack.cloud/agiles/192-1/current" target="_blank">Roadmap</a>
                 </div>
                 <div class="footer-links">
                     <h4>Resources</h4>
-                    <a href="docs/">Documentation</a>
                     <a href="https://github.com/axorithlabs/axorith" target="_blank">GitHub</a>
                     <a href="https://github.com/axorithlabs/axorith/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a>
                     <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">License</a>
@@ -387,7 +340,6 @@
                 <div class="footer-links">
                     <h4>Community</h4>
                     <a href="https://discord.gg/axorith" target="_blank">Discord</a>
-                    <a href="https://github.com/axorithlabs/axorith/discussions" target="_blank">Discussions</a>
                     <a href="mailto:mail@axorith.com">Contact</a>
                 </div>
             </div>
@@ -400,5 +352,59 @@
 
     <!-- Scripts -->
     <script src="js/main.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION - Change these values as needed
+        // ============================================
+        
+        // Set to TRUE when sales are open (Jan 9, 2026)
+        // Set to FALSE to show "Available Jan 9" message
+        const SALES_ENABLED = false;
+        
+        // Number of slots sold (0-100)
+        const SLOTS_SOLD = 0;
+        const TOTAL_SLOTS = 100;
+        
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const slotsFill = document.getElementById('slots-fill');
+            const slotsSold = document.getElementById('slots-sold');
+            const foundingBtn = document.getElementById('founding-btn');
+            
+            if (slotsFill && slotsSold) {
+                slotsSold.textContent = SLOTS_SOLD;
+                slotsFill.style.width = (SLOTS_SOLD / TOTAL_SLOTS * 100) + '%';
+            }
+            
+            if (foundingBtn) {
+                // Sales not yet enabled
+                if (!SALES_ENABLED) {
+                    foundingBtn.classList.add('disabled');
+                    foundingBtn.removeAttribute('href');
+                    foundingBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Available Jan 9
+                    `;
+                }
+                // Sold out
+                else if (SLOTS_SOLD >= TOTAL_SLOTS) {
+                    foundingBtn.classList.add('disabled');
+                    foundingBtn.removeAttribute('href');
+                    foundingBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        Sold Out
+                    `;
+                }
+            }
+        });
+    </script>
 </body>
 </html>

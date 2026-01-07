@@ -21,9 +21,9 @@
             </a>
             <div class="nav-links">
                 <a href="index.html#features" class="nav-link">Features</a>
+                <a href="modules.html" class="nav-link">Modules</a>
                 <a href="pricing.html" class="nav-link active">Pricing</a>
                 <a href="index.html#founding" class="nav-link">Founding Member</a>
-                <a href="docs/" class="nav-link">Docs</a>
                 <a href="https://discord.gg/axorith" class="nav-link" target="_blank">Discord</a>
             </div>
             <div class="nav-actions">
@@ -40,9 +40,9 @@
     <!-- Mobile Menu -->
     <div class="mobile-menu">
         <a href="index.html#features" class="mobile-link">Features</a>
+        <a href="modules.html" class="mobile-link">Modules</a>
         <a href="pricing.html" class="mobile-link">Pricing</a>
         <a href="index.html#founding" class="mobile-link">Founding Member</a>
-        <a href="docs/" class="mobile-link">Docs</a>
         <a href="https://discord.gg/axorith" class="mobile-link" target="_blank">Discord</a>
         <a href="index.html#download" class="mobile-cta">Download Free</a>
     </div>
@@ -246,7 +246,7 @@
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
                         </svg>
-                        Limited to 100 spots — Launches Jan 9, 2026
+                        Limited to 100 spots — Available Now
                     </div>
                     <h2>Founding Member — $99 forever</h2>
                     <p>Get lifetime access to Pro + Teams features. Support the project and shape its future.</p>
@@ -278,7 +278,7 @@
                 </div>
                 <div class="faq-item">
                     <h3>What is the Founding Member program?</h3>
-                    <p>For $99 one-time (launching Jan 9, 2026), you get lifetime access to all Pro and Teams features, plus exclusive perks like direct developer access.</p>
+                    <p>For $99 one-time, you get lifetime access to all Pro and Teams features, plus exclusive perks like direct developer access and Discord badge.</p>
                 </div>
                 <div class="faq-item">
                     <h3>Can I cancel anytime?</h3>
@@ -320,13 +320,13 @@
                 <div class="footer-links">
                     <h4>Product</h4>
                     <a href="index.html#features">Features</a>
+                    <a href="modules.html">Modules</a>
                     <a href="pricing.html">Pricing</a>
                     <a href="index.html#founding">Founding Member</a>
                     <a href="https://github.com/axorithlabs/axorith/releases">Releases</a>
                 </div>
                 <div class="footer-links">
                     <h4>Resources</h4>
-                    <a href="docs/">Documentation</a>
                     <a href="https://github.com/axorithlabs/axorith" target="_blank">GitHub</a>
                     <a href="https://github.com/axorithlabs/axorith/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a>
                     <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">License</a>
@@ -334,7 +334,6 @@
                 <div class="footer-links">
                     <h4>Community</h4>
                     <a href="https://discord.gg/axorith" target="_blank">Discord</a>
-                    <a href="https://github.com/axorithlabs/axorith/discussions" target="_blank">Discussions</a>
                     <a href="mailto:mail@axorith.com">Contact</a>
                 </div>
             </div>
@@ -346,5 +345,35 @@
     </footer>
 
     <script src="js/main.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION - Must match index.html
+        // ============================================
+        const SALES_ENABLED = false;
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const foundingCtaBtn = document.querySelector('.founding-cta .btn-primary');
+            const foundingCtaBadge = document.querySelector('.founding-cta-badge');
+            
+            if (!SALES_ENABLED && foundingCtaBtn) {
+                foundingCtaBtn.classList.add('disabled');
+                foundingCtaBtn.classList.remove('btn-primary');
+                foundingCtaBtn.classList.add('btn-secondary');
+                foundingCtaBtn.textContent = 'Available Jan 9';
+                foundingCtaBtn.removeAttribute('href');
+            }
+            
+            if (!SALES_ENABLED && foundingCtaBadge) {
+                foundingCtaBadge.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Limited to 100 spots — Available Jan 9
+                `;
+            }
+        });
+    </script>
 </body>
 </html>

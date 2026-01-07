@@ -2,6 +2,20 @@
 .pricing-hero {
     padding: 140px 24px 100px;
     text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.pricing-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, transparent 60%);
+    pointer-events: none;
 }
 
 .pricing-badge {
@@ -15,6 +29,7 @@
     font-size: 0.875rem;
     color: var(--success);
     margin-bottom: 24px;
+    animation: slideUp 0.6s ease-out;
 }
 
 .pricing-title {
@@ -22,6 +37,7 @@
     font-weight: 800;
     letter-spacing: -0.03em;
     margin-bottom: 16px;
+    animation: slideUp 0.6s ease-out 0.1s both;
 }
 
 .pricing-subtitle {
@@ -29,6 +45,12 @@
     color: var(--text-secondary);
     max-width: 500px;
     margin: 0 auto;
+    animation: slideUp 0.6s ease-out 0.2s both;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Early Access Banner */
@@ -92,11 +114,21 @@
     display: flex;
     flex-direction: column;
     position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pricing-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
 }
 
 .pricing-card.featured {
     border-color: var(--accent);
     background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, transparent 100%);
+}
+
+.pricing-card.featured:hover {
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3), 0 0 60px rgba(37, 99, 235, 0.15);
 }
 
 .card-badge {
@@ -201,11 +233,30 @@
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-plan::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-plan:hover::before {
+    left: 100%;
 }
 
 .btn-plan:hover {
     background: var(--bg-secondary);
     border-color: var(--border-light);
+    transform: translateY(-2px);
 }
 
 .btn-plan.btn-featured {
@@ -216,6 +267,7 @@
 
 .btn-plan.btn-featured:hover {
     background: var(--accent-hover);
+    box-shadow: 0 8px 30px var(--accent-glow);
 }
 
 .btn-plan.disabled {
@@ -239,6 +291,31 @@
     border-radius: 24px;
     padding: 48px;
     text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s ease;
+}
+
+.founding-cta::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.1) 0%, transparent 50%);
+    animation: float 8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+
+.founding-cta:hover {
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 80px rgba(37, 99, 235, 0.15);
 }
 
 .founding-cta-badge {
@@ -252,6 +329,8 @@
     font-weight: 600;
     color: white;
     margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
 }
 
 .founding-cta h2 {
@@ -287,6 +366,13 @@
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 24px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.faq-item:hover {
+    border-color: var(--border-light);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
 
 .faq-item h3 {
