@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Text;
 
 namespace Axorith.Shared.Platform.Windows;
 
@@ -282,30 +284,113 @@ internal static class WindowApi
 
     public static string GetMonitorName(int monitorIndex)
     {
-        var dd = new DisplayDevice
+        try
         {
-            cb = Marshal.SizeOf<DisplayDevice>()
-        };
+            var monitorNames = GetMonitorNamesFromEdid();
+            if (monitorIndex >= 0 && monitorIndex < monitorNames.Count)
+            {
+                return monitorNames[monitorIndex];
+            }
+        }
+        catch
+        {
+            // Fall through to fallback
+        }
+
+        return GetMonitorNameFallback(monitorIndex);
+    }
+
+    private static List<string> GetMonitorNamesFromEdid()
+    {
+        var names = new List<string>();
+
+        using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM WmiMonitorID");
+        foreach (var obj in searcher.Get())
+        {
+            var userFriendlyName = obj["UserFriendlyName"] as ushort[];
+            if (userFriendlyName is { Length: > 0 })
+            {
+                var name = new StringBuilder();
+                foreach (var c in userFriendlyName)
+                {
+                    if (c == 0) break;
+                    name.Append((char)c);
+                }
+
+                var result = name.ToString().Trim();
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    names.Add(result);
+                    continue;
+                }
+            }
+
+            var manufacturerName = obj["ManufacturerName"] as ushort[];
+            var productCodeId = obj["ProductCodeID"] as ushort[];
+
+            var manufacturer = DecodeUshortArray(manufacturerName);
+            var productCode = DecodeUshortArray(productCodeId);
+
+            if (!string.IsNullOrWhiteSpace(manufacturer) || !string.IsNullOrWhiteSpace(productCode))
+            {
+                names.Add($"{manufacturer} {productCode}".Trim());
+            }
+            else
+            {
+                names.Add($"Monitor {names.Count + 1}");
+            }
+        }
+
+        return names;
+    }
+
+    private static string DecodeUshortArray(ushort[]? arr)
+    {
+        if (arr == null || arr.Length == 0) return string.Empty;
+
+        var sb = new StringBuilder();
+        foreach (var c in arr)
+        {
+            if (c == 0) break;
+            sb.Append((char)c);
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static string GetMonitorNameFallback(int monitorIndex)
+    {
+        var adapter = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
+        var monitor = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
 
         var foundIndex = 0;
-        uint devNum = 0;
+        uint adapterNum = 0;
 
-        while (EnumDisplayDevices(null, devNum, ref dd, 0))
+        while (EnumDisplayDevices(null, adapterNum, ref adapter, 0))
         {
-            var isActive = (dd.StateFlags & DisplayDeviceActive) != 0;
+            var isActive = (adapter.StateFlags & DisplayDeviceActive) != 0;
 
             if (isActive)
             {
                 if (foundIndex == monitorIndex)
                 {
-                    return string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceName : dd.DeviceString;
+                    if (EnumDisplayDevices(adapter.DeviceName, 0, ref monitor, 0))
+                    {
+                        if (!string.IsNullOrWhiteSpace(monitor.DeviceString) &&
+                            !monitor.DeviceString.Contains("Generic", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return monitor.DeviceString;
+                        }
+                    }
+
+                    return $"Monitor {monitorIndex + 1}";
                 }
 
                 foundIndex++;
             }
 
-            devNum++;
-            dd = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
+            adapterNum++;
+            adapter = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
         }
 
         return $"Monitor {monitorIndex + 1}";

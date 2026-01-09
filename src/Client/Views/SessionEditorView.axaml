@@ -41,6 +41,7 @@
         <StreamGeometry x:Key="PlusIcon">M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z</StreamGeometry>
         <StreamGeometry x:Key="DeleteIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z</StreamGeometry>
         <StreamGeometry x:Key="CloseIcon">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
+        <StreamGeometry x:Key="PlayIcon">M8,5.14V19.14L19,12.14L8,5.14Z</StreamGeometry>
 
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
             <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
@@ -490,7 +491,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <StackPanel MinWidth="500" Margin="0,0,0,100" Spacing="0">
+                    <StackPanel MinWidth="500" Margin="0,0,0,0" Spacing="0">
                         <Path Data="M 0 0 L 0 30" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
                         
                         <Button Command="{Binding OpenAddModuleCommand}" 
@@ -505,6 +506,160 @@
                             </Border>
                         </Button>
                     </StackPanel>
+
+                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+
+                    <Border Classes="Card" Padding="24" MinWidth="500">
+                        <StackPanel Spacing="15">
+                            <TextBlock Text="Stop On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            
+                            <ItemsControl ItemsSource="{Binding StopTriggers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TriggerViewModel">
+                                        <Button Classes="ItemCard" 
+                                                Command="{Binding $parent[ItemsControl].DataContext.EditStopTriggerCommand}" 
+                                                CommandParameter="{Binding}"
+                                                Margin="0,0,0,10"
+                                                Classes.error="{Binding HasError}">
+                                            <Border>
+                                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                                    <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
+                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="#FF6B6B"/>
+                                                    </Border>
+                                                    
+                                                    <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
+                                                        <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
+                                                    </StackPanel>
+                                                    
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Button Classes="delete-btn" 
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveStopTriggerCommand}" 
+                                                                CommandParameter="{Binding}" 
+                                                                ToolTip.Tip="Remove">
+                                                            <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Button HorizontalAlignment="Stretch" 
+                                    Background="Transparent" 
+                                    BorderBrush="#333" 
+                                    BorderThickness="1" 
+                                    CornerRadius="8" 
+                                    Padding="10"
+                                    Cursor="Hand">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="Fixed Time" 
+                                                  Command="{Binding AddStopAtTimeTriggerCommand}"
+                                                  IsEnabled="{Binding CanAddStopAtTimeTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource TimerIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Session Duration" 
+                                                  Command="{Binding AddStopAfterDurationTriggerCommand}"
+                                                  IsEnabled="{Binding CanAddStopAfterDurationTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource TimerIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12" Foreground="#888"/>
+                                    <TextBlock Text="Add Stop Trigger" Foreground="#888" FontWeight="Medium"/>
+                                </StackPanel>
+                            </Button>
+                            
+                            <TextBlock Text="If empty, stop manually via button." 
+                                       HorizontalAlignment="Center" 
+                                       Foreground="#666" 
+                                       FontSize="12" 
+                                       Margin="0,5,0,0"
+                                       IsVisible="{Binding !StopTriggers.Count}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+
+                    <Border Classes="Card" Padding="24" MinWidth="500" Margin="0,0,0,120">
+                        <StackPanel Spacing="15">
+                            <TextBlock Text="Then..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            
+                            <ItemsControl ItemsSource="{Binding ThenTriggers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ThenStartAnotherTriggerViewModel">
+                                        <Button Classes="ItemCard" 
+                                                Command="{Binding $parent[ItemsControl].DataContext.EditThenTriggerCommand}" 
+                                                CommandParameter="{Binding}"
+                                                Margin="0,0,0,10"
+                                                Classes.error="{Binding HasError}">
+                                            <Border>
+                                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                                    <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
+                                                        <PathIcon Data="{StaticResource PlayIcon}" Width="20" Height="20" Foreground="#4CAF50"/>
+                                                    </Border>
+                                                    
+                                                    <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
+                                                        <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
+                                                    </StackPanel>
+                                                    
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Button Classes="delete-btn" 
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveThenTriggerCommand}" 
+                                                                CommandParameter="{Binding}" 
+                                                                ToolTip.Tip="Remove">
+                                                            <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Button HorizontalAlignment="Stretch" 
+                                    Background="Transparent" 
+                                    BorderBrush="#333" 
+                                    BorderThickness="1" 
+                                    CornerRadius="8" 
+                                    Padding="10"
+                                    Cursor="Hand">
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuItem Header="Start Another Session" 
+                                                  Command="{Binding AddThenStartAnotherTriggerCommand}"
+                                                  IsEnabled="{Binding CanAddThenStartAnotherTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource PlayIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12" Foreground="#888"/>
+                                    <TextBlock Text="Add Then Trigger" Foreground="#888" FontWeight="Medium"/>
+                                </StackPanel>
+                            </Button>
+                            
+                            <TextBlock Text="Triggers next session after stop. Does not apply when stopped manually." 
+                                       HorizontalAlignment="Center" 
+                                       Foreground="#666" 
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Panel>
         </ScrollViewer>
@@ -617,10 +772,8 @@
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:ScheduleTriggerViewModel">
             <Panel>
-                <!-- Dimmed Background Overlay -->
                 <Border Background="#000000" Opacity="0.85"/>
                 
-                <!-- Modal Card -->
                 <Border Background="#0A0A0A" 
                         BorderBrush="#333" 
                         BorderThickness="1" 
@@ -631,7 +784,6 @@
                         BoxShadow="0 25 80 0 #80000000">
                     
                     <Grid RowDefinitions="Auto, *">
-                        <!-- Header -->
                         <Border Grid.Row="0" 
                                 Padding="20,16" 
                                 BorderThickness="0,0,0,1" 
@@ -654,15 +806,10 @@
                             </DockPanel>
                         </Border>
                         
-                        <!-- Body -->
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                             <Border Padding="24">
                                 <StackPanel Spacing="24">
-                                    
-                                    <!-- Main Settings Grid -->
                                     <StackPanel Spacing="20">
-                                        
-                                        <!-- Time Input Row -->
                                         <Grid ColumnDefinitions="120, *">
                                             <TextBlock Grid.Column="0" Text="Start Time" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
@@ -703,7 +850,6 @@
                                             </StackPanel>
                                         </Grid>
                                         
-                                        <!-- 12/24 Hour Format Checkbox -->
                                         <Grid ColumnDefinitions="120, *">
                                             <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
                                             <CheckBox Grid.Column="1" 
@@ -712,7 +858,6 @@
                                                       Foreground="#AAA"/>
                                         </Grid>
 
-                                        <!-- Days Row -->
                                         <Grid ColumnDefinitions="120, *">
                                             <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="#AAA" FontWeight="Medium"/>
                                             <Border Grid.Column="1" 
@@ -722,37 +867,30 @@
                                                     CornerRadius="8" 
                                                     Padding="8,12">
                                                 <UniformGrid Rows="1" Columns="7">
-                                                    <!-- Monday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Mon" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnMonday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
-                                                    <!-- Tuesday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Tue" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnTuesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
-                                                    <!-- Wednesday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Wed" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnWednesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
-                                                    <!-- Thursday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Thu" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnThursday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
-                                                    <!-- Friday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Fri" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnFriday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
-                                                    <!-- Saturday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Sat" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnSaturday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
-                                                    <!-- Sunday -->
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                                         <TextBlock Text="Sun" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnSunday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
@@ -762,82 +900,6 @@
                                         </Grid>
                                     </StackPanel>
 
-                                    <Separator Background="#222" Height="1"/>
-
-                                    <!-- Auto-Stop Section -->
-                                    <StackPanel Spacing="16">
-                                        <CheckBox IsChecked="{Binding IsAutoStopEnabled}" Content="Enable Auto-Stop" FontWeight="Medium" Foreground="#E0E0E0"/>
-
-                                        <StackPanel Spacing="16" IsVisible="{Binding IsAutoStopEnabled}">
-                                            
-                                            <!-- Duration -->
-                                            <Grid ColumnDefinitions="120, *">
-                                                <TextBlock Grid.Column="0" Text="Duration" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                                    <NumericUpDown Value="{Binding AutoStopHours}" 
-                                                                   Minimum="0" Maximum="23" 
-                                                                   FormatString="0" 
-                                                                   Width="70" 
-                                                                   Height="32"
-                                                                   Padding="8,0"
-                                                                   ShowButtonSpinner="False"
-                                                                   HorizontalContentAlignment="Center"
-                                                                   VerticalContentAlignment="Center"
-                                                                   Classes.error="{Binding HasAutoStopError}"/>
-                                                    <TextBlock Text="hours" VerticalAlignment="Center" Foreground="#666"/>
-                                                    <NumericUpDown Value="{Binding AutoStopMinutes}" 
-                                                                   Minimum="0" Maximum="59" 
-                                                                   FormatString="00" 
-                                                                   Width="70" 
-                                                                   Height="32"
-                                                                   Padding="8,0"
-                                                                   ShowButtonSpinner="False"
-                                                                   HorizontalContentAlignment="Center"
-                                                                   VerticalContentAlignment="Center"
-                                                                   Classes.error="{Binding HasAutoStopError}"/>
-                                                    <TextBlock Text="min" VerticalAlignment="Center" Foreground="#666"/>
-                                                </StackPanel>
-                                            </Grid>
-
-                                            <!-- After Action -->
-                                            <Grid ColumnDefinitions="120, *">
-                                                <TextBlock Grid.Column="0" Text="Then..." VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
-                                                <StackPanel Grid.Column="1" Spacing="8">
-                                                    <ComboBox SelectedItem="{Binding NextActionType}" 
-                                                              HorizontalAlignment="Stretch"
-                                                              Height="36">
-                                                        <ComboBox.Items>
-                                                            <x:String>Stop session</x:String>
-                                                            <x:String>Start another session</x:String>
-                                                        </ComboBox.Items>
-                                                    </ComboBox>
-
-                                                    <!-- Next Preset Selector -->
-                                                    <Grid IsVisible="{Binding NextActionType, Converter={StaticResource EqualsConverter}, ConverterParameter='Start another session'}">
-                                                        <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.AvailablePresetsForNext}" 
-                                                                  SelectedItem="{Binding SelectedNextPreset}"
-                                                                  IsVisible="{Binding IsNextPresetSelectionVisible}"
-                                                                  HorizontalAlignment="Stretch" 
-                                                                  PlaceholderText="Select next session..."
-                                                                  Height="36">
-                                                            <ComboBox.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <TextBlock Text="{Binding Name}"/>
-                                                                </DataTemplate>
-                                                            </ComboBox.ItemTemplate>
-                                                        </ComboBox>
-                                                        
-                                                        <Border IsVisible="{Binding IsNoOtherPresetsAvailable}" 
-                                                                Background="#2A1100" BorderBrush="#552200" BorderThickness="1" CornerRadius="4" Padding="8">
-                                                            <TextBlock Text="No other presets available to start." Foreground="#FFAA00" FontSize="12"/>
-                                                        </Border>
-                                                    </Grid>
-                                                </StackPanel>
-                                            </Grid>
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <!-- Footer Actions -->
                                     <Button Content="Done" 
                                             Command="{Binding $parent[UserControl].DataContext.CloseTriggerSettingsCommand}" 
                                             Classes="accent" 
@@ -845,6 +907,173 @@
                                             HorizontalContentAlignment="Center"
                                             Padding="10"
                                             FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Panel>
+        </DataTemplate>
+            </TransitioningContentControl.ContentTemplate>
+        </TransitioningContentControl>
+
+        <TransitioningContentControl Content="{Binding SelectedStopTrigger}" IsVisible="{Binding SelectedStopTrigger, Converter={x:Static converters:AppConverters.IsStopAtTimeTrigger}}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0:0:0.15"/>
+            </TransitioningContentControl.PageTransition>
+            <TransitioningContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:StopAtTimeTriggerViewModel">
+            <Panel>
+                <Border Background="#000000" Opacity="0.85"/>
+                <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                    <Grid RowDefinitions="Auto, *">
+                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="#FF6B6B" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Edit Fixed Time Stop" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <Border Padding="24">
+                                <StackPanel Spacing="24">
+                                    <StackPanel Spacing="20">
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="Stop Time" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                                <NumericUpDown Value="{Binding Hours}" Minimum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMinHour}}" Maximum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMaxHour}}" FormatString="0" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasTimeError}"/>
+                                                <TextBlock Text=":" VerticalAlignment="Center" Foreground="#888" FontSize="16" FontWeight="Bold"/>
+                                                <NumericUpDown Value="{Binding Minutes}" Minimum="0" Maximum="59" FormatString="00" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasTimeError}"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !Use24HourFormat}" Margin="8,0,0,0">
+                                                    <RadioButton Content="AM" IsChecked="{Binding IsAm}" GroupName="StopAtTimeAmPm" Padding="8,4" Foreground="#E0E0E0"/>
+                                                    <RadioButton Content="PM" IsChecked="{Binding !IsAm}" GroupName="StopAtTimeAmPm" Padding="8,4" Foreground="#E0E0E0"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
+                                            <CheckBox Grid.Column="1" IsChecked="{Binding Use24HourFormat}" Content="Use 24-hour format" Foreground="#AAA"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="#AAA" FontWeight="Medium"/>
+                                            <Border Grid.Column="1" Background="#050505" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="8,12">
+                                                <UniformGrid Rows="1" Columns="7">
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Mon" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnMonday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Tue" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnTuesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Wed" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnWednesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Thu" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnThursday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Fri" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnFriday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Sat" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnSaturday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Sun" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnSunday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
+                                                </UniformGrid>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Panel>
+        </DataTemplate>
+            </TransitioningContentControl.ContentTemplate>
+        </TransitioningContentControl>
+
+        <TransitioningContentControl Content="{Binding SelectedStopTrigger}" IsVisible="{Binding SelectedStopTrigger, Converter={x:Static converters:AppConverters.IsStopAfterDurationTrigger}}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0:0:0.15"/>
+            </TransitioningContentControl.PageTransition>
+            <TransitioningContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:StopAfterDurationTriggerViewModel">
+            <Panel>
+                <Border Background="#000000" Opacity="0.85"/>
+                <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                    <Grid RowDefinitions="Auto, *">
+                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="#FF6B6B" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Edit Session Duration" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <Border Padding="24">
+                                <StackPanel Spacing="24">
+                                    <StackPanel Spacing="20">
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="Duration" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                                <NumericUpDown Value="{Binding DurationHours}" Minimum="0" Maximum="23" FormatString="0" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasDurationError}"/>
+                                                <TextBlock Text="hours" VerticalAlignment="Center" Foreground="#666"/>
+                                                <NumericUpDown Value="{Binding DurationMinutes}" Minimum="0" Maximum="59" FormatString="00" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasDurationError}"/>
+                                                <TextBlock Text="min" VerticalAlignment="Center" Foreground="#666"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <TextBlock Text="Session will automatically stop after this duration from start." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
+                                    </StackPanel>
+                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Panel>
+        </DataTemplate>
+            </TransitioningContentControl.ContentTemplate>
+        </TransitioningContentControl>
+
+        <TransitioningContentControl Content="{Binding SelectedThenTrigger}" IsVisible="{Binding SelectedThenTrigger, Converter={x:Static converters:AppConverters.IsThenStartAnotherTrigger}}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0:0:0.15"/>
+            </TransitioningContentControl.PageTransition>
+            <TransitioningContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:ThenStartAnotherTriggerViewModel">
+            <Panel>
+                <Border Background="#000000" Opacity="0.85"/>
+                <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                    <Grid RowDefinitions="Auto, *">
+                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseThenTriggerSettingsCommand}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="{StaticResource PlayIcon}" Width="18" Height="18" Foreground="#4CAF50" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Start Another Session" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <Border Padding="24">
+                                <StackPanel Spacing="24">
+                                    <StackPanel Spacing="20">
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="Next Session" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
+                                            <Grid Grid.Column="1">
+                                                <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.AvailablePresetsForNext}" 
+                                                          SelectedItem="{Binding SelectedNextPreset}"
+                                                          IsVisible="{Binding IsNextPresetSelectionVisible}"
+                                                          HorizontalAlignment="Stretch" 
+                                                          PlaceholderText="Select session to start..."
+                                                          Height="36">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Name}"/>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                                <Border IsVisible="{Binding IsNoOtherPresetsAvailable}" 
+                                                        Background="#2A1100" BorderBrush="#552200" BorderThickness="1" CornerRadius="4" Padding="8">
+                                                    <TextBlock Text="No other presets available to start." Foreground="#FFAA00" FontSize="12"/>
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                        <TextBlock Text="This session will start automatically after the current session stops." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
+                                    </StackPanel>
+                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseThenTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </Border>
                         </ScrollViewer>

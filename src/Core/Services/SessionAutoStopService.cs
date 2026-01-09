@@ -14,7 +14,7 @@ public class SessionAutoStopService(
     ILogger<SessionAutoStopService> logger)
     : ISessionAutoStopService
 {
-    private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly object _stateLock = new();
     private readonly HashSet<string> _sentNotificationKeys = [];
     private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
 
@@ -24,46 +24,37 @@ public class SessionAutoStopService(
     private Task? _loopTask;
     private CancellationTokenSource? _loopCts;
 
+    private volatile bool _isStoppingSession;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         sessionManager.SessionStopped += OnSessionStopped;
-
         return Task.CompletedTask;
     }
 
-    public async Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
+    public Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
         CancellationToken cancellationToken = default)
     {
-        await _lock.WaitAsync(cancellationToken);
-        try
+        lock (_stateLock)
         {
-            if (_loopTask != null)
-            {
-                _loopCts?.Cancel();
-                try
-                {
-                    await _loopTask.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Expected
-                }
-
-                _loopCts?.Dispose();
-            }
+            _loopCts?.Cancel();
+            _loopCts?.Dispose();
+            _loopCts = null;
+            _loopTask = null;
 
             _currentSessionId = sessionId;
             _nextPresetId = nextPresetId;
+            _sentNotificationKeys.Clear();
 
             if (autoStopDuration.HasValue && autoStopDuration.Value > TimeSpan.Zero)
             {
                 _stopAt = DateTimeOffset.UtcNow + autoStopDuration.Value;
-                _loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                _loopCts = new CancellationTokenSource();
                 _loopTask = RunTrackingLoopAsync(_loopCts.Token);
 
                 logger.LogInformation(
-                    "Started tracking session {SessionId} with auto-stop in {Duration}. Next preset: {NextPresetId}",
-                    sessionId, autoStopDuration, nextPresetId?.ToString() ?? "none");
+                    "Started tracking session {SessionId} with auto-stop at {StopAt} (in {Duration}). Next preset: {NextPresetId}",
+                    sessionId, _stopAt.Value, autoStopDuration, nextPresetId?.ToString() ?? "none");
             }
             else
             {
@@ -71,146 +62,161 @@ public class SessionAutoStopService(
                 logger.LogInformation("Started tracking session {SessionId} without auto-stop", sessionId);
             }
         }
-        finally
-        {
-            _lock.Release();
-        }
+
+        return Task.CompletedTask;
     }
 
-    public async Task StopTrackingAsync(CancellationToken cancellationToken = default)
+    public Task StopTrackingAsync(CancellationToken cancellationToken = default)
     {
-        await _lock.WaitAsync(cancellationToken);
-        try
+        lock (_stateLock)
         {
-            if (_loopTask != null)
-            {
-                _loopCts?.Cancel();
-                try
-                {
-                    await _loopTask.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Expected
-                }
-
-                _loopCts?.Dispose();
-                _loopTask = null;
-            }
+            _loopCts?.Cancel();
+            _loopCts?.Dispose();
+            _loopCts = null;
+            _loopTask = null;
 
             _currentSessionId = null;
             _nextPresetId = null;
             _stopAt = null;
+            _sentNotificationKeys.Clear();
 
-            logger.LogInformation("Stopped tracking session");
+            logger.LogDebug("Stopped tracking session");
         }
-        finally
-        {
-            _lock.Release();
-        }
+
+        return Task.CompletedTask;
     }
 
     public TimeSpan? GetTimeRemaining()
     {
-        if (!_stopAt.HasValue)
+        lock (_stateLock)
         {
-            return null;
-        }
+            if (!_stopAt.HasValue)
+            {
+                return null;
+            }
 
-        var remaining = _stopAt.Value - DateTimeOffset.UtcNow;
-        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+            var remaining = _stopAt.Value - DateTimeOffset.UtcNow;
+            return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        }
     }
 
     private async void OnSessionStopped(Guid sessionId)
     {
+        if (_isStoppingSession)
+        {
+            return;
+        }
+
         try
         {
             await StopTrackingAsync().ConfigureAwait(false);
         }
         catch (Exception e)
         {
-            logger.LogWarning("Session stopped with error {Exception}", e);
+            logger.LogWarning(e, "Error while stopping tracking after session stopped");
         }
     }
 
     private async Task RunTrackingLoopAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-
-        while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
+        try
         {
-            try
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+
+            while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
             {
-                await CheckAndNotifyAsync(ct).ConfigureAwait(false);
-                CleanupNotificationCache();
+                try
+                {
+                    await CheckAndProcessAsync(ct).ConfigureAwait(false);
+                    CleanupNotificationCache();
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error in auto-stop tracking loop");
+                }
             }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error in auto-stop tracking loop");
-            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown
         }
     }
 
-    private async Task CheckAndNotifyAsync(CancellationToken ct)
+    private async Task CheckAndProcessAsync(CancellationToken ct)
     {
-        await _lock.WaitAsync(ct);
-        var lockReleased = false;
-        try
+        DateTimeOffset? stopAt;
+        Guid? nextPresetId;
+        Guid? currentSessionId;
+
+        lock (_stateLock)
         {
             if (!_stopAt.HasValue || !sessionManager.IsSessionRunning)
             {
                 return;
             }
 
-            var now = DateTimeOffset.UtcNow;
-            var timeLeft = _stopAt.Value - now;
-
-            if (timeLeft <= TimeSpan.Zero)
-            {
-                _lock.Release();
-                lockReleased = true;
-                await StopSessionAndStartNextAsync(ct).ConfigureAwait(false);
-                return;
-            }
-
-            if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
-            {
-                await CheckAndNotifyAsync(TimeSpan.FromSeconds(15), "15 seconds", ct)
-                    .ConfigureAwait(false);
-            }
-            else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
-            {
-                await CheckAndNotifyAsync(TimeSpan.FromMinutes(1), "1 minute", ct)
-                    .ConfigureAwait(false);
-            }
-            else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
-            {
-                await CheckAndNotifyAsync(TimeSpan.FromMinutes(5), "5 minutes", ct)
-                    .ConfigureAwait(false);
-            }
-            else if (timeLeft <= TimeSpan.FromMinutes(15) && timeLeft > TimeSpan.FromMinutes(5))
-            {
-                await CheckAndNotifyAsync(TimeSpan.FromMinutes(15), "15 minutes", ct)
-                    .ConfigureAwait(false);
-            }
+            stopAt = _stopAt;
+            nextPresetId = _nextPresetId;
+            currentSessionId = _currentSessionId;
         }
-        finally
+
+        var now = DateTimeOffset.UtcNow;
+        var timeLeft = stopAt.Value - now;
+
+        if (timeLeft <= TimeSpan.FromSeconds(1))
         {
-            if (!lockReleased)
-            {
-                _lock.Release();
-            }
+            await StopSessionAndStartNextAsync(currentSessionId, nextPresetId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        await SendNotificationsIfNeededAsync(timeLeft, ct).ConfigureAwait(false);
+    }
+
+    private async Task SendNotificationsIfNeededAsync(TimeSpan timeLeft, CancellationToken ct)
+    {
+        if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.FromSeconds(10))
+        {
+            await TrySendNotificationAsync(TimeSpan.FromSeconds(15), "15 seconds", ct).ConfigureAwait(false);
+        }
+        else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.FromSeconds(55))
+        {
+            await TrySendNotificationAsync(TimeSpan.FromMinutes(1), "1 minute", ct).ConfigureAwait(false);
+        }
+        else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.FromMinutes(4.9))
+        {
+            await TrySendNotificationAsync(TimeSpan.FromMinutes(5), "5 minutes", ct).ConfigureAwait(false);
+        }
+        else if (timeLeft <= TimeSpan.FromMinutes(15) && timeLeft > TimeSpan.FromMinutes(14.9))
+        {
+            await TrySendNotificationAsync(TimeSpan.FromMinutes(15), "15 minutes", ct).ConfigureAwait(false);
         }
     }
 
-    private async Task CheckAndNotifyAsync(TimeSpan threshold, string timeText,
-        CancellationToken ct)
+    private async Task TrySendNotificationAsync(TimeSpan threshold, string timeText, CancellationToken ct)
     {
-        var key = $"{_currentSessionId}_{_stopAt?.Ticks}_{threshold.TotalSeconds}";
+        Guid? currentSessionId;
+        long? stopAtTicks;
+        Guid? nextPresetIdLocal;
 
-        if (!_sentNotificationKeys.Add(key))
+        lock (_stateLock)
         {
-            return;
+            currentSessionId = _currentSessionId;
+            stopAtTicks = _stopAt?.Ticks;
+            nextPresetIdLocal = _nextPresetId;
+        }
+
+        var key = $"{currentSessionId}_{stopAtTicks}_{threshold.TotalSeconds}";
+
+        lock (_stateLock)
+        {
+            if (!_sentNotificationKeys.Add(key))
+            {
+                return;
+            }
         }
 
         var preset = sessionManager.ActiveSession;
@@ -220,10 +226,9 @@ public class SessionAutoStopService(
         }
 
         string message;
-        if (_nextPresetId.HasValue)
+        if (nextPresetIdLocal.HasValue)
         {
-            var nextPreset = await presetManager.GetPresetByIdAsync(_nextPresetId.Value, ct)
-                .ConfigureAwait(false);
+            var nextPreset = await presetManager.GetPresetByIdAsync(nextPresetIdLocal.Value, ct).ConfigureAwait(false);
             var nextPresetName = nextPreset?.Name ?? "next session";
             message = $"Session '{preset.Name}' will end in {timeText}, then '{nextPresetName}' will start.";
         }
@@ -236,15 +241,20 @@ public class SessionAutoStopService(
         await notifier.ShowSystemAsync("Session Auto-Stop", message).ConfigureAwait(false);
     }
 
-    private async Task StopSessionAndStartNextAsync(CancellationToken ct)
+    private async Task StopSessionAndStartNextAsync(Guid? currentSessionId, Guid? nextPresetId, CancellationToken ct)
     {
-        await _lock.WaitAsync(ct);
+        if (_isStoppingSession)
+        {
+            return;
+        }
+
+        _isStoppingSession = true;
         try
         {
             if (!sessionManager.IsSessionRunning)
             {
                 logger.LogWarning("Session already stopped, skipping auto-stop");
-                await StopTrackingAsync(ct).ConfigureAwait(false);
+                await StopTrackingAsync(CancellationToken.None).ConfigureAwait(false);
                 return;
             }
 
@@ -252,15 +262,24 @@ public class SessionAutoStopService(
             if (currentPreset == null)
             {
                 logger.LogWarning("No active session found, skipping auto-stop");
-                await StopTrackingAsync(ct).ConfigureAwait(false);
+                await StopTrackingAsync(CancellationToken.None).ConfigureAwait(false);
                 return;
             }
 
-            logger.LogInformation("Auto-stopping session '{PresetName}'", currentPreset.Name);
+            logger.LogInformation("Auto-stopping session '{PresetName}' (ID: {SessionId})",
+                currentPreset.Name, currentSessionId);
+
+            lock (_stateLock)
+            {
+                _currentSessionId = null;
+                _nextPresetId = null;
+                _stopAt = null;
+                _sentNotificationKeys.Clear();
+            }
 
             try
             {
-                await sessionManager.StopCurrentSessionAsync(ct).ConfigureAwait(false);
+                await sessionManager.StopCurrentSessionAsync(CancellationToken.None).ConfigureAwait(false);
                 logger.LogInformation("Session '{PresetName}' stopped successfully", currentPreset.Name);
             }
             catch (Exception ex)
@@ -268,45 +287,55 @@ public class SessionAutoStopService(
                 logger.LogError(ex, "Failed to auto-stop session '{PresetName}'", currentPreset.Name);
                 await notifier.ShowSystemAsync("Auto-Stop Error",
                     $"Failed to stop session '{currentPreset.Name}': {ex.Message}").ConfigureAwait(false);
-                await StopTrackingAsync(ct).ConfigureAwait(false);
                 return;
             }
+            finally
+            {
+                lock (_stateLock)
+                {
+                    _loopCts?.Cancel();
+                }
+            }
 
-            if (_nextPresetId.HasValue)
+            if (nextPresetId.HasValue)
             {
                 try
                 {
-                    var nextPreset = await presetManager.GetPresetByIdAsync(_nextPresetId.Value, ct)
+                    var nextPreset = await presetManager.GetPresetByIdAsync(nextPresetId.Value, CancellationToken.None)
                         .ConfigureAwait(false);
 
                     if (nextPreset == null)
                     {
-                        logger.LogWarning("Next preset {NextPresetId} not found", _nextPresetId.Value);
-                        await notifier.ShowSystemAsync("Auto-Stop Error",
-                            $"Next preset (ID: {_nextPresetId.Value}) not found.").ConfigureAwait(false);
-                        await StopTrackingAsync(ct).ConfigureAwait(false);
+                        logger.LogWarning("Next preset {NextPresetId} not found", nextPresetId.Value);
+                        await notifier.ShowSystemAsync("Auto-Stop",
+                            $"Session stopped. Next preset (ID: {nextPresetId.Value}) not found.").ConfigureAwait(false);
                         return;
                     }
 
                     logger.LogInformation("Starting next preset '{NextPresetName}'", nextPreset.Name);
-                    await sessionManager.StartSessionAsync(nextPreset, ct).ConfigureAwait(false);
                     await notifier.ShowSystemAsync("Session Transition",
                         $"Starting '{nextPreset.Name}'...").ConfigureAwait(false);
+
+                    await sessionManager.StartSessionAsync(nextPreset, CancellationToken.None).ConfigureAwait(false);
+
                     logger.LogInformation("Next preset '{NextPresetName}' started successfully", nextPreset.Name);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to start next preset {NextPresetId}", _nextPresetId.Value);
+                    logger.LogError(ex, "Failed to start next preset {NextPresetId}", nextPresetId.Value);
                     await notifier.ShowSystemAsync("Auto-Stop Error",
                         $"Failed to start next preset: {ex.Message}").ConfigureAwait(false);
                 }
             }
-
-            await StopTrackingAsync(ct).ConfigureAwait(false);
+            else
+            {
+                await notifier.ShowSystemAsync("Session Auto-Stop",
+                    $"Session '{currentPreset.Name}' has ended.").ConfigureAwait(false);
+            }
         }
         finally
         {
-            _lock.Release();
+            _isStoppingSession = false;
         }
     }
 
@@ -317,7 +346,11 @@ public class SessionAutoStopService(
             return;
         }
 
-        _sentNotificationKeys.Clear();
+        lock (_stateLock)
+        {
+            _sentNotificationKeys.Clear();
+        }
+
         _lastCleanup = DateTimeOffset.Now;
     }
 
@@ -325,12 +358,24 @@ public class SessionAutoStopService(
     {
         sessionManager.SessionStopped -= OnSessionStopped;
 
-        _loopCts?.Cancel();
-        if (_loopTask != null)
+        CancellationTokenSource? cts;
+        Task? loopTask;
+
+        lock (_stateLock)
+        {
+            cts = _loopCts;
+            loopTask = _loopTask;
+            _loopCts = null;
+            _loopTask = null;
+        }
+
+        cts?.Cancel();
+
+        if (loopTask != null)
         {
             try
             {
-                await _loopTask.ConfigureAwait(false);
+                await loopTask.ConfigureAwait(false);
             }
             catch
             {
@@ -338,7 +383,6 @@ public class SessionAutoStopService(
             }
         }
 
-        _loopCts?.Dispose();
-        _lock.Dispose();
+        cts?.Dispose();
     }
 }

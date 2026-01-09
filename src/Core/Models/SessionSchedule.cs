@@ -3,7 +3,9 @@
 public enum ScheduleType
 {
     OneTime,
-    Recurring
+    Recurring,
+    StopRecurring,
+    StopDuration
 }
 
 public class SessionSchedule
@@ -44,22 +46,29 @@ public class SessionSchedule
 
         if (Type == ScheduleType.OneTime)
         {
-            return OneTimeDate > now ? OneTimeDate : null;
+            if (!OneTimeDate.HasValue)
+            {
+                return null;
+            }
+
+            var diff = OneTimeDate.Value - now;
+            return diff.TotalSeconds >= -30 ? OneTimeDate : null;
         }
 
-        if (Type != ScheduleType.Recurring || !RecurringTime.HasValue)
+        if ((Type != ScheduleType.Recurring && Type != ScheduleType.StopRecurring) || !RecurringTime.HasValue)
         {
             return null;
         }
 
-        var tolerance = TimeSpan.FromMinutes(5);
+        var localNow = now.LocalDateTime;
+        var tolerance = TimeSpan.FromSeconds(30); // Allow 30 second window for triggering
 
         for (var i = 0; i <= 7; i++)
         {
-            var candidateDate = now.Date.AddDays(i);
+            var candidateDate = localNow.Date.AddDays(i);
             var candidateRun = candidateDate + RecurringTime.Value;
 
-            if (i == 0 && candidateRun < now - tolerance)
+            if (i == 0 && candidateRun < localNow.Add(-tolerance))
             {
                 continue;
             }
@@ -69,7 +78,7 @@ public class SessionSchedule
                 continue;
             }
 
-            return candidateRun;
+            return new DateTimeOffset(candidateRun, TimeZoneInfo.Local.GetUtcOffset(candidateRun));
         }
 
         return null;
