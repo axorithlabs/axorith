@@ -5,7 +5,7 @@ const WALLET_ADDRESSES = {
     'usdt-erc20': '0xB1Aec06166336CF717B244DBDC8620820824F1D7',
     'usdc-erc20': '0xB1Aec06166336CF717B244DBDC8620820824F1D7',
     'btc': 'bc1q4p93zvy3pxdf293hwka2tmdyhr53zwju3xmwlf',
-    'eth': '0xb1aec06166336cf717b244dbdc8620820824f1d7',
+    'eth': '0xB1Aec06166336CF717B244DBDC8620820824F1D7',
     'sol': 'Ctuthbpvw2y7Q8fpjET8iqhw5UukcVUWTbuM3TT85KhH',
     'bnb': '0xB1Aec06166336CF717B244DBDC8620820824F1D7',
     'ltc': 'ltc1qgecn35js80n7yacyl5fw5pdsykamnzw4wf2wdl'
