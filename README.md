@@ -20,10 +20,10 @@ Every time you start a task, you pay a tax in time and willpower. This 15-minute
 
 | The Old Way (Manual Chaos)            | The Axorith Way (Instant Context)       |
 |:--------------------------------------|:----------------------------------------|
-| 😩 Struggle to start working.         | ✅ **One click to Deep Work.**          |
-| 🎮 Can't fully disconnect after work. | ✅ **One click to Gaming Mode.**        |
-| 🎵 Fiddling with Spotify & smart home.| ✅ **Lights & Music adjust instantly.** |
-| 🛡️ Manual distraction blocking.       | ✅ **Automatic Focus shield.**          |
+| 😩 Struggle to start working.         | ✅ **Deep Work.**          |
+| 🎮 Can't fully disconnect after work. | ✅ **Gaming Mode.**        |
+| 🎵 Fiddling with apps & smart home.   | ✅ **Lights & Media adjust instantly.** |
+| 🛡️ Manual distraction blocking.       | ✅ **Automatic Distraction Blocker.**   |
 | **15 minutes of friction.**           | **< 15 seconds to your flow state.**    |
 
 <h1 align="center">The Philosophy: Your Mind is the Kernel</h1>
@@ -33,7 +33,7 @@ Axorith was born from a simple, powerful observation: **the modern digital works
 The very tools meant to help us have become the primary source of friction. Existing applications only treat the symptoms — they are features *within* the chaos.
 
 **Axorith is not another app. It's a remote control for your digital life.**
-We believe you shouldn't spend mental energy setting up your environment. Whether you are coding, gaming, or winding down for the night, Axorith orchestrates your apps, your home, and your focus.
+We believe you shouldn't spend mental energy setting up your environment. Whether you are coding, gaming, or winding down for the night, Axorith automates your apps, your home, and your focus.
 
 This philosophy is built on three core principles, embodied in our key features:
 
@@ -41,14 +41,17 @@ This philosophy is built on three core principles, embodied in our key features:
 
 ### 1. ⚙️ You Are In Control, Not The Machine.
 
-It's not about complex settings, but about meaningful control. You define the rules for your focus, codifying your entire workflow for different tasks into reusable, one-click launchers.
+It's not about complex settings, but about meaningful control. You define the rules for your focus, codifying your entire workflow for different tasks into reusable presets.
 
 > **Core Feature: Session Presets**
-> Design your ideal environment for "Coding," "Writing," or "Gaming." One click launches your apps, sets up your windows, starts your music, and engages your focus shield.
+> Design your ideal environment for "Work" or "Play." Axorith launches any application, arranges your windows, starts your media, and enables your distraction blocker.
+
+> **Core Feature: Session Scheduler**
+> True autopilot. Schedule your "Deep Work" session to start at 9:00 AM and auto-switch to "Rest" at 10:00 AM. Your PC and room adapt instantly without you touching a thing.
 
 ### 2. 🧩 Radical Modularity, Not A Locked Cage.
 
-Your workflow is unique. We don't lock you into our way of thinking. The entire system is built on plugins. Axorith provides the conductor's podium; you choose the instruments.
+Your workflow is unique. We don't lock you into our way of thinking. The entire system is built on plugins. Axorith provides the foundation; you choose the instruments.
 
 > **Core Feature: A True Plugin Ecosystem**
 > The entire system is built on a powerful SDK that lets you and the community integrate any tool with an API. A clean, well-documented, developer-first approach makes creating and sharing your own modules simple.
@@ -58,7 +61,7 @@ Your workflow is unique. We don't lock you into our way of thinking. The entire 
 Your focus is fragile. The tools that protect it must be bulletproof. We built Axorith to be the most reliable part of your workflow.
 
 > **Core Feature: Client-Server Architecture**
-> The UI (`Client`) is completely separate from the engine (`Host`). If the user interface crashes for any reason, your focus session **keeps running** without interruption. Simply restart the UI and reconnect.
+> The UI (`Client`) is completely separate from the engine (`Host`). If the user interface crashes for any reason, your schedule and blockers **keep running** without interruption. Simply restart the UI and reconnect.
 
 ---
 
@@ -84,7 +87,7 @@ Axorith is under active development, moving towards a powerful, stable release. 
 *   **Milestone 1: The Foundation**
     *   [x] Bulletproof client-server architecture for maximum stability.
     *   [x] A powerful, reactive SDK for module development.
-    *   [x] A core set of powerful modules (App/Site Blocker, Spotify, IDE Launchers).
+    *   [x] A core set of powerful modules (App/Site Blocker, Media Control, Universal Launchers).
     *   [x] Session scheduling.
 
 *   **Milestone 2: The Ecosystem**

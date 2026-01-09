@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Axorith.Shared.Licensing</AssemblyName>
+        <RootNamespace>Axorith.Shared.Licensing</RootNamespace>
+        <Description>User registration and licensing support for Axorith.</Description>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Utils\Axorith.Shared.Utils.csproj" />
+    </ItemGroup>
+</Project>

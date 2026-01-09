@@ -1,4 +1,5 @@
 ﻿using Avalonia.Data.Converters;
+using Axorith.Client.ViewModels;
 
 namespace Axorith.Client.Converters;
 
@@ -7,6 +8,24 @@ namespace Axorith.Client.Converters;
 /// </summary>
 public static class AppConverters
 {
+    /// <summary>
+    ///     Returns true if the value is a StopAtTimeTriggerViewModel.
+    /// </summary>
+    public static readonly IValueConverter IsStopAtTimeTrigger =
+        new FuncValueConverter<object?, bool>(value => value is StopAtTimeTriggerViewModel);
+
+    /// <summary>
+    ///     Returns true if the value is a StopAfterDurationTriggerViewModel.
+    /// </summary>
+    public static readonly IValueConverter IsStopAfterDurationTrigger =
+        new FuncValueConverter<object?, bool>(value => value is StopAfterDurationTriggerViewModel);
+
+    /// <summary>
+    ///     Returns true if the value is a ThenStartAnotherTriggerViewModel.
+    /// </summary>
+    public static readonly IValueConverter IsThenStartAnotherTrigger =
+        new FuncValueConverter<object?, bool>(value => value is ThenStartAnotherTriggerViewModel);
+
     public static readonly IValueConverter IsNotNullOrEmpty =
         new FuncValueConverter<string?, bool>(value => !string.IsNullOrEmpty(value));
 

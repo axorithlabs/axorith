@@ -13,6 +13,7 @@ using Axorith.Host.Interceptors;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Licensing;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
@@ -99,6 +100,7 @@ try
 
     builder.Services.AddSingleton(_ => telemetry ?? new NoopTelemetryService());
     builder.Services.AddSingleton(hostUptime);
+    builder.Services.AddSingleton<IUserRegistrationService, UserRegistrationService>();
     builder.Services.Configure<Configuration>(builder.Configuration);
 
     // Determine actual port to use (check if configured port is available)
@@ -164,6 +166,30 @@ try
         Log.Fatal(ex, "Failed to initialize authentication service. Host cannot start securely.");
         return 1;
     }
+
+    // Initialize user registration (for future licensing)
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            var registrationService = app.Services.GetRequiredService<IUserRegistrationService>();
+            var registration = await registrationService.GetOrCreateAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+            
+            Log.Information("User registration initialized: MachineId={MachineId}, FirstSeen={FirstSeen}",
+                registration.MachineId[..8] + "...",
+                registration.FirstSeenUtc);
+            
+            telemetry?.TrackEvent("UserRegistrationLoaded", new Dictionary<string, object?>
+            {
+                ["firstSeenUtc"] = registration.FirstSeenUtc.ToString("O"),
+                ["appVersion"] = registration.AppVersion
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to initialize user registration");
+        }
+    }, app.Lifetime.ApplicationStopping);
 
     _ = Task.Run(async () =>
     {

@@ -422,6 +422,12 @@
             <Setter Property="BorderBrush" Value="#666"/>
             <Setter Property="Background" Value="#161616"/>
         </Style>
+        <Style Selector="Button.ItemCard.error > Border">
+            <Setter Property="BorderBrush" Value="#FF6B6B"/>
+        </Style>
+        <Style Selector="Button.ItemCard.error:pointerover > Border">
+            <Setter Property="BorderBrush" Value="#FF8888"/>
+        </Style>
 
         <Style Selector="Button.move-btn">
             <Setter Property="Background" Value="Transparent"/>

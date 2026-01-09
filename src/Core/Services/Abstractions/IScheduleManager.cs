@@ -18,6 +18,11 @@ public interface IScheduleManager : IAsyncDisposable
     Task<IReadOnlyList<SessionSchedule>> ListSchedulesAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    ///     Gets schedules for a specific preset.
+    /// </summary>
+    Task<IReadOnlyList<SessionSchedule>> GetSchedulesForPresetAsync(Guid presetId, CancellationToken cancellationToken);
+
+    /// <summary>
     ///     Creates or updates a schedule.
     /// </summary>
     Task<SessionSchedule> SaveScheduleAsync(SessionSchedule schedule, CancellationToken cancellationToken);

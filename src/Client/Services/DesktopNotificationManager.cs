@@ -36,8 +36,7 @@ public class DesktopNotificationManager(
     private void OnNotificationReceived(ToastNotification notification)
     {
         var mainWindow = desktop.MainWindow;
-        var isWindowVisibleAndActive = mainWindow != null &&
-                                       mainWindow.IsVisible &&
+        var isWindowVisibleAndActive = mainWindow is { IsVisible: true } &&
                                        mainWindow.WindowState != WindowState.Minimized &&
                                        mainWindow.IsActive;
 

@@ -56,7 +56,7 @@ public class Module : IModule
             if (killed.Count > 0)
             {
                 var appList = string.Join(", ", killed);
-                _notifier.ShowSystemAsync("Focus Mode: Distractions Cleared", $"Closed apps: {appList}");
+                // _notifier.ShowSystemAsync("Focus Mode: Distractions Cleared", $"Closed apps: {appList}");
                 _logger.LogInfo("Initial cleanup closed: {Apps}", appList);
             }
         }
