@@ -9,6 +9,7 @@ using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host;
+using Axorith.Host.Grpc;
 using Axorith.Host.Interceptors;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
@@ -101,6 +102,7 @@ try
     builder.Services.AddSingleton(_ => telemetry ?? new NoopTelemetryService());
     builder.Services.AddSingleton(hostUptime);
     builder.Services.AddSingleton<IUserRegistrationService, UserRegistrationService>();
+    builder.Services.AddSingleton<UpdateService>();
     builder.Services.Configure<Configuration>(builder.Configuration);
 
     // Determine actual port to use (check if configured port is available)
@@ -249,6 +251,7 @@ try
     app.MapGrpcService<HostManagementServiceImpl>();
     app.MapGrpcService<SchedulerServiceImpl>();
     app.MapGrpcService<NotificationServiceImpl>();
+    app.MapGrpcService<GrpcUpdatesService>();
 
     if (app.Environment.IsDevelopment())
     {

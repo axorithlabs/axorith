@@ -22,6 +22,7 @@ public class GrpcCoreConnection : ICoreConnection
     private readonly string _serverAddress;
     private readonly ITokenProvider _tokenProvider;
     private readonly ILogger<GrpcCoreConnection> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly BehaviorSubject<ConnectionState> _stateSubject;
     private readonly AsyncRetryPolicy _retryPolicy;
 
@@ -32,6 +33,7 @@ public class GrpcCoreConnection : ICoreConnection
     private GrpcDiagnosticsApi? _diagnosticsApi;
     private GrpcSchedulerApi? _schedulerApi;
     private GrpcNotificationApi? _notificationApi;
+    private GrpcUpdatesApi? _updatesApi;
     private bool _disposed;
 
     /// <summary>
@@ -40,10 +42,12 @@ public class GrpcCoreConnection : ICoreConnection
     /// <param name="serverAddress">The gRPC server address (e.g., "http://localhost:5901").</param>
     /// <param name="tokenProvider">The provider for retrieving the authentication token.</param>
     /// <param name="logger">The logger instance.</param>
+    /// <param name="loggerFactory">The logger factory for creating loggers.</param>
     public GrpcCoreConnection(
         string serverAddress,
         ITokenProvider tokenProvider,
-        ILogger<GrpcCoreConnection> logger)
+        ILogger<GrpcCoreConnection> logger,
+        ILoggerFactory loggerFactory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serverAddress);
         ArgumentNullException.ThrowIfNull(tokenProvider);
@@ -51,6 +55,7 @@ public class GrpcCoreConnection : ICoreConnection
         _serverAddress = serverAddress;
         _tokenProvider = tokenProvider;
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _stateSubject = new BehaviorSubject<ConnectionState>(ConnectionState.Disconnected);
 
         _retryPolicy = Policy
@@ -92,6 +97,11 @@ public class GrpcCoreConnection : ICoreConnection
     public INotificationApi Notifications => _notificationApi
                                              ?? throw new InvalidOperationException(
                                                  "Not connected. Call ConnectAsync first.");
+
+    /// <inheritdoc />
+    public IUpdatesApi Updates => _updatesApi
+                                  ?? throw new InvalidOperationException(
+                                      "Not connected. Call ConnectAsync first.");
 
     /// <inheritdoc />
     public ConnectionState State => _stateSubject.Value;
@@ -163,6 +173,7 @@ public class GrpcCoreConnection : ICoreConnection
             var diagnosticsClient = new DiagnosticsService.DiagnosticsServiceClient(_channel);
             var schedulerClient = new SchedulerService.SchedulerServiceClient(_channel);
             var notificationClient = new NotificationService.NotificationServiceClient(_channel);
+            var updatesClient = new UpdatesService.UpdatesServiceClient(_channel);
 
             _presetsApi = new GrpcPresetsApi(presetsClient, _retryPolicy);
             _sessionsApi = new GrpcSessionsApi(sessionsClient, _retryPolicy, _logger);
@@ -170,6 +181,7 @@ public class GrpcCoreConnection : ICoreConnection
             _diagnosticsApi = new GrpcDiagnosticsApi(diagnosticsClient, _retryPolicy);
             _schedulerApi = new GrpcSchedulerApi(schedulerClient, _retryPolicy);
             _notificationApi = new GrpcNotificationApi(notificationClient);
+            _updatesApi = new GrpcUpdatesApi(updatesClient, _loggerFactory.CreateLogger<GrpcUpdatesApi>());
 
             var health = await _diagnosticsApi.GetHealthAsync(ct).ConfigureAwait(false);
 

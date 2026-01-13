@@ -12,9 +12,6 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
-/// <summary>
-///     ViewModel for the application settings view.
-/// </summary>
 public sealed class SettingsViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
@@ -199,7 +196,6 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
         catch
         {
-            // Ignore if browser fails to open
         }
     }
 

@@ -164,7 +164,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         Func<string, string?, Task> statusUpdater)
     {
         var connectionLogger = loggerFactory.CreateLogger<GrpcCoreConnection>();
-        var connection = new GrpcCoreConnection(serverAddress, tokenProvider, connectionLogger);
+        var connection = new GrpcCoreConnection(serverAddress, tokenProvider, connectionLogger, loggerFactory);
 
         Exception? lastException = null;
 
@@ -220,6 +220,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddSingleton(connection.Diagnostics);
         services.AddSingleton(connection.Scheduler);
         services.AddSingleton(connection.Notifications);
+        services.AddSingleton(connection.Updates);
 
         var existingMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
         existingMonitor.SetDiagnosticsApi(connection.Diagnostics);

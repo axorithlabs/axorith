@@ -37,6 +37,11 @@ public interface ICoreConnection : IAsyncDisposable
     INotificationApi Notifications { get; }
 
     /// <summary>
+    ///     Access to update operations.
+    /// </summary>
+    IUpdatesApi Updates { get; }
+
+    /// <summary>
     ///     Current connection state.
     /// </summary>
     ConnectionState State { get; }
