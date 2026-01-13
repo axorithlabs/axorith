@@ -174,12 +174,6 @@ jobs:
           name: windows-installer
           path: ./release-assets
 
-      - name: Download Extension
-        uses: actions/download-artifact@v4
-        with:
-          name: firefox-extension
-          path: ./release-assets
-      
       - name: Build Changelog
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@v4
