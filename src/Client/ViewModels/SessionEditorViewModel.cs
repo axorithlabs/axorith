@@ -991,7 +991,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private void Validate()
     {
-        ErrorMessage = !string.IsNullOrWhiteSpace(Name) ? string.Empty : "Session name cannot be empty.";
+        ErrorMessage = !string.IsNullOrWhiteSpace(Name) ? string.Empty : "Preset name cannot be empty.";
     }
 
     private async Task InitializeAsync()
@@ -1239,7 +1239,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     {
         if (string.IsNullOrWhiteSpace(Name))
         {
-            ErrorMessage = "Session name cannot be empty.";
+            ErrorMessage = "Preset name cannot be empty.";
             return;
         }
 

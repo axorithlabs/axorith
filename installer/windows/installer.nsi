@@ -47,7 +47,9 @@ SetCompressor /SOLID lzma
     !endif
     !define ${VERSION_OUT} "${_V_MAJOR}.${_V_MINOR}.${_V_PATCH}.0"
     !undef _VERSION_NUM
-    !undef _VERSION_SUFFIX
+    !ifdef _VERSION_SUFFIX
+        !undef _VERSION_SUFFIX
+    !endif
     !undef _V_MAJOR
     !undef _V_MINOR
     !undef _V_PATCH
@@ -196,6 +198,23 @@ SectionEnd
 
 Section "MainSection" SEC_INSTALL
     SetShellVarContext current
+
+    ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString"
+    ${If} $0 != ""
+        DetailPrint "Found existing installation, uninstalling..."
+        
+        nsExec::ExecToStack 'taskkill /F /IM Axorith.Client.exe'
+        Pop $1
+        nsExec::ExecToStack 'taskkill /F /IM Axorith.Host.exe'
+        Pop $1
+        
+        Sleep 1000
+        
+        StrCpy $1 $0 -1 1
+        ExecWait '$1 /S _?=$INSTDIR'
+        
+        Sleep 500
+    ${EndIf}
 
     SetOutPath "$INSTDIR"
   

@@ -178,7 +178,6 @@
                 BorderThickness="0,1,0,0" 
                 Padding="20">
             <Grid ColumnDefinitions="Auto, *, Auto">
-                <!-- Settings button on the left -->
                 <Button Grid.Column="0"
                         Command="{Binding OpenSettingsCommand}"
                         ToolTip.Tip="Settings"
@@ -189,7 +188,6 @@
                     </StackPanel>
                 </Button>
                         
-                <!-- Center buttons -->
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal" 
                             Spacing="20" 
@@ -208,6 +206,25 @@
                             IsVisible="{Binding IsSessionActive}"
                             MinWidth="200"
                             HorizontalContentAlignment="Center"/>
+
+                    <Button Command="{Binding InstallUpdateCommand}"
+                            IsVisible="{Binding UpdateAvailable}"
+                            Classes="success"
+                            MinWidth="200"
+                            HorizontalContentAlignment="Center"
+                            IsEnabled="{Binding !IsDownloadingUpdate}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" 
+                                      Width="16" Height="16"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="Update to {0}">
+                                        <Binding Path="UpdateVersion"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <Button Grid.Column="2"

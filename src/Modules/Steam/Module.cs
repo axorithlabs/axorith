@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Runtime.Versioning;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
@@ -11,7 +10,7 @@ using Axorith.Shared.Platform;
 namespace Axorith.Module.Steam;
 
 /// <summary>
-/// Module for launching Steam and optionally starting games.
+///     Module for launching Steam and optionally starting games.
 /// </summary>
 public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryService appDiscovery)
     : IModule
@@ -25,10 +24,25 @@ public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryServi
     private Process? _currentProcess;
     private bool _attachedToExisting;
 
-    public IReadOnlyList<ISetting> GetSettings() => _settings.GetAllSettings();
-    public IReadOnlyList<IAction> GetActions() => _settings.GetAllActions();
-    public Task InitializeAsync(CancellationToken cancellationToken) => _settings.InitializeAsync();
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) => _settings.ValidateAsync();
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return _settings.GetAllSettings();
+    }
+
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _settings.GetAllActions();
+    }
+
+    public Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        return _settings.InitializeAsync();
+    }
+
+    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
+    {
+        return _settings.ValidateAsync();
+    }
 
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
@@ -51,7 +65,10 @@ public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryServi
 
     public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        if (_currentProcess == null || _currentProcess.HasExited) return;
+        if (_currentProcess == null || _currentProcess.HasExited)
+        {
+            return;
+        }
 
         var lifecycle = ParseLifecycleMode(_settings.LifecycleMode.GetCurrentValue());
         await _processService.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting).ConfigureAwait(false);
@@ -105,7 +122,8 @@ public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryServi
         try
         {
             var windowConfig = BuildWindowConfig();
-            await _windowService.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken).ConfigureAwait(false);
+            await _windowService.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
@@ -168,13 +186,16 @@ public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryServi
         }
 
         return new WindowConfig(state, useCustomSize, width, height, moveToMonitor, targetMonitorIndex,
-            _settings.BringToForeground.GetCurrentValue(), WindowTimeoutMs, 500, 1000, 500, 0);
+            _settings.BringToForeground.GetCurrentValue(), WindowTimeoutMs, 500, 1000, 500);
     }
 
-    private static ProcessLifecycleMode ParseLifecycleMode(string setting) => setting switch
+    private static ProcessLifecycleMode ParseLifecycleMode(string setting)
     {
-        "KeepRunning" => ProcessLifecycleMode.KeepRunning,
-        "TerminateForce" or "TerminateOnEnd" => ProcessLifecycleMode.TerminateForce,
-        _ => ProcessLifecycleMode.TerminateGraceful
-    };
+        return setting switch
+        {
+            "KeepRunning" => ProcessLifecycleMode.KeepRunning,
+            "TerminateForce" or "TerminateOnEnd" => ProcessLifecycleMode.TerminateForce,
+            _ => ProcessLifecycleMode.TerminateGraceful
+        };
+    }
 }

@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -8,7 +7,7 @@ using Axorith.Sdk.Logging;
 namespace Axorith.Module.OBS;
 
 /// <summary>
-/// Service for communicating with OBS via WebSocket (obs-websocket 5.x protocol).
+///     Service for communicating with OBS via WebSocket (obs-websocket 5.x protocol).
 /// </summary>
 internal sealed class ObsWebSocketService(IModuleLogger logger, Settings settings) : IObsWebSocketService
 {
@@ -44,10 +43,16 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
             await _webSocket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
 
             var helloResponse = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
-            if (helloResponse == null) return false;
+            if (helloResponse == null)
+            {
+                return false;
+            }
 
             using var helloDoc = JsonDocument.Parse(helloResponse);
-            if (helloDoc.RootElement.GetProperty("op").GetInt32() != 0) return false;
+            if (helloDoc.RootElement.GetProperty("op").GetInt32() != 0)
+            {
+                return false;
+            }
 
             var data = helloDoc.RootElement.GetProperty("d");
             string identifyJson;
@@ -58,7 +63,8 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
                 var salt = authElement.GetProperty("salt").GetString()!;
                 var authString = GenerateAuthString(password ?? string.Empty, challenge, salt);
 
-                identifyJson = JsonSerializer.Serialize(new { op = 1, d = new { rpcVersion = 1, authentication = authString } });
+                identifyJson = JsonSerializer.Serialize(new
+                    { op = 1, d = new { rpcVersion = 1, authentication = authString } });
             }
             else
             {
@@ -68,10 +74,16 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
             await SendMessageAsync(identifyJson, cancellationToken).ConfigureAwait(false);
 
             var identifiedResponse = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
-            if (identifiedResponse == null) return false;
+            if (identifiedResponse == null)
+            {
+                return false;
+            }
 
             using var identifiedDoc = JsonDocument.Parse(identifiedResponse);
-            if (identifiedDoc.RootElement.GetProperty("op").GetInt32() != 2) return false;
+            if (identifiedDoc.RootElement.GetProperty("op").GetInt32() != 2)
+            {
+                return false;
+            }
 
             _isConnected = true;
             logger.LogInfo("Connected to OBS WebSocket");
@@ -88,23 +100,51 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
     {
         if (_webSocket?.State == WebSocketState.Open)
         {
-            try { await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None); }
+            try
+            {
+                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+            }
             catch
             {
                 // ignored
             }
         }
+
         _isConnected = false;
     }
 
-    public Task<bool> StartStreamingAsync(CancellationToken ct = default) => SendRequestAsync("StartStream", null, ct);
-    public Task<bool> StopStreamingAsync(CancellationToken ct = default) => SendRequestAsync("StopStream", null, ct);
-    public Task<bool> StartRecordingAsync(CancellationToken ct = default) => SendRequestAsync("StartRecord", null, ct);
-    public Task<bool> StopRecordingAsync(CancellationToken ct = default) => SendRequestAsync("StopRecord", null, ct);
-    public Task<bool> StartVirtualCameraAsync(CancellationToken ct = default) => SendRequestAsync("StartVirtualCam", null, ct);
-    public Task<bool> StopVirtualCameraAsync(CancellationToken ct = default) => SendRequestAsync("StopVirtualCam", null, ct);
+    public Task<bool> StartStreamingAsync(CancellationToken ct = default)
+    {
+        return SendRequestAsync("StartStream", null, ct);
+    }
 
-    private async Task<bool> SendRequestAsync(string requestType, object? requestData, CancellationToken cancellationToken)
+    public Task<bool> StopStreamingAsync(CancellationToken ct = default)
+    {
+        return SendRequestAsync("StopStream", null, ct);
+    }
+
+    public Task<bool> StartRecordingAsync(CancellationToken ct = default)
+    {
+        return SendRequestAsync("StartRecord", null, ct);
+    }
+
+    public Task<bool> StopRecordingAsync(CancellationToken ct = default)
+    {
+        return SendRequestAsync("StopRecord", null, ct);
+    }
+
+    public Task<bool> StartVirtualCameraAsync(CancellationToken ct = default)
+    {
+        return SendRequestAsync("StartVirtualCam", null, ct);
+    }
+
+    public Task<bool> StopVirtualCameraAsync(CancellationToken ct = default)
+    {
+        return SendRequestAsync("StopVirtualCam", null, ct);
+    }
+
+    private async Task<bool> SendRequestAsync(string requestType, object? requestData,
+        CancellationToken cancellationToken)
     {
         if (!_isConnected || _webSocket?.State != WebSocketState.Open)
         {
@@ -125,10 +165,12 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
                 using var doc = JsonDocument.Parse(response);
                 if (doc.RootElement.GetProperty("op").GetInt32() == 7)
                 {
-                    var result = doc.RootElement.GetProperty("d").GetProperty("requestStatus").GetProperty("result").GetBoolean();
+                    var result = doc.RootElement.GetProperty("d").GetProperty("requestStatus").GetProperty("result")
+                        .GetBoolean();
                     return result;
                 }
             }
+
             return true;
         }
         catch (Exception ex)
@@ -140,14 +182,21 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
 
     private async Task SendMessageAsync(string message, CancellationToken cancellationToken)
     {
-        if (_webSocket == null) return;
+        if (_webSocket == null)
+        {
+            return;
+        }
+
         var bytes = Encoding.UTF8.GetBytes(message);
         await _webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellationToken);
     }
 
     private async Task<string?> ReceiveMessageAsync(CancellationToken cancellationToken)
     {
-        if (_webSocket == null) return null;
+        if (_webSocket == null)
+        {
+            return null;
+        }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(10000);
@@ -166,6 +215,7 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
                     _isConnected = false;
                     return null;
                 }
+
                 ms.Write(buffer, 0, result.Count);
             } while (!result.EndOfMessage);
 

@@ -20,13 +20,11 @@ public class MainViewModel : ReactiveObject, IDisposable
     private readonly ShellViewModel _shell;
     private readonly IPresetsApi _presetsApi;
     private readonly ISessionsApi _sessionsApi;
+    private readonly IUpdatesApi _updatesApi;
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
     private readonly ITelemetryService? _telemetry;
 
-    /// <summary>
-    ///     The currently selected session preset in the list.
-    /// </summary>
     public SessionPresetViewModel? SelectedPreset
     {
         get;
@@ -39,28 +37,44 @@ public class MainViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    /// <summary>
-    ///     A user-friendly string describing the current session status.
-    /// </summary>
     public string SessionStatus
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = "No session is active.";
 
-    /// <summary>
-    ///     Gets a value indicating whether a session is currently active.
-    ///     This property is exposed for binding in the View.
-    /// </summary>
     public bool IsSessionActive
     {
         get;
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    /// <summary>
-    ///     A collection of all available session presets loaded from the core.
-    /// </summary>
+    public bool UpdateAvailable
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public string? UpdateVersion
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public bool IsDownloadingUpdate
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public double DownloadProgress
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    private UpdateInfoDto? _availableUpdate;
+
     public ObservableCollection<SessionPresetViewModel> Presets { get; } = [];
 
     /// <summary>
@@ -93,22 +107,19 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
-    /// <summary>
-    ///     Command to open Discord invite link.
-    /// </summary>
     public ICommand JoinDiscordCommand { get; }
 
-    /// <summary>
-    ///     Command to open the settings view.
-    /// </summary>
     public ICommand OpenSettingsCommand { get; }
 
+    public ICommand InstallUpdateCommand { get; }
+
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
-        IServiceProvider serviceProvider)
+        IUpdatesApi updatesApi, IServiceProvider serviceProvider)
     {
         _shell = shell;
         _presetsApi = presetsApi;
         _sessionsApi = sessionsApi;
+        _updatesApi = updatesApi;
         _serviceProvider = serviceProvider;
         _telemetry = serviceProvider.GetService<ITelemetryService>();
 
@@ -187,6 +198,12 @@ public class MainViewModel : ReactiveObject, IDisposable
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
         JoinDiscordCommand = ReactiveCommand.Create(OpenDiscordInvite);
         OpenSettingsCommand = ReactiveCommand.Create(OpenSettings);
+
+        var canInstallUpdate = this
+            .WhenAnyValue(vm => vm.UpdateAvailable, vm => vm.IsDownloadingUpdate,
+                (available, downloading) => available && !downloading)
+            .ObserveOn(RxApp.MainThreadScheduler);
+        InstallUpdateCommand = ReactiveCommand.CreateFromTask(InstallUpdateAsync, canInstallUpdate);
     }
 
     /// <summary>
@@ -196,6 +213,68 @@ public class MainViewModel : ReactiveObject, IDisposable
     {
         await LoadPresetsAsync();
         await RefreshSessionStateAsync();
+        await CheckForUpdatesAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var updateInfo = await _updatesApi.GetUpdateInfoAsync();
+            if (updateInfo != null)
+            {
+                _availableUpdate = updateInfo;
+                UpdateAvailable = true;
+                UpdateVersion = updateInfo.Version;
+
+                _telemetry?.TrackEvent("UpdateAvailable", new Dictionary<string, object?>
+                {
+                    ["version"] = updateInfo.Version
+                });
+            }
+        }
+        catch (Exception)
+        {
+            _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            {
+                ["message"] = "Failed to check for updates",
+                ["fatal"] = false
+            });
+        }
+    }
+
+    private async Task InstallUpdateAsync()
+    {
+        if (_availableUpdate == null)
+        {
+            return;
+        }
+
+        try
+        {
+            IsDownloadingUpdate = true;
+            DownloadProgress = 0;
+
+            var progress = new Progress<double>(value => { DownloadProgress = value; });
+
+            var installerPath = await _updatesApi.DownloadUpdateAsync(_availableUpdate, progress);
+
+            _telemetry?.TrackEvent("UpdateInstalled", new Dictionary<string, object?>
+            {
+                ["version"] = _availableUpdate.Version
+            });
+
+            await _updatesApi.InstallUpdateAsync(installerPath);
+        }
+        catch (Exception)
+        {
+            IsDownloadingUpdate = false;
+            _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            {
+                ["message"] = "Failed to install update",
+                ["fatal"] = false
+            });
+        }
     }
 
     private async Task StartPresetAsync(SessionPresetViewModel presetVm)

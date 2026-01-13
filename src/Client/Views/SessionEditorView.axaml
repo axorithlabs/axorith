@@ -300,7 +300,7 @@
                     
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Session Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
                             <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                             

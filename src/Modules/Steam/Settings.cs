@@ -1,5 +1,4 @@
-﻿using System.Runtime.Versioning;
-using Axorith.Sdk;
+﻿using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;

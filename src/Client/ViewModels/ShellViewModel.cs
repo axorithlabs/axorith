@@ -1,7 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using Axorith.Client.Services.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;

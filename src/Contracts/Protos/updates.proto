@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option csharp_namespace = "Axorith.Contracts";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service UpdatesService {
+  rpc GetUpdateInfo(google.protobuf.Empty) returns (UpdateInfoResponse);
+}
+
+message UpdateInfoResponse {
+  bool update_available = 1;
+  string current_version = 2;
+  string latest_version = 3;
+  string download_url = 4;
+  string release_notes = 5;
+  google.protobuf.Timestamp published_at = 6;
+}

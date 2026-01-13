@@ -1,5 +1,4 @@
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Axorith.Client.CoreSdk.Abstractions;
@@ -14,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
+using WindowState = Avalonia.Controls.WindowState;
 
 namespace Axorith.Client;
 
@@ -110,7 +110,8 @@ public class App : Application
             sp.GetRequiredService<IToastNotificationService>(),
             desktop));
         services.AddSingleton<IAutoStartManager>(sp =>
-            PlatformServices.CreateAutoStartManager(sp.GetRequiredService<ILoggerFactory>().CreateLogger<IAutoStartManager>()));
+            PlatformServices.CreateAutoStartManager(sp.GetRequiredService<ILoggerFactory>()
+                .CreateLogger<IAutoStartManager>()));
         services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ShellViewModel>(),
             sp.GetRequiredService<IClientUiSettingsStore>(),
@@ -138,7 +139,7 @@ public class App : Application
         {
             logger.LogInformation("Starting with window hidden (--tray flag)");
             _mainWindow.ShowInTaskbar = false;
-            _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
+            _mainWindow.WindowState = WindowState.Minimized;
         }
         else
         {
@@ -173,7 +174,7 @@ public class App : Application
                     return;
                 }
 
-                if (_mainWindow.WindowState != Avalonia.Controls.WindowState.Minimized)
+                if (_mainWindow.WindowState != WindowState.Minimized)
                 {
                     windowStateManager.SaveWindowState(_mainWindow);
                 }
@@ -184,7 +185,7 @@ public class App : Application
                 if (cfg.Ui.MinimizeToTrayOnClose)
                 {
                     e.Cancel = true;
-                    _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
+                    _mainWindow.WindowState = WindowState.Minimized;
                     _mainWindow.ShowInTaskbar = false;
                     logger.LogInformation("Window minimized to tray");
                 }
@@ -249,13 +250,14 @@ public class App : Application
         };
     }
 
-    private static void ApplyAutoStartSettings(UiSettingsStore settingsStore, IServiceProvider services, ILogger<App> logger)
+    private static void ApplyAutoStartSettings(UiSettingsStore settingsStore, IServiceProvider services,
+        ILogger<App> logger)
     {
         try
         {
             var config = settingsStore.LoadOrDefault();
             var autoStartManager = services.GetService<IAutoStartManager>();
-            
+
             if (autoStartManager == null)
             {
                 return;
