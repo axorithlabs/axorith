@@ -83,6 +83,43 @@ jobs:
         uses: repolevedavaj/install-nsis@v1.1.0
         with:
           nsis-version: 3.11
+      
+      - name: Install NSIS Plugins
+        shell: pwsh
+        run: |
+          $nsisPluginsDir = "${env:ProgramFiles(x86)}\NSIS\Plugins\x86-unicode"
+          if (-not (Test-Path $nsisPluginsDir)) {
+            New-Item -ItemType Directory -Force $nsisPluginsDir | Out-Null
+          }
+          
+          Write-Host "Downloading InetC plugin..."
+          $inetcUrl = "https://nsis.sourceforge.io/mediawiki/images/c/c9/Inetc.zip"
+          $inetcZip = "$env:TEMP\inetc.zip"
+          Invoke-WebRequest -Uri $inetcUrl -OutFile $inetcZip
+          
+          Expand-Archive -Path $inetcZip -DestinationPath "$env:TEMP\inetc" -Force
+          Copy-Item "$env:TEMP\inetc\Plugins\x86-unicode\INetC.dll" $nsisPluginsDir -Force
+          
+          Write-Host "InetC plugin installed successfully"
+          
+          if (Test-Path "$nsisPluginsDir\INetC.dll") {
+            Write-Host "INetC.dll found at: $nsisPluginsDir\INetC.dll"
+          } else {
+            Write-Error "Failed to install INetC plugin"
+            exit 1
+          }
+      
+      - name: Add NSIS to PATH
+        shell: pwsh
+        run: |
+          $nsisPath = "${env:ProgramFiles(x86)}\NSIS"
+          if (Test-Path $nsisPath) {
+            echo "$nsisPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Host "Added NSIS to PATH: $nsisPath"
+          } else {
+            Write-Error "NSIS not found at $nsisPath"
+            exit 1
+          }
 
       - name: Ensure PostHog key is present
         if: ${{ env.POSTHOG_API_KEY == '' }}
@@ -90,6 +127,20 @@ jobs:
         run: |
           Write-Error "POSTHOG_API_KEY secret is required for telemetry patching (CI injects into TelemetryDefaults)."
           exit 1
+      
+      - name: Verify NSIS Installation
+        shell: pwsh
+        run: |
+          $nsisPath = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
+          if (-not $nsisPath) {
+            $nsisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+            if (-not (Test-Path $nsisPath)) {
+              Write-Error "NSIS not found. Installation may have failed."
+              exit 1
+            }
+          }
+          Write-Host "NSIS found at: $($nsisPath.Source ?? $nsisPath)"
+          & makensis /VERSION
       
       - name: Run Build Script (Publish & NSIS)
         shell: pwsh
@@ -103,40 +154,9 @@ jobs:
           path: ./build/Installer/*.exe
           if-no-files-found: error
 
-  package-extension:
-    name: 🦊 Package Firefox Extension
-    needs: tests
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Extract Version
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
-      - name: Update Manifest Version
-        working-directory: ./src/Modules/SiteBlocker/BrowserExtension/Firefox
-        run: |
-          # Обновляем версию в manifest.json, чтобы она совпадала с тегом релиза
-          jq --arg v "${{ steps.get_version.outputs.VERSION }}" '.version = $v' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
-
-      - name: Zip Extension
-        working-directory: ./src/Modules/SiteBlocker/BrowserExtension/Firefox
-        run: |
-          zip -r axorith-site-blocker-${{ steps.get_version.outputs.VERSION }}.xpi . -x "*.git*" "*.DS_Store"
-
-      - name: Upload Extension Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: firefox-extension
-          path: ./src/Modules/SiteBlocker/BrowserExtension/Firefox/*.xpi
-
   create-release:
     name: 🚀 Create Release
-    needs: [build-installer, package-extension]
+    needs: [build-installer]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -174,7 +194,6 @@ jobs:
           body: ${{ steps.build_changelog.outputs.changelog }}
           files: |
             ./release-assets/*.exe
-            ./release-assets/*.xpi
           draft: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:
