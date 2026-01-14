@@ -42,7 +42,8 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
                 var fileInfo = new FileInfo(filePath);
                 if (fileInfo.Length > MaxPresetFileSizeBytes)
                 {
-                    logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath, fileInfo.Length);
+                    logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath,
+                        fileInfo.Length);
                     continue;
                 }
 
@@ -93,14 +94,16 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Length > MaxPresetFileSizeBytes)
             {
-                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath, fileInfo.Length);
+                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath,
+                    fileInfo.Length);
                 return null;
             }
 
             await using var stream = File.OpenRead(filePath);
             // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
             // File size and MaxDepth are validated to prevent DoS attacks
-            var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken) //-V5611
+            var preset = await JsonSerializer
+                .DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken) //-V5611
                 .ConfigureAwait(false);
 
             if (preset is not { Version: < CurrentPresetVersion })

@@ -1,4 +1,5 @@
-﻿using System.Runtime.Versioning;
+﻿using System.Reflection;
+using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
@@ -116,7 +117,7 @@ public sealed class WindowsAutoStartManager : IAutoStartManager
             return exePath;
         }
 
-        var assembly = System.Reflection.Assembly.GetEntryAssembly();
+        var assembly = Assembly.GetEntryAssembly();
         return assembly?.Location ?? "Axorith.Client.exe";
     }
 }

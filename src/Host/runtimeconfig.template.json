@@ -1,0 +1,14 @@
+{
+  "configProperties": {
+    "System.GC.Server": true,
+    "System.GC.Concurrent": true,
+    "System.GC.RetainVM": true,
+    "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false,
+    "System.Runtime.TieredCompilation": true,
+    "System.Runtime.TieredCompilation.QuickJit": true,
+    "System.Runtime.TieredCompilation.QuickJitForLoops": true,
+    "System.Threading.ThreadPool.MinThreads": 4,
+    "System.Threading.ThreadPool.MaxThreads": 32767,
+    "Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.IOQueueCount": 0
+  }
+}

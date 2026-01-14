@@ -185,7 +185,8 @@ internal sealed class Settings : LauncherSettingsBase
         {
             return Task.FromResult(
                 ValidationResult.Fail(
-                    new Dictionary<string, string> { [CustomUrl.Key] = "Custom URL is required when 'Enter a custom URL' is selected." },
+                    new Dictionary<string, string>
+                        { [CustomUrl.Key] = "Custom URL is required when 'Enter a custom URL' is selected." },
                     "Please enter a Spotify URL (track, playlist, or album)."));
         }
 

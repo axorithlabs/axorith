@@ -20,6 +20,7 @@ public class ScheduleManager(
 
     private readonly List<SessionSchedule> _schedules = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -90,7 +91,8 @@ public class ScheduleManager(
         }
     }
 
-    public async Task<IReadOnlyList<SessionSchedule>> GetSchedulesForPresetAsync(Guid presetId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<SessionSchedule>> GetSchedulesForPresetAsync(Guid presetId,
+        CancellationToken cancellationToken)
     {
         await _lock.WaitAsync(cancellationToken);
         try
@@ -244,7 +246,6 @@ public class ScheduleManager(
                 {
                     // StopDuration schedules are handled by ISessionAutoStopService when session starts
                     // They don't run on a fixed time, but track duration from session start
-                    continue;
                 }
                 else
                 {
@@ -284,7 +285,7 @@ public class ScheduleManager(
         {
             _lock.Release();
         }
-        
+
         toStop = toStop.OrderBy(x => x.RunTime).ToList();
         toRun = toRun.OrderBy(x => x.RunTime).ToList();
 
@@ -467,14 +468,16 @@ public class ScheduleManager(
             var fileInfo = new FileInfo(_storagePath);
             if (fileInfo.Length > MaxScheduleFileSizeBytes)
             {
-                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)", _storagePath, fileInfo.Length);
+                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)", _storagePath,
+                    fileInfo.Length);
                 return;
             }
 
             await using var stream = File.OpenRead(_storagePath);
             // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
             // File size and MaxDepth are validated to prevent DoS attacks
-            var loaded = await JsonSerializer.DeserializeAsync<List<SessionSchedule>>(stream, _jsonOptions, ct); //-V5611
+            var loaded =
+                await JsonSerializer.DeserializeAsync<List<SessionSchedule>>(stream, _jsonOptions, ct); //-V5611
             if (loaded != null)
             {
                 _schedules.Clear();

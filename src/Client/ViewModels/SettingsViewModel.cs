@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Reflection;
 using System.Windows.Input;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Shared.Platform;
@@ -201,7 +202,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
 
     private static string GetAppVersion()
     {
-        var assembly = System.Reflection.Assembly.GetEntryAssembly();
+        var assembly = Assembly.GetEntryAssembly();
         var version = assembly?.GetName().Version;
         return version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "v0.0.0";
     }

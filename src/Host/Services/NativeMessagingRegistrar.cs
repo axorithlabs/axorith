@@ -56,7 +56,7 @@ public class NativeMessagingRegistrar(
 
         // Register for Firefox
         manager.RegisterFirefoxHost(hostName, shimPath, [FirefoxExtensionId]);
-        
+
         // Register for Chrome/Chromium-based browsers
         // Note: The extension ID will be determined when the extension is loaded in Chrome.
         // For unpacked extensions, Chrome generates an ID based on the extension's path.

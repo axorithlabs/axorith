@@ -5,6 +5,16 @@
         <Description>Headless gRPC server for Axorith Core services</Description>
         <OutputType>WinExe</OutputType>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        
+        <ServerGarbageCollection>true</ServerGarbageCollection>
+        <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+        
+        <PublishSingleFile Condition="'$(Configuration)' == 'Release'">false</PublishSingleFile>
+        <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
+        <PublishReadyToRunShowWarnings Condition="'$(Configuration)' == 'Release'">false</PublishReadyToRunShowWarnings>
+        
+        <TieredCompilation>true</TieredCompilation>
+        <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     </PropertyGroup>
 
     <ItemGroup>
@@ -37,6 +47,9 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="appsettings.development.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="runtimeconfig.template.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>

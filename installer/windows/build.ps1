@@ -36,7 +36,6 @@ function Sign-Executable {
         return $false
     }
 
-    # Find signtool.exe
     $signtoolPath = $null
     $sdkPaths = @(
         "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe",
@@ -99,22 +98,26 @@ function Sign-Executable {
     }
 }
 
-# Get version from git tag if not provided
+# Version resolution: CLI param > git tag > fallback
+# This ensures installer version matches the assembly version from Directory.Build.targets
 if ([string]::IsNullOrWhiteSpace($Version)) {
     try {
+        Push-Location $SolutionDir
         $gitVersion = & git describe --tags --abbrev=0 2>&1
+        Pop-Location
+        
         if ($LASTEXITCODE -eq 0 -and ![string]::IsNullOrWhiteSpace($gitVersion)) {
             $Version = $gitVersion.TrimStart('v').Trim()
-            Write-Host "Version detected from git tag: $Version" -ForegroundColor Green
+            Write-Host "Version from git tag: $Version" -ForegroundColor Green
         }
         else {
             $Version = "0.0.1-alpha"
-            Write-Host "No git tags found, using default version: $Version" -ForegroundColor Yellow
+            Write-Host "No git tags found, using fallback: $Version" -ForegroundColor Yellow
         }
     }
     catch {
         $Version = "0.0.1-alpha"
-        Write-Host "Failed to get git version, using default: $Version" -ForegroundColor Yellow
+        Write-Host "Failed to get git version, using fallback: $Version" -ForegroundColor Yellow
     }
 }
 else {
@@ -143,7 +146,7 @@ if (Test-Path $DistDir) { Remove-Item -Recurse -Force $DistDir }
 New-Item -ItemType Directory -Force $StagingDir | Out-Null
 New-Item -ItemType Directory -Force $DistDir | Out-Null
 
-dotnet publish $SolutionDir --configuration Release
+dotnet publish $SolutionDir --configuration Release -p:Version=$Version
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Solution publish failed."
     exit 1
@@ -159,18 +162,15 @@ foreach ($folder in $publishFolders) {
     $parts = $relativePath -split '\\'
     $topFolder = $parts[0]
 
-    # Skip Tests folder
     if ($topFolder -eq "Tests") {
         Write-Host "Skipping test artifacts in: $relativePath" -ForegroundColor Gray
         continue
     }
 
-    # Handle Modules
     if ($topFolder -eq "Modules") {
         continue
     }
 
-    # Regular apps (e.g. Axorith.Host)
     $destinationPath = Join-Path $StagingDir $topFolder
     New-Item -ItemType Directory -Force $destinationPath | Out-Null
 
@@ -230,7 +230,6 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Sign installer if certificate is provided
 if (-not [string]::IsNullOrWhiteSpace($SigningCertificate) -and (Test-Path $SigningCertificate)) {
     $installerName = "Axorith-Setup-${Version}.exe"
     $installerPath = Join-Path $DistDir $installerName

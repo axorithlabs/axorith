@@ -10,6 +10,22 @@
         
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        
+        <!-- Performance optimizations -->
+        <ServerGarbageCollection>false</ServerGarbageCollection>
+        <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+        
+        <!-- Size optimizations for Release -->
+        <PublishSingleFile Condition="'$(Configuration)' == 'Release'">false</PublishSingleFile>
+        <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
+        <PublishReadyToRunShowWarnings Condition="'$(Configuration)' == 'Release'">false</PublishReadyToRunShowWarnings>
+        
+        <!-- Startup performance -->
+        <TieredCompilation>true</TieredCompilation>
+        <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+        
+        <!-- Avalonia-specific optimizations -->
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
 
     <ItemGroup>
@@ -54,6 +70,9 @@
         </None>
         <None Update="appsettings.development.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="runtimeconfig.template.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
 </Project>

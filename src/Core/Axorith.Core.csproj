@@ -4,6 +4,10 @@
         <RootNamespace>Axorith.Core</RootNamespace>
         
         <Description>Core system for Axorith.</Description>
+        
+        <!-- Library optimizations -->
+        <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>

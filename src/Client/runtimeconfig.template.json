@@ -1,0 +1,13 @@
+{
+  "configProperties": {
+    "System.GC.Server": false,
+    "System.GC.Concurrent": true,
+    "System.GC.RetainVM": false,
+    "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false,
+    "System.Runtime.TieredCompilation": true,
+    "System.Runtime.TieredCompilation.QuickJit": true,
+    "System.Runtime.TieredCompilation.QuickJitForLoops": true,
+    "System.Threading.ThreadPool.MinThreads": 2,
+    "System.Threading.ThreadPool.MaxThreads": 32767
+  }
+}

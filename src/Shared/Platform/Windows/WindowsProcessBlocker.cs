@@ -395,7 +395,9 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private static string NormalizeName(string name)
     {
-        return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileNameWithoutExtension(name) : name;
+        return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetFileNameWithoutExtension(name)
+            : name;
     }
 
     public void Dispose()

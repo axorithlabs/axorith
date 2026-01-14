@@ -308,7 +308,8 @@ public class SessionAutoStopService(
                     {
                         logger.LogWarning("Next preset {NextPresetId} not found", nextPresetId.Value);
                         await notifier.ShowSystemAsync("Auto-Stop",
-                            $"Session stopped. Next preset (ID: {nextPresetId.Value}) not found.").ConfigureAwait(false);
+                                $"Session stopped. Next preset (ID: {nextPresetId.Value}) not found.")
+                            .ConfigureAwait(false);
                         return;
                     }
 

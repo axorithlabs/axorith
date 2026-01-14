@@ -101,6 +101,14 @@ file class NoOpAutoStartManager : IAutoStartManager
 {
     public bool IsAutoStartEnabled => false;
     public bool IsStartMinimized => false;
-    public bool EnableAutoStart(bool startMinimized = true) => false;
-    public bool DisableAutoStart() => true;
+
+    public bool EnableAutoStart(bool startMinimized = true)
+    {
+        return false;
+    }
+
+    public bool DisableAutoStart()
+    {
+        return true;
+    }
 }

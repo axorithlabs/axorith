@@ -23,7 +23,8 @@ public class SessionManager(
     : ISessionManager
 {
     private CancellationTokenSource? _sessionCts;
-    private readonly SemaphoreSlim _stateLock = new(1, 1);
+    private readonly SemaphoreSlim _asyncLock = new(1, 1);
+    private readonly object _syncLock = new();
 
     // This private class holds the live instance of a module and its personal DI scope.
     private class ActiveModule : IDisposable
@@ -54,7 +55,7 @@ public class SessionManager(
     /// <inheritdoc />
     public async Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default)
     {
-        await _stateLock.WaitAsync(cancellationToken);
+        await _asyncLock.WaitAsync(cancellationToken);
         try
         {
             if (IsSessionRunning)
@@ -104,7 +105,7 @@ public class SessionManager(
         }
         finally
         {
-            _stateLock.Release();
+            _asyncLock.Release();
         }
 
         try
@@ -258,7 +259,7 @@ public class SessionManager(
     /// <inheritdoc />
     public async Task StopCurrentSessionAsync(CancellationToken cancellationToken = default)
     {
-        await _stateLock.WaitAsync(cancellationToken);
+        await _asyncLock.WaitAsync(cancellationToken);
         try
         {
             if (!IsSessionRunning && _activeModules.Count == 0)
@@ -336,7 +337,7 @@ public class SessionManager(
         }
         finally
         {
-            _stateLock.Release();
+            _asyncLock.Release();
         }
     }
 
@@ -352,39 +353,28 @@ public class SessionManager(
     /// <inheritdoc />
     public IModule? GetActiveModuleInstance(Guid moduleId)
     {
-        _stateLock.Wait();
-        try
+        lock (_syncLock)
         {
             return _activeModules
                 .FirstOrDefault(m => m.Configuration.ModuleId == moduleId)
                 ?.Instance;
-        }
-        finally
-        {
-            _stateLock.Release();
         }
     }
 
     /// <inheritdoc />
     public IModule? GetActiveModuleInstanceByInstanceId(Guid instanceId)
     {
-        _stateLock.Wait();
-        try
+        lock (_syncLock)
         {
             return _activeModules
                 .FirstOrDefault(m => m.Configuration.InstanceId == instanceId)
                 ?.Instance;
         }
-        finally
-        {
-            _stateLock.Release();
-        }
     }
 
     public SessionSnapshot? GetCurrentSnapshot()
     {
-        _stateLock.Wait();
-        try
+        lock (_syncLock)
         {
             if (!IsSessionRunning || ActiveSession == null)
             {
@@ -430,18 +420,48 @@ public class SessionManager(
 
             return new SessionSnapshot(ActiveSession.Id, ActiveSession.Name, modules);
         }
-        finally
-        {
-            _stateLock.Release();
-        }
     }
 
     /// <inheritdoc />
     public SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId)
     {
-        // GetCurrentSnapshot already takes the lock
-        var snapshot = GetCurrentSnapshot();
-        return snapshot?.Modules.FirstOrDefault(m => m.InstanceId == instanceId);
+        lock (_syncLock)
+        {
+            if (!IsSessionRunning || ActiveSession == null)
+            {
+                return null;
+            }
+
+            var active = _activeModules.FirstOrDefault(m => m.Configuration.InstanceId == instanceId);
+            if (active == null)
+            {
+                return null;
+            }
+
+            var settings = active.Instance.GetSettings().Select(setting => new SessionSettingSnapshot(
+                setting.Key,
+                setting.GetCurrentLabel(),
+                setting.Description,
+                setting.ControlType,
+                setting.Persistence,
+                setting.GetCurrentReadOnly(),
+                setting.GetCurrentVisibility(),
+                setting.ValueType.Name,
+                setting.GetValueAsString())).ToList();
+
+            var actions = active.Instance.GetActions().Select(action => new SessionActionSnapshot(
+                action.Key,
+                action.GetCurrentLabel(),
+                action.GetCurrentEnabled())).ToList();
+
+            return new SessionModuleSnapshot(
+                active.Configuration.InstanceId,
+                active.Configuration.ModuleId,
+                active.Definition.Name,
+                active.Configuration.CustomName,
+                settings,
+                actions);
+        }
     }
 
     private void TrackModuleStarted(ActiveModule module)
@@ -564,7 +584,7 @@ public class SessionManager(
         }
 
         _sessionCts?.Dispose();
-        _stateLock.Dispose();
+        _asyncLock.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -1,0 +1,24 @@
+<Project>
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <PublishReadyToRun>true</PublishReadyToRun>
+        <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
+        <PublishReadyToRunShowWarnings>false</PublishReadyToRunShowWarnings>
+
+        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
+        <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+        <CopyDocumentationFilesToPublishDirectory>false</CopyDocumentationFilesToPublishDirectory>
+
+        <UseAppHost>true</UseAppHost>
+        <SelfContained>false</SelfContained>
+
+        <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+        <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+
+        <InvariantGlobalization>false</InvariantGlobalization>
+        <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+        <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+    </PropertyGroup>
+</Project>

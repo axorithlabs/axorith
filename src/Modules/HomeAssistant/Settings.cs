@@ -96,7 +96,7 @@ internal sealed class Settings : IDisposable
             .Skip(1)
             .Where(token => !string.IsNullOrWhiteSpace(token))
             .Subscribe(token => _secureStorage.StoreSecret(TokenStorageKey, token));
-        
+
         _disposables.Add(tokenSubscription);
     }
 

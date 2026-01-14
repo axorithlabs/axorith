@@ -103,7 +103,8 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             var edgeRegistryPath = $@"Software\Microsoft\Edge\NativeMessagingHosts\{hostName}";
             RegisterInRegistry(edgeRegistryPath, manifestPath);
 
-            logger.LogInformation("Successfully registered Chrome/Chromium Native Messaging Host '{HostName}'", hostName);
+            logger.LogInformation("Successfully registered Chrome/Chromium Native Messaging Host '{HostName}'",
+                hostName);
         }
         catch (Exception ex)
         {

@@ -13,7 +13,7 @@ internal sealed class Settings : LauncherSettingsBase
     private const int MinPort = 1;
     private const int MaxPort = 65535;
     private const int DefaultObsWebSocketPort = 4455;
-    
+
     internal const string ActionNone = "none";
     internal const string ActionStartStreaming = "start_streaming";
     internal const string ActionStartRecording = "start_recording";
@@ -58,7 +58,8 @@ internal sealed class Settings : LauncherSettingsBase
             key: "EnableWebSocket",
             label: "Enable WebSocket Control",
             defaultValue: false,
-            description: "Control OBS via WebSocket. To enable: Open OBS → Tools → WebSocket Server Settings → Enable WebSocket server → Copy port and password."
+            description:
+            "Control OBS via WebSocket. To enable: Open OBS → Tools → WebSocket Server Settings → Enable WebSocket server → Copy port and password."
         );
 
         WebSocketPort = Setting.AsInt(
@@ -73,7 +74,8 @@ internal sealed class Settings : LauncherSettingsBase
             key: "WebSocketPassword",
             label: "WebSocket Password",
             defaultValue: string.Empty,
-            description: "OBS WebSocket password. Find it in OBS: Tools → WebSocket Server Settings → Show Connect Info.",
+            description:
+            "OBS WebSocket password. Find it in OBS: Tools → WebSocket Server Settings → Show Connect Info.",
             isVisible: false
         );
 
@@ -140,7 +142,11 @@ internal sealed class Settings : LauncherSettingsBase
         await RefreshPathAsync();
     }
 
-    public int GetPort() => WebSocketPort.GetCurrentValue();
+    public int GetPort()
+    {
+        return WebSocketPort.GetCurrentValue();
+    }
+
     public string? GetPassword()
     {
         var pwd = WebSocketPassword.GetCurrentValue();
@@ -158,7 +164,8 @@ internal sealed class Settings : LauncherSettingsBase
         if (port < MinPort || port > MaxPort)
         {
             return Task.FromResult(ValidationResult.Fail(
-                new Dictionary<string, string> { [WebSocketPort.Key] = $"Port must be between {MinPort} and {MaxPort}." },
+                new Dictionary<string, string>
+                    { [WebSocketPort.Key] = $"Port must be between {MinPort} and {MaxPort}." },
                 "Invalid WebSocket port."));
         }
 
@@ -175,7 +182,7 @@ internal sealed class Settings : LauncherSettingsBase
             @"C:\Program Files (x86)\Steam\steamapps\common\OBS Studio\bin\64bit\obs64.exe"
         };
 
-        string? path = possiblePaths.FirstOrDefault(File.Exists);
+        var path = possiblePaths.FirstOrDefault(File.Exists);
 
         if (string.IsNullOrEmpty(path))
         {

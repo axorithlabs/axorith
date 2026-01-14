@@ -6,6 +6,10 @@
         <Description>Software Development Kit (SDK) for creating Axorith modules.</Description>
         
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        
+        <!-- SDK optimizations -->
+        <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+        <IsTrimmable>true</IsTrimmable>
     </PropertyGroup>
     
     <ItemGroup>

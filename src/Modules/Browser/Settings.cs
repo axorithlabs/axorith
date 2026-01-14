@@ -13,7 +13,7 @@ namespace Axorith.Module.Browser;
 internal sealed class Settings : LauncherSettingsBase
 {
     /// <summary>
-    /// Known browser publishers for filtering applications.
+    ///     Known browser publishers for filtering applications.
     /// </summary>
     private static readonly string[] BrowserPublishers =
     [
@@ -24,7 +24,7 @@ internal sealed class Settings : LauncherSettingsBase
     ];
 
     /// <summary>
-    /// Known browser executable names for precise matching.
+    ///     Known browser executable names for precise matching.
     /// </summary>
     private static readonly HashSet<string> BrowserExecutables = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -131,7 +131,7 @@ internal sealed class Settings : LauncherSettingsBase
     }
 
     /// <summary>
-    /// Gets the browser profile for the currently selected browser.
+    ///     Gets the browser profile for the currently selected browser.
     /// </summary>
     public BrowserProfile? GetSelectedBrowserProfile()
     {
@@ -178,7 +178,8 @@ internal sealed class Settings : LauncherSettingsBase
             }
 
             var current = BrowserPath.GetCurrentValue();
-            if (!string.IsNullOrEmpty(current) && choices.All(c => !c.Key.Equals(current, StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrEmpty(current) &&
+                choices.All(c => !c.Key.Equals(current, StringComparison.OrdinalIgnoreCase)))
             {
                 choices.Insert(0, new KeyValuePair<string, string>(current, $"{Path.GetFileName(current)} (Custom)"));
             }
@@ -193,17 +194,19 @@ internal sealed class Settings : LauncherSettingsBase
     }
 
     /// <summary>
-    /// Picks the best entry from a group of duplicate browsers (same exe name).
-    /// Prefers entries with human-readable names over technical names.
+    ///     Picks the best entry from a group of duplicate browsers (same exe name).
+    ///     Prefers entries with human-readable names over technical names.
     /// </summary>
     private static AppInfo PickBestBrowserEntry(IGrouping<string, AppInfo> group)
     {
         var entries = group.ToList();
         if (entries.Count == 1)
+        {
             return entries[0];
+        }
 
         var exeNameWithoutExt = Path.GetFileNameWithoutExtension(group.Key);
-        
+
         return entries
             .OrderByDescending(e => !e.Name.Equals(exeNameWithoutExt, StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(e => e.Name.Contains(' '))
@@ -212,19 +215,21 @@ internal sealed class Settings : LauncherSettingsBase
     }
 
     /// <summary>
-    /// Determines if an application is a browser by checking its executable name against known browser executables.
+    ///     Determines if an application is a browser by checking its executable name against known browser executables.
     /// </summary>
     private static bool IsBrowserByExecutableName(AppInfo app)
     {
         if (string.IsNullOrWhiteSpace(app.ExecutablePath))
+        {
             return false;
+        }
 
         var fileName = Path.GetFileName(app.ExecutablePath);
         return BrowserExecutables.Contains(fileName);
     }
 
     /// <summary>
-    /// Determines if an application is a browser by checking both executable name and application characteristics.
+    ///     Determines if an application is a browser by checking both executable name and application characteristics.
     /// </summary>
     private static bool IsBrowserApplication(AppInfo app)
     {

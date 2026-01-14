@@ -52,10 +52,10 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
     {
         var installFirefoxAction = Action.Create("InstallFirefoxExtension", "Install Firefox Extension");
         installFirefoxAction.OnInvokeAsync(OpenFirefoxExtensionPageAsync);
-        
+
         var installChromeAction = Action.Create("InstallChromeExtension", "Install Chrome Extension", false);
         installChromeAction.OnInvokeAsync(OpenChromeExtensionPageAsync);
-        
+
         return [installFirefoxAction, installChromeAction];
     }
 

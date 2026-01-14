@@ -116,7 +116,7 @@ public class Module : IModule
             {
                 var endAction = _settings.SessionEndAction.GetCurrentValue();
                 await ExecuteActionAsync(endAction, cancellationToken);
-                
+
                 if (endAction != Settings.ActionNone)
                 {
                     await Task.Delay(1500, cancellationToken).ConfigureAwait(false);

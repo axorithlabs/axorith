@@ -14,8 +14,11 @@ public class GrpcUpdatesService : UpdatesService.UpdatesServiceBase
         _updateService = updateService;
     }
 
-    public override Task<UpdateInfoResponse> GetUpdateInfo(Empty request, ServerCallContext context)
+    public override async Task<UpdateInfoResponse> GetUpdateInfo(Empty request, ServerCallContext context)
     {
+        // Wait for initial check to complete (with timeout)
+        await _updateService.WaitForInitialCheckAsync(context.CancellationToken);
+
         var response = new UpdateInfoResponse
         {
             UpdateAvailable = _updateService.UpdateAvailable,
@@ -30,6 +33,6 @@ public class GrpcUpdatesService : UpdatesService.UpdatesServiceBase
             response.PublishedAt = Timestamp.FromDateTime(_updateService.LatestUpdate.PublishedAt.ToUniversalTime());
         }
 
-        return Task.FromResult(response);
+        return response;
     }
 }

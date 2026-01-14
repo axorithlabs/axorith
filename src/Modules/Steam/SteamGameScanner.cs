@@ -3,40 +3,42 @@
 namespace Axorith.Module.Steam;
 
 /// <summary>
-/// Scans Steam library folders for installed games.
+///     Scans Steam library folders for installed games.
 /// </summary>
-
 internal static class SteamGameScanner
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
-    
-    private static readonly string[] SkipPatterns = 
+
+    private static readonly string[] SkipPatterns =
     [
-        "Redistributable", "DirectX", "Visual C++", "Steamworks", 
+        "Redistributable", "DirectX", "Visual C++", "Steamworks",
         "Proton", "Steam Linux Runtime", "SteamVR"
     ];
 
     /// <summary>
-    /// Gets Steam installation directory from executable path.
+    ///     Gets Steam installation directory from executable path.
     /// </summary>
     public static string? GetSteamDirectory(string steamExePath)
     {
         if (string.IsNullOrEmpty(steamExePath))
+        {
             return null;
-            
+        }
+
         var dir = Path.GetDirectoryName(steamExePath);
         return Directory.Exists(dir) ? dir : null;
     }
 
     /// <summary>
-    /// Gets all installed games from Steam directory.
+    ///     Gets all installed games from Steam directory.
     /// </summary>
     public static List<SteamGame> GetInstalledGames(string steamDirectory)
     {
         var games = new List<SteamGame>();
         var libraries = GetLibraryFolders(steamDirectory);
 
-        foreach (var steamappsPath in libraries.Select(library => Path.Combine(library, "steamapps")).Where(Directory.Exists))
+        foreach (var steamappsPath in libraries.Select(library => Path.Combine(library, "steamapps"))
+                     .Where(Directory.Exists))
         {
             try
             {
@@ -64,14 +66,16 @@ internal static class SteamGameScanner
 
         var libraryFoldersPath = Path.Combine(steamDirectory, "steamapps", "libraryfolders.vdf");
         if (!File.Exists(libraryFoldersPath))
+        {
             return libraries;
+        }
 
         try
         {
             var content = File.ReadAllText(libraryFoldersPath);
-            var matches = Regex.Matches(content, @"""path""\s+""([^""]+)""", 
+            var matches = Regex.Matches(content, @"""path""\s+""([^""]+)""",
                 RegexOptions.IgnoreCase, RegexTimeout);
-            
+
             foreach (Match match in matches)
             {
                 var libPath = match.Groups[1].Value.Replace(@"\\", @"\");
@@ -99,11 +103,15 @@ internal static class SteamGameScanner
             var nameMatch = Regex.Match(content, @"""name""\s+""([^""]+)""", RegexOptions.IgnoreCase, RegexTimeout);
 
             if (!appIdMatch.Success || !nameMatch.Success)
+            {
                 return null;
+            }
 
             var name = nameMatch.Groups[1].Value;
 
-            return SkipPatterns.Any(p => name.Contains(p, StringComparison.OrdinalIgnoreCase)) ? null : new SteamGame(appIdMatch.Groups[1].Value, name);
+            return SkipPatterns.Any(p => name.Contains(p, StringComparison.OrdinalIgnoreCase))
+                ? null
+                : new SteamGame(appIdMatch.Groups[1].Value, name);
         }
         catch
         {
@@ -113,6 +121,6 @@ internal static class SteamGameScanner
 }
 
 /// <summary>
-/// Represents an installed Steam game.
+///     Represents an installed Steam game.
 /// </summary>
 internal sealed record SteamGame(string AppId, string Name);

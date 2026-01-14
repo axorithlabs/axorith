@@ -59,7 +59,8 @@ public class GrpcCoreConnection : ICoreConnection
         _stateSubject = new BehaviorSubject<ConnectionState>(ConnectionState.Disconnected);
 
         _retryPolicy = Policy
-            .Handle<RpcException>(ex => ex.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded or StatusCode.Internal)
+            .Handle<RpcException>(ex =>
+                ex.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded or StatusCode.Internal)
             .WaitAndRetryAsync(
                 retryCount: 5,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -160,7 +161,8 @@ public class GrpcCoreConnection : ICoreConnection
                                 InitialBackoff = TimeSpan.FromSeconds(1),
                                 MaxBackoff = TimeSpan.FromSeconds(5),
                                 BackoffMultiplier = 1.5,
-                                RetryableStatusCodes = { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
+                                RetryableStatusCodes =
+                                    { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
                             }
                         }
                     }

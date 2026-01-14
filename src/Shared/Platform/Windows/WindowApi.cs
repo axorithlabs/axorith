@@ -313,7 +313,11 @@ internal static class WindowApi
                 var name = new StringBuilder();
                 foreach (var c in userFriendlyName)
                 {
-                    if (c == 0) break;
+                    if (c == 0)
+                    {
+                        break;
+                    }
+
                     name.Append((char)c);
                 }
 
@@ -346,12 +350,19 @@ internal static class WindowApi
 
     private static string DecodeUshortArray(ushort[]? arr)
     {
-        if (arr == null || arr.Length == 0) return string.Empty;
+        if (arr == null || arr.Length == 0)
+        {
+            return string.Empty;
+        }
 
         var sb = new StringBuilder();
         foreach (var c in arr)
         {
-            if (c == 0) break;
+            if (c == 0)
+            {
+                break;
+            }
+
             sb.Append((char)c);
         }
 

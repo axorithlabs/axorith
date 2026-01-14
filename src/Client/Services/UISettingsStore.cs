@@ -26,7 +26,8 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
             var fileInfo = new FileInfo(_settingsPath);
             if (fileInfo.Length > MaxSettingsFileSizeBytes)
             {
-                logger.LogWarning("Settings file {Path} exceeds maximum size limit ({Size} bytes)", _settingsPath, fileInfo.Length);
+                logger.LogWarning("Settings file {Path} exceeds maximum size limit ({Size} bytes)", _settingsPath,
+                    fileInfo.Length);
                 return new ClientUiConfiguration();
             }
 

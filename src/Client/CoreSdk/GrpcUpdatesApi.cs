@@ -45,7 +45,8 @@ public class GrpcUpdatesApi : IUpdatesApi
         }
     }
 
-    public async Task<string> DownloadUpdateAsync(UpdateInfoDto updateInfo, IProgress<double>? progress = null, CancellationToken ct = default)
+    public async Task<string> DownloadUpdateAsync(UpdateInfoDto updateInfo, IProgress<double>? progress = null,
+        CancellationToken ct = default)
     {
         try
         {
@@ -53,14 +54,16 @@ public class GrpcUpdatesApi : IUpdatesApi
 
             _logger.LogInformation("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, tempPath);
 
-            using var response = await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var response =
+                await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? 0;
             var downloadedBytes = 0L;
 
             await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+            await using var fileStream =
+                new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
 
             var buffer = new byte[8192];
             int bytesRead;

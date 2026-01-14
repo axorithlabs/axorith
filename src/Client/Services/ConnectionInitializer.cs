@@ -254,7 +254,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
             sp.GetRequiredService<ShellViewModel>(),
             sp.GetRequiredService<IClientUiSettingsStore>(),
-            sp.GetRequiredService<IAutoStartManager>(),
+            sp.GetService<IAutoStartManager>() ?? new NoOpAutoStartManager(),
             sp.GetRequiredService<ITelemetryService>(),
             sp.GetRequiredService<IOptions<Configuration>>(),
             sp,

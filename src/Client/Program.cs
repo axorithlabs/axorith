@@ -53,10 +53,11 @@ internal static class Program
             Log.Warning(
                 "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
                 telemetrySettings.Enabled,
-                !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) && telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
+                !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) &&
+                telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
                 string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
-            
+
             if (!telemetrySettings.Enabled)
             {
                 Log.Information("Telemetry is disabled by user preference in Settings");

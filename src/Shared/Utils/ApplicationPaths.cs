@@ -10,8 +10,12 @@ namespace Axorith.Shared.Utils;
 ///         All paths are resolved relative to the user's application data directories
 ///         as defined by the operating system. On Windows, this typically resolves to:
 ///         <list type="bullet">
-///             <item><description>AppData: %APPDATA%\Axorith (e.g., C:\Users\{user}\AppData\Roaming\Axorith)</description></item>
-///             <item><description>LocalAppData: %LOCALAPPDATA%\Axorith (e.g., C:\Users\{user}\AppData\Local\Axorith)</description></item>
+///             <item>
+///                 <description>AppData: %APPDATA%\Axorith (e.g., C:\Users\{user}\AppData\Roaming\Axorith)</description>
+///             </item>
+///             <item>
+///                 <description>LocalAppData: %LOCALAPPDATA%\Axorith (e.g., C:\Users\{user}\AppData\Local\Axorith)</description>
+///             </item>
 ///         </list>
 ///     </para>
 ///     <para>
@@ -92,7 +96,7 @@ public static class ApplicationPaths
     /// <remarks>
     ///     Log files are stored in the roaming profile to allow centralized log collection
     ///     in enterprise environments. The directory is created automatically when accessed
-    ///     via <see cref="EnsureDirectoryExists"/>.
+    ///     via <see cref="EnsureDirectoryExists" />.
     /// </remarks>
     public static string Logs => Path.Combine(RoamingRoot, "logs");
 
@@ -249,7 +253,7 @@ public static class ApplicationPaths
     /// </summary>
     /// <param name="path">The directory path to ensure exists.</param>
     /// <returns>The same path that was passed in, for method chaining.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="path"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="path" /> is null.</exception>
     /// <exception cref="UnauthorizedAccessException">Thrown when the caller does not have permission to create the directory.</exception>
     /// <exception cref="IOException">Thrown when the directory cannot be created due to an I/O error.</exception>
     /// <example>
@@ -275,7 +279,7 @@ public static class ApplicationPaths
     /// </summary>
     /// <param name="paths">The path segments to combine with the roaming root.</param>
     /// <returns>The combined path.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="paths"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="paths" /> is null.</exception>
     /// <example>
     ///     <code>
     ///         // Get path to a specific module's data directory
@@ -297,7 +301,7 @@ public static class ApplicationPaths
     /// </summary>
     /// <param name="paths">The path segments to combine with the local root.</param>
     /// <returns>The combined path.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="paths"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="paths" /> is null.</exception>
     /// <example>
     ///     <code>
     ///         // Get path to a cache directory
@@ -319,7 +323,7 @@ public static class ApplicationPaths
     /// </summary>
     /// <param name="path">The path containing environment variables (e.g., %AppData%\Axorith).</param>
     /// <returns>The expanded and normalized path.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="path"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="path" /> is null.</exception>
     /// <remarks>
     ///     This method expands Windows-style environment variables (%VAR%) and
     ///     normalizes the path by resolving relative segments and standardizing separators.

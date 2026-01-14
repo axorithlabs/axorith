@@ -14,7 +14,7 @@ namespace Axorith.Module.Spotify;
 ///     Unified Spotify module that combines launcher and playback control functionality.
 ///     Supports OAuth authentication, playlist selection, and automatic playback on session start.
 /// </summary>
-public class Module : IModule
+public class Module : IModule, IAsyncDisposable
 {
     private readonly IModuleLogger _logger;
     private readonly Settings _settings;
@@ -23,6 +23,7 @@ public class Module : IModule
     private readonly WindowService _windowService;
     private Process? _currentProcess;
     private bool _attachedToExisting;
+    private bool _disposed;
 
     private readonly AuthService _authService;
     private readonly SpotifyApiService _apiService;
@@ -84,30 +85,53 @@ public class Module : IModule
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _playbackService.Dispose();
+        _authService.Dispose();
+        _currentProcess?.Dispose();
+        _currentProcess = null;
+
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         _playbackService.Dispose();
         _authService.Dispose();
 
-        try
+        if (_currentProcess is { HasExited: false })
         {
-            if (_currentProcess is { HasExited: false })
-            {
-                var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
-                var lifecycle = lifecycleSetting == "KeepRunning"
-                    ? ProcessLifecycleMode.KeepRunning
-                    : ProcessLifecycleMode.TerminateGraceful;
+            var lifecycleSetting = _settings.LifecycleMode.GetCurrentValue();
+            var lifecycle = lifecycleSetting == "KeepRunning"
+                ? ProcessLifecycleMode.KeepRunning
+                : ProcessLifecycleMode.TerminateGraceful;
 
-                _ = Task.Run(() => _processService.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
+            try
+            {
+                await _processService.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Failed to terminate process during async dispose: {Message}", ex.Message);
             }
         }
-        catch
-        {
-            // Swallow exceptions in Dispose
-        }
-        finally
-        {
-            _currentProcess?.Dispose();
-            _currentProcess = null;
-        }
+
+        _currentProcess?.Dispose();
+        _currentProcess = null;
 
         GC.SuppressFinalize(this);
     }

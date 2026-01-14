@@ -64,7 +64,8 @@ try
         Log.Warning(
             "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
             telemetrySettings.Enabled,
-            !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) && telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
+            !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) &&
+            telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
         Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
@@ -78,8 +79,8 @@ try
     builder.Host.UseSerilog((context, _, configuration) =>
     {
         var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath");
-        var resolvedLogsPath = string.IsNullOrWhiteSpace(logsPath) 
-            ? ApplicationPaths.Logs 
+        var resolvedLogsPath = string.IsNullOrWhiteSpace(logsPath)
+            ? ApplicationPaths.Logs
             : ApplicationPaths.ExpandPath(logsPath);
 
         configuration
@@ -91,6 +92,7 @@ try
                 Path.Combine(resolvedLogsPath, "host-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 30,
+                shared: true,
                 outputTemplate:
                 "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}")
             .WriteTo.Sink(new TelemetrySerilogSink(telemetry ?? new NoopTelemetryService()),
@@ -175,12 +177,13 @@ try
         try
         {
             var registrationService = app.Services.GetRequiredService<IUserRegistrationService>();
-            var registration = await registrationService.GetOrCreateAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
-            
+            var registration = await registrationService.GetOrCreateAsync(app.Lifetime.ApplicationStopping)
+                .ConfigureAwait(false);
+
             Log.Information("User registration initialized: MachineId={MachineId}, FirstSeen={FirstSeen}",
                 registration.MachineId[..8] + "...",
                 registration.FirstSeenUtc);
-            
+
             telemetry?.TrackEvent("UserRegistrationLoaded", new Dictionary<string, object?>
             {
                 ["firstSeenUtc"] = registration.FirstSeenUtc.ToString("O"),
