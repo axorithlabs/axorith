@@ -46,7 +46,6 @@
                 <a href="#features" class="nav-link">Features</a>
                 <a href="modules.html" class="nav-link">Modules</a>
                 <a href="pricing.html" class="nav-link">Pricing</a>
-                <a href="index.html#founding" class="nav-link">Founding Member</a>
                 <a href="https://discord.gg/axorith" class="nav-link" target="_blank">Discord</a>
             </div>
             <div class="nav-actions">
@@ -65,7 +64,6 @@
         <a href="#features" class="mobile-link">Features</a>
         <a href="modules.html" class="mobile-link">Modules</a>
         <a href="pricing.html" class="mobile-link">Pricing</a>
-        <a href="#founding" class="mobile-link">Founding Member</a>
         <a href="https://discord.gg/axorith" class="mobile-link" target="_blank">Discord</a>
         <a href="#download" class="mobile-cta">Download Free</a>
     </div>
@@ -220,72 +218,6 @@
         </div>
     </section>
 
-    <!-- Founding Member Section -->
-    <section class="section founding-section" id="founding">
-        <div class="container">
-            <div class="founding-card">
-                <div class="founding-badge">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-                    </svg>
-                    Limited Edition
-                </div>
-                <h2 class="founding-title">Become a Founding Member</h2>
-                <p class="founding-subtitle">Join the first 100 believers who will shape the future of Axorith</p>
-                
-                <!-- Slots Counter -->
-                <div class="founding-slots">
-                    <div class="slots-bar">
-                        <div class="slots-fill" id="slots-fill" style="width: 0%"></div>
-                    </div>
-                    <p class="slots-text"><strong id="slots-sold">0</strong> of <strong>100</strong> slots claimed</p>
-                </div>
-                
-                <div class="founding-price">
-                    <span class="price-amount">$99</span>
-                    <span class="price-period">one-time, forever</span>
-                </div>
-                
-                <ul class="founding-perks">
-                    <li>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Lifetime Pro + Team license — all future features included
-                    </li>
-                    <li>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Exclusive "Founding Member" badge in Discord
-                    </li>
-                    <li>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Direct access to the development team
-                    </li>
-                    <li>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Priority feature requests & your name in credits
-                    </li>
-                </ul>
-                
-                <a href="checkout.html" class="btn btn-founding" id="founding-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 6v12M6 12h12"/>
-                    </svg>
-                    Buy with Crypto
-                </a>
-                
-                <p class="founding-note">The app is free. This is for those who want to support the project and get premium perks.</p>
-            </div>
-        </div>
-    </section>
-
     <!-- CTA Section -->
     <section class="section cta-section">
         <div class="container">
@@ -328,7 +260,6 @@
                     <a href="#features">Features</a>
                     <a href="modules.html">Modules</a>
                     <a href="pricing.html">Pricing</a>
-                    <a href="#founding">Founding Member</a>
                     <a href="https://github.com/axorithlabs/axorith/releases">Releases</a>
                 </div>
                 <div class="footer-links">
@@ -352,59 +283,5 @@
 
     <!-- Scripts -->
     <script src="js/main.js"></script>
-    <script>
-        // ============================================
-        // CONFIGURATION - Change these values as needed
-        // ============================================
-        
-        // Set to TRUE when sales are open (Jan 9, 2026)
-        // Set to FALSE to show "Available Jan 9" message
-        const SALES_ENABLED = true;
-        
-        // Number of slots sold (0-100)
-        const SLOTS_SOLD = 0;
-        const TOTAL_SLOTS = 100;
-        
-        // ============================================
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const slotsFill = document.getElementById('slots-fill');
-            const slotsSold = document.getElementById('slots-sold');
-            const foundingBtn = document.getElementById('founding-btn');
-            
-            if (slotsFill && slotsSold) {
-                slotsSold.textContent = SLOTS_SOLD;
-                slotsFill.style.width = (SLOTS_SOLD / TOTAL_SLOTS * 100) + '%';
-            }
-            
-            if (foundingBtn) {
-                // Sales not yet enabled
-                if (!SALES_ENABLED) {
-                    foundingBtn.classList.add('disabled');
-                    foundingBtn.removeAttribute('href');
-                    foundingBtn.innerHTML = `
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        Available Jan 9
-                    `;
-                }
-                // Sold out
-                else if (SLOTS_SOLD >= TOTAL_SLOTS) {
-                    foundingBtn.classList.add('disabled');
-                    foundingBtn.removeAttribute('href');
-                    foundingBtn.innerHTML = `
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="15" y1="9" x2="9" y2="15"/>
-                            <line x1="9" y1="9" x2="15" y2="15"/>
-                        </svg>
-                        Sold Out
-                    `;
-                }
-            }
-        });
-    </script>
 </body>
 </html>
