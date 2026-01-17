@@ -226,7 +226,7 @@ Section "MainSection" SEC_INSTALL
     SetDetailsPrint listonly
 
     SetOutPath "$INSTDIR\Axorith.Client"
-    CreateShortCut "$smprograms\${PRODUCT_NAME}.lnk" "$INSTDIR\Axorith.Client\Axorith.Client.exe" "" "$INSTDIR\Axorith.Client\Assets\icon.ico"
+    CreateShortCut "$smprograms\${PRODUCT_NAME}.lnk" "$INSTDIR\Axorith.Client\Axorith.Client.exe" "" "$INSTDIR\Axorith.Client\Assets\icon.ico" 0 SW_SHOWNORMAL "" "Launch ${PRODUCT_NAME}"
     SetOutPath "$INSTDIR"
   
     WriteRegExpandStr HKCU "Environment" "AXORITH_HOST_PATH" "$INSTDIR\Axorith.Host\Axorith.Host.exe"

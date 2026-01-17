@@ -37,10 +37,12 @@ public sealed class HostTrayService(
             return;
         }
 
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
+        
         _trayIcon = new TrayIcon
         {
             ToolTipText = "Axorith Client",
-            Icon = new WindowIcon("Assets/icon.ico"),
+            Icon = new WindowIcon(iconPath),
             IsVisible = true
         };
 
