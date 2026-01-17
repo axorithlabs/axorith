@@ -5,6 +5,8 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services;
+using Axorith.Client.Services.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,8 @@ public class MainViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
     private readonly ITelemetryService? _telemetry;
+    private readonly IClientOnboardingService? _onboardingService;
+    private readonly IToastNotificationService? _toastService;
 
     public SessionPresetViewModel? SelectedPreset
     {
@@ -113,6 +117,14 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     public ICommand InstallUpdateCommand { get; }
 
+    public ICommand RunSetupWizardCommand { get; }
+
+    public bool IsRunningSetup
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IUpdatesApi updatesApi, IServiceProvider serviceProvider)
     {
@@ -122,6 +134,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         _updatesApi = updatesApi;
         _serviceProvider = serviceProvider;
         _telemetry = serviceProvider.GetService<ITelemetryService>();
+        _onboardingService = serviceProvider.GetService<IClientOnboardingService>();
+        _toastService = serviceProvider.GetService<IToastNotificationService>();
 
         var subscription = _sessionsApi.SessionEvents
             .ObserveOn(RxApp.MainThreadScheduler)
@@ -204,6 +218,9 @@ public class MainViewModel : ReactiveObject, IDisposable
                 (available, downloading) => available && !downloading)
             .ObserveOn(RxApp.MainThreadScheduler);
         InstallUpdateCommand = ReactiveCommand.CreateFromTask(InstallUpdateAsync, canInstallUpdate);
+
+        var canRunSetup = this.WhenAnyValue(vm => vm.IsRunningSetup, running => !running);
+        RunSetupWizardCommand = ReactiveCommand.CreateFromTask(RunSetupWizardAsync, canRunSetup);
     }
 
     /// <summary>
@@ -379,6 +396,11 @@ public class MainViewModel : ReactiveObject, IDisposable
     {
         var settings = _serviceProvider.GetRequiredService<SettingsViewModel>();
         _shell.NavigateTo(settings);
+    }
+
+    private async Task RunSetupWizardAsync()
+    {
+        return;
     }
 
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)

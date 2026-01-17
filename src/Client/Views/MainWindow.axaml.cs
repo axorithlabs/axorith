@@ -1,4 +1,5 @@
 ﻿using Avalonia.Controls;
+using Axorith.Client.ViewModels;
 
 namespace Axorith.Client.Views;
 
@@ -21,6 +22,14 @@ public partial class MainWindow : Window
             WindowState = WindowState == WindowState.Maximized
                 ? WindowState.Normal
                 : WindowState.Maximized;
+        };
+
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is ShellViewModel shell)
+            {
+                shell.SetMainWindow(this);
+            }
         };
     }
 }

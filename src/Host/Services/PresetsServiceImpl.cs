@@ -106,6 +106,17 @@ public class PresetsServiceImpl(
 
             var preset = PresetMapper.ToModel(request.Preset);
 
+            var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
+                .ConfigureAwait(false) ?? [];
+
+            var nameConflict = existingPresets.FirstOrDefault(p =>
+                string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
+
+            if (nameConflict != null)
+            {
+                throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
+            }
+
             if (preset.Id == Guid.Empty)
             {
                 preset.Id = Guid.NewGuid();
@@ -155,6 +166,17 @@ public class PresetsServiceImpl(
             logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
 
             var preset = PresetMapper.ToModel(request.Preset);
+
+            var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
+                .ConfigureAwait(false) ?? [];
+
+            var nameConflict = existingPresets.FirstOrDefault(p =>
+                string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase) && p.Id != preset.Id);
+
+            if (nameConflict != null)
+            {
+                throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
+            }
 
             await presetManager.SavePresetAsync(preset, context.CancellationToken)
                 .ConfigureAwait(false);

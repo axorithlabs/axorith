@@ -68,4 +68,10 @@ public static class AppConverters
     /// </summary>
     public static readonly IValueConverter BoolToMaxHour =
         new FuncValueConverter<bool, int>(is24Hour => is24Hour ? 23 : 12);
+
+    public static readonly IValueConverter BoolToRunningText =
+        new FuncValueConverter<bool, string>(isRunning => isRunning ? "Running..." : "Run Setup");
+
+    public static readonly IValueConverter BoolToSetupText =
+        new FuncValueConverter<bool, string>(isRunning => isRunning ? "Running..." : "Run Setup Wizard");
 }

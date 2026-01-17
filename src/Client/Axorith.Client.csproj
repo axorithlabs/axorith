@@ -34,6 +34,7 @@
         <ProjectReference Include="..\Contracts\Axorith.Contracts.csproj" />
         <ProjectReference Include="..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
         <ProjectReference Include="..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+        <ProjectReference Include="..\Shared\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\Telemetry\Axorith.Telemetry.csproj" />
     </ItemGroup>
 

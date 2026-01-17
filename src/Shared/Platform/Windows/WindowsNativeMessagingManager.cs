@@ -1,6 +1,7 @@
 ﻿using System.Runtime.Versioning;
 using System.Text.Json;
 using Axorith.Shared.Utils;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
@@ -17,7 +18,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         if (!File.Exists(executablePath))
         {
             logger.LogWarning("Native Messaging Host executable not found at '{Path}'. Registration might be invalid.",
-                executablePath);
+                TelemetryGuard.SafePath(executablePath));
         }
 
         try
@@ -40,7 +41,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             var manifestPath = Path.Combine(manifestDir, manifestFileName);
 
             File.WriteAllText(manifestPath, jsonContent);
-            logger.LogDebug("Generated Native Messaging manifest at: {Path}", manifestPath);
+            logger.LogDebug("Generated Native Messaging manifest at: {Path}", TelemetryGuard.SafePath(manifestPath));
 
             var registryPath = $@"Software\Mozilla\NativeMessagingHosts\{hostName}";
 
@@ -69,7 +70,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         if (!File.Exists(executablePath))
         {
             logger.LogWarning("Native Messaging Host executable not found at '{Path}'. Registration might be invalid.",
-                executablePath);
+                TelemetryGuard.SafePath(executablePath));
         }
 
         try
@@ -92,7 +93,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             var manifestPath = Path.Combine(manifestDir, manifestFileName);
 
             File.WriteAllText(manifestPath, jsonContent);
-            logger.LogDebug("Generated Chrome Native Messaging manifest at: {Path}", manifestPath);
+            logger.LogDebug("Generated Chrome Native Messaging manifest at: {Path}", TelemetryGuard.SafePath(manifestPath));
 
             var chromeRegistryPath = $@"Software\Google\Chrome\NativeMessagingHosts\{hostName}";
             RegisterInRegistry(chromeRegistryPath, manifestPath);

@@ -11,6 +11,7 @@ using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using DynamicData;
 using DynamicData.Binding;
+using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
@@ -1624,6 +1625,10 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             });
 
             Cancel();
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.AlreadyExists)
+        {
+            ErrorMessage = "Name already taken. Please choose a different name.";
         }
         catch (Exception ex)
         {

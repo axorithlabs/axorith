@@ -9,5 +9,6 @@
     <ItemGroup>
         <ProjectReference Include="..\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\Telemetry\Axorith.Telemetry.csproj" />
     </ItemGroup>
 </Project>

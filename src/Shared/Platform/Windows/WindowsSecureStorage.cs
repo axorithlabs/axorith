@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
@@ -21,7 +22,7 @@ internal class WindowsSecureStorage : ISecureStorageService
 
         _storagePath = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.SecureStorage);
 
-        _logger.LogDebug("Windows SecureStorage initialized at: {Path}", _storagePath);
+        _logger.LogDebug("Windows SecureStorage initialized at: {Path}", TelemetryGuard.SafePath(_storagePath));
     }
 
     public void StoreSecret(string key, string secret)

@@ -6,63 +6,108 @@ namespace Axorith.Module.AppBlocker;
 
 internal sealed class Settings : IDisposable
 {
+    private static readonly Dictionary<string, string[]> CategoryProcesses = new()
+    {
+        ["Gaming"] =
+        [
+            "steam", "steamwebhelper", "epicgameslauncher", "eadesktop", "origin",
+            "battle.net", "gog galaxy", "ubisoft connect", "upc", "riotclientservices",
+            "leagueclient", "valorant", "dota2", "csgo", "cs2", "minecraft",
+            "robloxplayerbeta", "xbox", "xboxapp", "geforce experience"
+        ],
+        ["Social"] =
+        [
+            "discord", "telegram", "whatsapp", "messenger", "slack", "skype",
+            "zoom", "teams", "signal", "viber", "wechat", "line", "element"
+        ],
+        ["Browsers"] =
+        [
+            "chrome", "firefox", "msedge", "opera", "brave", "vivaldi",
+            "safari", "chromium", "waterfox", "librewolf", "tor browser"
+        ],
+        ["Entertainment"] =
+        [
+            "spotify", "netflix", "vlc", "itunes", "amazon music", "deezer",
+            "plex", "kodi", "foobar2000", "aimp", "winamp", "musicbee",
+            "potplayer", "mpc-hc", "mpv"
+        ],
+        ["Productivity"] =
+        [
+            "notion", "obsidian", "evernote", "onenote", "todoist", "ticktick",
+            "trello", "asana", "clickup", "roam research"
+        ],
+        ["Email"] =
+        [
+            "outlook", "thunderbird", "mailspring", "em client", "mailbird",
+            "spark", "postbox", "nylas mail"
+        ],
+        ["Development"] =
+        [
+            "code", "rider64", "idea64", "pycharm64", "webstorm64", "clion64",
+            "goland64", "phpstorm64", "datagrip64", "android studio",
+            "sublime_text", "atom", "notepad++", "vim", "emacs"
+        ],
+        ["Design"] =
+        [
+            "photoshop", "illustrator", "figma", "sketch", "affinity designer",
+            "affinity photo", "gimp", "inkscape", "canva", "adobe xd", "blender"
+        ],
+        ["Office"] =
+        [
+            "winword", "excel", "powerpnt", "msaccess", "onenote",
+            "libreoffice", "soffice", "wps office", "google docs"
+        ]
+    };
+
     private readonly Setting<List<string>> _categories;
-    private readonly Setting<string> _manualProcessList;
+    private readonly Setting<string> _customProcessList;
     private readonly IReadOnlyList<ISetting> _allSettings;
     private readonly IReadOnlyList<IAction> _allActions;
-
-    private static readonly Dictionary<string, List<string>> CategoryProcesses = new()
-    {
-        ["Games"] = ["steam", "epicgameslauncher", "battle.net", "dota2", "csgo", "valorant", "league of legends"],
-        ["Social"] = ["discord", "telegram", "slack", "skype", "whatsapp"],
-        ["Browsers"] = ["chrome", "firefox", "msedge", "opera", "brave"]
-    };
 
     public Settings()
     {
         _categories = Setting.AsMultiChoice(
             key: "Categories",
             label: "Block Categories",
-            defaultValues: [],
+            defaultValues: ["Gaming", "Social", "Browsers", "Entertainment"],
             initialChoices:
             [
-                new KeyValuePair<string, string>("Games", "Block Games (Steam, Epic, etc.)"),
-                new KeyValuePair<string, string>("Social", "Block Communication (Discord, Telegram)"),
-                new KeyValuePair<string, string>("Browsers", "Block Browsers")
+                new KeyValuePair<string, string>("Gaming", "Gaming (Steam, Epic, Battle.net, Riot...)"),
+                new KeyValuePair<string, string>("Social", "Social & Messaging (Discord, Telegram, Slack, Zoom...)"),
+                new KeyValuePair<string, string>("Browsers", "Web Browsers (Chrome, Firefox, Edge...)"),
+                new KeyValuePair<string, string>("Entertainment", "Entertainment (Spotify, Netflix, VLC...)"),
+                new KeyValuePair<string, string>("Productivity", "Productivity (Notion, Obsidian, Todoist...)"),
+                new KeyValuePair<string, string>("Email", "Email Clients (Outlook, Thunderbird...)"),
+                new KeyValuePair<string, string>("Development", "Development Tools (VS Code, JetBrains IDEs...)"),
+                new KeyValuePair<string, string>("Design", "Design Tools (Photoshop, Figma, Blender...)"),
+                new KeyValuePair<string, string>("Office", "Office Apps (Word, Excel, LibreOffice...)")
             ],
-            description: "Select categories to automatically block common apps."
+            description: "Select categories to block. Apps from selected categories will be automatically terminated."
         );
 
-        _manualProcessList = Setting.AsTextArea(
-            key: "ManualProcessList",
-            label: "Manual Blocklist",
+        _customProcessList = Setting.AsTextArea(
+            key: "CustomProcessList",
+            label: "Custom Apps",
             defaultValue: "",
-            description: "Manually add process names (e.g. 'notepad', 'calc'). Separate by comma or new line."
+            description: "Additional process names to block (comma or newline separated). Example: notepad, calc"
         );
 
-        _allSettings = [_categories, _manualProcessList];
+        _allSettings = [_categories, _customProcessList];
         _allActions = [];
     }
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _allSettings;
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
 
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _allActions;
-    }
+    public IReadOnlyList<IAction> GetActions() => _allActions;
 
     public Task<ValidationResult> ValidateAsync()
     {
         var cats = _categories.GetCurrentValue();
-        var manual = _manualProcessList.GetCurrentValue();
+        var custom = _customProcessList.GetCurrentValue();
 
-        if (cats.Count == 0 && string.IsNullOrWhiteSpace(manual))
+        if (cats.Count == 0 && string.IsNullOrWhiteSpace(custom))
         {
-            return Task.FromResult(
-                ValidationResult.Warn("No categories or processes selected. The module will not block anything."));
+            return Task.FromResult(ValidationResult.Warn("No categories or apps selected. The module will not block anything."));
         }
 
         return Task.FromResult(ValidationResult.Success);
@@ -72,34 +117,21 @@ internal sealed class Settings : IDisposable
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var selectedCats = _categories.GetCurrentValue();
-        foreach (var cat in selectedCats)
+        foreach (var cat in _categories.GetCurrentValue())
         {
-            if (!CategoryProcesses.TryGetValue(cat, out var procs))
+            if (CategoryProcesses.TryGetValue(cat, out var procs))
             {
-                continue;
-            }
-
-            foreach (var p in procs)
-            {
-                result.Add(p);
+                foreach (var p in procs) result.Add(p);
             }
         }
 
-        var manual = _manualProcessList.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(manual))
+        var custom = _customProcessList.GetCurrentValue();
+        if (!string.IsNullOrWhiteSpace(custom))
         {
-            return result;
-        }
-
-        {
-            var manualList = manual.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrWhiteSpace(s));
-
-            foreach (var p in manualList)
+            foreach (var p in custom.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
             {
-                result.Add(p);
+                var trimmed = p.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed)) result.Add(trimmed);
             }
         }
 
@@ -109,6 +141,6 @@ internal sealed class Settings : IDisposable
     public void Dispose()
     {
         _categories.Dispose();
-        _manualProcessList.Dispose();
+        _customProcessList.Dispose();
     }
 }

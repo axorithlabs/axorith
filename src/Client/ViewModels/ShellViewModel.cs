@@ -30,11 +30,23 @@ public class ShellViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<ToastViewModel> Toasts { get; } = [];
 
+    private Avalonia.Controls.Window? _mainWindow;
+
     public ShellViewModel(IToastNotificationService toastService)
     {
         toastService.Notifications
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(AddToast);
+    }
+
+    public void SetMainWindow(Avalonia.Controls.Window window)
+    {
+        _mainWindow = window;
+    }
+
+    public Avalonia.Controls.Window GetMainWindow()
+    {
+        return _mainWindow ?? throw new InvalidOperationException("Main window not set");
     }
 
     /// <summary>

@@ -7,7 +7,8 @@
         <Authors>Axorith Labs</Authors>
         <Company>Axorith Labs</Company>
         <Product>Axorith</Product>
-        <Copyright>Copyright (C) 2026 Axorith Labs</Copyright>
+        <Copyright>Copyright (C) $([System.DateTime]::Now.Year) Axorith Labs</Copyright>
+        <RepositoryType>git</RepositoryType>
 
         <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
 

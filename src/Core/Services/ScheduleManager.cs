@@ -2,6 +2,7 @@
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk.Services;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
@@ -468,7 +469,7 @@ public class ScheduleManager(
             var fileInfo = new FileInfo(_storagePath);
             if (fileInfo.Length > MaxScheduleFileSizeBytes)
             {
-                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)", _storagePath,
+                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)", TelemetryGuard.SafePath(_storagePath),
                     fileInfo.Length);
                 return;
             }
@@ -486,7 +487,7 @@ public class ScheduleManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to load schedules from {Path}", _storagePath);
+            logger.LogError(ex, "Failed to load schedules from {Path}", TelemetryGuard.SafePath(_storagePath));
         }
     }
 
@@ -505,7 +506,7 @@ public class ScheduleManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to save schedules to {Path}", _storagePath);
+            logger.LogError(ex, "Failed to save schedules to {Path}", TelemetryGuard.SafePath(_storagePath));
         }
     }
 

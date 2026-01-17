@@ -1,0 +1,171 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Axorith.Client.ViewModels"
+             x:Class="Axorith.Client.Views.SetupWizardView"
+             x:DataType="vm:SetupWizardViewModel">
+
+    <Panel>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <Panel MaxWidth="800" HorizontalAlignment="Center">
+                <StackPanel Margin="20,30" Spacing="0">
+                    <Border Classes="Card" Padding="30,25" Margin="0" MinWidth="500">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Welcome to Axorith"
+                                       FontSize="28"
+                                       FontWeight="Bold"
+                                       Foreground="#E0E0E0"/>
+                            <TextBlock Text="Let's set up your workflow presets based on your installed apps"
+                                       FontSize="14"
+                                       Foreground="#999"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+
+                    <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
+                        <Grid>
+                            <StackPanel Spacing="20" IsVisible="{Binding !IsScanning}">
+                                <TextBlock Text="Select the types of presets you want to create:"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="#CCC"
+                                           Margin="0,0,0,10"/>
+
+                                <ItemsControl ItemsSource="{Binding PresetTypes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:PresetTypeOption">
+                                            <Border Background="#151515"
+                                                    BorderBrush="#333"
+                                                    BorderThickness="2"
+                                                    CornerRadius="8"
+                                                    Padding="20"
+                                                    Margin="0,0,0,12"
+                                                    Cursor="Hand"
+                                                    Classes.Selected="{Binding IsSelected}"
+                                                    Tapped="OnPresetTypeTapped">
+                                                
+                                                <Border.Styles>
+                                                    <Style Selector="Border">
+                                                        <Setter Property="Transitions">
+                                                            <Transitions>
+                                                                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                                                                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                                                            </Transitions>
+                                                        </Setter>
+                                                    </Style>
+                                                    <Style Selector="Border:pointerover">
+                                                        <Setter Property="BorderBrush" Value="#444"/>
+                                                        <Setter Property="Background" Value="#1A1A1A"/>
+                                                    </Style>
+                                                    <Style Selector="Border.Selected">
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+                                                        <Setter Property="Background" Value="#1A1A1A"/>
+                                                    </Style>
+                                                </Border.Styles>
+
+                                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                                    <Border Grid.Column="0"
+                                                            Width="50"
+                                                            Height="50"
+                                                            Background="#222"
+                                                            CornerRadius="8"
+                                                            Margin="0,0,15,0">
+                                                        <PathIcon Data="{Binding Icon}"
+                                                                  Width="28"
+                                                                  Height="28"
+                                                                  Foreground="{DynamicResource SystemAccentColor}"/>
+                                                    </Border>
+
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                                        <TextBlock Text="{Binding Title}"
+                                                                   FontSize="16"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#E0E0E0"/>
+                                                        <TextBlock Text="{Binding Description}"
+                                                                   FontSize="13"
+                                                                   Foreground="#999"
+                                                                   TextWrapping="Wrap"/>
+                                                        <TextBlock FontSize="12"
+                                                                   Foreground="#777"
+                                                                   Margin="0,4,0,0">
+                                                            <Run Text="{Binding Count}"/>
+                                                            <Run Text="preset(s) available"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+
+                                                    <Border Grid.Column="2"
+                                                            Width="24"
+                                                            Height="24"
+                                                            Background="{DynamicResource SystemAccentColor}"
+                                                            CornerRadius="12"
+                                                            VerticalAlignment="Center"
+                                                            IsVisible="{Binding IsSelected}">
+                                                        <PathIcon Data="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z"
+                                                                  Width="14"
+                                                                  Height="14"
+                                                                  Foreground="White"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="No compatible apps found. Install IDEs, Steam, OBS, or other supported apps."
+                                           FontSize="14"
+                                           Foreground="#888"
+                                           TextAlignment="Center"
+                                           Margin="0,40,0,0"
+                                           IsVisible="{Binding !HasOptions}"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding IsScanning}">
+                                <PathIcon Data="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"
+                                          Width="48"
+                                          Height="48"
+                                          Foreground="{DynamicResource SystemAccentColor}"
+                                          HorizontalAlignment="Center"/>
+                                <TextBlock Text="Scanning for installed apps..."
+                                           FontSize="15"
+                                           Foreground="#999"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+
+                    <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
+                        <Grid ColumnDefinitions="*, Auto, Auto">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                                <TextBlock FontSize="13" Foreground="#777" IsVisible="{Binding HasOptions}">
+                                    <Run Text="Selected:"/>
+                                    <Run Text="{Binding SelectedCount}"/>
+                                    <Run Text="type(s)"/>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                                    Content="Cancel"
+                                    Command="{Binding CancelCommand}"
+                                    Padding="25,10"
+                                    Margin="0,0,10,0"
+                                    MinWidth="120"/>
+
+                            <Button Grid.Column="2"
+                                    Content="Create Presets"
+                                    Command="{Binding CreatePresetsCommand}"
+                                    Classes="accent"
+                                    Padding="25,10"
+                                    MinWidth="150"
+                                    IsEnabled="{Binding HasSelection}"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Panel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

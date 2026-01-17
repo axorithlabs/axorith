@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
@@ -23,7 +24,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
     public async Task<IReadOnlyList<SessionPreset>> LoadAllPresetsAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Loading all presets from {Directory}", presetsDirectory);
+        logger.LogInformation("Loading all presets from {Directory}", TelemetryGuard.SafePath(presetsDirectory));
         Directory.CreateDirectory(presetsDirectory);
 
         var presets = new List<SessionPreset>();
@@ -42,7 +43,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
                 var fileInfo = new FileInfo(filePath);
                 if (fileInfo.Length > MaxPresetFileSizeBytes)
                 {
-                    logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath,
+                    logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", TelemetryGuard.SafePath(filePath),
                         fileInfo.Length);
                     continue;
                 }
@@ -71,7 +72,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to load or deserialize preset from {FilePath}", filePath);
+                logger.LogError(ex, "Failed to load or deserialize preset from {FilePath}", TelemetryGuard.SafePath(filePath));
             }
         }
 
@@ -85,7 +86,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
         if (!File.Exists(filePath))
         {
-            logger.LogWarning("Preset file not found: {FilePath}", filePath);
+            logger.LogWarning("Preset file not found: {FilePath}", TelemetryGuard.SafePath(filePath));
             return null;
         }
 
@@ -94,7 +95,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Length > MaxPresetFileSizeBytes)
             {
-                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", filePath,
+                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)", TelemetryGuard.SafePath(filePath),
                     fileInfo.Length);
                 return null;
             }
@@ -121,7 +122,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to load preset {PresetId} from {FilePath}", presetId, filePath);
+            logger.LogError(ex, "Failed to load preset {PresetId} from {FilePath}", presetId, TelemetryGuard.SafePath(filePath));
             return null;
         }
     }
@@ -130,7 +131,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
     {
         var filePath = Path.Combine(presetsDirectory, $"{preset.Id}.json");
         var tempFilePath = Path.Combine(presetsDirectory, $"{preset.Id}.json.tmp");
-        logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, filePath);
+        logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name, TelemetryGuard.SafePath(filePath));
 
         await FileLock.WaitAsync(cancellationToken);
         try
@@ -171,7 +172,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
     public Task DeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
-        logger.LogInformation("Deleting preset with ID {PresetId} from {FilePath}", presetId, filePath);
+        logger.LogInformation("Deleting preset with ID {PresetId} from {FilePath}", presetId, TelemetryGuard.SafePath(filePath));
 
         try
         {
@@ -182,12 +183,12 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             }
             else
             {
-                logger.LogWarning("Attempted to delete a preset that does not exist on disk: {FilePath}", filePath);
+                logger.LogWarning("Attempted to delete a preset that does not exist on disk: {FilePath}", TelemetryGuard.SafePath(filePath));
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to delete preset file {FilePath}", filePath);
+            logger.LogError(ex, "Failed to delete preset file {FilePath}", TelemetryGuard.SafePath(filePath));
         }
 
         return Task.CompletedTask;

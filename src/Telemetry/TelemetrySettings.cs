@@ -66,6 +66,9 @@ public sealed record TelemetrySettings
 
 public static class TelemetryGuard
 {
+    private static readonly string UserProfilePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    private static readonly string UserName = Environment.UserName;
+
     public static string SafeString(string? value, int maxLength = 1_024)
     {
         if (string.IsNullOrEmpty(value))
@@ -85,5 +88,36 @@ public static class TelemetryGuard
 
         var stack = ex.ToString();
         return SafeString(stack, maxLength);
+    }
+
+    /// <summary>
+    ///     Masks user-specific information in file paths for privacy.
+    ///     Replaces username and user profile path with [USER] placeholder.
+    /// </summary>
+    /// <param name="path">File path that may contain user information</param>
+    /// <param name="maxLength">Maximum length of the returned string</param>
+    /// <returns>Masked path with user information replaced</returns>
+    public static string SafePath(string? path, int maxLength = 1_024)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return string.Empty;
+        }
+
+        var masked = path;
+
+        // Replace user profile path (e.g., C:\Users\username -> C:\Users\[USER])
+        if (!string.IsNullOrEmpty(UserProfilePath))
+        {
+            masked = masked.Replace(UserProfilePath, Path.Combine(Path.GetDirectoryName(UserProfilePath) ?? "C:\\Users", "[USER]"), StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Replace username in paths (fallback for cases where profile path doesn't match)
+        if (!string.IsNullOrEmpty(UserName))
+        {
+            masked = masked.Replace(UserName, "[USER]", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return SafeString(masked, maxLength);
     }
 }

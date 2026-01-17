@@ -406,29 +406,54 @@
                     
                     <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
                     
-                    <ItemsControl ItemsSource="{Binding ConfiguredModules}">
-                        <ItemsControl.ItemTemplate>
+                    <ListBox ItemsSource="{Binding ConfiguredModules}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             HorizontalAlignment="Center"
+                             SelectionMode="Single"
+                             SelectedItem="{Binding SelectedModule}">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                                 <StackPanel Spacing="0" HorizontalAlignment="Center">
                                     <Button Classes="ItemCard" 
-                                            Command="{Binding $parent[ItemsControl].DataContext.OpenModuleSettingsCommand}" 
+                                            Command="{Binding $parent[ListBox].DataContext.OpenModuleSettingsCommand}" 
                                             CommandParameter="{Binding}"
                                             Width="500">
                                         <Border Classes.error="{Binding HasErrors}">
                                             <Grid ColumnDefinitions="*, Auto">
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
-                                                    <TextBlock Text="{Binding Definition.Description}" Foreground="#B0B0B0" FontSize="13" TextWrapping="Wrap" MaxWidth="400" Margin="0,6,0,0"/>
+                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock Text="{Binding Definition.Description}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="Wrap" MaxWidth="400" Margin="0,6,0,0"/>
                                                 </StackPanel>
                                                 
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="15,0,0,0">
-                                                    <Button Classes="move-btn" Command="{Binding $parent[ItemsControl].DataContext.MoveUpCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsFirst}" ToolTip.Tip="Move Up">
+                                                    <Button Classes="move-btn" Command="{Binding $parent[ListBox].DataContext.MoveUpCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsFirst}" ToolTip.Tip="Move Up">
                                                         <PathIcon Data="{StaticResource ArrowUpIcon}" Width="16" Height="16"/>
                                                     </Button>
-                                                    <Button Classes="move-btn" Command="{Binding $parent[ItemsControl].DataContext.MoveDownCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsLast}" ToolTip.Tip="Move Down">
+                                                    <Button Classes="move-btn" Command="{Binding $parent[ListBox].DataContext.MoveDownCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsLast}" ToolTip.Tip="Move Down">
                                                         <PathIcon Data="{StaticResource ArrowDownIcon}" Width="16" Height="16"/>
                                                     </Button>
-                                                    <Button Classes="delete-btn" Command="{Binding $parent[ItemsControl].DataContext.RemoveModuleCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove">
+                                                    <Button Classes="delete-btn" Command="{Binding $parent[ListBox].DataContext.RemoveModuleCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove">
                                                         <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
                                                     </Button>
                                                 </StackPanel>
@@ -437,14 +462,14 @@
                                     </Button>
                                     
                                     <Grid Height="60" IsVisible="{Binding !IsLast}" HorizontalAlignment="Center">
-                                        <Rectangle Width="1" Fill="#333" VerticalAlignment="Stretch" HorizontalAlignment="Center"/>
+                                        <Rectangle Width="1" Fill="{DynamicResource BorderPrimaryBrush}" VerticalAlignment="Stretch" HorizontalAlignment="Center"/>
                                         
-                                        <Border Background="#111" BorderBrush="#333" BorderThickness="1" CornerRadius="12" Padding="8,2" 
+                                        <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" CornerRadius="12" Padding="8,2" 
                                                 VerticalAlignment="Center" HorizontalAlignment="Center"
                                                 IsVisible="{Binding NextModule.HasDelay}">
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                                <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="#00AAFF"/>
-                                                <TextBlock Text="Wait" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                                                <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentInfoBrush}"/>
+                                                <TextBlock Text="Wait" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
                                                     
                                                 <TextBox Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}" 
                                                          Width="36" Height="22" Padding="0" FontSize="13"
@@ -488,8 +513,8 @@
                                     </Grid>
                                 </StackPanel>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
 
                     <StackPanel MinWidth="500" Margin="0,0,0,0" Spacing="0">
                         <Path Data="M 0 0 L 0 30" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
@@ -500,8 +525,8 @@
                                 Cursor="Hand">
                             <Border Classes="Card" Padding="20,15" CornerRadius="8">
                                 <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                                    <PathIcon Data="{StaticResource PlusIcon}" Width="14" Height="14" Foreground="#00AAFF"/>
-                                    <TextBlock Text="Add Module" FontWeight="SemiBold" Foreground="#E0E0E0"/>
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="14" Height="14" Foreground="{DynamicResource AccentInfoBrush}"/>
+                                    <TextBlock Text="Add Module" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 </StackPanel>
                             </Border>
                         </Button>
@@ -672,7 +697,7 @@
                 <DataTemplate x:DataType="vm:ModuleSelectorViewModel">
                     <Panel>
                         <Border Background="#000000" Opacity="0.85"/>
-                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="800" MaxHeight="600" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="800" MaxHeight="700" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
                             <Grid RowDefinitions="Auto, Auto, *">
                                 <Border Grid.Row="0" Padding="24" BorderThickness="0,0,0,1" BorderBrush="#333" Background="#0A0A0A" CornerRadius="12,12,0,0">
                                     <DockPanel>
@@ -702,12 +727,12 @@
                                             </ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <RadioButton Content="{Binding}" 
+                                            <DataTemplate DataType="vm:CategoryViewModel">
+                                                <RadioButton Content="{Binding Name}" 
                                                              GroupName="CategoryGroup"
                                                              Command="{Binding $parent[ItemsControl].DataContext.SelectCategoryCommand}" 
                                                              CommandParameter="{Binding}"
-                                                             IsChecked="{Binding $parent[ItemsControl].DataContext.SelectedCategory, Converter={StaticResource EqualsConverter}, ConverterParameter={Binding}, Mode=OneWay}"
+                                                             IsChecked="{Binding IsSelected}"
                                                              Theme="{StaticResource ButtonRadioButton}"/>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

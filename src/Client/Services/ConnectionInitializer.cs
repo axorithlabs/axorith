@@ -5,6 +5,7 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -136,6 +137,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             var controller = services.GetService<IHostController>();
             if (controller == null)
             {
+                logger.LogWarning("HostController not available, skipping auto-start");
                 return;
             }
 
@@ -147,12 +149,40 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 logger.LogInformation("Host not reachable. Attempting auto-start...");
                 await statusUpdater("Starting Axorith Client...", "Starting local Host process...");
 
-                await controller.StartHostAsync(forceRestart: true);
+                // CRITICAL FIX: Use forceRestart: false to allow existing Host to initialize
+                // This prevents killing a Host that's still starting up
+                await controller.StartHostAsync(forceRestart: false);
+                
+                // Give Host additional time to become fully ready after file write
+                await statusUpdater("Starting Axorith Client...", "Waiting for Host to initialize (this may take 10-15 seconds)...");
+                
+                // Wait and verify Host actually started
+                var verifyStarted = false;
+                for (var i = 0; i < 10; i++)
+                {
+                    await Task.Delay(1000);
+                    if (await controller.IsHostReachableAsync())
+                    {
+                        verifyStarted = true;
+                        logger.LogInformation("Host verified as reachable after {Seconds}s", i + 1);
+                        break;
+                    }
+                }
+                
+                if (!verifyStarted)
+                {
+                    logger.LogWarning("Host auto-start completed but Host is not reachable. Will attempt connection anyway.");
+                }
+            }
+            else
+            {
+                logger.LogInformation("Host is already reachable. Skipping auto-start.");
             }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Auto-start Host attempt failed. Will try to connect anyway.");
+            logger.LogError(ex, "Auto-start Host attempt failed: {Message}. Will try to connect anyway.", ex.Message);
+            // Don't throw - let connection attempt handle the error with better UI feedback
         }
     }
 
@@ -167,31 +197,52 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         var connection = new GrpcCoreConnection(serverAddress, tokenProvider, connectionLogger, loggerFactory);
 
         Exception? lastException = null;
+        var maxRetries = 5; // Increased from 3 to 5
+        var retryDelayMs = 2000; // Increased from 1s to 2s
 
-        for (var attempt = 1; attempt <= MaxRetries; attempt++)
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
             try
             {
-                await statusUpdater("Connecting to Axorith.Host...",
-                    attempt == 1 ? "Opening secure channel..." : $"Retry {attempt} of {MaxRetries}...");
+                var statusMessage = attempt == 1 
+                    ? "Opening secure channel..." 
+                    : $"Retry {attempt} of {maxRetries} (waiting {retryDelayMs / 1000}s between attempts)...";
+                    
+                await statusUpdater("Connecting to Axorith.Host...", statusMessage);
 
                 await connection.ConnectAsync();
+                
+                logger.LogInformation("Successfully connected to Host on attempt {Attempt}", attempt);
                 return connection;
             }
-            catch (Exception ex) when (attempt < MaxRetries)
+            catch (Exception ex) when (attempt < maxRetries)
             {
                 lastException = ex;
-                logger.LogWarning(ex, "Connection attempt {Attempt}/{Max} failed. Retrying in {Delay}ms...",
-                    attempt, MaxRetries, RetryDelayMs);
-                await Task.Delay(RetryDelayMs);
+                logger.LogWarning(ex, "Connection attempt {Attempt}/{Max} failed: {Message}. Retrying in {Delay}ms...",
+                    attempt, maxRetries, ex.Message, retryDelayMs);
+                await Task.Delay(retryDelayMs, default);
+            }
+            catch (Exception ex)
+            {
+                // Last attempt failed
+                lastException = ex;
+                logger.LogError(ex, "Final connection attempt {Attempt}/{Max} failed: {Message}",
+                    attempt, maxRetries, ex.Message);
             }
         }
 
         if (lastException != null)
         {
-            throw new InvalidOperationException(
-                $"Failed to connect to Host after {MaxRetries} attempts. Ensure the Host process is running.",
-                lastException);
+            var errorMessage = $"Failed to connect to Host after {maxRetries} attempts.\n\n" +
+                              $"Last error: {lastException.Message}\n\n" +
+                              $"Possible causes:\n" +
+                              $"• Host process failed to start\n" +
+                              $"• Port {serverAddress} is blocked by firewall\n" +
+                              $"• Another instance is using the port\n" +
+                              $"• Host crashed during initialization\n\n" +
+                              $"Check logs at: {ApplicationPaths.Logs}";
+            
+            throw new InvalidOperationException(errorMessage, lastException);
         }
 
         throw new InvalidOperationException("Connection failed with unknown error.");
@@ -260,6 +311,9 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             sp,
             sp.GetRequiredService<ILogger<SettingsViewModel>>()));
 
+        services.AddSingleton<IAppDiscoveryService>(_ => PlatformServices.CreateAppDiscoveryService(loggerFactory));
+        services.AddSingleton<IClientOnboardingService, ClientOnboardingService>();
+
         var newProvider = services.BuildServiceProvider();
         app.Services = newProvider;
 
@@ -309,8 +363,18 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
             var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
 
+            // Enhanced error message with actionable information
+            var enhancedMessage = $"❌ Failed to start Axorith\n\n{errorMessage}\n\n" +
+                                 $"📁 Log files: {ApplicationPaths.Logs}\n\n" +
+                                 $"💡 Troubleshooting:\n" +
+                                 $"1. Check if another Axorith instance is running\n" +
+                                 $"2. Restart your computer to free up ports\n" +
+                                 $"3. Check antivirus/firewall settings\n" +
+                                 $"4. Run as Administrator if needed\n\n" +
+                                 $"Click 'Retry' to try again, or check logs for details.";
+
             errorViewModel.Configure(
-                $"Initialization error: {errorMessage}\n\nCheck logs for details. Ensure Axorith.Host is running.",
+                enhancedMessage,
                 async () => await InitializeAsync(app, config, loggerFactory, logger));
 
             shellViewModel.Content = errorViewModel;

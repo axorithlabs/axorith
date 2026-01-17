@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Linux;
@@ -270,7 +271,7 @@ internal class LinuxSecureStorage : ISecureStorageService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to set file permissions for {File}", filePath);
+                _logger.LogWarning(ex, "Failed to set file permissions for {File}", TelemetryGuard.SafePath(filePath));
             }
         }
     }
@@ -366,7 +367,7 @@ internal class LinuxSecureStorage : ISecureStorageService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to set file permissions for key file {File}", keyPath);
+                _logger.LogWarning(ex, "Failed to set file permissions for key file {File}", TelemetryGuard.SafePath(keyPath));
             }
         }
 

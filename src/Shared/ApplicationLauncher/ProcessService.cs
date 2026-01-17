@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axorith.Sdk.Logging;
 using Axorith.Shared.Platform;
+using Axorith.Telemetry;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
@@ -121,7 +122,7 @@ public sealed class ProcessService(IModuleLogger logger)
     {
         try
         {
-            logger.LogDebug("Launching process: {Path} {Args} (WorkingDir: {WorkingDirectory})", path, args,
+            logger.LogDebug("Launching process: {Path} {Args} (WorkingDir: {WorkingDirectory})", TelemetryGuard.SafePath(path), args,
                 string.IsNullOrWhiteSpace(workingDirectory) ? "<default>" : workingDirectory);
 
             var effectiveWorkingDirectory = workingDirectory;
@@ -149,7 +150,7 @@ public sealed class ProcessService(IModuleLogger logger)
             {
                 startInfo.WorkingDirectory = effectiveWorkingDirectory;
                 logger.LogDebug("Using working directory {WorkingDirectory} for process {Path}",
-                    effectiveWorkingDirectory, path);
+                    TelemetryGuard.SafePath(effectiveWorkingDirectory), TelemetryGuard.SafePath(path));
             }
 
             var process = new Process
@@ -170,7 +171,7 @@ public sealed class ProcessService(IModuleLogger logger)
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to launch process: {Path}", path);
+            logger.LogError(ex, "Failed to launch process: {Path}", TelemetryGuard.SafePath(path));
             return Task.FromResult<Process?>(null);
         }
     }
@@ -179,12 +180,12 @@ public sealed class ProcessService(IModuleLogger logger)
     {
         try
         {
-            logger.LogDebug("Searching for existing process: {Path}", path);
+            logger.LogDebug("Searching for existing process: {Path}", TelemetryGuard.SafePath(path));
 
             var processes = PublicApi.FindProcesses(path);
             if (processes.Count == 0)
             {
-                logger.LogDebug("No existing process found for {Path}", path);
+                logger.LogDebug("No existing process found for {Path}", TelemetryGuard.SafePath(path));
                 return Task.FromResult<Process?>(null);
             }
 

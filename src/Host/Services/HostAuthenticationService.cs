@@ -1,6 +1,7 @@
 ﻿using System.Security.Cryptography;
 using Axorith.Contracts;
 using Axorith.Shared.Utils;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Services;
@@ -34,7 +35,7 @@ public class HostAuthenticationService(
                         // Validate that the token is valid Base64
                         _ = Convert.FromBase64String(existingToken);
                         _currentToken = existingToken;
-                        logger.LogInformation("Loaded existing auth token from {Path}", tokenFilePath);
+                        logger.LogInformation("Loaded existing auth token from {Path}", TelemetryGuard.SafePath(tokenFilePath));
                         return;
                     }
                 }
@@ -48,11 +49,11 @@ public class HostAuthenticationService(
             _currentToken = Convert.ToBase64String(tokenData);
 
             File.WriteAllText(tokenFilePath, _currentToken);
-            logger.LogInformation("New auth token generated and written to {Path}", tokenFilePath);
+            logger.LogInformation("New auth token generated and written to {Path}", TelemetryGuard.SafePath(tokenFilePath));
         }
         catch (Exception ex)
         {
-            logger.LogCritical(ex, "Failed to initialize auth token at {Path}", tokenFilePath);
+            logger.LogCritical(ex, "Failed to initialize auth token at {Path}", TelemetryGuard.SafePath(tokenFilePath));
             throw;
         }
     }

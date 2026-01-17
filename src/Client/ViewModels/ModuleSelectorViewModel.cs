@@ -17,6 +17,23 @@ public class ModuleDefinitionViewModel(ModuleDefinition definition) : ReactiveOb
     }
 }
 
+public class CategoryViewModel : ReactiveObject
+{
+    public string Name { get; }
+
+    public bool IsSelected
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public CategoryViewModel(string name, bool isSelected = false)
+    {
+        Name = name;
+        IsSelected = isSelected;
+    }
+}
+
 public class ModuleSelectorViewModel : ReactiveObject
 {
     private readonly IReadOnlyList<ModuleDefinition> _allModules;
@@ -32,9 +49,9 @@ public class ModuleSelectorViewModel : ReactiveObject
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    } = "All";
 
-    public ObservableCollection<string> Categories { get; } = [];
+    public ObservableCollection<CategoryViewModel> Categories { get; } = [];
 
     public ObservableCollection<ModuleDefinitionViewModel> FilteredModules { get; } = [];
 
@@ -50,13 +67,11 @@ public class ModuleSelectorViewModel : ReactiveObject
         _allModules = allModules;
         _onModuleSelected = onModuleSelected;
 
-        SelectModuleCommand = ReactiveCommand.CreateFromTask<ModuleDefinitionViewModel>(SelectModule);
-        SelectCategoryCommand = ReactiveCommand.Create<string>(cat => SelectedCategory = cat);
+        SelectModuleCommand = ReactiveCommand.Create<ModuleDefinitionViewModel>(SelectModule);
+        SelectCategoryCommand = ReactiveCommand.Create<CategoryViewModel>(SelectCategory);
         CloseCommand = ReactiveCommand.Create(onCancel);
 
         InitializeCategories();
-
-        SelectedCategory = "All";
 
         this.WhenAnyValue(x => x.SearchText, x => x.SelectedCategory)
             .Throttle(TimeSpan.FromMilliseconds(100))
@@ -68,7 +83,8 @@ public class ModuleSelectorViewModel : ReactiveObject
 
     private void InitializeCategories()
     {
-        Categories.Add("All");
+        Categories.Add(new CategoryViewModel("All", true));
+
         var distinctCategories = _allModules
             .Select(m => m.Category)
             .Where(c => !string.IsNullOrWhiteSpace(c))
@@ -77,8 +93,17 @@ public class ModuleSelectorViewModel : ReactiveObject
 
         foreach (var cat in distinctCategories)
         {
-            Categories.Add(cat);
+            Categories.Add(new CategoryViewModel(cat));
         }
+    }
+
+    private void SelectCategory(CategoryViewModel category)
+    {
+        foreach (var cat in Categories)
+        {
+            cat.IsSelected = cat == category;
+        }
+        SelectedCategory = category.Name;
     }
 
     private void FilterModules()
@@ -106,17 +131,14 @@ public class ModuleSelectorViewModel : ReactiveObject
         }
     }
 
-    private async Task SelectModule(ModuleDefinitionViewModel vm)
+    private async void SelectModule(ModuleDefinitionViewModel vm)
     {
+        if (vm.IsJustAdded) return;
+
         _onModuleSelected(vm.Definition);
-
-        if (vm.IsJustAdded)
-        {
-            return;
-        }
-
         vm.IsJustAdded = true;
-        await Task.Delay(1000);
+
+        await Task.Delay(800);
         vm.IsJustAdded = false;
     }
 }

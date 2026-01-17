@@ -35,7 +35,7 @@ internal sealed class Settings : LauncherSettingsBase
         ProjectPath = Setting.AsDirectoryPicker(
             key: "ProjectPath",
             label: "Project Path",
-            defaultValue: Environment.CurrentDirectory,
+            defaultValue: "",
             description: "Path to the folder or workspace to open."
         );
 
@@ -79,6 +79,26 @@ internal sealed class Settings : LauncherSettingsBase
             var showArgs = mode is "LaunchNew" or "LaunchOrAttach";
             ApplicationArgs.SetVisibility(showArgs);
         });
+    }
+
+    protected override Task<ValidationResult> ValidateAdditionalAsync()
+    {
+        var projectPath = ProjectPath.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(projectPath))
+        {
+            return Task.FromResult(ValidationResult.Fail(
+                new Dictionary<string, string> { [ProjectPath.Key] = "Project path is required." },
+                "Project path is required."));
+        }
+
+        if (!Directory.Exists(projectPath))
+        {
+            return Task.FromResult(ValidationResult.Fail(
+                new Dictionary<string, string> { [ProjectPath.Key] = $"Directory not found: '{projectPath}'." },
+                "Project directory not found."));
+        }
+
+        return Task.FromResult(ValidationResult.Success);
     }
 
     private async Task RefreshPathAsync()

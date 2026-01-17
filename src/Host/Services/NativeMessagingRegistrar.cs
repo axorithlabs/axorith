@@ -1,4 +1,5 @@
 ﻿using Axorith.Shared.Platform;
+using Axorith.Telemetry;
 
 namespace Axorith.Host.Services;
 
@@ -48,11 +49,11 @@ public class NativeMessagingRegistrar(
 
         if (!File.Exists(shimPath))
         {
-            logger.LogWarning("Axorith.Shim.exe not found at expected path: {Path}. Skipping registration.", shimPath);
+            logger.LogWarning("Axorith.Shim.exe not found at expected path: {Path}. Skipping registration.", TelemetryGuard.SafePath(shimPath));
             return;
         }
 
-        logger.LogInformation("Found Shim executable at: {Path}", shimPath);
+        logger.LogInformation("Found Shim executable at: {Path}", TelemetryGuard.SafePath(shimPath));
 
         // Register for Firefox
         manager.RegisterFirefoxHost(hostName, shimPath, [FirefoxExtensionId]);

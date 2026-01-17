@@ -12,7 +12,7 @@ namespace Axorith.Module.Spotify;
 ///     Handles authentication, retries, and rate limiting.
 /// </summary>
 internal sealed class SpotifyApiService(
-    IHttpClientFactory httpClientFactory,
+    Axorith.Sdk.Http.IHttpClientFactory httpClientFactory,
     ModuleDefinition definition,
     AuthService authService,
     IModuleLogger logger)

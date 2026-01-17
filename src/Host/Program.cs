@@ -34,6 +34,38 @@ var hostInfoPath = ApplicationPaths.HostInfoFile;
 ITelemetryService? telemetry = null;
 var telemetryLogLevel = LogEventLevel.Warning;
 var hostUptime = Stopwatch.StartNew();
+
+// CRITICAL: Use global mutex to prevent multiple Host instances
+// This protects against race conditions when multiple Clients start simultaneously
+using var hostMutex = new Mutex(true, "Global\\AxorithHostInstanceMutex", out var createdNew);
+
+if (!createdNew)
+{
+    Log.Warning("Another Axorith.Host instance is already running. Exiting.");
+    
+    // Check if the other instance is actually responsive
+    await Task.Delay(1000);
+    
+    // Try to read existing host info
+    if (File.Exists(hostInfoPath))
+    {
+        try
+        {
+            var existingInfo = await File.ReadAllTextAsync(hostInfoPath);
+            Log.Information("Existing Host info: {Info}", existingInfo);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not read existing host-info.json");
+        }
+    }
+    
+    Log.Information("Exiting duplicate Host instance.");
+    return 0;
+}
+
+Log.Information("✅ Acquired Host instance mutex. This is the primary Host instance.");
+
 try
 {
     Log.Information("Starting Axorith.Host...");
@@ -291,8 +323,24 @@ try
 
             var hostInfo = new
                 { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };
-            await File.WriteAllTextAsync(hostInfoPath, JsonSerializer.Serialize(hostInfo));
-            Log.Information("Host info written to {Path}", hostInfoPath);
+            
+            // Use FileShare.Read to allow clients to read while we're writing
+            // This prevents "file is being used by another process" errors
+            var json = JsonSerializer.Serialize(hostInfo);
+            await using (var stream = new FileStream(
+                hostInfoPath, 
+                FileMode.Create, 
+                FileAccess.Write, 
+                FileShare.Read, // Allow concurrent reads
+                bufferSize: 4096, 
+                useAsync: true))
+            {
+                await using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(json);
+                await writer.FlushAsync();
+            }
+            
+            Log.Information("Host info written to {Path} (port={Port})", hostInfoPath, boundPort);
         }
         catch (Exception ex)
         {
@@ -349,6 +397,7 @@ finally
         if (File.Exists(hostInfoPath))
         {
             File.Delete(hostInfoPath);
+            Log.Information("Cleaned up host-info.json on shutdown");
         }
     }
     catch
@@ -362,6 +411,8 @@ finally
         await telemetry.FlushAsync();
         await telemetry.DisposeAsync();
     }
+    
+    Log.Information("Host instance mutex will be released on disposal");
 }
 
 static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)

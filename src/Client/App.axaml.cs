@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
@@ -135,6 +136,10 @@ public class App : Application
             DataContext = shellViewModel
         };
 
+        // CRITICAL: Set MainWindow BEFORE any other initialization
+        // This ensures Avalonia shows the window immediately
+        desktop.MainWindow = _mainWindow;
+
         if (_isTrayMode)
         {
             logger.LogInformation("Starting with window hidden (--tray flag)");
@@ -148,13 +153,22 @@ public class App : Application
             windowStateManager.RestoreWindowState(_mainWindow);
         }
 
-        desktop.MainWindow = _mainWindow;
-
         var trayService = Services.GetRequiredService<IHostTrayService>();
         trayService.Initialize(desktop, logger);
 
         _notificationManager = Services.GetRequiredService<DesktopNotificationManager>();
         _notificationManager.Initialize();
+
+        // Register activation handler for single instance
+        var singleInstanceManager = Program.GetSingleInstanceManager();
+        if (singleInstanceManager != null)
+        {
+            singleInstanceManager.ActivationRequested += (_, _) =>
+            {
+                logger.LogInformation("Activation requested from another instance");
+                Dispatcher.UIThread.Post(() => ActivateMainWindow());
+            };
+        }
 
         telemetry.TrackEvent("AppReady", new Dictionary<string, object?>
         {
@@ -201,13 +215,17 @@ public class App : Application
             }
         };
 
-        logger.LogInformation("Starting Host connection in background...");
-        var connInit = Services.GetRequiredService<IConnectionInitializer>();
-        _ = Task.Run(() => connInit.InitializeAsync(this, clientConfig, loggerFactory, logger));
-
         RegisterShutdownHandler(desktop, logger);
 
+        // CRITICAL FIX: Call base.OnFrameworkInitializationCompleted() BEFORE heavy initialization
+        // This allows Avalonia to show the window immediately (within ~100ms)
+        // All connection logic happens AFTER the window is visible
         base.OnFrameworkInitializationCompleted();
+
+        // Now start the connection in background - window is already visible
+        logger.LogInformation("Window shown. Starting Host connection in background...");
+        var connInit = Services.GetRequiredService<IConnectionInitializer>();
+        _ = Task.Run(() => connInit.InitializeAsync(this, clientConfig, loggerFactory, logger));
     }
 
     private bool _isShuttingDown;
@@ -277,6 +295,47 @@ public class App : Application
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to apply auto-start settings");
+        }
+    }
+
+    /// <summary>
+    ///     Activates and brings the main window to the foreground.
+    /// </summary>
+    private void ActivateMainWindow()
+    {
+        if (_mainWindow == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Restore from minimized state
+            if (_mainWindow.WindowState == WindowState.Minimized)
+            {
+                _mainWindow.WindowState = WindowState.Normal;
+            }
+
+            // Show in taskbar if hidden
+            if (!_mainWindow.ShowInTaskbar)
+            {
+                _mainWindow.ShowInTaskbar = true;
+            }
+
+            // Bring to front
+            _mainWindow.Show();
+            _mainWindow.Activate();
+            _mainWindow.Topmost = true;
+            _mainWindow.Topmost = false;
+            _mainWindow.Focus();
+
+            var logger = Services.GetService<ILogger<App>>();
+            logger?.LogInformation("Main window activated");
+        }
+        catch (Exception ex)
+        {
+            var logger = Services.GetService<ILogger<App>>();
+            logger?.LogError(ex, "Failed to activate main window");
         }
     }
 }

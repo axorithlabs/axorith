@@ -3,10 +3,13 @@ using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Axorith.Client.Services;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using ReactiveUI.Avalonia;
 using Serilog;
+using Serilog.Extensions.Logging;
 
 namespace Axorith.Client;
 
@@ -14,10 +17,45 @@ internal static class Program
 {
     internal static ITelemetryService? Telemetry { get; private set; }
     private static readonly Stopwatch AppUptime = Stopwatch.StartNew();
+    private static SingleInstanceManager? _singleInstanceManager;
 
     [STAThread]
     public static int Main(string[] args)
     {
+        // Early logging setup for single instance check
+        var earlyLogger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.Console()
+            .CreateLogger();
+
+        var earlyLoggerFactory = new SerilogLoggerFactory(earlyLogger);
+        var singleInstanceLogger = earlyLoggerFactory.CreateLogger<SingleInstanceManager>();
+
+        // Check for single instance BEFORE any heavy initialization
+        _singleInstanceManager = new SingleInstanceManager(singleInstanceLogger);
+        
+        if (!_singleInstanceManager.TryAcquireLock())
+        {
+            earlyLogger.Information("Another instance detected - sending activation request");
+            
+            // Send activation request to existing instance
+            var activationTask = _singleInstanceManager.SendActivationRequestAsync();
+            activationTask.Wait(TimeSpan.FromSeconds(5));
+            
+            if (activationTask.Result)
+            {
+                earlyLogger.Information("Activation request sent successfully - exiting");
+            }
+            else
+            {
+                earlyLogger.Warning("Failed to activate existing instance - exiting anyway");
+            }
+            
+            _singleInstanceManager.Dispose();
+            earlyLogger.Dispose();
+            return 0;
+        }
+
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
@@ -124,8 +162,12 @@ internal static class Program
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             Telemetry?.FlushAsync(flushCts.Token).GetAwaiter().GetResult();
             Telemetry?.DisposeAsync().GetAwaiter().GetResult();
+            
+            _singleInstanceManager?.Dispose();
         }
     }
+
+    internal static SingleInstanceManager? GetSingleInstanceManager() => _singleInstanceManager;
 
     public static AppBuilder BuildAvaloniaApp()
     {

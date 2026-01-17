@@ -1,3 +1,4 @@
+using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
@@ -33,7 +34,7 @@ internal sealed class Settings : LauncherSettingsBase
         ProjectPath = Setting.AsFilePicker(
             key: "ProjectPath",
             label: "Project Path",
-            defaultValue: Environment.CurrentDirectory,
+            defaultValue: "",
             description: "Path to the solution or project directory to open in IDE."
         );
 
@@ -77,6 +78,26 @@ internal sealed class Settings : LauncherSettingsBase
             var showArgs = mode is "LaunchNew" or "LaunchOrAttach";
             ApplicationArgs.SetVisibility(showArgs);
         });
+    }
+
+    protected override Task<ValidationResult> ValidateAdditionalAsync()
+    {
+        var projectPath = ProjectPath.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(projectPath))
+        {
+            return Task.FromResult(ValidationResult.Fail(
+                new Dictionary<string, string> { [ProjectPath.Key] = "Project path is required." },
+                "Project path is required."));
+        }
+
+        if (!Directory.Exists(projectPath) && !File.Exists(projectPath))
+        {
+            return Task.FromResult(ValidationResult.Fail(
+                new Dictionary<string, string> { [ProjectPath.Key] = $"Path not found: '{projectPath}'." },
+                "Project path not found."));
+        }
+
+        return Task.FromResult(ValidationResult.Success);
     }
 
     private async Task RefreshIdeListAsync()

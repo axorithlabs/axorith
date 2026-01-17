@@ -25,14 +25,20 @@
     </Application.DataTemplates>
 
     <Application.Resources>
-        <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
-        <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
-        
-        <SolidColorBrush x:Key="SystemRegionBrush" Color="#050505" />
-        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#0A0A0A" />
-        <SolidColorBrush x:Key="BorderBrush" Color="#333333" />
-        <Color x:Key="SystemAccentColor">#2563EB</Color>
-        <SolidColorBrush x:Key="SystemAccentBrush" Color="{StaticResource SystemAccentColor}"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Axorith.Client/Assets/App.Styles.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
+            <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
+            
+            <SolidColorBrush x:Key="SystemRegionBrush" Color="{DynamicResource BackgroundPrimaryColor}" />
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="{DynamicResource BackgroundSecondaryColor}" />
+            <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderPrimaryColor}" />
+            <Color x:Key="SystemAccentColor">#2563EB</Color>
+            <SolidColorBrush x:Key="SystemAccentBrush" Color="{StaticResource SystemAccentColor}"/>
+        </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>

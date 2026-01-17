@@ -3,6 +3,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Windows.Input;
+using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Shared.Platform;
 using Axorith.Telemetry;
@@ -23,6 +24,8 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
     private readonly ClientUiConfiguration _config;
+    private readonly IClientOnboardingService? _onboardingService;
+    private readonly IToastNotificationService? _toastService;
 
     private bool _telemetryEnabled;
     private bool _autoStartEnabled;
@@ -82,6 +85,13 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     public ICommand OpenPrivacyPolicyCommand { get; }
     public ICommand OpenGitHubCommand { get; }
     public ICommand OpenDiscordCommand { get; }
+    public ICommand RunSetupWizardCommand { get; }
+
+    public bool IsRunningSetup
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public SettingsViewModel(
         ShellViewModel shell,
@@ -99,29 +109,21 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         _logger = logger;
         _serviceProvider = serviceProvider;
         _config = options.Value.Ui;
+        _onboardingService = serviceProvider.GetService<IClientOnboardingService>();
+        _toastService = serviceProvider.GetService<IToastNotificationService>();
 
         AppVersion = GetAppVersion();
 
         LoadSettings();
 
-        var canSave = this.WhenAnyValue(x => x.HasUnsavedChanges);
-
-        SaveCommand = ReactiveCommand.Create(SaveSettings, canSave);
+        SaveCommand = ReactiveCommand.Create(SaveSettings);
         BackCommand = ReactiveCommand.Create(NavigateBack);
         OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
         OpenDiscordCommand = ReactiveCommand.Create(() => OpenUrl("https://discord.gg/axorith"));
 
-        this.WhenAnyValue(
-                x => x.TelemetryEnabled,
-                x => x.AutoStartEnabled,
-                x => x.AutoStartMinimized,
-                x => x.MinimizeToTrayOnClose)
-            .Skip(1)
-            .Throttle(TimeSpan.FromMilliseconds(500))
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ => SaveSettings())
-            .DisposeWith(_disposables);
+        var canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
+        RunSetupWizardCommand = ReactiveCommand.CreateFromTask(RunSetupWizardAsync, canRunSetup);
     }
 
     private void LoadSettings()
@@ -205,6 +207,55 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         var assembly = Assembly.GetEntryAssembly();
         var version = assembly?.GetName().Version;
         return version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "v0.0.0";
+    }
+
+    private async Task RunSetupWizardAsync()
+    {
+        if (_onboardingService == null)
+        {
+            return;
+        }
+
+        IsRunningSetup = true;
+
+        try
+        {
+            var result = await _onboardingService.RunSetupAsync();
+
+            if (result.CreatedCount > 0)
+            {
+                _toastService?.Show(
+                    $"Setup complete: Created {result.CreatedCount} preset(s): {string.Join(", ", result.CreatedPresetNames)}",
+                    Axorith.Sdk.Services.NotificationType.Success);
+
+                _telemetry.TrackEvent("SetupWizardCompleted", new Dictionary<string, object?>
+                {
+                    ["createdCount"] = result.CreatedCount,
+                    ["presetNames"] = result.CreatedPresetNames.ToArray()
+                });
+            }
+            else if (result.Errors.Count > 0)
+            {
+                _toastService?.Show(
+                    $"Setup completed with errors: {result.Errors.First()}",
+                    Axorith.Sdk.Services.NotificationType.Warning);
+            }
+            else
+            {
+                _toastService?.Show(
+                    "No new presets created. Required modules may not be installed.",
+                    Axorith.Sdk.Services.NotificationType.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Setup wizard failed");
+            _toastService?.Show($"Setup failed: {ex.Message}", Axorith.Sdk.Services.NotificationType.Error);
+        }
+        finally
+        {
+            IsRunningSetup = false;
+        }
     }
 
     public void Dispose()

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
+using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
@@ -52,7 +53,7 @@ public class GrpcUpdatesApi : IUpdatesApi
         {
             var tempPath = Path.Combine(Path.GetTempPath(), $"Axorith-Setup-{updateInfo.Version}.exe");
 
-            _logger.LogInformation("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, tempPath);
+            _logger.LogInformation("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, TelemetryGuard.SafePath(tempPath));
 
             using var response =
                 await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -80,7 +81,7 @@ public class GrpcUpdatesApi : IUpdatesApi
                 }
             }
 
-            _logger.LogInformation("Update downloaded successfully to {Path}", tempPath);
+            _logger.LogInformation("Update downloaded successfully to {Path}", TelemetryGuard.SafePath(tempPath));
             return tempPath;
         }
         catch (Exception ex)
@@ -99,7 +100,7 @@ public class GrpcUpdatesApi : IUpdatesApi
                 throw new FileNotFoundException("Installer not found", installerPath);
             }
 
-            _logger.LogInformation("Starting installer: {Path}", installerPath);
+            _logger.LogInformation("Starting installer: {Path}", TelemetryGuard.SafePath(installerPath));
 
             var startInfo = new ProcessStartInfo
             {

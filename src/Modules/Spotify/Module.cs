@@ -31,7 +31,7 @@ public class Module : IModule, IAsyncDisposable
 
     public Module(
         IModuleLogger logger,
-        IHttpClientFactory httpClientFactory,
+        Axorith.Sdk.Http.IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage,
         INotifier notifier,
         IAppDiscoveryService appDiscovery,

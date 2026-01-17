@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 using static Axorith.Shared.Utils.EnvironmentUtils;
 
@@ -49,16 +50,16 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     continue;
                 }
 
-                logger.LogInformation("Allowing whitelisted symlink: {Path}", path);
+                logger.LogInformation("Allowing whitelisted symlink: {Path}", TelemetryGuard.SafePath(path));
             }
 
             if (!Directory.Exists(path))
             {
-                logger.LogWarning("Module search path not found, skipping: {Path}", path);
+                logger.LogWarning("Module search path not found, skipping: {Path}", TelemetryGuard.SafePath(path));
                 continue;
             }
 
-            logger.LogDebug("Scanning directory for modules: {Path}", path);
+            logger.LogDebug("Scanning directory for modules: {Path}", TelemetryGuard.SafePath(path));
 
             var enumerationOptions = new EnumerationOptions
             {

@@ -94,16 +94,27 @@ public sealed class UserRegistrationService : IUserRegistrationService
 
         try
         {
-            await using var stream = File.OpenRead(RegistrationFilePath);
+            // Use FileShare.ReadWrite to allow reading even if another process is writing
+            // This handles the case where Host is writing while Client is reading
+            await using var stream = new FileStream(
+                RegistrationFilePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite, // Allow concurrent reads and writes
+                bufferSize: 4096,
+                useAsync: true);
+            
             return await JsonSerializer.DeserializeAsync<UserRegistration>(stream, JsonOptions, ct)
                 .ConfigureAwait(false);
         }
         catch (JsonException)
         {
+            // Corrupted or incomplete JSON - will recreate
             return null;
         }
         catch (IOException)
         {
+            // File locked or inaccessible - will recreate
             return null;
         }
     }
@@ -119,8 +130,18 @@ public sealed class UserRegistrationService : IUserRegistrationService
 
         ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.LocalRoot);
 
-        await using var stream = File.Create(RegistrationFilePath);
+        // Use FileShare.Read to allow concurrent reads while writing
+        // This prevents "file is being used by another process" errors when multiple instances start
+        await using var stream = new FileStream(
+            RegistrationFilePath,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.Read, // Allow concurrent reads
+            bufferSize: 4096,
+            useAsync: true);
+        
         await JsonSerializer.SerializeAsync(stream, registration, JsonOptions, ct).ConfigureAwait(false);
+        await stream.FlushAsync(ct).ConfigureAwait(false);
 
         return registration;
     }

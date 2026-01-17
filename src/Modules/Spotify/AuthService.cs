@@ -38,7 +38,7 @@ internal sealed class AuthService : IDisposable
 
     public event Action<bool>? AuthenticationStateChanged;
 
-    public AuthService(IModuleLogger logger, IHttpClientFactory httpClientFactory,
+    public AuthService(IModuleLogger logger, Axorith.Sdk.Http.IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage, ModuleDefinition definition, Settings settings, INotifier notifier)
     {
         _logger = logger;
