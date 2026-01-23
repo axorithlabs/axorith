@@ -469,7 +469,8 @@ public class ScheduleManager(
             var fileInfo = new FileInfo(_storagePath);
             if (fileInfo.Length > MaxScheduleFileSizeBytes)
             {
-                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)", TelemetryGuard.SafePath(_storagePath),
+                logger.LogWarning("Schedule file {Path} exceeds maximum size limit ({Size} bytes)",
+                    TelemetryGuard.SafePath(_storagePath),
                     fileInfo.Length);
                 return;
             }

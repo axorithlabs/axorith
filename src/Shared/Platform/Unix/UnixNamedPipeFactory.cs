@@ -8,12 +8,12 @@ namespace Axorith.Shared.Platform.Unix;
 internal class UnixNamedPipeFactory(ILogger<UnixNamedPipeFactory> logger) : INamedPipeFactory
 {
     public NamedPipeServerStream CreateSecureServerPipe(
-        string pipeName, 
+        string pipeName,
         PipeDirection direction = PipeDirection.In,
         int maxNumberOfServerInstances = 1)
     {
         logger.LogDebug("Created named pipe: {PipeName}", pipeName);
-        
+
         return new NamedPipeServerStream(
             pipeName,
             direction,

@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive.Linq;
+using Avalonia.Controls;
 using Axorith.Client.Services.Abstractions;
 using ReactiveUI;
 
@@ -30,7 +31,7 @@ public class ShellViewModel : ReactiveObject
     /// </summary>
     public ObservableCollection<ToastViewModel> Toasts { get; } = [];
 
-    private Avalonia.Controls.Window? _mainWindow;
+    private Window? _mainWindow;
 
     public ShellViewModel(IToastNotificationService toastService)
     {
@@ -39,12 +40,12 @@ public class ShellViewModel : ReactiveObject
             .Subscribe(AddToast);
     }
 
-    public void SetMainWindow(Avalonia.Controls.Window window)
+    public void SetMainWindow(Window window)
     {
         _mainWindow = window;
     }
 
-    public Avalonia.Controls.Window GetMainWindow()
+    public Window GetMainWindow()
     {
         return _mainWindow ?? throw new InvalidOperationException("Main window not set");
     }

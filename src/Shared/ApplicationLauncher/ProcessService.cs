@@ -5,7 +5,7 @@ using Axorith.Telemetry;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
-public sealed class ProcessService(IModuleLogger logger)
+public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService processService)
 {
     public async Task<ProcessStartResult> StartAsync(ProcessConfig config)
     {
@@ -122,7 +122,8 @@ public sealed class ProcessService(IModuleLogger logger)
     {
         try
         {
-            logger.LogDebug("Launching process: {Path} {Args} (WorkingDir: {WorkingDirectory})", TelemetryGuard.SafePath(path), args,
+            logger.LogDebug("Launching process: {Path} {Args} (WorkingDir: {WorkingDirectory})",
+                TelemetryGuard.SafePath(path), args,
                 string.IsNullOrWhiteSpace(workingDirectory) ? "<default>" : workingDirectory);
 
             if (!File.Exists(path))
@@ -189,7 +190,7 @@ public sealed class ProcessService(IModuleLogger logger)
         {
             logger.LogDebug("Searching for existing process: {Path}", TelemetryGuard.SafePath(path));
 
-            var processes = PublicApi.FindProcesses(path);
+            var processes = processService.FindProcesses(path);
             if (processes.Count == 0)
             {
                 logger.LogDebug("No existing process found for {Path}", TelemetryGuard.SafePath(path));

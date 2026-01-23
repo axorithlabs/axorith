@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
@@ -8,32 +9,47 @@ namespace Axorith.Shim;
 internal static class Program
 {
     private const string PipeName = "axorith-nm-pipe";
-    private const int MaxLogSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private const int MaxLogSizeBytes = 10 * 1024 * 1024;
+    private const int LogFlushIntervalMs = 5000;
+
+    private static readonly ConcurrentQueue<string> LogQueue = new();
+    private static readonly SemaphoreSlim LogSemaphore = new(1, 1);
+    private static CancellationTokenSource? _logFlushCts;
 
     public static void Main()
     {
+        StartLogFlusher();
+
         var loggerFactory = NullLoggerFactory.Instance;
         var pipeFactory = PlatformServices.CreateNamedPipeFactory(loggerFactory);
 
-        while (true)
-            try
+        try
+        {
+            while (true)
             {
-                using var pipeServer = pipeFactory.CreateSecureServerPipe(PipeName);
-                pipeServer.WaitForConnection();
-
-                using var reader = new StreamReader(pipeServer);
-
-                var message = reader.ReadToEnd();
-
-                if (!string.IsNullOrWhiteSpace(message))
+                try
                 {
-                    SendMessageToExtension(message);
+                    using var pipeServer = pipeFactory.CreateSecureServerPipe(PipeName);
+                    pipeServer.WaitForConnection();
+
+                    using var reader = new StreamReader(pipeServer);
+                    var message = reader.ReadToEnd();
+
+                    if (!string.IsNullOrWhiteSpace(message))
+                    {
+                        SendMessageToExtension(message);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogExceptionAsync(ex).GetAwaiter().GetResult();
                 }
             }
-            catch (Exception ex)
-            {
-                LogException(ex);
-            }
+        }
+        finally
+        {
+            StopLogFlusher();
+        }
     }
 
     private static void SendMessageToExtension(string jsonMessage)
@@ -50,12 +66,41 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            LogException(ex, "Failed to send message to extension");
+            _ = LogExceptionAsync(ex, "Failed to send message to extension");
         }
     }
 
-    private static void LogException(Exception ex, string? context = null)
+    private static void StartLogFlusher()
     {
+        _logFlushCts = new CancellationTokenSource();
+        var token = _logFlushCts.Token;
+
+        Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(LogFlushIntervalMs));
+
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                await FlushLogsAsync();
+            }
+        }, token);
+    }
+
+    private static void StopLogFlusher()
+    {
+        _logFlushCts?.Cancel();
+        FlushLogsAsync().GetAwaiter().GetResult();
+        _logFlushCts?.Dispose();
+    }
+
+    private static async Task FlushLogsAsync()
+    {
+        if (LogQueue.IsEmpty)
+        {
+            return;
+        }
+
+        await LogSemaphore.WaitAsync();
         try
         {
             var logsDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.Logs);
@@ -68,16 +113,44 @@ internal static class Program
                 File.Move(errorLogPath, archivePath);
             }
 
-            var errorMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
-                               $"{(context != null ? $"[{context}] " : "")}" +
-                               $"{ex.GetType().Name}: {ex.Message}\n" +
-                               $"StackTrace: {ex.StackTrace}\n\n";
+            var batch = new StringBuilder();
+            while (LogQueue.TryDequeue(out var logEntry))
+            {
+                batch.AppendLine(logEntry);
+            }
 
-            File.AppendAllText(errorLogPath, errorMessage);
+            if (batch.Length > 0)
+            {
+                await File.AppendAllTextAsync(errorLogPath, batch.ToString());
+            }
         }
         catch
         {
-            // If logging fails, there is nothing more we can do.
+            // If logging fails, clear queue to prevent memory leak
+            while (LogQueue.TryDequeue(out _))
+            {
+            }
         }
+        finally
+        {
+            LogSemaphore.Release();
+        }
+    }
+
+    private static Task LogExceptionAsync(Exception ex, string? context = null)
+    {
+        var errorMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
+                           $"{(context != null ? $"[{context}] " : "")}" +
+                           $"{ex.GetType().Name}: {ex.Message}\n" +
+                           $"StackTrace: {ex.StackTrace}\n";
+
+        LogQueue.Enqueue(errorMessage);
+
+        if (LogQueue.Count > 100)
+        {
+            return FlushLogsAsync();
+        }
+
+        return Task.CompletedTask;
     }
 }

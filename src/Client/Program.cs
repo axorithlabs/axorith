@@ -33,15 +33,15 @@ internal static class Program
 
         // Check for single instance BEFORE any heavy initialization
         _singleInstanceManager = new SingleInstanceManager(singleInstanceLogger);
-        
+
         if (!_singleInstanceManager.TryAcquireLock())
         {
             earlyLogger.Information("Another instance detected - sending activation request");
-            
+
             // Send activation request to existing instance
             var activationTask = _singleInstanceManager.SendActivationRequestAsync();
             activationTask.Wait(TimeSpan.FromSeconds(5));
-            
+
             if (activationTask.Result)
             {
                 earlyLogger.Information("Activation request sent successfully - exiting");
@@ -50,7 +50,7 @@ internal static class Program
             {
                 earlyLogger.Warning("Failed to activate existing instance - exiting anyway");
             }
-            
+
             _singleInstanceManager.Dispose();
             earlyLogger.Dispose();
             return 0;
@@ -162,12 +162,15 @@ internal static class Program
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             Telemetry?.FlushAsync(flushCts.Token).GetAwaiter().GetResult();
             Telemetry?.DisposeAsync().GetAwaiter().GetResult();
-            
+
             _singleInstanceManager?.Dispose();
         }
     }
 
-    internal static SingleInstanceManager? GetSingleInstanceManager() => _singleInstanceManager;
+    internal static SingleInstanceManager? GetSingleInstanceManager()
+    {
+        return _singleInstanceManager;
+    }
 
     public static AppBuilder BuildAvaloniaApp()
     {

@@ -9,7 +9,11 @@ namespace Axorith.Module.Browser;
 ///     Module for launching web browsers with configurable options.
 ///     Supports profile selection, incognito mode, and custom URLs.
 /// </summary>
-public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : LauncherModuleBase(logger)
+public class Module(
+    IModuleLogger logger,
+    IAppDiscoveryService appDiscovery,
+    IPlatformProcessService processService,
+    IPlatformWindowService windowService) : LauncherModuleBase(logger, processService, windowService)
 {
     private readonly Settings _settings = new(appDiscovery);
 
@@ -65,7 +69,9 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : L
 
     private static string SanitizeArgument(string argument)
     {
-        return string.IsNullOrWhiteSpace(argument) ? string.Empty : argument.Replace("\"", "").Replace("'", "").Replace(";", "").Replace("&", "").Replace("|", "");
+        return string.IsNullOrWhiteSpace(argument)
+            ? string.Empty
+            : argument.Replace("\"", "").Replace("'", "").Replace(";", "").Replace("&", "").Replace("|", "");
     }
 
     private static string SanitizeAdditionalArguments(string arguments)

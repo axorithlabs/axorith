@@ -30,21 +30,23 @@ public class Module : IModule, IAsyncDisposable
 
     public Module(
         IModuleLogger logger,
-        Sdk.Http.IHttpClientFactory httpClientFactory,
+        IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage,
         INotifier notifier,
         IAppDiscoveryService appDiscovery,
+        IPlatformProcessService processService,
+        IPlatformWindowService windowService,
         ModuleDefinition definition)
     {
         _logger = logger;
         _settings = new Settings(appDiscovery);
 
-        _processService = new ProcessService(logger);
-        _windowService = new WindowService(logger);
+        _processService = new ProcessService(logger, processService);
+        _windowService = new WindowService(logger, windowService);
 
         _authService = new AuthService(logger, httpClientFactory, secureStorage, definition, _settings, notifier);
         _apiService = new SpotifyApiService(httpClientFactory, definition, _authService, logger);
-        _playbackService = new PlaybackService(logger, _settings, _authService, _apiService);
+        _playbackService = new PlaybackService(logger, _settings, _authService, _apiService, processService);
     }
 
     public IReadOnlyList<ISetting> GetSettings()

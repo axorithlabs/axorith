@@ -36,7 +36,8 @@ public class HostAuthenticationService(
                     {
                         _ = Convert.FromBase64String(existingToken);
                         _currentToken = existingToken;
-                        logger.LogInformation("Loaded existing auth token from {Path}", TelemetryGuard.SafePath(tokenFilePath));
+                        logger.LogInformation("Loaded existing auth token from {Path}",
+                            TelemetryGuard.SafePath(tokenFilePath));
                         return;
                     }
                 }
@@ -52,7 +53,8 @@ public class HostAuthenticationService(
             File.WriteAllText(tokenFilePath, _currentToken);
             filePermissionsService.SetRestrictivePermissions(tokenFilePath);
 
-            logger.LogInformation("New auth token generated and written to {Path}", TelemetryGuard.SafePath(tokenFilePath));
+            logger.LogInformation("New auth token generated and written to {Path}",
+                TelemetryGuard.SafePath(tokenFilePath));
         }
         catch (Exception ex)
         {

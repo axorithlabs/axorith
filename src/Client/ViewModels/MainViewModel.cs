@@ -400,7 +400,6 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private async Task RunSetupWizardAsync()
     {
-        return;
     }
 
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)

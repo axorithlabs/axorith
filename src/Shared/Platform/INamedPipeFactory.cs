@@ -17,7 +17,7 @@ public interface INamedPipeFactory
     /// <param name="maxNumberOfServerInstances">Maximum number of server instances.</param>
     /// <returns>Configured NamedPipeServerStream.</returns>
     NamedPipeServerStream CreateSecureServerPipe(
-        string pipeName, 
+        string pipeName,
         PipeDirection direction = PipeDirection.In,
         int maxNumberOfServerInstances = 1);
 }

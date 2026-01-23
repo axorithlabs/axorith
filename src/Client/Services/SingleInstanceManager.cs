@@ -14,7 +14,7 @@ public sealed class SingleInstanceManager : IDisposable
     private readonly string _mutexName;
     private readonly string _pipeName;
     private const string ActivateCommand = "ACTIVATE_WINDOW";
-    
+
     private readonly ILogger<SingleInstanceManager> _logger;
     private Mutex? _mutex;
     private bool _isFirstInstance;
@@ -99,9 +99,9 @@ public sealed class SingleInstanceManager : IDisposable
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await using var client = new NamedPipeClientStream(".", _pipeName, PipeDirection.Out);
-            
+
             await client.ConnectAsync(cts.Token);
-            
+
             var message = Encoding.UTF8.GetBytes(ActivateCommand);
             await client.WriteAsync(message, cts.Token);
             await client.FlushAsync(cts.Token);
@@ -151,7 +151,7 @@ public sealed class SingleInstanceManager : IDisposable
 
                 var buffer = new byte[1024];
                 var bytesRead = await server.ReadAsync(buffer, ct);
-                
+
                 if (bytesRead > 0)
                 {
                     var message = Encoding.UTF8.GetString(buffer, 0, bytesRead);

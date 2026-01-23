@@ -1,4 +1,6 @@
 using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
@@ -12,22 +14,22 @@ internal class WindowsFilePermissionsService(ILogger<WindowsFilePermissionsServi
         {
             var fileInfo = new FileInfo(filePath);
             var fileSecurity = fileInfo.GetAccessControl();
-            
+
             fileSecurity.SetAccessRuleProtection(true, false);
-            
-            var currentUser = System.Security.Principal.WindowsIdentity.GetCurrent();
+
+            var currentUser = WindowsIdentity.GetCurrent();
             var currentUserSid = currentUser.User;
-            
+
             if (currentUserSid != null)
             {
-                var userRule = new System.Security.AccessControl.FileSystemAccessRule(
+                var userRule = new FileSystemAccessRule(
                     currentUserSid,
-                    System.Security.AccessControl.FileSystemRights.FullControl,
-                    System.Security.AccessControl.AccessControlType.Allow);
-                
+                    FileSystemRights.FullControl,
+                    AccessControlType.Allow);
+
                 fileSecurity.AddAccessRule(userRule);
             }
-            
+
             fileInfo.SetAccessControl(fileSecurity);
             logger.LogDebug("Set restrictive permissions on file: {FilePath}", filePath);
         }

@@ -152,10 +152,11 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 // CRITICAL FIX: Use forceRestart: false to allow existing Host to initialize
                 // This prevents killing a Host that's still starting up
                 await controller.StartHostAsync(forceRestart: false);
-                
+
                 // Give Host additional time to become fully ready after file write
-                await statusUpdater("Starting Axorith Client...", "Waiting for Host to initialize (this may take 10-15 seconds)...");
-                
+                await statusUpdater("Starting Axorith Client...",
+                    "Waiting for Host to initialize (this may take 10-15 seconds)...");
+
                 // Wait and verify Host actually started
                 var verifyStarted = false;
                 for (var i = 0; i < 10; i++)
@@ -168,10 +169,11 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                         break;
                     }
                 }
-                
+
                 if (!verifyStarted)
                 {
-                    logger.LogWarning("Host auto-start completed but Host is not reachable. Will attempt connection anyway.");
+                    logger.LogWarning(
+                        "Host auto-start completed but Host is not reachable. Will attempt connection anyway.");
                 }
             }
             else
@@ -204,14 +206,14 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         {
             try
             {
-                var statusMessage = attempt == 1 
-                    ? "Opening secure channel..." 
+                var statusMessage = attempt == 1
+                    ? "Opening secure channel..."
                     : $"Retry {attempt} of {maxRetries} (waiting {retryDelayMs / 1000}s between attempts)...";
-                    
+
                 await statusUpdater("Connecting to Axorith.Host...", statusMessage);
 
                 await connection.ConnectAsync();
-                
+
                 logger.LogInformation("Successfully connected to Host on attempt {Attempt}", attempt);
                 return connection;
             }
@@ -234,14 +236,14 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         if (lastException != null)
         {
             var errorMessage = $"Failed to connect to Host after {maxRetries} attempts.\n\n" +
-                              $"Last error: {lastException.Message}\n\n" +
-                              $"Possible causes:\n" +
-                              $"• Host process failed to start\n" +
-                              $"• Port {serverAddress} is blocked by firewall\n" +
-                              $"• Another instance is using the port\n" +
-                              $"• Host crashed during initialization\n\n" +
-                              $"Check logs at: {ApplicationPaths.Logs}";
-            
+                               $"Last error: {lastException.Message}\n\n" +
+                               $"Possible causes:\n" +
+                               $"• Host process failed to start\n" +
+                               $"• Port {serverAddress} is blocked by firewall\n" +
+                               $"• Another instance is using the port\n" +
+                               $"• Host crashed during initialization\n\n" +
+                               $"Check logs at: {ApplicationPaths.Logs}";
+
             throw new InvalidOperationException(errorMessage, lastException);
         }
 
@@ -365,13 +367,13 @@ public sealed class ConnectionInitializer : IConnectionInitializer
 
             // Enhanced error message with actionable information
             var enhancedMessage = $"❌ Failed to start Axorith\n\n{errorMessage}\n\n" +
-                                 $"📁 Log files: {ApplicationPaths.Logs}\n\n" +
-                                 $"💡 Troubleshooting:\n" +
-                                 $"1. Check if another Axorith instance is running\n" +
-                                 $"2. Restart your computer to free up ports\n" +
-                                 $"3. Check antivirus/firewall settings\n" +
-                                 $"4. Run as Administrator if needed\n\n" +
-                                 $"Click 'Retry' to try again, or check logs for details.";
+                                  $"📁 Log files: {ApplicationPaths.Logs}\n\n" +
+                                  $"💡 Troubleshooting:\n" +
+                                  $"1. Check if another Axorith instance is running\n" +
+                                  $"2. Restart your computer to free up ports\n" +
+                                  $"3. Check antivirus/firewall settings\n" +
+                                  $"4. Run as Administrator if needed\n\n" +
+                                  $"Click 'Retry' to try again, or check logs for details.";
 
             errorViewModel.Configure(
                 enhancedMessage,

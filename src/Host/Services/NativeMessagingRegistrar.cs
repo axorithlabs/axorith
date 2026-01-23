@@ -50,7 +50,8 @@ public class NativeMessagingRegistrar(
 
         if (!File.Exists(shimPath))
         {
-            logger.LogWarning("Axorith.Shim.exe not found at expected path: {Path}. Skipping registration.", TelemetryGuard.SafePath(shimPath));
+            logger.LogWarning("Axorith.Shim.exe not found at expected path: {Path}. Skipping registration.",
+                TelemetryGuard.SafePath(shimPath));
             return;
         }
 
@@ -74,7 +75,7 @@ public class NativeMessagingRegistrar(
         {
             var chromeOrigin = $"chrome-extension://{ChromeExtensionId}/";
             manager.RegisterChromeHost(hostName, shimPath, [chromeOrigin]);
-            logger.LogInformation("Registered Chrome Native Messaging Host with extension ID: {ExtensionId}", 
+            logger.LogInformation("Registered Chrome Native Messaging Host with extension ID: {ExtensionId}",
                 ChromeExtensionId);
         }
         #endif

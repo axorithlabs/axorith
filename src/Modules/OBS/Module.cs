@@ -16,7 +16,8 @@ namespace Axorith.Module.OBS;
 public class Module : IModule
 {
     private const int MaxWebSocketConnectAttempts = 10;
-    private const int WebSocketConnectDelayMs = 1000;
+    private const int InitialConnectDelayMs = 500;
+    private const int MaxConnectDelayMs = 5000;
     private const int WindowTimeoutMs = 15000;
 
     private readonly IModuleLogger _logger;
@@ -30,14 +31,19 @@ public class Module : IModule
 
     private readonly ObsWebSocketService _webSocketService;
 
-    public Module(IModuleLogger logger, IAppDiscoveryService appDiscovery, INotifier notifier)
+    public Module(
+        IModuleLogger logger,
+        IAppDiscoveryService appDiscovery,
+        INotifier notifier,
+        IPlatformProcessService processService,
+        IPlatformWindowService windowService)
     {
         _logger = logger;
         _notifier = notifier;
         _settings = new Settings(appDiscovery);
 
-        _processService = new ProcessService(logger);
-        _windowService = new WindowService(logger);
+        _processService = new ProcessService(logger, processService);
+        _windowService = new WindowService(logger, windowService);
 
         _webSocketService = new ObsWebSocketService(logger, _settings);
     }
@@ -84,6 +90,8 @@ public class Module : IModule
 
     private async Task<bool> ConnectWithRetryAsync(CancellationToken cancellationToken)
     {
+        var delay = InitialConnectDelayMs;
+
         for (var attempt = 1; attempt <= MaxWebSocketConnectAttempts; attempt++)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -101,7 +109,8 @@ public class Module : IModule
 
             if (attempt < MaxWebSocketConnectAttempts)
             {
-                await Task.Delay(WebSocketConnectDelayMs, cancellationToken);
+                await Task.Delay(delay, cancellationToken);
+                delay = Math.Min(delay * 2, MaxConnectDelayMs);
             }
         }
 

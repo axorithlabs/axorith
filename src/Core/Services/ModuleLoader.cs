@@ -136,9 +136,11 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     {
                         var combinedPath = Path.Combine(moduleDirectoryFullPath, definition.AssemblyFileName);
                         var dllFullPath = Path.GetFullPath(combinedPath);
+                        var moduleDirectoryNormalized = Path.GetFullPath(moduleDirectoryFullPath);
 
-                        var relative = Path.GetRelativePath(moduleDirectoryFullPath, dllFullPath);
-                        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                        if (!dllFullPath.StartsWith(moduleDirectoryNormalized + Path.DirectorySeparatorChar,
+                                StringComparison.OrdinalIgnoreCase) &&
+                            !dllFullPath.Equals(moduleDirectoryNormalized, StringComparison.OrdinalIgnoreCase))
                         {
                             logger.LogWarning(
                                 "Specified assembly path '{Assembly}' for module '{ModuleName}' escapes module directory '{ModuleDir}'. Skipping",

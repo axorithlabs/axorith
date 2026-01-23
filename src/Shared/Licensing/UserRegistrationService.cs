@@ -103,7 +103,7 @@ public sealed class UserRegistrationService : IUserRegistrationService
                 FileShare.ReadWrite, // Allow concurrent reads and writes
                 bufferSize: 4096,
                 useAsync: true);
-            
+
             return await JsonSerializer.DeserializeAsync<UserRegistration>(stream, JsonOptions, ct)
                 .ConfigureAwait(false);
         }
@@ -139,7 +139,7 @@ public sealed class UserRegistrationService : IUserRegistrationService
             FileShare.Read, // Allow concurrent reads
             bufferSize: 4096,
             useAsync: true);
-        
+
         await JsonSerializer.SerializeAsync(stream, registration, JsonOptions, ct).ConfigureAwait(false);
         await stream.FlushAsync(ct).ConfigureAwait(false);
 

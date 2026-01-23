@@ -109,7 +109,9 @@ public static class TelemetryGuard
         // Replace user profile path (e.g., C:\Users\username -> C:\Users\[USER])
         if (!string.IsNullOrEmpty(UserProfilePath))
         {
-            masked = masked.Replace(UserProfilePath, Path.Combine(Path.GetDirectoryName(UserProfilePath) ?? "C:\\Users", "[USER]"), StringComparison.OrdinalIgnoreCase);
+            masked = masked.Replace(UserProfilePath,
+                Path.Combine(Path.GetDirectoryName(UserProfilePath) ?? "C:\\Users", "[USER]"),
+                StringComparison.OrdinalIgnoreCase);
         }
 
         // Replace username in paths (fallback for cases where profile path doesn't match)

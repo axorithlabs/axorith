@@ -12,4 +12,10 @@
         <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
         <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Data\blocked_apps.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
 </Project>

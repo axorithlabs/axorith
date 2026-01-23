@@ -93,7 +93,8 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             var manifestPath = Path.Combine(manifestDir, manifestFileName);
 
             File.WriteAllText(manifestPath, jsonContent);
-            logger.LogDebug("Generated Chrome Native Messaging manifest at: {Path}", TelemetryGuard.SafePath(manifestPath));
+            logger.LogDebug("Generated Chrome Native Messaging manifest at: {Path}",
+                TelemetryGuard.SafePath(manifestPath));
 
             var chromeRegistryPath = $@"Software\Google\Chrome\NativeMessagingHosts\{hostName}";
             RegisterInRegistry(chromeRegistryPath, manifestPath);

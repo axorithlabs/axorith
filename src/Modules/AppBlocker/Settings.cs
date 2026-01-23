@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
@@ -6,58 +7,8 @@ namespace Axorith.Module.AppBlocker;
 
 internal sealed class Settings : IDisposable
 {
-    private static readonly Dictionary<string, string[]> CategoryProcesses = new()
-    {
-        ["Gaming"] =
-        [
-            "steam", "steamwebhelper", "epicgameslauncher", "eadesktop", "origin",
-            "battle.net", "gog galaxy", "ubisoft connect", "upc", "riotclientservices",
-            "leagueclient", "valorant", "dota2", "csgo", "cs2", "minecraft",
-            "robloxplayerbeta", "xbox", "xboxapp", "geforce experience"
-        ],
-        ["Social"] =
-        [
-            "discord", "telegram", "whatsapp", "messenger", "slack", "skype",
-            "zoom", "teams", "signal", "viber", "wechat", "line", "element"
-        ],
-        ["Browsers"] =
-        [
-            "chrome", "firefox", "msedge", "opera", "brave", "vivaldi",
-            "safari", "chromium", "waterfox", "librewolf", "tor browser"
-        ],
-        ["Entertainment"] =
-        [
-            "spotify", "netflix", "vlc", "itunes", "amazon music", "deezer",
-            "plex", "kodi", "foobar2000", "aimp", "winamp", "musicbee",
-            "potplayer", "mpc-hc", "mpv"
-        ],
-        ["Productivity"] =
-        [
-            "notion", "obsidian", "evernote", "onenote", "todoist", "ticktick",
-            "trello", "asana", "clickup", "roam research"
-        ],
-        ["Email"] =
-        [
-            "outlook", "thunderbird", "mailspring", "em client", "mailbird",
-            "spark", "postbox", "nylas mail"
-        ],
-        ["Development"] =
-        [
-            "code", "rider64", "idea64", "pycharm64", "webstorm64", "clion64",
-            "goland64", "phpstorm64", "datagrip64", "android studio",
-            "sublime_text", "atom", "notepad++", "vim", "emacs"
-        ],
-        ["Design"] =
-        [
-            "photoshop", "illustrator", "figma", "sketch", "affinity designer",
-            "affinity photo", "gimp", "inkscape", "canva", "adobe xd", "blender"
-        ],
-        ["Office"] =
-        [
-            "winword", "excel", "powerpnt", "msaccess", "onenote",
-            "libreoffice", "soffice", "wps office", "google docs"
-        ]
-    };
+    private static Dictionary<string, string[]>? _categoryProcesses;
+    private static readonly Lock _loadLock = new();
 
     private readonly Setting<List<string>> _categories;
     private readonly Setting<string> _customProcessList;
@@ -66,22 +17,13 @@ internal sealed class Settings : IDisposable
 
     public Settings()
     {
+        EnsureCategoriesLoaded();
+
         _categories = Setting.AsMultiChoice(
             key: "Categories",
             label: "Block Categories",
             defaultValues: ["Gaming", "Social", "Browsers", "Entertainment"],
-            initialChoices:
-            [
-                new KeyValuePair<string, string>("Gaming", "Gaming (Steam, Epic, Battle.net, Riot...)"),
-                new KeyValuePair<string, string>("Social", "Social & Messaging (Discord, Telegram, Slack, Zoom...)"),
-                new KeyValuePair<string, string>("Browsers", "Web Browsers (Chrome, Firefox, Edge...)"),
-                new KeyValuePair<string, string>("Entertainment", "Entertainment (Spotify, Netflix, VLC...)"),
-                new KeyValuePair<string, string>("Productivity", "Productivity (Notion, Obsidian, Todoist...)"),
-                new KeyValuePair<string, string>("Email", "Email Clients (Outlook, Thunderbird...)"),
-                new KeyValuePair<string, string>("Development", "Development Tools (VS Code, JetBrains IDEs...)"),
-                new KeyValuePair<string, string>("Design", "Design Tools (Photoshop, Figma, Blender...)"),
-                new KeyValuePair<string, string>("Office", "Office Apps (Word, Excel, LibreOffice...)")
-            ],
+            initialChoices: BuildCategoryChoices(),
             description: "Select categories to block. Apps from selected categories will be automatically terminated."
         );
 
@@ -96,9 +38,15 @@ internal sealed class Settings : IDisposable
         _allActions = [];
     }
 
-    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
+    public IReadOnlyList<ISetting> GetSettings()
+    {
+        return _allSettings;
+    }
 
-    public IReadOnlyList<IAction> GetActions() => _allActions;
+    public IReadOnlyList<IAction> GetActions()
+    {
+        return _allActions;
+    }
 
     public Task<ValidationResult> ValidateAsync()
     {
@@ -107,7 +55,8 @@ internal sealed class Settings : IDisposable
 
         if (cats.Count == 0 && string.IsNullOrWhiteSpace(custom))
         {
-            return Task.FromResult(ValidationResult.Warn("No categories or apps selected. The module will not block anything."));
+            return Task.FromResult(
+                ValidationResult.Warn("No categories or apps selected. The module will not block anything."));
         }
 
         return Task.FromResult(ValidationResult.Success);
@@ -119,9 +68,12 @@ internal sealed class Settings : IDisposable
 
         foreach (var cat in _categories.GetCurrentValue())
         {
-            if (CategoryProcesses.TryGetValue(cat, out var procs))
+            if (_categoryProcesses!.TryGetValue(cat, out var procs))
             {
-                foreach (var p in procs) result.Add(p);
+                foreach (var p in procs)
+                {
+                    result.Add(p);
+                }
             }
         }
 
@@ -131,11 +83,80 @@ internal sealed class Settings : IDisposable
             foreach (var p in custom.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
             {
                 var trimmed = p.Trim();
-                if (!string.IsNullOrWhiteSpace(trimmed)) result.Add(trimmed);
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    result.Add(trimmed);
+                }
             }
         }
 
         return result;
+    }
+
+    private static void EnsureCategoriesLoaded()
+    {
+        if (_categoryProcesses != null)
+        {
+            return;
+        }
+
+        lock (_loadLock)
+        {
+            if (_categoryProcesses != null)
+            {
+                return;
+            }
+
+            var jsonPath = Path.Combine(AppContext.BaseDirectory, "Modules", "AppBlocker", "Data", "blocked_apps.json");
+
+            if (!File.Exists(jsonPath))
+            {
+                _categoryProcesses = new Dictionary<string, string[]>();
+                return;
+            }
+
+            try
+            {
+                var json = File.ReadAllText(jsonPath);
+                _categoryProcesses = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json)
+                                     ?? new Dictionary<string, string[]>();
+            }
+            catch
+            {
+                _categoryProcesses = new Dictionary<string, string[]>();
+            }
+        }
+    }
+
+    private static List<KeyValuePair<string, string>> BuildCategoryChoices()
+    {
+        var choices = new List<KeyValuePair<string, string>>();
+
+        if (_categoryProcesses == null)
+        {
+            return choices;
+        }
+
+        var descriptions = new Dictionary<string, string>
+        {
+            ["Gaming"] = "Gaming (Steam, Epic, Battle.net, Riot...)",
+            ["Social"] = "Social & Messaging (Discord, Telegram, Slack, Zoom...)",
+            ["Browsers"] = "Web Browsers (Chrome, Firefox, Edge...)",
+            ["Entertainment"] = "Entertainment (Spotify, Netflix, VLC...)",
+            ["Productivity"] = "Productivity (Notion, Obsidian, Todoist...)",
+            ["Email"] = "Email Clients (Outlook, Thunderbird...)",
+            ["Development"] = "Development Tools (VS Code, JetBrains IDEs...)",
+            ["Design"] = "Design Tools (Photoshop, Figma, Blender...)",
+            ["Office"] = "Office Apps (Word, Excel, LibreOffice...)"
+        };
+
+        foreach (var category in _categoryProcesses.Keys)
+        {
+            var description = descriptions.TryGetValue(category, out var desc) ? desc : category;
+            choices.Add(new KeyValuePair<string, string>(category, description));
+        }
+
+        return choices;
     }
 
     public void Dispose()

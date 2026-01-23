@@ -1,6 +1,5 @@
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
-using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;

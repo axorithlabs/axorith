@@ -244,10 +244,22 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     {
         _validationSubscription?.Dispose();
 
-        var changes = Settings.Select(s => s.ValueChanged).Merge();
+        var observables = Settings.Select(s =>
+            Observable.FromEventPattern(
+                h => s.ValueChanged += h,
+                h => s.ValueChanged -= h
+            ).Select(_ => Unit.Default)
+        ).ToList();
+
+        if (observables.Count == 0)
+        {
+            return;
+        }
+
+        var changes = observables.Merge();
 
         _validationSubscription = changes
-            .Throttle(TimeSpan.FromMilliseconds(300)) // Debounce validation requests
+            .Throttle(TimeSpan.FromMilliseconds(300))
             .ObserveOn(RxApp.MainThreadScheduler)
             .SelectMany(_ => ValidateAsync())
             .Subscribe();

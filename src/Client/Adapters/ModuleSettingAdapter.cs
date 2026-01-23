@@ -220,7 +220,7 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
         }
         catch
         {
-            // Ignore parsing errors
+            // Adapter has no logger - return null on parse failure
         }
 
         return null;
