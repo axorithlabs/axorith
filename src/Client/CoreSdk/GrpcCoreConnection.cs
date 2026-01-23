@@ -177,7 +177,7 @@ public class GrpcCoreConnection : ICoreConnection
                 _logger.LogWarning(
                     "Using insecure channel for localhost communication. " +
                     "This is acceptable only for local IPC. Never use in production over network.");
-                
+
                 channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
                 channelOptions = new GrpcChannelOptions
                 {

@@ -1,8 +1,6 @@
 using System.Collections.ObjectModel;
-using System.Reactive;
-using System.Reactive.Disposables;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
@@ -14,15 +12,10 @@ using ReactiveUI;
 
 namespace Axorith.Client.ViewModels;
 
-public class SettingViewModel : ReactiveObject, IDisposable
+public class SettingViewModel : INotifyPropertyChanged, IDisposable
 {
-    private readonly CompositeDisposable _disposables = [];
     private readonly Guid _moduleInstanceId;
     private readonly IModulesApi _modulesApi;
-    private readonly Subject<object?> _numberUpdates = new();
-    private readonly Subject<string?> _stringUpdates = new();
-    private readonly Subject<Unit> _valueChangedSubject = new();
-
     private readonly IClientUiSettingsStore? _uiSettingsStore;
     private readonly ClientUiConfiguration? _uiConfig;
     private readonly IFilePickerService? _filePickerService;
@@ -31,46 +24,59 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private const int ChoiceThrottleMs = 50;
 
     private bool _isUserEditing;
-
     private IReadOnlyList<KeyValuePair<string, string>> _rawChoices = [];
+
+    private Timer? _stringDebounceTimer;
+    private Timer? _numberThrottleTimer;
+    private string? _pendingStringValue;
+    private object? _pendingNumberValue;
 
     public ISetting Setting { get; }
 
+    private string _label = string.Empty;
+
     public string Label
     {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+        get => _label;
+        private set => SetProperty(ref _label, value);
+    }
+
+    private bool _isVisible = true;
 
     public bool IsVisible
     {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = true;
+        get => _isVisible;
+        private set => SetProperty(ref _isVisible, value);
+    }
+
+    private bool _isReadOnly;
 
     public bool IsReadOnly
     {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
+        get => _isReadOnly;
+        private set => SetProperty(ref _isReadOnly, value);
     }
+
+    private string? _error;
 
     public string? Error
     {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
+        get => _error;
+        set => SetProperty(ref _error, value);
     }
 
-    public IObservable<Unit> ValueChanged => _valueChangedSubject.AsObservable();
+    public event EventHandler? ValueChanged;
 
     public ObservableCollection<string> History { get; } = [];
 
+    private string? _selectedHistoryItem;
+
     public string? SelectedHistoryItem
     {
-        get;
+        get => _selectedHistoryItem;
         set
         {
-            this.RaiseAndSetIfChanged(ref field, value);
-            if (!string.IsNullOrEmpty(value))
+            if (SetProperty(ref _selectedHistoryItem, value) && !string.IsNullOrEmpty(value))
             {
                 StringValue = value;
             }
@@ -94,10 +100,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
             }
 
             Setting.SetValueFromString(value);
-            this.RaisePropertyChanged();
+            OnPropertyChanged();
 
-            _stringUpdates.OnNext(value);
-            _valueChangedSubject.OnNext(Unit.Default);
+            HandleStringUpdate(value);
+            ValueChanged?.Invoke(this, EventArgs.Empty);
             TryAddToHistory(value);
 
             UpdateDisplayedChoices();
@@ -116,10 +122,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
             }
 
             Setting.SetValueFromObject(value);
-            this.RaisePropertyChanged();
+            OnPropertyChanged();
 
             _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
-            _valueChangedSubject.OnNext(Unit.Default);
+            ValueChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -156,10 +162,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
             }
 
             Setting.SetValueFromObject(boxedValue);
-            this.RaisePropertyChanged();
+            OnPropertyChanged();
 
-            _numberUpdates.OnNext(boxedValue);
-            _valueChangedSubject.OnNext(Unit.Default);
+            HandleNumberUpdate(boxedValue);
+            ValueChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -191,8 +197,8 @@ public class SettingViewModel : ReactiveObject, IDisposable
             }
 
             StringValue = value.Value.Key;
-            this.RaisePropertyChanged(nameof(StringValue));
-            this.RaisePropertyChanged();
+            OnPropertyChanged(nameof(StringValue));
+            OnPropertyChanged();
         }
     }
 
@@ -228,38 +234,69 @@ public class SettingViewModel : ReactiveObject, IDisposable
         RemoveHistoryItemCommand = ReactiveCommand.Create<string>(RemoveHistoryItem);
         BrowseCommand = ReactiveCommand.CreateFromTask(BrowseAsync);
 
-        setting.Label
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(newLabel => Label = newLabel)
-            .DisposeWith(_disposables);
-
-        setting.IsVisible
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(visible => IsVisible = visible)
-            .DisposeWith(_disposables);
-
-        setting.IsReadOnly
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(readOnly => IsReadOnly = readOnly)
-            .DisposeWith(_disposables);
-
-        setting.ValueAsObject
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ =>
+        Setting.Label.Subscribe(newLabel =>
+        {
+            if (Dispatcher.UIThread.CheckAccess())
             {
-                if (ShouldIgnoreBroadcast())
-                {
-                    return;
-                }
+                Label = newLabel;
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() => Label = newLabel);
+            }
+        });
 
-                this.RaisePropertyChanged(nameof(StringValue));
-                this.RaisePropertyChanged(nameof(BoolValue));
-                this.RaisePropertyChanged(nameof(DecimalValue));
+        Setting.IsVisible.Subscribe(visible =>
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                IsVisible = visible;
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() => IsVisible = visible);
+            }
+        });
 
+        Setting.IsReadOnly.Subscribe(readOnly =>
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                IsReadOnly = readOnly;
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() => IsReadOnly = readOnly);
+            }
+        });
+
+        Setting.ValueAsObject.Subscribe(_ =>
+        {
+            if (ShouldIgnoreBroadcast())
+            {
+                return;
+            }
+
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                OnPropertyChanged(nameof(StringValue));
+                OnPropertyChanged(nameof(BoolValue));
+                OnPropertyChanged(nameof(DecimalValue));
                 UpdateDisplayedChoices();
                 UpdateMultiChoices();
-            })
-            .DisposeWith(_disposables);
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    OnPropertyChanged(nameof(StringValue));
+                    OnPropertyChanged(nameof(BoolValue));
+                    OnPropertyChanged(nameof(DecimalValue));
+                    UpdateDisplayedChoices();
+                    UpdateMultiChoices();
+                });
+            }
+        });
 
         if (setting.GetCurrentChoices() is { } initialChoices)
         {
@@ -280,45 +317,60 @@ public class SettingViewModel : ReactiveObject, IDisposable
             });
         }
 
-        Setting.Choices?
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(c =>
+        Setting.Choices?.Subscribe(c =>
+        {
+            _rawChoices = c;
+            if (Dispatcher.UIThread.CheckAccess())
             {
-                _rawChoices = c;
                 UpdateDisplayedChoices();
                 UpdateMultiChoices();
-            })
-            .DisposeWith(_disposables);
-
-        _numberUpdates
-            .Throttle(TimeSpan.FromMilliseconds(_inputConfig.NumberThrottleMs))
-            .ObserveOn(RxApp.TaskpoolScheduler)
-            .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
-            .DisposeWith(_disposables);
-
-        if (IsTextBasedSetting())
-        {
-            _stringUpdates
-                .Throttle(TimeSpan.FromMilliseconds(_inputConfig.TextDebounceMs))
-                .DistinctUntilChanged()
-                .ObserveOn(RxApp.TaskpoolScheduler)
-                .Subscribe(v =>
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() =>
                 {
-                    _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v);
+                    UpdateDisplayedChoices();
+                    UpdateMultiChoices();
+                });
+            }
+        });
+    }
 
-                    Dispatcher.UIThread.Post(() => _isUserEditing = false);
-                })
-                .DisposeWith(_disposables);
-        }
-        else
+    private void HandleStringUpdate(string value)
+    {
+        _pendingStringValue = value;
+
+        var delay = IsTextBasedSetting() ? _inputConfig.TextDebounceMs : ChoiceThrottleMs;
+
+        _stringDebounceTimer?.Dispose();
+        _stringDebounceTimer = new Timer(_ =>
         {
-            _stringUpdates
-                .Throttle(TimeSpan.FromMilliseconds(ChoiceThrottleMs))
-                .DistinctUntilChanged()
-                .ObserveOn(RxApp.TaskpoolScheduler)
-                .Subscribe(v => { _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, v); })
-                .DisposeWith(_disposables);
-        }
+            var valueToSend = _pendingStringValue;
+            if (valueToSend != null)
+            {
+                _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, valueToSend);
+
+                if (IsTextBasedSetting())
+                {
+                    Dispatcher.UIThread.Post(() => _isUserEditing = false);
+                }
+            }
+        }, null, delay, Timeout.Infinite);
+    }
+
+    private void HandleNumberUpdate(object value)
+    {
+        _pendingNumberValue = value;
+
+        _numberThrottleTimer?.Dispose();
+        _numberThrottleTimer = new Timer(_ =>
+        {
+            var valueToSend = _pendingNumberValue;
+            if (valueToSend != null)
+            {
+                _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, valueToSend);
+            }
+        }, null, _inputConfig.NumberThrottleMs, Timeout.Infinite);
     }
 
     private void UpdateDisplayedChoices()
@@ -355,7 +407,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
                 .Where((t, i) => t.Key != newDisplayList[i].Key || t.Value != newDisplayList[i].Value).Any();
             if (identical)
             {
-                this.RaisePropertyChanged(nameof(SelectedChoice));
+                OnPropertyChanged(nameof(SelectedChoice));
                 return;
             }
         }
@@ -366,7 +418,7 @@ public class SettingViewModel : ReactiveObject, IDisposable
             DisplayedChoices.Add(item);
         }
 
-        this.RaisePropertyChanged(nameof(SelectedChoice));
+        OnPropertyChanged(nameof(SelectedChoice));
     }
 
     private void UpdateMultiChoices()
@@ -404,10 +456,13 @@ public class SettingViewModel : ReactiveObject, IDisposable
             var isSelected = currentList.Contains(choice.Key);
             var itemVm = new MultiChoiceItemViewModel(choice.Key, choice.Value, isSelected);
 
-            itemVm.WhenAnyValue(x => x.IsSelected)
-                .Skip(1)
-                .Subscribe(_ => OnMultiChoiceChanged())
-                .DisposeWith(_disposables);
+            itemVm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(MultiChoiceItemViewModel.IsSelected))
+                {
+                    OnMultiChoiceChanged();
+                }
+            };
 
             MultiChoices.Add(itemVm);
         }
@@ -420,8 +475,8 @@ public class SettingViewModel : ReactiveObject, IDisposable
         Setting.SetValueFromObject(selectedKeys);
 
         var serialized = string.Join("|", selectedKeys);
-        _stringUpdates.OnNext(serialized);
-        _valueChangedSubject.OnNext(Unit.Default);
+        HandleStringUpdate(serialized);
+        ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task BrowseAsync()
@@ -566,24 +621,59 @@ public class SettingViewModel : ReactiveObject, IDisposable
         _isUserEditing = false;
     }
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+
     public void Dispose()
     {
-        _disposables.Dispose();
-        _valueChangedSubject.Dispose();
-        _numberUpdates.Dispose();
-        _stringUpdates.Dispose();
+        _stringDebounceTimer?.Dispose();
+        _numberThrottleTimer?.Dispose();
     }
 }
 
 // Helper VM for MultiChoice items
-public class MultiChoiceItemViewModel(string key, string label, bool isSelected) : ReactiveObject
+public class MultiChoiceItemViewModel : INotifyPropertyChanged
 {
-    public string Key { get; } = key;
-    public string Label { get; } = label;
+    public string Key { get; }
+    public string Label { get; }
+
+    private bool _isSelected;
 
     public bool IsSelected
     {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = isSelected;
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+
+    public MultiChoiceItemViewModel(string key, string label, bool isSelected)
+    {
+        Key = key;
+        Label = label;
+        _isSelected = isSelected;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }

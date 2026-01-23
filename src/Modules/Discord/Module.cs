@@ -11,11 +11,17 @@ namespace Axorith.Module.Discord;
 /// <summary>
 ///     Module for launching and managing Discord application.
 /// </summary>
-public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : IModule
+public class Module(
+    IModuleLogger logger,
+    IAppDiscoveryService appDiscovery,
+    IPlatformProcessService processService,
+    IPlatformWindowService windowService) : IModule
 {
     private const int MaxWindowWaitMs = 20000;
     private const int WindowCheckIntervalMs = 500;
-    private const int PostWindowReadyDelayMs = 1500;
+    private const int InitialPostWindowDelayMs = 200;
+    private const int MaxPostWindowDelayMs = 3000;
+    private const int PostWindowRetries = 5;
 
     /// <summary>
     ///     Window titles that indicate Discord is still loading/updating.
@@ -24,8 +30,8 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : I
 
     private readonly Settings _settings = new(appDiscovery);
 
-    private readonly ProcessService _processService = new(logger);
-    private readonly WindowService _windowService = new(logger);
+    private readonly ProcessService _processService = new(logger, processService);
+    private readonly WindowService _windowService = new(logger, windowService);
     private Process? _currentProcess;
     private bool _attachedToExisting;
 
@@ -192,12 +198,40 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : I
                 var title = _currentProcess.MainWindowTitle;
                 if (!string.IsNullOrWhiteSpace(title) && !IsLoadingTitle(title))
                 {
-                    await Task.Delay(PostWindowReadyDelayMs, cancellationToken).ConfigureAwait(false);
+                    await WaitForWindowStabilizationAsync(cancellationToken);
                     return;
                 }
             }
 
             await Task.Delay(WindowCheckIntervalMs, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task WaitForWindowStabilizationAsync(CancellationToken cancellationToken)
+    {
+        var delay = InitialPostWindowDelayMs;
+
+        for (var attempt = 0; attempt < PostWindowRetries; attempt++)
+        {
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+
+            if (_currentProcess == null || _currentProcess.HasExited)
+            {
+                return;
+            }
+
+            _currentProcess.Refresh();
+
+            if (_currentProcess.MainWindowHandle != IntPtr.Zero)
+            {
+                var title = _currentProcess.MainWindowTitle;
+                if (!string.IsNullOrWhiteSpace(title) && !IsLoadingTitle(title))
+                {
+                    return;
+                }
+            }
+
+            delay = Math.Min(delay * 2, MaxPostWindowDelayMs);
         }
     }
 

@@ -10,4 +10,9 @@ public interface IUpdatesApi
     Task InstallUpdateAsync(string installerPath, CancellationToken ct = default);
 }
 
-public record UpdateInfoDto(string Version, string DownloadUrl, string ReleaseNotes, DateTime PublishedAt, string? Sha256Hash = null);
+public record UpdateInfoDto(
+    string Version,
+    string DownloadUrl,
+    string ReleaseNotes,
+    DateTime PublishedAt,
+    string? Sha256Hash = null);

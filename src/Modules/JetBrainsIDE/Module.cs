@@ -4,7 +4,11 @@ using Axorith.Shared.Platform;
 
 namespace Axorith.Module.JetBrainsIDE;
 
-public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : LauncherModuleBase(logger)
+public class Module(
+    IModuleLogger logger,
+    IAppDiscoveryService appDiscovery,
+    IPlatformProcessService processService,
+    IPlatformWindowService windowService) : LauncherModuleBase(logger, processService, windowService)
 {
     private readonly Settings _settings = new(appDiscovery);
 

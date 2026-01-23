@@ -8,32 +8,27 @@ using Microsoft.Extensions.Logging;
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-///     Windows implementation of IProcessBlocker.
-///     Strategy:
-///     1. If Admin -> Use ETW (Real-time, Zero overhead).
-///     2. If User  -> Use WinEventHook (Real-time for windows) + Optimized Polling (Background).
+///     Windows process blocker with clean architecture:
+///     - Admin mode: ETW only (real-time, zero overhead)
+///     - User mode: Polling only (simple, reliable fallback)
+///     No hybrid chaos - one strategy per privilege level.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
     private readonly Lock _lock = new();
-
     private TraceEventSession? _etwSession;
-    private Task? _etwTask;
-
-    private CancellationTokenSource? _pollingCts;
-    private IntPtr _winEventHook = IntPtr.Zero;
-    private WindowApi.WinEventDelegate? _winEventDelegate;
-
+    private CancellationTokenSource? _pollingScanCts;
     private HashSet<string> _targetProcessNames = [];
-
-    public event Action<string>? ProcessBlocked;
+    private bool _isAdmin;
 
     private static readonly HashSet<string> SafeList = new(StringComparer.OrdinalIgnoreCase)
     {
         "Axorith.Client", "Axorith.Host", "Axorith.Shim", "Axorith.Core",
         "explorer", "taskmgr", "dwm", "lsass", "csrss", "svchost", "winlogon", "services", "spoolsv", "System", "Idle"
     };
+
+    public event Action<string>? ProcessBlocked;
 
     public List<string> Block(IEnumerable<string> processNames)
     {
@@ -44,7 +39,18 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
             var killed = ScanAndKillByList(initialScan: true);
 
-            StartMonitoring();
+            _isAdmin = TraceEventSession.IsElevated() ?? false;
+
+            if (_isAdmin)
+            {
+                logger.LogInformation("Admin privileges detected. Using ETW for real-time monitoring.");
+                StartEtwMonitoring();
+            }
+            else
+            {
+                logger.LogInformation("Running as standard user. Using polling-based monitoring.");
+                StartPollingMonitoring();
+            }
 
             return killed;
         }
@@ -57,7 +63,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             var normalized = NormalizeName(processName);
             if (_targetProcessNames.Remove(normalized))
             {
-                logger.LogInformation("Removed '{Process}' from BlockList.", normalized);
+                logger.LogInformation("Removed '{Process}' from block list.", normalized);
             }
         }
     }
@@ -72,40 +78,24 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         }
     }
 
-    private void StartMonitoring()
+    private void StartEtwMonitoring()
     {
-        if (_etwSession != null || _pollingCts != null)
+        if (_etwSession != null)
         {
             return;
         }
 
-        if (TraceEventSession.IsElevated() ?? false)
-        {
-            logger.LogInformation("Admin privileges detected. Starting Real-time ETW Monitor.");
-            StartEtwSession();
-        }
-        else
-        {
-            logger.LogInformation("Running as Standard User. Starting Hybrid Monitor (WinEventHook + Polling).");
-            StartWinEventHook();
-            StartPollingSession();
-        }
-    }
-
-    private void StartEtwSession()
-    {
         try
         {
             var sessionName = "AxorithProcessBlocker-" + Guid.NewGuid();
             _etwSession = new TraceEventSession(sessionName);
-
             _etwSession.EnableKernelProvider(KernelTraceEventParser.Keywords.Process);
 
             _etwSession.Source.Kernel.ProcessStart += data =>
             {
                 var processName = data.ProcessName;
                 var pid = data.ProcessID;
-                var imageName = data.ImageFileName;
+                var imagePath = data.ImageFileName;
 
                 if (string.IsNullOrEmpty(processName))
                 {
@@ -122,11 +112,11 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
                 if (shouldBlock)
                 {
-                    Task.Run(() => KillProcessByIdWithValidation(pid, normalized, imageName));
+                    Task.Run(() => KillProcessWithValidation(pid, normalized, imagePath));
                 }
             };
 
-            _etwTask = Task.Run(() =>
+            Task.Run(() =>
             {
                 try
                 {
@@ -134,99 +124,31 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "ETW Session processing failed");
+                    logger.LogError(ex, "ETW session processing failed");
                 }
             });
+
+            logger.LogInformation("ETW monitoring started successfully");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to start ETW session. Falling back to hybrid mode.");
+            logger.LogError(ex, "Failed to start ETW session. Falling back to polling.");
             _etwSession?.Dispose();
             _etwSession = null;
-            StartWinEventHook();
-            StartPollingSession();
+            _isAdmin = false;
+            StartPollingMonitoring();
         }
     }
 
-    private void StartWinEventHook()
+    private void StartPollingMonitoring()
     {
-        if (_winEventHook != IntPtr.Zero)
+        if (_pollingScanCts != null)
         {
             return;
         }
 
-        _winEventDelegate = WinEventProc;
-
-        _winEventHook = WindowApi.SetWinEventHook(
-            WindowApi.EVENT_SYSTEM_FOREGROUND,
-            WindowApi.EVENT_SYSTEM_FOREGROUND,
-            IntPtr.Zero,
-            _winEventDelegate,
-            0,
-            0,
-            WindowApi.WINEVENT_OUTOFCONTEXT);
-
-        if (_winEventHook == IntPtr.Zero)
-        {
-            logger.LogError("Failed to set WinEventHook");
-        }
-        else
-        {
-            logger.LogDebug("WinEventHook installed for foreground window detection.");
-        }
-    }
-
-    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild,
-        uint dwEventThread, uint dwmsEventTime)
-    {
-        if (hwnd == IntPtr.Zero)
-        {
-            return;
-        }
-
-        try
-        {
-            WindowApi.GetWindowThreadProcessId(hwnd, out var pid);
-            if (pid == 0)
-            {
-                return;
-            }
-
-            try
-            {
-                using var p = Process.GetProcessById((int)pid);
-                var normalized = NormalizeName(p.ProcessName);
-
-                bool shouldBlock;
-                lock (_lock)
-                {
-                    shouldBlock = ShouldBlock(normalized);
-                }
-
-                if (!shouldBlock)
-                {
-                    return;
-                }
-
-                logger.LogInformation("WinEventHook detected blocked app: {Name} (PID: {Pid})", normalized, pid);
-                p.Kill();
-                ProcessBlocked?.Invoke(normalized);
-            }
-            catch
-            {
-                // Process might have exited or access denied
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Error in WinEventProc");
-        }
-    }
-
-    private void StartPollingSession()
-    {
-        _pollingCts = new CancellationTokenSource();
-        var token = _pollingCts.Token;
+        _pollingScanCts = new CancellationTokenSource();
+        var token = _pollingScanCts.Token;
 
         Task.Run(async () =>
         {
@@ -243,6 +165,8 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 }
             }
         }, token);
+
+        logger.LogInformation("Polling monitoring started (500ms interval)");
     }
 
     private void StopMonitoring()
@@ -253,6 +177,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             {
                 _etwSession.Stop();
                 _etwSession.Dispose();
+                logger.LogInformation("ETW monitoring stopped");
             }
             catch (Exception ex)
             {
@@ -261,22 +186,15 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             finally
             {
                 _etwSession = null;
-                _etwTask = null;
             }
         }
 
-        if (_winEventHook != IntPtr.Zero)
+        if (_pollingScanCts != null)
         {
-            WindowApi.UnhookWinEvent(_winEventHook);
-            _winEventHook = IntPtr.Zero;
-            _winEventDelegate = null;
-        }
-
-        if (_pollingCts != null)
-        {
-            _pollingCts.Cancel();
-            _pollingCts.Dispose();
-            _pollingCts = null;
+            _pollingScanCts.Cancel();
+            _pollingScanCts.Dispose();
+            _pollingScanCts = null;
+            logger.LogInformation("Polling monitoring stopped");
         }
     }
 
@@ -300,9 +218,33 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             var processes = Process.GetProcessesByName(target);
             foreach (var p in processes)
             {
-                if (KillProcessById(p.Id, target, p, suppressEvent: initialScan))
+                try
                 {
-                    killedNames.Add(target);
+                    if (!p.HasExited)
+                    {
+                        p.Kill();
+                        logger.LogInformation("Blocked process: {Name} (PID: {Pid})", target, p.Id);
+
+                        if (!initialScan)
+                        {
+                            ProcessBlocked?.Invoke(target);
+                        }
+
+                        killedNames.Add(target);
+                    }
+                }
+                catch (Win32Exception ex)
+                {
+                    logger.LogDebug("Could not kill process '{Name}' (PID: {Pid}). Access denied: {Error}",
+                        target, p.Id, ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", target, p.Id);
+                }
+                finally
+                {
+                    p.Dispose();
                 }
             }
         }
@@ -320,67 +262,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         return _targetProcessNames.Contains(normalizedName);
     }
 
-    private bool KillProcessById(int pid, string name, Process? existingInstance = null, bool suppressEvent = false)
-    {
-        try
-        {
-            var p = existingInstance;
-            var dispose = false;
-
-            if (p == null)
-            {
-                try
-                {
-                    p = Process.GetProcessById(pid);
-                    dispose = true;
-                }
-                catch (ArgumentException)
-                {
-                    return false;
-                }
-            }
-
-            try
-            {
-                if (existingInstance == null && NormalizeName(p.ProcessName) != name)
-                {
-                    return false;
-                }
-
-                if (!p.HasExited)
-                {
-                    p.Kill();
-                    logger.LogInformation("Blocked process: {Name} (PID: {Pid})", name, pid);
-
-                    if (!suppressEvent)
-                    {
-                        ProcessBlocked?.Invoke(name);
-                    }
-
-                    return true;
-                }
-            }
-            catch (Win32Exception)
-            {
-                logger.LogDebug("Could not kill process '{Name}' (PID: {Pid}). Access Denied.", name, pid);
-            }
-            finally
-            {
-                if (dispose)
-                {
-                    p.Dispose();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", name, pid);
-        }
-
-        return false;
-    }
-
-    private bool KillProcessByIdWithValidation(int pid, string expectedName, string? imagePath)
+    private bool KillProcessWithValidation(int pid, string expectedName, string? imagePath)
     {
         try
         {
@@ -397,7 +279,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             using (p)
             {
                 var actualName = NormalizeName(p.ProcessName);
-                
+
                 if (actualName != expectedName)
                 {
                     logger.LogDebug(
@@ -411,7 +293,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                     try
                     {
                         var processPath = p.MainModule?.FileName;
-                        if (!string.IsNullOrEmpty(processPath) && 
+                        if (!string.IsNullOrEmpty(processPath) &&
                             !string.Equals(processPath, imagePath, StringComparison.OrdinalIgnoreCase))
                         {
                             logger.LogDebug(
@@ -422,7 +304,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                     }
                     catch
                     {
-                        // Access denied or process exited, continue with name-only validation
+                        // Access denied or process exited - continue with name-only validation
                     }
                 }
 

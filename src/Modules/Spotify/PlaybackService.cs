@@ -24,16 +24,20 @@ internal sealed class PlaybackService : IDisposable
     private string _cachedLikedSongsUri = string.Empty;
     private DateTime _choicesLastUpdatedUtc = DateTime.MinValue;
 
+    private readonly IPlatformProcessService _processService;
+
     public PlaybackService(
         IModuleLogger logger,
         Settings settings,
         AuthService authService,
-        SpotifyApiService apiService)
+        SpotifyApiService apiService,
+        IPlatformProcessService processService)
     {
         _logger = logger;
         _settings = settings;
         _authService = authService;
         _apiService = apiService;
+        _processService = processService;
 
         _settings.PlaybackContext.Value
             .Select(v => v == Settings.CustomUrlValue)
@@ -263,7 +267,7 @@ internal sealed class PlaybackService : IDisposable
 
             try
             {
-                var processes = PublicApi.FindProcesses(processName);
+                var processes = _processService.FindProcesses(processName);
                 if (processes.Count > 0)
                 {
                     _logger.LogInfo("Process '{ProcessName}' found (PID: {Pid}). Proceeding.", processName,
@@ -278,7 +282,7 @@ internal sealed class PlaybackService : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogDebug("Error checking for process: {Message}", ex.Message);
+                _logger.LogError(ex, "Failed to check if process '{ProcessName}' is running", processName);
             }
 
             await Task.Delay(1000, ct);

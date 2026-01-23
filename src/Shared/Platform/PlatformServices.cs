@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Platform.Linux;
 using Axorith.Shared.Platform.MacOS;
+using Axorith.Shared.Platform.Unix;
 using Axorith.Shared.Platform.Windows;
 using Microsoft.Extensions.Logging;
 
@@ -94,7 +96,7 @@ public static class PlatformServices
             return new WindowsFilePermissionsService(loggerFactory.CreateLogger<WindowsFilePermissionsService>());
         }
 
-        return new Unix.UnixFilePermissionsService(loggerFactory.CreateLogger<Unix.UnixFilePermissionsService>());
+        return new UnixFilePermissionsService(loggerFactory.CreateLogger<UnixFilePermissionsService>());
     }
 
     public static INamedPipeFactory CreateNamedPipeFactory(ILoggerFactory loggerFactory)
@@ -104,7 +106,38 @@ public static class PlatformServices
             return new WindowsNamedPipeFactory(loggerFactory.CreateLogger<WindowsNamedPipeFactory>());
         }
 
-        return new Unix.UnixNamedPipeFactory(loggerFactory.CreateLogger<Unix.UnixNamedPipeFactory>());
+        return new UnixNamedPipeFactory(loggerFactory.CreateLogger<UnixNamedPipeFactory>());
+    }
+
+    public static IPlatformWindowService CreateWindowService()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsPlatformWindowService();
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxPlatformWindowService();
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return new MacOsPlatformWindowService();
+        }
+
+        throw new PlatformNotSupportedException(
+            $"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
+    }
+
+    public static IPlatformProcessService CreateProcessService()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsPlatformProcessService();
+        }
+
+        return new FallbackPlatformProcessService();
     }
 }
 
@@ -130,5 +163,31 @@ file class NoOpAutoStartManager : IAutoStartManager
     public bool DisableAutoStart()
     {
         return true;
+    }
+}
+
+file class FallbackPlatformProcessService : IPlatformProcessService
+{
+    public List<Process> FindProcesses(string processNameOrPath)
+    {
+        var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
+        return [.. Process.GetProcessesByName(processName)];
+    }
+
+    public bool IsProcessRunning(string processNameOrPath)
+    {
+        return FindProcesses(processNameOrPath).Count > 0;
+    }
+
+    public bool IsProcessRunningByName(string processName)
+    {
+        try
+        {
+            return Process.GetProcessesByName(processName).Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

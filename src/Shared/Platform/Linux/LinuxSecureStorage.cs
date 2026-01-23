@@ -358,7 +358,8 @@ internal class LinuxSecureStorage : ISecureStorageService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to decrypt master key. Regenerating new key. Previous secrets will be inaccessible.");
+                _logger.LogError(ex,
+                    "Failed to decrypt master key. Regenerating new key. Previous secrets will be inaccessible.");
                 File.Delete(keyPath);
             }
         }
@@ -366,7 +367,7 @@ internal class LinuxSecureStorage : ISecureStorageService
         var key = RandomNumberGenerator.GetBytes(32);
         var machineKey = GetMachineKey();
         var encryptedKey = EncryptKeyWithMachineKey(key, machineKey);
-        
+
         File.WriteAllBytes(keyPath, encryptedKey);
 
         if (OperatingSystem.IsLinux())
@@ -380,7 +381,8 @@ internal class LinuxSecureStorage : ISecureStorageService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to set file permissions for key file {File}", TelemetryGuard.SafePath(keyPath));
+                _logger.LogWarning(ex, "Failed to set file permissions for key file {File}",
+                    TelemetryGuard.SafePath(keyPath));
             }
         }
 
@@ -405,7 +407,7 @@ internal class LinuxSecureStorage : ISecureStorageService
                 {
                     components.Add(File.ReadAllText(machineIdFile).Trim());
                 }
-                
+
                 var dbusIdFile = "/var/lib/dbus/machine-id";
                 if (File.Exists(dbusIdFile))
                 {
@@ -432,10 +434,10 @@ internal class LinuxSecureStorage : ISecureStorageService
         }
 
         var combinedData = string.Join("|", components);
-        
+
         using var sha512 = SHA512.Create();
         var hash = sha512.ComputeHash(Encoding.UTF8.GetBytes(combinedData));
-        
+
         var key = new byte[32];
         Array.Copy(hash, key, 32);
         return key;

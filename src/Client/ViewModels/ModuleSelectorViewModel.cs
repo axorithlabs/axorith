@@ -103,6 +103,7 @@ public class ModuleSelectorViewModel : ReactiveObject
         {
             cat.IsSelected = cat == category;
         }
+
         SelectedCategory = category.Name;
     }
 
@@ -133,7 +134,10 @@ public class ModuleSelectorViewModel : ReactiveObject
 
     private async void SelectModule(ModuleDefinitionViewModel vm)
     {
-        if (vm.IsJustAdded) return;
+        if (vm.IsJustAdded)
+        {
+            return;
+        }
 
         _onModuleSelected(vm.Definition);
         vm.IsJustAdded = true;

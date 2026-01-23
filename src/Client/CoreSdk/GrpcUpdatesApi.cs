@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Axorith.Telemetry;
@@ -54,7 +56,8 @@ public class GrpcUpdatesApi : IUpdatesApi
         {
             var tempPath = Path.Combine(Path.GetTempPath(), $"Axorith-Setup-{updateInfo.Version}.exe");
 
-            _logger.LogInformation("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl, TelemetryGuard.SafePath(tempPath));
+            _logger.LogInformation("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl,
+                TelemetryGuard.SafePath(tempPath));
 
             using var response =
                 await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -70,7 +73,7 @@ public class GrpcUpdatesApi : IUpdatesApi
             var buffer = new byte[8192];
             int bytesRead;
 
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            using var sha256 = SHA256.Create();
             while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
             {
                 await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
@@ -102,7 +105,8 @@ public class GrpcUpdatesApi : IUpdatesApi
             }
             else
             {
-                _logger.LogWarning("No SHA256 hash provided for update verification. Proceeding without integrity check.");
+                _logger.LogWarning(
+                    "No SHA256 hash provided for update verification. Proceeding without integrity check.");
             }
 
             if (OperatingSystem.IsWindows())
@@ -113,6 +117,7 @@ public class GrpcUpdatesApi : IUpdatesApi
                     throw new InvalidOperationException(
                         "Update file signature verification failed. The installer is not signed by a trusted publisher.");
                 }
+
                 _logger.LogInformation("Authenticode signature verified successfully");
             }
 
@@ -129,8 +134,8 @@ public class GrpcUpdatesApi : IUpdatesApi
     {
         try
         {
-            using var cert2 = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(filePath);
-            
+            using var cert2 = X509CertificateLoader.LoadCertificateFromFile(filePath);
+
             var expectedSubjects = new[]
             {
                 "CN=Axorith Labs",
@@ -138,23 +143,23 @@ public class GrpcUpdatesApi : IUpdatesApi
                 "O=Axorith Labs"
             };
 
-            var subjectMatches = expectedSubjects.Any(expected => 
+            var subjectMatches = expectedSubjects.Any(expected =>
                 cert2.Subject.Contains(expected, StringComparison.OrdinalIgnoreCase));
 
             if (!subjectMatches)
             {
-                _logger.LogError("Certificate subject mismatch. Expected one of: {Expected}, Got: {Actual}", 
+                _logger.LogError("Certificate subject mismatch. Expected one of: {Expected}, Got: {Actual}",
                     string.Join(", ", expectedSubjects), cert2.Subject);
                 return false;
             }
 
-            var chain = new System.Security.Cryptography.X509Certificates.X509Chain
+            var chain = new X509Chain
             {
                 ChainPolicy =
                 {
-                    RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
-                    RevocationFlag = System.Security.Cryptography.X509Certificates.X509RevocationFlag.EntireChain,
-                    VerificationFlags = System.Security.Cryptography.X509Certificates.X509VerificationFlags.NoFlag
+                    RevocationMode = X509RevocationMode.Online,
+                    RevocationFlag = X509RevocationFlag.EntireChain,
+                    VerificationFlags = X509VerificationFlags.NoFlag
                 }
             };
 
@@ -162,7 +167,7 @@ public class GrpcUpdatesApi : IUpdatesApi
 
             if (!isValid)
             {
-                _logger.LogError("Certificate chain validation failed. Status: {Status}", 
+                _logger.LogError("Certificate chain validation failed. Status: {Status}",
                     string.Join(", ", chain.ChainStatus.Select(s => s.StatusInformation)));
                 return false;
             }
@@ -170,14 +175,14 @@ public class GrpcUpdatesApi : IUpdatesApi
             var now = DateTime.Now;
             if (now < cert2.NotBefore || now > cert2.NotAfter)
             {
-                _logger.LogError("Certificate is expired or not yet valid. Valid from {From} to {To}", 
+                _logger.LogError("Certificate is expired or not yet valid. Valid from {From} to {To}",
                     cert2.NotBefore, cert2.NotAfter);
                 return false;
             }
 
             return true;
         }
-        catch (System.Security.Cryptography.CryptographicException ex)
+        catch (CryptographicException ex)
         {
             _logger.LogError(ex, "File is not signed or signature is invalid");
             return false;

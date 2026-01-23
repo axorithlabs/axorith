@@ -12,15 +12,20 @@ namespace Axorith.Module.Steam;
 /// <summary>
 ///     Module for launching Steam and optionally starting games.
 /// </summary>
-public class Module(IModuleLogger logger, INotifier notifier, IAppDiscoveryService appDiscovery)
+public class Module(
+    IModuleLogger logger,
+    INotifier notifier,
+    IAppDiscoveryService appDiscovery,
+    IPlatformProcessService processService,
+    IPlatformWindowService windowService)
     : IModule
 {
     private const int WindowTimeoutMs = 30000;
 
     private readonly Settings _settings = new(appDiscovery);
 
-    private readonly ProcessService _processService = new(logger);
-    private readonly WindowService _windowService = new(logger);
+    private readonly ProcessService _processService = new(logger, processService);
+    private readonly WindowService _windowService = new(logger, windowService);
     private Process? _currentProcess;
     private bool _attachedToExisting;
 

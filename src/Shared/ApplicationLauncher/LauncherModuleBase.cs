@@ -3,6 +3,7 @@ using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
@@ -11,7 +12,10 @@ namespace Axorith.Shared.ApplicationLauncher;
 ///     Provides complete lifecycle management for launching applications and configuring windows.
 ///     Derived classes must provide Settings and can override extension points for customization.
 /// </summary>
-public abstract class LauncherModuleBase(IModuleLogger logger) : IModule
+public abstract class LauncherModuleBase(
+    IModuleLogger logger,
+    IPlatformProcessService processService,
+    IPlatformWindowService windowService) : IModule
 {
     /// <summary>
     ///     Logger instance for the module.
@@ -21,12 +25,12 @@ public abstract class LauncherModuleBase(IModuleLogger logger) : IModule
     /// <summary>
     ///     Service for process management (start, attach, terminate).
     /// </summary>
-    protected ProcessService ProcessService { get; } = new(logger);
+    protected ProcessService ProcessService { get; } = new(logger, processService);
 
     /// <summary>
     ///     Service for window configuration (size, position, state).
     /// </summary>
-    protected WindowService WindowService { get; } = new(logger);
+    protected WindowService WindowService { get; } = new(logger, windowService);
 
     /// <summary>
     ///     Current process handle. Null if not started.

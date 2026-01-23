@@ -334,7 +334,8 @@ public abstract class LauncherSettingsBase : IDisposable
     {
         var choices = new List<KeyValuePair<string, string>>();
 
-        var monitorCount = PublicApi.GetMonitorCount();
+        var windowService = PlatformServices.CreateWindowService();
+        var monitorCount = windowService.GetMonitorCount();
         if (monitorCount <= 0)
         {
             monitorCount = 1;
@@ -342,7 +343,7 @@ public abstract class LauncherSettingsBase : IDisposable
 
         for (var i = 0; i < monitorCount; i++)
         {
-            var monitorName = PublicApi.GetMonitorName(i);
+            var monitorName = windowService.GetMonitorName(i);
             var display = $"{i}: {monitorName}";
             choices.Add(new KeyValuePair<string, string>(i.ToString(), display));
         }

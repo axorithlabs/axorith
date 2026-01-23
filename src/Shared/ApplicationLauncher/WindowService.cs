@@ -4,7 +4,7 @@ using Axorith.Shared.Platform;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
-public sealed class WindowService(IModuleLogger logger)
+public sealed class WindowService(IModuleLogger logger, IPlatformWindowService windowService)
 {
     public async Task ConfigureWindowAsync(Process process, WindowConfig config,
         CancellationToken cancellationToken = default)
@@ -21,7 +21,7 @@ public sealed class WindowService(IModuleLogger logger)
 
             try
             {
-                await PublicApi.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken)
+                await windowService.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (TimeoutException)
@@ -53,7 +53,7 @@ public sealed class WindowService(IModuleLogger logger)
                 }
 
                 logger.LogDebug("Moving window to monitor {MonitorIndex}", idx);
-                PublicApi.MoveWindowToMonitor(windowHandle, idx);
+                windowService.MoveWindowToMonitor(windowHandle, idx);
             }
 
             switch (config.State)
@@ -61,14 +61,14 @@ public sealed class WindowService(IModuleLogger logger)
                 case "Maximized":
                 {
                     logger.LogDebug("Maximizing window");
-                    PublicApi.SetWindowState(windowHandle, WindowState.Maximized);
+                    windowService.SetWindowState(windowHandle, WindowState.Maximized);
 
                     if (config.MaximizeSnapDelayMs > 0)
                     {
                         await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
                     }
 
-                    var current = PublicApi.GetWindowState(windowHandle);
+                    var current = windowService.GetWindowState(windowHandle);
                     if (current != WindowState.Maximized)
                     {
                         logger.LogWarning("Failed to maximize window");
@@ -76,8 +76,8 @@ public sealed class WindowService(IModuleLogger logger)
 
                     if (moveToMonitor && monitorIndex is { } snapIndex)
                     {
-                        var (mx, my, mWidth, mHeight) = PublicApi.GetMonitorBounds(snapIndex);
-                        var (wx, wy, wWidth, wHeight) = PublicApi.GetWindowBounds(windowHandle);
+                        var (mx, my, mWidth, mHeight) = windowService.GetMonitorBounds(snapIndex);
+                        var (wx, wy, wWidth, wHeight) = windowService.GetWindowBounds(windowHandle);
 
                         if (wx != mx || wy != my || wWidth != mWidth || wHeight != mHeight)
                         {
@@ -85,8 +85,8 @@ public sealed class WindowService(IModuleLogger logger)
                                 "Window bounds {WX},{WY},{WWidth}x{WHeight} do not match monitor {MX},{MY},{MWidth}x{MHeight}. Snapping to monitor bounds.",
                                 wx, wy, wWidth, wHeight, mx, my, mWidth, mHeight);
 
-                            PublicApi.SetWindowPosition(windowHandle, mx, my);
-                            PublicApi.SetWindowSize(windowHandle, mWidth, mHeight);
+                            windowService.SetWindowPosition(windowHandle, mx, my);
+                            windowService.SetWindowSize(windowHandle, mWidth, mHeight);
                         }
                     }
 
@@ -96,17 +96,17 @@ public sealed class WindowService(IModuleLogger logger)
                 case "Minimized":
                 {
                     logger.LogDebug("Minimizing window");
-                    PublicApi.SetWindowState(windowHandle, WindowState.Minimized);
+                    windowService.SetWindowState(windowHandle, WindowState.Minimized);
 
                     if (config.MaximizeSnapDelayMs > 0)
                     {
                         await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
                     }
 
-                    if (PublicApi.GetWindowState(windowHandle) != WindowState.Minimized)
+                    if (windowService.GetWindowState(windowHandle) != WindowState.Minimized)
                     {
                         logger.LogDebug("Re-applying minimize state after revert");
-                        PublicApi.SetWindowState(windowHandle, WindowState.Minimized);
+                        windowService.SetWindowState(windowHandle, WindowState.Minimized);
                     }
 
                     break;
@@ -117,7 +117,7 @@ public sealed class WindowService(IModuleLogger logger)
                     if (config is { UseCustomSize: true, Width: { } width, Height: { } height })
                     {
                         logger.LogDebug("Setting custom window size: {Width}x{Height}", width, height);
-                        PublicApi.SetWindowSize(windowHandle, width, height);
+                        windowService.SetWindowSize(windowHandle, width, height);
                     }
 
                     break;
@@ -132,7 +132,7 @@ public sealed class WindowService(IModuleLogger logger)
             if (config.BringToForeground && config.State != "Minimized")
             {
                 logger.LogDebug("Bringing window to foreground");
-                PublicApi.FocusWindow(windowHandle);
+                windowService.FocusWindow(windowHandle);
             }
 
             logger.LogInfo("Window configuration completed successfully for {ProcessName}", process.ProcessName);

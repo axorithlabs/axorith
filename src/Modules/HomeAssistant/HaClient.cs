@@ -1,13 +1,12 @@
 ﻿using System.Text;
 using System.Text.Json;
-using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.HomeAssistant;
 
 internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
 {
-    private readonly IHttpClient _client = clientFactory.CreateClient("HomeAssistant");
+    private readonly HttpClient _client = clientFactory.CreateClient("HomeAssistant");
 
     public async Task CallServiceAsync(string baseUrl, string token, string domain, string service, string entityId,
         CancellationToken ct)
@@ -28,14 +27,18 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
 
         logger.LogDebug("Calling HA Service: {Url} for Entity: {Entity}", url, entityId);
 
-        _client.AddDefaultHeader("Authorization", $"Bearer {token}");
-
         var payload = new { entity_id = entityId };
         var json = JsonSerializer.Serialize(payload);
 
         try
         {
-            await _client.PostStringAsync(url, json, Encoding.UTF8, "application/json", ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("Authorization", $"Bearer {token}");
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            using var response = await _client.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
+
             logger.LogInfo("Successfully called {Domain}.{Service} for {Entity}", domain, service, entityId);
         }
         catch (Exception ex)
@@ -58,11 +61,13 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
             baseUrl = $"http://{baseUrl}";
         }
 
-        _client.AddDefaultHeader("Authorization", $"Bearer {token}");
-
         try
         {
-            await _client.GetStringAsync($"{baseUrl}/api/", ct);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/api/");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            using var response = await _client.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
             return true;
         }
         catch

@@ -1,5 +1,7 @@
 using System.IO.Pipes;
 using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
@@ -8,7 +10,7 @@ namespace Axorith.Shared.Platform.Windows;
 internal class WindowsNamedPipeFactory(ILogger<WindowsNamedPipeFactory> logger) : INamedPipeFactory
 {
     public NamedPipeServerStream CreateSecureServerPipe(
-        string pipeName, 
+        string pipeName,
         PipeDirection direction = PipeDirection.In,
         int maxNumberOfServerInstances = 1)
     {
@@ -16,7 +18,7 @@ internal class WindowsNamedPipeFactory(ILogger<WindowsNamedPipeFactory> logger) 
 
         try
         {
-            var currentUser = System.Security.Principal.WindowsIdentity.GetCurrent();
+            var currentUser = WindowsIdentity.GetCurrent();
             var currentUserSid = currentUser.User;
 
             if (currentUserSid != null)
@@ -24,13 +26,13 @@ internal class WindowsNamedPipeFactory(ILogger<WindowsNamedPipeFactory> logger) 
                 var userRule = new PipeAccessRule(
                     currentUserSid,
                     PipeAccessRights.ReadWrite,
-                    System.Security.AccessControl.AccessControlType.Allow);
+                    AccessControlType.Allow);
 
                 pipeSecurity.AddAccessRule(userRule);
             }
 
             pipeSecurity.SetAccessRuleProtection(true, false);
-            
+
             logger.LogDebug("Created secure named pipe with ACL: {PipeName}", pipeName);
         }
         catch (Exception ex)

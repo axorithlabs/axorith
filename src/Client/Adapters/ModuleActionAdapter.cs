@@ -71,7 +71,8 @@ internal class ModuleActionAdapter(
             }
             catch (Exception)
             {
-                // ignored
+                // Adapter has no logger - silently ignore action invocation errors
+                // Errors are logged on the Host side
             }
         });
     }

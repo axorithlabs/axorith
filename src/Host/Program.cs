@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
-using Axorith.Core.Http;
 using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
@@ -24,7 +23,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
-using IHttpClientFactory = Axorith.Sdk.Http.IHttpClientFactory;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -42,10 +40,10 @@ using var hostMutex = new Mutex(true, "Global\\AxorithHostInstanceMutex", out va
 if (!createdNew)
 {
     Log.Warning("Another Axorith.Host instance is already running. Exiting.");
-    
+
     // Check if the other instance is actually responsive
     await Task.Delay(1000);
-    
+
     // Try to read existing host info
     if (File.Exists(hostInfoPath))
     {
@@ -59,7 +57,7 @@ if (!createdNew)
             Log.Warning(ex, "Could not read existing host-info.json");
         }
     }
-    
+
     Log.Information("Exiting duplicate Host instance.");
     return 0;
 }
@@ -163,7 +161,7 @@ try
         options.Limits.Http2.KeepAlivePingTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
     });
 
-    builder.Services.AddSingleton(sp => 
+    builder.Services.AddSingleton(sp =>
         PlatformServices.CreateFilePermissionsService(sp.GetRequiredService<ILoggerFactory>()));
     builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();
 
@@ -325,23 +323,23 @@ try
 
             var hostInfo = new
                 { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };
-            
+
             // Use FileShare.Read to allow clients to read while we're writing
             // This prevents "file is being used by another process" errors
             var json = JsonSerializer.Serialize(hostInfo);
             await using (var stream = new FileStream(
-                hostInfoPath, 
-                FileMode.Create, 
-                FileAccess.Write, 
-                FileShare.Read, // Allow concurrent reads
-                bufferSize: 4096, 
-                useAsync: true))
+                             hostInfoPath,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.Read, // Allow concurrent reads
+                             bufferSize: 4096,
+                             useAsync: true))
             {
                 await using var writer = new StreamWriter(stream);
                 await writer.WriteAsync(json);
                 await writer.FlushAsync();
             }
-            
+
             Log.Information("Host info written to {Path} (port={Port})", hostInfoPath, boundPort);
         }
         catch (Exception ex)
@@ -413,7 +411,7 @@ finally
         await telemetry.FlushAsync();
         await telemetry.DisposeAsync();
     }
-    
+
     Log.Information("Host instance mutex will be released on disposal");
 }
 
@@ -468,6 +466,20 @@ static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
 
 static void RegisterCoreServices(ContainerBuilder builder)
 {
+    builder.Register(ctx =>
+        {
+            var loggerFactory = ctx.Resolve<ILoggerFactory>();
+            return PlatformServices.CreateWindowService();
+        })
+        .As<IPlatformWindowService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
+    builder.Register(ctx => { return PlatformServices.CreateProcessService(); })
+        .As<IPlatformProcessService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
     builder.Register(ctx =>
         {
             var logger = ctx.Resolve<ILogger<ISecureStorageService>>();
@@ -526,13 +538,6 @@ static void RegisterCoreServices(ContainerBuilder builder)
 
     builder.RegisterType<EventAggregator>()
         .As<IEventAggregator>()
-        .SingleInstance()
-        .PreserveExistingDefaults();
-
-    builder.Register(ctx =>
-            new HttpClientFactoryAdapter(
-                ctx.Resolve<System.Net.Http.IHttpClientFactory>()))
-        .As<IHttpClientFactory>()
         .SingleInstance()
         .PreserveExistingDefaults();
 

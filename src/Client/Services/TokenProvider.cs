@@ -17,17 +17,17 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
         var maxAttempts = 60;
         var delayMs = 200;
         var lastLogTime = DateTime.UtcNow;
-        
+
         for (var i = 0; i < maxAttempts; i++)
         {
             // Log progress every 3 seconds
             if ((DateTime.UtcNow - lastLogTime).TotalSeconds >= 3)
             {
-                logger.LogInformation("Waiting for auth token... (attempt {Attempt}/{Max}, elapsed {Elapsed}s)", 
-                    i + 1, maxAttempts, (i * delayMs) / 1000);
+                logger.LogInformation("Waiting for auth token... (attempt {Attempt}/{Max}, elapsed {Elapsed}s)",
+                    i + 1, maxAttempts, i * delayMs / 1000);
                 lastLogTime = DateTime.UtcNow;
             }
-            
+
             if (File.Exists(tokenPath))
             {
                 try
@@ -38,10 +38,10 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
 
                     if (!string.IsNullOrWhiteSpace(token))
                     {
-                        logger.LogInformation("Auth token loaded successfully after {Elapsed}s", (i * delayMs) / 1000);
+                        logger.LogInformation("Auth token loaded successfully after {Elapsed}s", i * delayMs / 1000);
                         return token.Trim();
                     }
-                    
+
                     logger.LogDebug("Token file exists but is empty, waiting for Host to write...");
                 }
                 catch (IOException ioEx)
@@ -58,8 +58,8 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
             await Task.Delay(delayMs, ct);
         }
 
-        logger.LogError("Auth token file not found at {Path} after {Timeout}s. Host may have failed to start.", 
-            TelemetryGuard.SafePath(tokenPath), (maxAttempts * delayMs) / 1000);
+        logger.LogError("Auth token file not found at {Path} after {Timeout}s. Host may have failed to start.",
+            TelemetryGuard.SafePath(tokenPath), maxAttempts * delayMs / 1000);
         return null;
     }
 }

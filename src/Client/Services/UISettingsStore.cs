@@ -27,7 +27,8 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
             var fileInfo = new FileInfo(_settingsPath);
             if (fileInfo.Length > MaxSettingsFileSizeBytes)
             {
-                logger.LogWarning("Settings file {Path} exceeds maximum size limit ({Size} bytes)", TelemetryGuard.SafePath(_settingsPath),
+                logger.LogWarning("Settings file {Path} exceeds maximum size limit ({Size} bytes)",
+                    TelemetryGuard.SafePath(_settingsPath),
                     fileInfo.Length);
                 return new ClientUiConfiguration();
             }
@@ -45,7 +46,8 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to load client UI settings from {Path}", TelemetryGuard.SafePath(_settingsPath));
+            logger.LogWarning(ex, "Failed to load client UI settings from {Path}",
+                TelemetryGuard.SafePath(_settingsPath));
             return new ClientUiConfiguration();
         }
     }
@@ -63,7 +65,8 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to save client UI settings to {Path}", TelemetryGuard.SafePath(_settingsPath));
+            logger.LogWarning(ex, "Failed to save client UI settings to {Path}",
+                TelemetryGuard.SafePath(_settingsPath));
         }
     }
 }

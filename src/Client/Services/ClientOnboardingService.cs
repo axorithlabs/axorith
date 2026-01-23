@@ -25,7 +25,9 @@ public sealed class ClientOnboardingService : IClientOnboardingService
 
     private static class BlockCategories
     {
-        public const string CodingSiteCategories = "Social,Video,Streaming,Gaming,News,Shopping,Adult,Gambling,Dating,Forums";
+        public const string CodingSiteCategories =
+            "Social,Video,Streaming,Gaming,News,Shopping,Adult,Gambling,Dating,Forums";
+
         public const string CodingAppCategories = "Gaming,Social,Browsers,Entertainment";
 
         public const string GamingSiteCategories = "Work,News,Shopping";
@@ -34,7 +36,9 @@ public sealed class ClientOnboardingService : IClientOnboardingService
         public const string StreamingSiteCategories = "Social,News,Shopping,Adult,Gambling,Dating";
         public const string StreamingAppCategories = "Productivity,Email,Office,Development";
 
-        public const string FocusSiteCategories = "Social,Video,Streaming,Gaming,News,Shopping,Adult,Gambling,Dating,Forums";
+        public const string FocusSiteCategories =
+            "Social,Video,Streaming,Gaming,News,Shopping,Adult,Gambling,Dating,Forums";
+
         public const string FocusAppCategories = "Gaming,Social,Browsers,Entertainment";
     }
 
@@ -76,7 +80,10 @@ public sealed class ClientOnboardingService : IClientOnboardingService
             var createTasks = new List<Task>();
             foreach (var preset in presetsToCreate)
             {
-                if (preset.Modules.Count == 0) continue;
+                if (preset.Modules.Count == 0)
+                {
+                    continue;
+                }
 
                 preset.Name = GetUniqueName(preset.Name, existingNames);
                 existingNames.Add(preset.Name);
@@ -133,7 +140,8 @@ public sealed class ClientOnboardingService : IClientOnboardingService
         return result;
     }
 
-    public async Task<OnboardingResult> CreateSelectedPresetsAsync(List<string> selectedTypes, CancellationToken ct = default)
+    public async Task<OnboardingResult> CreateSelectedPresetsAsync(List<string> selectedTypes,
+        CancellationToken ct = default)
     {
         var result = new OnboardingResult();
 
@@ -162,19 +170,28 @@ public sealed class ClientOnboardingService : IClientOnboardingService
             if (selectedTypes.Contains("Gamer"))
             {
                 var gamingPreset = CreateGamingPreset(discoveredApps, moduleIds);
-                if (gamingPreset.Modules.Count > 0) presetsToCreate.Add(gamingPreset);
+                if (gamingPreset.Modules.Count > 0)
+                {
+                    presetsToCreate.Add(gamingPreset);
+                }
             }
 
             if (selectedTypes.Contains("Streamer"))
             {
                 var streamingPreset = CreateStreamingPreset(discoveredApps, moduleIds);
-                if (streamingPreset.Modules.Count > 0) presetsToCreate.Add(streamingPreset);
+                if (streamingPreset.Modules.Count > 0)
+                {
+                    presetsToCreate.Add(streamingPreset);
+                }
             }
 
             var createTasks = new List<Task>();
             foreach (var preset in presetsToCreate)
             {
-                if (preset.Modules.Count == 0) continue;
+                if (preset.Modules.Count == 0)
+                {
+                    continue;
+                }
 
                 preset.Name = GetUniqueName(preset.Name, existingNames);
                 existingNames.Add(preset.Name);
@@ -217,7 +234,11 @@ public sealed class ClientOnboardingService : IClientOnboardingService
         try
         {
             await _presetsApi.CreatePresetAsync(preset, ct);
-            lock (result) result.CreatedPresets.Add(preset.Name);
+            lock (result)
+            {
+                result.CreatedPresets.Add(preset.Name);
+            }
+
             _logger.LogInformation("Created preset: {PresetName}", preset.Name);
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.AlreadyExists)
@@ -233,7 +254,11 @@ public sealed class ClientOnboardingService : IClientOnboardingService
             try
             {
                 await _presetsApi.CreatePresetAsync(preset, ct);
-                lock (result) result.CreatedPresets.Add(preset.Name);
+                lock (result)
+                {
+                    result.CreatedPresets.Add(preset.Name);
+                }
+
                 _logger.LogInformation("Created preset with retry name: {PresetName}", preset.Name);
             }
             catch (Exception retryEx)
@@ -308,10 +333,16 @@ public sealed class ClientOnboardingService : IClientOnboardingService
         presets.AddRange(GenerateCodingPresets(apps, moduleIds));
 
         var gamingPreset = CreateGamingPreset(apps, moduleIds);
-        if (gamingPreset.Modules.Count > 0) presets.Add(gamingPreset);
+        if (gamingPreset.Modules.Count > 0)
+        {
+            presets.Add(gamingPreset);
+        }
 
         var streamingPreset = CreateStreamingPreset(apps, moduleIds);
-        if (streamingPreset.Modules.Count > 0) presets.Add(streamingPreset);
+        if (streamingPreset.Modules.Count > 0)
+        {
+            presets.Add(streamingPreset);
+        }
 
         return presets;
     }
@@ -337,15 +368,25 @@ public sealed class ClientOnboardingService : IClientOnboardingService
 
         foreach (var (path, presetName, moduleName) in ideConfigs)
         {
-            if (path == null) continue;
+            if (path == null)
+            {
+                continue;
+            }
+
             var preset = CreateCodingPreset(presetName, moduleName, path, moduleIds, apps);
-            if (preset.Modules.Count > 0) presets.Add(preset);
+            if (preset.Modules.Count > 0)
+            {
+                presets.Add(preset);
+            }
         }
 
         if (presets.Count == 0 && (moduleIds.ContainsKey("Site Blocker") || moduleIds.ContainsKey("App Blocker")))
         {
             var focusPreset = CreateFocusModePreset(moduleIds, apps);
-            if (focusPreset.Modules.Count > 0) presets.Add(focusPreset);
+            if (focusPreset.Modules.Count > 0)
+            {
+                presets.Add(focusPreset);
+            }
         }
 
         return presets;
@@ -415,9 +456,13 @@ public sealed class ClientOnboardingService : IClientOnboardingService
         }
     }
 
-    private static void AddSpotifyModule(SessionPreset preset, DiscoveredApps apps, Dictionary<string, Guid> moduleIds, string customName)
+    private static void AddSpotifyModule(SessionPreset preset, DiscoveredApps apps, Dictionary<string, Guid> moduleIds,
+        string customName)
     {
-        if (apps.SpotifyPath == null || !moduleIds.TryGetValue("Spotify", out var spotifyId)) return;
+        if (apps.SpotifyPath == null || !moduleIds.TryGetValue("Spotify", out var spotifyId))
+        {
+            return;
+        }
 
         preset.Modules.Add(new ConfiguredModule
         {
@@ -491,7 +536,10 @@ public sealed class ClientOnboardingService : IClientOnboardingService
             hasStreamingSoftware = true;
         }
 
-        if (!hasStreamingSoftware) return preset;
+        if (!hasStreamingSoftware)
+        {
+            return preset;
+        }
 
         var browserPath = apps.ChromePath ?? apps.FirefoxPath ?? apps.EdgePath;
         if (browserPath != null && moduleIds.TryGetValue("Browser", out var browserId))
@@ -502,7 +550,8 @@ public sealed class ClientOnboardingService : IClientOnboardingService
                 ModuleId = browserId,
                 CustomName = "Open Stream Dashboard",
                 StartDelay = TimeSpan.FromSeconds(3),
-                Settings = new Dictionary<string, string> { ["executablePath"] = browserPath, ["url"] = "https://dashboard.twitch.tv" }
+                Settings = new Dictionary<string, string>
+                    { ["executablePath"] = browserPath, ["url"] = "https://dashboard.twitch.tv" }
             });
         }
 
@@ -526,7 +575,10 @@ public sealed class ClientOnboardingService : IClientOnboardingService
 
     private static string GetUniqueName(string baseName, HashSet<string> existingNames)
     {
-        if (!existingNames.Contains(baseName)) return baseName;
+        if (!existingNames.Contains(baseName))
+        {
+            return baseName;
+        }
 
         var counter = 1;
         string candidate;

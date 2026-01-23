@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
-using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
@@ -18,7 +17,7 @@ namespace Axorith.Module.Spotify;
 internal sealed class AuthService : IDisposable
 {
     private readonly IModuleLogger _logger;
-    private readonly IHttpClient _authClient;
+    private readonly HttpClient _authClient;
     private readonly ISecureStorageService _secureStorage;
     private readonly Settings _settings;
     private readonly INotifier _notifier;
@@ -39,7 +38,7 @@ internal sealed class AuthService : IDisposable
 
     public event Action<bool>? AuthenticationStateChanged;
 
-    public AuthService(IModuleLogger logger, Sdk.Http.IHttpClientFactory httpClientFactory,
+    public AuthService(IModuleLogger logger, IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage, ModuleDefinition definition, Settings settings, INotifier notifier)
     {
         _logger = logger;
@@ -111,9 +110,15 @@ internal sealed class AuthService : IDisposable
                     { "client_id", SpotifyClientId }
                 });
 
-                var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
-                    await content.ReadAsStringAsync(),
-                    Encoding.UTF8, "application/x-www-form-urlencoded");
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token")
+                {
+                    Content = content
+                };
+
+                using var httpResponse = await _authClient.SendAsync(request);
+                httpResponse.EnsureSuccessStatusCode();
+
+                var responseJson = await httpResponse.Content.ReadAsStringAsync();
 
                 using var jsonDoc = JsonDocument.Parse(responseJson);
                 var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
@@ -319,12 +324,13 @@ internal sealed class AuthService : IDisposable
             var returnedState = context.Request.QueryString.Get("state");
 
             var response = context.Response;
-            
+
             if (returnedState != state)
             {
-                _logger.LogError(null, "CSRF validation failed: state mismatch. Expected: {Expected}, Got: {Got}", 
+                _logger.LogError(null, "CSRF validation failed: state mismatch. Expected: {Expected}, Got: {Got}",
                     state, returnedState ?? "<null>");
-                var csrfErrorHtml = "<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Security Error</h1><p>CSRF validation failed. Please try again.</p></body></html>";
+                var csrfErrorHtml =
+                    "<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Security Error</h1><p>CSRF validation failed. Please try again.</p></body></html>";
                 var csrfBuffer = Encoding.UTF8.GetBytes(csrfErrorHtml);
                 response.ContentLength64 = csrfBuffer.Length;
                 await response.OutputStream.WriteAsync(csrfBuffer);
@@ -361,9 +367,15 @@ internal sealed class AuthService : IDisposable
                     { "code_verifier", codeVerifier }
                 });
 
-                var responseJson = await _authClient.PostStringAsync("https://accounts.spotify.com/api/token",
-                    await content.ReadAsStringAsync(),
-                    Encoding.UTF8, "application/x-www-form-urlencoded");
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token")
+                {
+                    Content = content
+                };
+
+                using var httpResponse = await _authClient.SendAsync(request);
+                httpResponse.EnsureSuccessStatusCode();
+
+                var responseJson = await httpResponse.Content.ReadAsStringAsync();
 
                 using var jsonDoc = JsonDocument.Parse(responseJson);
                 var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();

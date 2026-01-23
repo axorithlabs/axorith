@@ -2,7 +2,6 @@
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
-using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.Spotify;
@@ -12,12 +11,12 @@ namespace Axorith.Module.Spotify;
 ///     Handles authentication, retries, and rate limiting.
 /// </summary>
 internal sealed class SpotifyApiService(
-    Sdk.Http.IHttpClientFactory httpClientFactory,
+    IHttpClientFactory httpClientFactory,
     ModuleDefinition definition,
     AuthService authService,
     IModuleLogger logger)
 {
-    private readonly IHttpClient _apiClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
+    private readonly HttpClient _apiClient = httpClientFactory.CreateClient($"{definition.Name}.Api");
 
     private const int MaxRetries = 3;
     private const int BaseDelayMs = 500;
@@ -44,7 +43,8 @@ internal sealed class SpotifyApiService(
         return TimeSpan.FromMilliseconds(baseDelay + jitter);
     }
 
-    private async Task<T?> ExecuteWithRetryAsync<T>(Func<string, Task<T>> operation, string operationName) where T : class
+    private async Task<T?> ExecuteWithRetryAsync<T>(Func<string, Task<T>> operation, string operationName)
+        where T : class
     {
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -56,15 +56,7 @@ internal sealed class SpotifyApiService(
 
             try
             {
-                _apiClient.AddDefaultHeader("Authorization", $"Bearer {token}");
-                try
-                {
-                    return await operation(token);
-                }
-                finally
-                {
-                    _apiClient.RemoveDefaultHeader("Authorization");
-                }
+                return await operation(token);
             }
             catch (HttpRequestException ex) when (attempt < MaxRetries)
             {
@@ -90,9 +82,15 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<SpotifyDevice>> GetDevicesAsync()
     {
-        var result = await ExecuteWithRetryAsync(async _ =>
+        var result = await ExecuteWithRetryAsync(async token =>
         {
-            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/player/devices");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            using var response = await _apiClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
             using var jsonDoc = JsonDocument.Parse(responseJson);
 
             return jsonDoc.RootElement.GetProperty("devices").EnumerateArray().Select(element =>
@@ -107,9 +105,16 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
     {
-        var result = await ExecuteWithRetryAsync(async _ =>
+        var result = await ExecuteWithRetryAsync(async token =>
         {
-            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists?limit=50");
+            using var request =
+                new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/playlists?limit=50");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            using var response = await _apiClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
             using var jsonDoc = JsonDocument.Parse(responseJson);
 
             if (!jsonDoc.RootElement.TryGetProperty("items", out var itemsElement))
@@ -131,10 +136,17 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetSavedAlbumsAsync()
     {
-        var result = await ExecuteWithRetryAsync<List<KeyValuePair<string, string>>>(async _ =>
+        var result = await ExecuteWithRetryAsync<List<KeyValuePair<string, string>>>(async token =>
         {
-            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums?limit=50");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/albums?limit=50");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            using var response = await _apiClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
             using var jsonDoc = JsonDocument.Parse(responseJson);
+
             return
             [
                 .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
@@ -149,10 +161,17 @@ internal sealed class SpotifyApiService(
 
     public async Task<string> GetLikedSongsAsUriListAsync()
     {
-        var result = await ExecuteWithRetryAsync(async _ =>
+        var result = await ExecuteWithRetryAsync(async token =>
         {
-            var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/tracks?limit=50");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+
+            using var response = await _apiClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
             using var jsonDoc = JsonDocument.Parse(responseJson);
+
             var tracks = jsonDoc.RootElement.GetProperty("items").EnumerateArray().Select(t => t.GetProperty("track"));
             return JsonSerializer.Serialize(new { uris = tracks.Select(t => t.GetProperty("uri").GetString()) });
         }, "GetLikedSongs");
@@ -215,22 +234,16 @@ internal sealed class SpotifyApiService(
             return;
         }
 
-        _apiClient.AddDefaultHeader("Authorization", $"Bearer {token}");
-        try
+        using var request = new HttpRequestMessage(HttpMethod.Put, uri);
+        request.Headers.Add("Authorization", $"Bearer {token}");
+
+        if (jsonContent != null)
         {
-            if (jsonContent != null)
-            {
-                await _apiClient.PutStringAsync(uri, jsonContent, Encoding.UTF8, "application/json");
-            }
-            else
-            {
-                await _apiClient.PutAsync(uri);
-            }
+            request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
         }
-        finally
-        {
-            _apiClient.RemoveDefaultHeader("Authorization");
-        }
+
+        using var response = await _apiClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
     }
 }
 
