@@ -25,7 +25,8 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : L
         var profileName = _settings.ProfileName.GetCurrentValue();
         if (!string.IsNullOrWhiteSpace(profileName) && profile?.ProfileArgument != null)
         {
-            args.Append(string.Format(profile.ProfileArgument, profileName));
+            var sanitizedProfileName = SanitizeArgument(profileName);
+            args.Append(string.Format(profile.ProfileArgument, sanitizedProfileName));
             args.Append(' ');
         }
 
@@ -38,7 +39,8 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : L
         var additionalArgs = _settings.AdditionalArgs.GetCurrentValue();
         if (!string.IsNullOrWhiteSpace(additionalArgs))
         {
-            args.Append(additionalArgs);
+            var sanitizedArgs = SanitizeAdditionalArguments(additionalArgs);
+            args.Append(sanitizedArgs);
             args.Append(' ');
         }
 
@@ -48,16 +50,72 @@ public class Module(IModuleLogger logger, IAppDiscoveryService appDiscovery) : L
             return args.ToString().Trim();
         }
 
-        if (startUrl.Contains(' '))
+        var sanitizedUrl = SanitizeUrl(startUrl);
+        if (sanitizedUrl.Contains(' '))
         {
-            args.Append($"\"{startUrl}\"");
+            args.Append($"\"{sanitizedUrl}\"");
         }
         else
         {
-            args.Append(startUrl);
+            args.Append(sanitizedUrl);
         }
 
         return args.ToString().Trim();
+    }
+
+    private static string SanitizeArgument(string argument)
+    {
+        return string.IsNullOrWhiteSpace(argument) ? string.Empty : argument.Replace("\"", "").Replace("'", "").Replace(";", "").Replace("&", "").Replace("|", "");
+    }
+
+    private static string SanitizeAdditionalArguments(string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            return string.Empty;
+        }
+
+        var dangerousFlags = new[]
+        {
+            "--gpu-launcher",
+            "--renderer-cmd-prefix",
+            "--utility-cmd-prefix",
+            "--js-flags",
+            "--enable-features=RunningInForcedAppMode",
+            "--load-extension"
+        };
+
+        var lowerArgs = arguments.ToLowerInvariant();
+        foreach (var flag in dangerousFlags)
+        {
+            if (lowerArgs.Contains(flag))
+            {
+                throw new InvalidOperationException(
+                    $"Dangerous browser flag detected: {flag}. This flag is not allowed for security reasons.");
+            }
+        }
+
+        return arguments;
+    }
+
+    private static string SanitizeUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return string.Empty;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidOperationException($"Invalid URL format: {url}");
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException($"Only HTTP and HTTPS URLs are allowed. Got: {uri.Scheme}");
+        }
+
+        return uri.AbsoluteUri;
     }
 
     /// <inheritdoc />

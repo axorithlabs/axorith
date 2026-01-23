@@ -86,6 +86,26 @@ public static class PlatformServices
         throw new PlatformNotSupportedException(
             $"Native Messaging registration is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
+
+    public static IFilePermissionsService CreateFilePermissionsService(ILoggerFactory loggerFactory)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsFilePermissionsService(loggerFactory.CreateLogger<WindowsFilePermissionsService>());
+        }
+
+        return new Unix.UnixFilePermissionsService(loggerFactory.CreateLogger<Unix.UnixFilePermissionsService>());
+    }
+
+    public static INamedPipeFactory CreateNamedPipeFactory(ILoggerFactory loggerFactory)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new WindowsNamedPipeFactory(loggerFactory.CreateLogger<WindowsNamedPipeFactory>());
+        }
+
+        return new Unix.UnixNamedPipeFactory(loggerFactory.CreateLogger<Unix.UnixNamedPipeFactory>());
+    }
 }
 
 // Simple fallback to avoid breaking Linux/Mac builds until implemented

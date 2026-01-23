@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using System.Windows.Input;
 using Axorith.Client.Services;
 using ReactiveUI;

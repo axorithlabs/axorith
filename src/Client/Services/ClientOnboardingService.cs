@@ -1,6 +1,5 @@
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
-using Axorith.Sdk;
 using Axorith.Shared.Platform;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;

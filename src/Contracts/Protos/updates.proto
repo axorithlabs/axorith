@@ -16,4 +16,5 @@ message UpdateInfoResponse {
   string download_url = 4;
   string release_notes = 5;
   google.protobuf.Timestamp published_at = 6;
+  string sha256_hash = 7;
 }

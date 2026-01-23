@@ -105,6 +105,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             {
                 var processName = data.ProcessName;
                 var pid = data.ProcessID;
+                var imageName = data.ImageFileName;
 
                 if (string.IsNullOrEmpty(processName))
                 {
@@ -121,7 +122,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
                 if (shouldBlock)
                 {
-                    Task.Run(() => KillProcessById(pid, normalized));
+                    Task.Run(() => KillProcessByIdWithValidation(pid, normalized, imageName));
                 }
             };
 
@@ -374,6 +375,75 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         catch (Exception ex)
         {
             logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", name, pid);
+        }
+
+        return false;
+    }
+
+    private bool KillProcessByIdWithValidation(int pid, string expectedName, string? imagePath)
+    {
+        try
+        {
+            Process? p = null;
+            try
+            {
+                p = Process.GetProcessById(pid);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+
+            using (p)
+            {
+                var actualName = NormalizeName(p.ProcessName);
+                
+                if (actualName != expectedName)
+                {
+                    logger.LogDebug(
+                        "PID {Pid} name mismatch. Expected: {Expected}, Got: {Actual}. Possible PID reuse, skipping.",
+                        pid, expectedName, actualName);
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(imagePath))
+                {
+                    try
+                    {
+                        var processPath = p.MainModule?.FileName;
+                        if (!string.IsNullOrEmpty(processPath) && 
+                            !string.Equals(processPath, imagePath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            logger.LogDebug(
+                                "PID {Pid} path mismatch. Expected: {Expected}, Got: {Actual}. Possible PID reuse, skipping.",
+                                pid, imagePath, processPath);
+                            return false;
+                        }
+                    }
+                    catch
+                    {
+                        // Access denied or process exited, continue with name-only validation
+                    }
+                }
+
+                if (p.HasExited)
+                {
+                    return false;
+                }
+
+                p.Kill();
+                logger.LogInformation("Blocked process: {Name} (PID: {Pid})", expectedName, pid);
+                ProcessBlocked?.Invoke(expectedName);
+                return true;
+            }
+        }
+        catch (Win32Exception ex)
+        {
+            logger.LogDebug("Could not kill process '{Name}' (PID: {Pid}). {Error}", expectedName, pid, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", expectedName, pid);
         }
 
         return false;

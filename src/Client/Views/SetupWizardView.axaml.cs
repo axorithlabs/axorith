@@ -13,7 +13,7 @@ public partial class SetupWizardView : UserControl
 
     private void OnPresetTypeTapped(object? sender, RoutedEventArgs e)
     {
-        if (sender is Border border && border.DataContext is PresetTypeOption option && DataContext is SetupWizardViewModel vm)
+        if (sender is Border { DataContext: PresetTypeOption option } && DataContext is SetupWizardViewModel vm)
         {
             vm.ToggleSelectionCommand.Execute(option);
         }

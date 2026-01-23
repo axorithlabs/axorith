@@ -16,6 +16,12 @@ public interface IHttpClient
     void AddDefaultHeader(string name, string value);
 
     /// <summary>
+    ///     Removes a default header that was previously added.
+    /// </summary>
+    /// <param name="name">The header name to remove.</param>
+    void RemoveDefaultHeader(string name);
+
+    /// <summary>
     ///     Sends a GET request and returns the response body as a string.
     /// </summary>
     Task<string> GetStringAsync(string requestUri, CancellationToken cancellationToken = default);

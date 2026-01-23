@@ -16,6 +16,11 @@ internal class HttpClientAdapter(HttpClient httpClient) : IHttpClient
         httpClient.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
     }
 
+    public void RemoveDefaultHeader(string name)
+    {
+        httpClient.DefaultRequestHeaders.Remove(name);
+    }
+
     public Task<string> GetStringAsync(string requestUri, CancellationToken cancellationToken = default)
     {
         return httpClient.GetStringAsync(requestUri, cancellationToken);

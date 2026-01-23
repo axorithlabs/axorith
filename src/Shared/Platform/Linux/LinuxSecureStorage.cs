@@ -350,11 +350,24 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         if (File.Exists(keyPath))
         {
-            return File.ReadAllBytes(keyPath);
+            try
+            {
+                var storedEncryptedKey = File.ReadAllBytes(keyPath);
+                var derivedMachineKey = GetMachineKey();
+                return DecryptKeyWithMachineKey(storedEncryptedKey, derivedMachineKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to decrypt master key. Regenerating new key. Previous secrets will be inaccessible.");
+                File.Delete(keyPath);
+            }
         }
 
         var key = RandomNumberGenerator.GetBytes(32);
-        File.WriteAllBytes(keyPath, key);
+        var machineKey = GetMachineKey();
+        var encryptedKey = EncryptKeyWithMachineKey(key, machineKey);
+        
+        File.WriteAllBytes(keyPath, encryptedKey);
 
         if (OperatingSystem.IsLinux())
         {
@@ -376,10 +389,97 @@ internal class LinuxSecureStorage : ISecureStorageService
 
     private static byte[] GetMachineKey()
     {
-        // Create machine-specific encryption key
-        var machineId = Environment.MachineName + Environment.UserName;
-        using var sha = SHA256.Create();
-        return sha.ComputeHash(Encoding.UTF8.GetBytes(machineId));
+        var components = new List<string>
+        {
+            Environment.MachineName,
+            Environment.UserName,
+            Environment.UserDomainName
+        };
+
+        if (OperatingSystem.IsLinux())
+        {
+            try
+            {
+                var machineIdFile = "/etc/machine-id";
+                if (File.Exists(machineIdFile))
+                {
+                    components.Add(File.ReadAllText(machineIdFile).Trim());
+                }
+                
+                var dbusIdFile = "/var/lib/dbus/machine-id";
+                if (File.Exists(dbusIdFile))
+                {
+                    components.Add(File.ReadAllText(dbusIdFile).Trim());
+                }
+
+                var productUuidFile = "/sys/class/dmi/id/product_uuid";
+                if (File.Exists(productUuidFile))
+                {
+                    try
+                    {
+                        components.Add(File.ReadAllText(productUuidFile).Trim());
+                    }
+                    catch
+                    {
+                        // May require root, skip if not accessible
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to basic machine ID
+            }
+        }
+
+        var combinedData = string.Join("|", components);
+        
+        using var sha512 = SHA512.Create();
+        var hash = sha512.ComputeHash(Encoding.UTF8.GetBytes(combinedData));
+        
+        var key = new byte[32];
+        Array.Copy(hash, key, 32);
+        return key;
+    }
+
+    private static byte[] EncryptKeyWithMachineKey(byte[] key, byte[] machineKey)
+    {
+        var nonce = RandomNumberGenerator.GetBytes(12);
+        var ciphertext = new byte[key.Length];
+        var tag = new byte[16];
+
+        using (var aes = new AesGcm(machineKey, tag.Length))
+        {
+            aes.Encrypt(nonce, key, ciphertext, tag);
+        }
+
+        var result = new byte[nonce.Length + ciphertext.Length + tag.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, result, nonce.Length + ciphertext.Length, tag.Length);
+
+        return result;
+    }
+
+    private static byte[] DecryptKeyWithMachineKey(byte[] encryptedKey, byte[] machineKey)
+    {
+        if (encryptedKey.Length < 12 + 16)
+        {
+            throw new CryptographicException("Encrypted key too short");
+        }
+
+        var nonce = new byte[12];
+        var tag = new byte[16];
+        var ciphertext = new byte[encryptedKey.Length - nonce.Length - tag.Length];
+
+        Buffer.BlockCopy(encryptedKey, 0, nonce, 0, nonce.Length);
+        Buffer.BlockCopy(encryptedKey, nonce.Length, ciphertext, 0, ciphertext.Length);
+        Buffer.BlockCopy(encryptedKey, nonce.Length + ciphertext.Length, tag, 0, tag.Length);
+
+        var plaintext = new byte[ciphertext.Length];
+        using var aes = new AesGcm(machineKey, tag.Length);
+        aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+        return plaintext;
     }
 
     private static byte[] EncryptWithAesGcm(byte[] data, byte[] key)
@@ -417,10 +517,8 @@ internal class LinuxSecureStorage : ISecureStorageService
         Buffer.BlockCopy(data, nonce.Length + ciphertext.Length, tag, 0, tag.Length);
 
         var plaintext = new byte[ciphertext.Length];
-        using (var aes = new AesGcm(key, tag.Length))
-        {
-            aes.Decrypt(nonce, ciphertext, tag, plaintext);
-        }
+        using var aes = new AesGcm(key, tag.Length);
+        aes.Decrypt(nonce, ciphertext, tag, plaintext);
 
         return plaintext;
     }

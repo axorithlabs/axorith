@@ -12,7 +12,7 @@ namespace Axorith.Module.Spotify;
 ///     Handles authentication, retries, and rate limiting.
 /// </summary>
 internal sealed class SpotifyApiService(
-    Axorith.Sdk.Http.IHttpClientFactory httpClientFactory,
+    Sdk.Http.IHttpClientFactory httpClientFactory,
     ModuleDefinition definition,
     AuthService authService,
     IModuleLogger logger)
@@ -25,22 +25,18 @@ internal sealed class SpotifyApiService(
     private const int VolumeMin = 0;
     private const int VolumeMax = 100;
 
-    private async Task<bool> PrepareHttpClient()
+    private async Task<string?> GetAccessTokenForRequestAsync()
     {
         var accessToken = await authService.GetValidAccessTokenAsync();
-        if (string.IsNullOrWhiteSpace(accessToken))
+        if (!string.IsNullOrWhiteSpace(accessToken))
         {
-            logger.LogWarning("Cannot perform API call without a valid access token.");
-            return false;
+            return accessToken;
         }
 
-        _apiClient.AddDefaultHeader("Authorization", $"Bearer {accessToken}");
-        return true;
+        logger.LogWarning("Cannot perform API call without a valid access token.");
+        return null;
     }
 
-    /// <summary>
-    ///     Calculates retry delay with exponential backoff and jitter.
-    /// </summary>
     private static TimeSpan GetRetryDelay(int attempt)
     {
         var baseDelay = Math.Pow(2, attempt) * BaseDelayMs;
@@ -48,19 +44,32 @@ internal sealed class SpotifyApiService(
         return TimeSpan.FromMilliseconds(baseDelay + jitter);
     }
 
-    private async Task<T?> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, string operationName) where T : class
+    private async Task<T?> ExecuteWithRetryAsync<T>(Func<string, Task<T>> operation, string operationName) where T : class
     {
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
+            var token = await GetAccessTokenForRequestAsync();
+            if (token == null)
+            {
+                return null;
+            }
+
             try
             {
-                return await operation();
+                _apiClient.AddDefaultHeader("Authorization", $"Bearer {token}");
+                try
+                {
+                    return await operation(token);
+                }
+                finally
+                {
+                    _apiClient.RemoveDefaultHeader("Authorization");
+                }
             }
             catch (HttpRequestException ex) when (attempt < MaxRetries)
             {
                 var statusCode = ex.StatusCode;
 
-                // Retry on rate limit (429) or server errors (5xx)
                 if (statusCode == HttpStatusCode.TooManyRequests ||
                     (statusCode.HasValue && (int)statusCode >= 500))
                 {
@@ -81,12 +90,7 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<SpotifyDevice>> GetDevicesAsync()
     {
-        if (!await PrepareHttpClient())
-        {
-            return [];
-        }
-
-        var result = await ExecuteWithRetryAsync(async () =>
+        var result = await ExecuteWithRetryAsync(async _ =>
         {
             var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/player/devices");
             using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -103,12 +107,7 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
     {
-        if (!await PrepareHttpClient())
-        {
-            return [];
-        }
-
-        var result = await ExecuteWithRetryAsync(async () =>
+        var result = await ExecuteWithRetryAsync(async _ =>
         {
             var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/playlists?limit=50");
             using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -132,12 +131,7 @@ internal sealed class SpotifyApiService(
 
     public async Task<List<KeyValuePair<string, string>>> GetSavedAlbumsAsync()
     {
-        if (!await PrepareHttpClient())
-        {
-            return [];
-        }
-
-        var result = await ExecuteWithRetryAsync<List<KeyValuePair<string, string>>>(async () =>
+        var result = await ExecuteWithRetryAsync<List<KeyValuePair<string, string>>>(async _ =>
         {
             var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/albums?limit=50");
             using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -155,12 +149,7 @@ internal sealed class SpotifyApiService(
 
     public async Task<string> GetLikedSongsAsUriListAsync()
     {
-        if (!await PrepareHttpClient())
-        {
-            return string.Empty;
-        }
-
-        var result = await ExecuteWithRetryAsync(async () =>
+        var result = await ExecuteWithRetryAsync(async _ =>
         {
             var responseJson = await _apiClient.GetStringAsync("https://api.spotify.com/v1/me/tracks?limit=50");
             using var jsonDoc = JsonDocument.Parse(responseJson);
@@ -171,13 +160,13 @@ internal sealed class SpotifyApiService(
         return result ?? string.Empty;
     }
 
-    public Task PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
+    public async Task PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
     {
         var jsonContent = trackUris != null
             ? JsonSerializer.Serialize(new { uris = trackUris })
             : JsonSerializer.Serialize(new { context_uri = contextUri });
 
-        return PutWithTokenAsync($"https://api.spotify.com/v1/me/player/play?device_id={deviceId}", jsonContent);
+        await PutWithTokenAsync($"https://api.spotify.com/v1/me/player/play?device_id={deviceId}", jsonContent);
     }
 
     public async Task PauseAsync()
@@ -199,39 +188,48 @@ internal sealed class SpotifyApiService(
         }
     }
 
-    public Task SetVolumeAsync(string deviceId, int volume)
+    public async Task SetVolumeAsync(string deviceId, int volume)
     {
         volume = Math.Clamp(volume, VolumeMin, VolumeMax);
-        return PutWithTokenAsync(
+        await PutWithTokenAsync(
             $"https://api.spotify.com/v1/me/player/volume?volume_percent={volume}&device_id={deviceId}");
     }
 
-    public Task SetShuffleAsync(string deviceId, bool shuffle)
+    public async Task SetShuffleAsync(string deviceId, bool shuffle)
     {
-        return PutWithTokenAsync(
+        await PutWithTokenAsync(
             $"https://api.spotify.com/v1/me/player/shuffle?state={shuffle.ToString().ToLowerInvariant()}&device_id={deviceId}");
     }
 
-    public Task SetRepeatModeAsync(string deviceId, string repeatMode)
+    public async Task SetRepeatModeAsync(string deviceId, string repeatMode)
     {
-        return PutWithTokenAsync(
+        await PutWithTokenAsync(
             $"https://api.spotify.com/v1/me/player/repeat?state={repeatMode}&device_id={deviceId}");
     }
 
     private async Task PutWithTokenAsync(string uri, string? jsonContent = null)
     {
-        if (!await PrepareHttpClient())
+        var token = await GetAccessTokenForRequestAsync();
+        if (token == null)
         {
             return;
         }
 
-        if (jsonContent != null)
+        _apiClient.AddDefaultHeader("Authorization", $"Bearer {token}");
+        try
         {
-            await _apiClient.PutStringAsync(uri, jsonContent, Encoding.UTF8, "application/json");
+            if (jsonContent != null)
+            {
+                await _apiClient.PutStringAsync(uri, jsonContent, Encoding.UTF8, "application/json");
+            }
+            else
+            {
+                await _apiClient.PutAsync(uri);
+            }
         }
-        else
+        finally
         {
-            await _apiClient.PutAsync(uri);
+            _apiClient.RemoveDefaultHeader("Authorization");
         }
     }
 }

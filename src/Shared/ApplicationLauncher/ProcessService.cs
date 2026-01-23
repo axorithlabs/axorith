@@ -125,6 +125,12 @@ public sealed class ProcessService(IModuleLogger logger)
             logger.LogDebug("Launching process: {Path} {Args} (WorkingDir: {WorkingDirectory})", TelemetryGuard.SafePath(path), args,
                 string.IsNullOrWhiteSpace(workingDirectory) ? "<default>" : workingDirectory);
 
+            if (!File.Exists(path))
+            {
+                logger.LogError(null, "Executable not found: {Path}", TelemetryGuard.SafePath(path));
+                return Task.FromResult<Process?>(null);
+            }
+
             var effectiveWorkingDirectory = workingDirectory;
 
             if (string.IsNullOrWhiteSpace(effectiveWorkingDirectory))
@@ -143,7 +149,8 @@ public sealed class ProcessService(IModuleLogger logger)
             {
                 FileName = path,
                 Arguments = args,
-                UseShellExecute = true
+                UseShellExecute = false,
+                CreateNoWindow = false
             };
 
             if (!string.IsNullOrWhiteSpace(effectiveWorkingDirectory))

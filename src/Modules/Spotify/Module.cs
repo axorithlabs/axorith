@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
-using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
@@ -31,7 +30,7 @@ public class Module : IModule, IAsyncDisposable
 
     public Module(
         IModuleLogger logger,
-        Axorith.Sdk.Http.IHttpClientFactory httpClientFactory,
+        Sdk.Http.IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage,
         INotifier notifier,
         IAppDiscoveryService appDiscovery,

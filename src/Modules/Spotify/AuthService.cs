@@ -10,6 +10,7 @@ using Axorith.Sdk;
 using Axorith.Sdk.Http;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Utils;
 using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.Spotify;
@@ -24,7 +25,7 @@ internal sealed class AuthService : IDisposable
     private readonly CompositeDisposable _disposables = [];
     private readonly SemaphoreSlim _tokenRefreshSemaphore = new(1, 1);
 
-    private string? _inMemoryAccessToken;
+    private SecureMemoryString? _inMemoryAccessToken;
     private DateTimeOffset? _accessTokenExpiresAtUtc;
 
     private const string RefreshTokenKey = "SpotifyRefreshToken";
@@ -38,7 +39,7 @@ internal sealed class AuthService : IDisposable
 
     public event Action<bool>? AuthenticationStateChanged;
 
-    public AuthService(IModuleLogger logger, Axorith.Sdk.Http.IHttpClientFactory httpClientFactory,
+    public AuthService(IModuleLogger logger, Sdk.Http.IHttpClientFactory httpClientFactory,
         ISecureStorageService secureStorage, ModuleDefinition definition, Settings settings, INotifier notifier)
     {
         _logger = logger;
@@ -81,13 +82,14 @@ internal sealed class AuthService : IDisposable
         await _tokenRefreshSemaphore.WaitAsync();
         try
         {
-            if (!string.IsNullOrWhiteSpace(_inMemoryAccessToken) &&
+            if (_inMemoryAccessToken != null &&
                 _accessTokenExpiresAtUtc.HasValue &&
                 _accessTokenExpiresAtUtc > DateTimeOffset.UtcNow.AddSeconds(30))
             {
-                return _inMemoryAccessToken;
+                return _inMemoryAccessToken.GetValue();
             }
 
+            _inMemoryAccessToken?.Dispose();
             _inMemoryAccessToken = null;
             _accessTokenExpiresAtUtc = null;
 
@@ -137,7 +139,7 @@ internal sealed class AuthService : IDisposable
                 }
 
                 _logger.LogInfo("Successfully refreshed access token.");
-                _inMemoryAccessToken = newAccessToken;
+                _inMemoryAccessToken = new SecureMemoryString(newAccessToken);
 
                 const int safetyMarginSeconds = 30;
                 var effectiveExpirySeconds = expiresInSeconds > safetyMarginSeconds
@@ -146,7 +148,7 @@ internal sealed class AuthService : IDisposable
 
                 _accessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(effectiveExpirySeconds);
                 UpdateUiForAuthenticationState(true);
-                return _inMemoryAccessToken;
+                return _inMemoryAccessToken.GetValue();
             }
             catch (Exception ex)
             {
@@ -191,6 +193,7 @@ internal sealed class AuthService : IDisposable
     private void Logout()
     {
         _secureStorage.DeleteSecret(RefreshTokenKey);
+        _inMemoryAccessToken?.Dispose();
         _inMemoryAccessToken = null;
         _accessTokenExpiresAtUtc = null;
         _logger.LogInfo("Logged out from Spotify");
@@ -199,6 +202,7 @@ internal sealed class AuthService : IDisposable
     private async Task<bool> PerformPkceLoginAsync()
     {
         var (codeVerifier, codeChallenge) = GeneratePkcePair();
+        var state = GenerateSecureState();
 
         HttpListener? listener = null;
         string? redirectUri = null;
@@ -277,7 +281,8 @@ internal sealed class AuthService : IDisposable
                           $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                           $"&scope={Uri.EscapeDataString(scopes)}" +
                           "&code_challenge_method=S256" +
-                          $"&code_challenge={codeChallenge}";
+                          $"&code_challenge={codeChallenge}" +
+                          $"&state={state}";
 
             try
             {
@@ -311,8 +316,23 @@ internal sealed class AuthService : IDisposable
             var context = await contextTask.ConfigureAwait(false);
             var code = context.Request.QueryString.Get("code");
             var error = context.Request.QueryString.Get("error");
+            var returnedState = context.Request.QueryString.Get("state");
 
             var response = context.Response;
+            
+            if (returnedState != state)
+            {
+                _logger.LogError(null, "CSRF validation failed: state mismatch. Expected: {Expected}, Got: {Got}", 
+                    state, returnedState ?? "<null>");
+                var csrfErrorHtml = "<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Security Error</h1><p>CSRF validation failed. Please try again.</p></body></html>";
+                var csrfBuffer = Encoding.UTF8.GetBytes(csrfErrorHtml);
+                response.ContentLength64 = csrfBuffer.Length;
+                await response.OutputStream.WriteAsync(csrfBuffer);
+                response.OutputStream.Close();
+                _notifier.ShowToast("Error: Security validation failed", NotificationType.Error);
+                return false;
+            }
+
             var responseString = string.IsNullOrEmpty(error)
                 ? "<html><body style='background:#121212;color:#e0e0e0;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Axorith Connected!</h1><p>You can now close this tab and return to the app.</p></body></html>"
                 : $"<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Login Failed</h1><p>Spotify returned error: {error}</p></body></html>";
@@ -368,6 +388,15 @@ internal sealed class AuthService : IDisposable
         }
     }
 
+    private static string GenerateSecureState()
+    {
+        var randomBytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(randomBytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
     private static (string, string) GeneratePkcePair()
     {
         var randomBytes = RandomNumberGenerator.GetBytes(32);
@@ -388,7 +417,7 @@ internal sealed class AuthService : IDisposable
 
     public void Dispose()
     {
+        _inMemoryAccessToken?.Dispose();
         _disposables.Dispose();
-        // Intentionally do not dispose _tokenRefreshSemaphore to avoid race with in-flight refresh tasks
     }
 }

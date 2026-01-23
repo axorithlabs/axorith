@@ -243,7 +243,7 @@ public class ScheduleManagerTests : IAsyncDisposable
 
         // Assert
         result.Should().NotBeNull();
-        result!.IsEnabled.Should().BeFalse();
+        result.IsEnabled.Should().BeFalse();
 
         var schedules = await _manager.ListSchedulesAsync(CancellationToken.None);
         schedules[0].IsEnabled.Should().BeFalse();
@@ -406,8 +406,9 @@ public class SessionScheduleTests
     public void GetNextRun_Recurring_WithTime_ShouldReturnNextOccurrence()
     {
         // Arrange
-        var now = DateTimeOffset.Now;
-        var futureTime = now.TimeOfDay.Add(TimeSpan.FromHours(1));
+        var now = new DateTimeOffset(2024, 1, 15, 10, 0, 0,
+            TimeZoneInfo.Local.GetUtcOffset(new DateTime(2024, 1, 15, 10, 0, 0)));
+        var futureTime = TimeSpan.FromHours(14);
         var schedule = new SessionSchedule
         {
             IsEnabled = true,
@@ -420,7 +421,8 @@ public class SessionScheduleTests
 
         // Assert
         result.Should().NotBeNull();
-        result!.Value.TimeOfDay.Should().BeCloseTo(futureTime, TimeSpan.FromSeconds(1));
+        result.Value.Date.Should().Be(now.Date);
+        result.Value.TimeOfDay.Should().Be(futureTime);
     }
 
     [Fact]
@@ -465,7 +467,7 @@ public class SessionScheduleTests
         // Assert
         result.Should().NotBeNull();
         // The next run should be today at 10 AM (since now is 8 AM and recurring time is 10 AM)
-        result!.Value.TimeOfDay.Should().Be(TimeSpan.FromHours(10));
+        result.Value.TimeOfDay.Should().Be(TimeSpan.FromHours(10));
     }
 
     #endregion

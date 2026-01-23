@@ -11,8 +11,6 @@ namespace Axorith.Shared.Platform.Windows;
 [SupportedOSPlatform("windows")]
 internal class WindowsSecureStorage : ISecureStorageService
 {
-    private static readonly byte[] SEntropy = "AxorithLabs.Axorith.v1"u8.ToArray();
-
     private readonly string _storagePath;
     private readonly ILogger _logger;
 
@@ -40,7 +38,7 @@ internal class WindowsSecureStorage : ISecureStorageService
         try
         {
             var secretBytes = Encoding.UTF8.GetBytes(secret);
-            var encryptedBytes = ProtectedData.Protect(secretBytes, SEntropy, DataProtectionScope.CurrentUser);
+            var encryptedBytes = ProtectedData.Protect(secretBytes, null, DataProtectionScope.CurrentUser);
             var filePath = GetFilePathForKey(key);
 
             File.WriteAllBytes(filePath, encryptedBytes);
@@ -71,12 +69,11 @@ internal class WindowsSecureStorage : ISecureStorageService
         try
         {
             var encryptedBytes = File.ReadAllBytes(filePath);
-            var secretBytes = ProtectedData.Unprotect(encryptedBytes, SEntropy, DataProtectionScope.CurrentUser);
+            var secretBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(secretBytes);
         }
         catch (CryptographicException ex)
         {
-            // Graceful degradation: data corrupted or encrypted under different user
             _logger.LogWarning(ex,
                 "Failed to decrypt secret for key: {Key}. File: {FileName}, Size: {Size} bytes. " +
                 "Data may be corrupted or encrypted under a different user account.",

@@ -140,34 +140,74 @@ public class GrpcCoreConnection : ICoreConnection
                 return Task.CompletedTask;
             });
 
-            var channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
+            ChannelCredentials channelCredentials;
+            GrpcChannelOptions channelOptions;
 
-            _channel = GrpcChannel.ForAddress(_serverAddress, new GrpcChannelOptions
+            if (_serverAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                MaxReceiveMessageSize = 16 * 1024 * 1024, // 16MB
-                MaxSendMessageSize = 16 * 1024 * 1024,
-                Credentials = channelCredentials,
-                UnsafeUseInsecureChannelCallCredentials = true,
-                ServiceConfig = new ServiceConfig
+                channelCredentials = ChannelCredentials.Create(ChannelCredentials.SecureSsl, credentials);
+                channelOptions = new GrpcChannelOptions
                 {
-                    MethodConfigs =
+                    MaxReceiveMessageSize = 16 * 1024 * 1024,
+                    MaxSendMessageSize = 16 * 1024 * 1024,
+                    Credentials = channelCredentials,
+                    ServiceConfig = new ServiceConfig
                     {
-                        new MethodConfig
+                        MethodConfigs =
                         {
-                            Names = { MethodName.Default },
-                            RetryPolicy = new RetryPolicy
+                            new MethodConfig
                             {
-                                MaxAttempts = 5,
-                                InitialBackoff = TimeSpan.FromSeconds(1),
-                                MaxBackoff = TimeSpan.FromSeconds(5),
-                                BackoffMultiplier = 1.5,
-                                RetryableStatusCodes =
-                                    { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
+                                Names = { MethodName.Default },
+                                RetryPolicy = new RetryPolicy
+                                {
+                                    MaxAttempts = 5,
+                                    InitialBackoff = TimeSpan.FromSeconds(1),
+                                    MaxBackoff = TimeSpan.FromSeconds(5),
+                                    BackoffMultiplier = 1.5,
+                                    RetryableStatusCodes =
+                                        { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
+                                }
                             }
                         }
                     }
-                }
-            });
+                };
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Using insecure channel for localhost communication. " +
+                    "This is acceptable only for local IPC. Never use in production over network.");
+                
+                channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
+                channelOptions = new GrpcChannelOptions
+                {
+                    MaxReceiveMessageSize = 16 * 1024 * 1024,
+                    MaxSendMessageSize = 16 * 1024 * 1024,
+                    Credentials = channelCredentials,
+                    UnsafeUseInsecureChannelCallCredentials = true,
+                    ServiceConfig = new ServiceConfig
+                    {
+                        MethodConfigs =
+                        {
+                            new MethodConfig
+                            {
+                                Names = { MethodName.Default },
+                                RetryPolicy = new RetryPolicy
+                                {
+                                    MaxAttempts = 5,
+                                    InitialBackoff = TimeSpan.FromSeconds(1),
+                                    MaxBackoff = TimeSpan.FromSeconds(5),
+                                    BackoffMultiplier = 1.5,
+                                    RetryableStatusCodes =
+                                        { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            _channel = GrpcChannel.ForAddress(_serverAddress, channelOptions);
 
             var presetsClient = new PresetsService.PresetsServiceClient(_channel);
             var sessionsClient = new SessionsService.SessionsServiceClient(_channel);

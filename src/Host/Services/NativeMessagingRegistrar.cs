@@ -12,6 +12,7 @@ public class NativeMessagingRegistrar(
     ILogger<NativeMessagingRegistrar> logger) : IHostedService
 {
     private const string FirefoxExtensionId = "site-blocker-firefox@axorithlabs.com";
+    private const string ChromeExtensionId = "CHROME_EXTENSION_ID_PLACEHOLDER";
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -55,22 +56,27 @@ public class NativeMessagingRegistrar(
 
         logger.LogInformation("Found Shim executable at: {Path}", TelemetryGuard.SafePath(shimPath));
 
-        // Register for Firefox
         manager.RegisterFirefoxHost(hostName, shimPath, [FirefoxExtensionId]);
 
-        // Register for Chrome/Chromium-based browsers
-        // Note: The extension ID will be determined when the extension is loaded in Chrome.
-        // For unpacked extensions, Chrome generates an ID based on the extension's path.
-        // For published extensions, the ID is fixed by Chrome Web Store.
-        // Using wildcard pattern to allow any extension origin during development.
-        // In production, replace with the actual Chrome Web Store extension ID.
         #if DEBUG
-        // Allow all extensions during development
+        logger.LogWarning(
+            "DEBUG MODE: Allowing wildcard chrome-extension origins for development. " +
+            "This is insecure and must be replaced with actual extension ID in production.");
         manager.RegisterChromeHost(hostName, shimPath, ["chrome-extension://*/*"]);
         #else
-        // TODO: Replace with actual Chrome Web Store extension ID after publishing
-        // Format: "chrome-extension://[32-character-extension-id]/"
-        manager.RegisterChromeHost(hostName, shimPath, ["chrome-extension://*/*"]);
+        if (ChromeExtensionId == "CHROME_EXTENSION_ID_PLACEHOLDER")
+        {
+            logger.LogError(
+                "Chrome extension ID not configured. Native Messaging for Chrome will not work. " +
+                "Update ChromeExtensionId constant in NativeMessagingRegistrar.cs with your published extension ID.");
+        }
+        else
+        {
+            var chromeOrigin = $"chrome-extension://{ChromeExtensionId}/";
+            manager.RegisterChromeHost(hostName, shimPath, [chromeOrigin]);
+            logger.LogInformation("Registered Chrome Native Messaging Host with extension ID: {ExtensionId}", 
+                ChromeExtensionId);
+        }
         #endif
     }
 }
