@@ -163,6 +163,8 @@ try
         options.Limits.Http2.KeepAlivePingTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
     });
 
+    builder.Services.AddSingleton(sp => 
+        PlatformServices.CreateFilePermissionsService(sp.GetRequiredService<ILoggerFactory>()));
     builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();
 
     builder.Services.AddHostedService<NativeMessagingRegistrar>();

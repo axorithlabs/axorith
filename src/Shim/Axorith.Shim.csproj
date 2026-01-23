@@ -9,6 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Shared\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\Shared\Utils\Axorith.Shared.Utils.csproj" />
     </ItemGroup>
 </Project>

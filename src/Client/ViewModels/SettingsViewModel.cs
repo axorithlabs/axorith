@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Reactive.Disposables;
-using System.Reactive.Linq;
 using System.Reflection;
 using System.Windows.Input;
 using Axorith.Client.Services;
@@ -226,7 +225,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
             {
                 _toastService?.Show(
                     $"Setup complete: Created {result.CreatedCount} preset(s): {string.Join(", ", result.CreatedPresetNames)}",
-                    Axorith.Sdk.Services.NotificationType.Success);
+                    Sdk.Services.NotificationType.Success);
 
                 _telemetry.TrackEvent("SetupWizardCompleted", new Dictionary<string, object?>
                 {
@@ -238,19 +237,19 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
             {
                 _toastService?.Show(
                     $"Setup completed with errors: {result.Errors.First()}",
-                    Axorith.Sdk.Services.NotificationType.Warning);
+                    Sdk.Services.NotificationType.Warning);
             }
             else
             {
                 _toastService?.Show(
                     "No new presets created. Required modules may not be installed.",
-                    Axorith.Sdk.Services.NotificationType.Info);
+                    Sdk.Services.NotificationType.Info);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Setup wizard failed");
-            _toastService?.Show($"Setup failed: {ex.Message}", Axorith.Sdk.Services.NotificationType.Error);
+            _toastService?.Show($"Setup failed: {ex.Message}", Sdk.Services.NotificationType.Error);
         }
         finally
         {

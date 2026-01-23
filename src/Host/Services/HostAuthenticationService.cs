@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using Axorith.Contracts;
+using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,7 @@ public interface IHostAuthenticationService
 
 public class HostAuthenticationService(
     IOptions<Configuration> options,
+    IFilePermissionsService filePermissionsService,
     ILogger<HostAuthenticationService> logger) : IHostAuthenticationService
 {
     private string _currentToken = string.Empty;
@@ -32,7 +34,6 @@ public class HostAuthenticationService(
                     var existingToken = File.ReadAllText(tokenFilePath).Trim();
                     if (!string.IsNullOrWhiteSpace(existingToken))
                     {
-                        // Validate that the token is valid Base64
                         _ = Convert.FromBase64String(existingToken);
                         _currentToken = existingToken;
                         logger.LogInformation("Loaded existing auth token from {Path}", TelemetryGuard.SafePath(tokenFilePath));
@@ -49,6 +50,8 @@ public class HostAuthenticationService(
             _currentToken = Convert.ToBase64String(tokenData);
 
             File.WriteAllText(tokenFilePath, _currentToken);
+            filePermissionsService.SetRestrictivePermissions(tokenFilePath);
+
             logger.LogInformation("New auth token generated and written to {Path}", TelemetryGuard.SafePath(tokenFilePath));
         }
         catch (Exception ex)

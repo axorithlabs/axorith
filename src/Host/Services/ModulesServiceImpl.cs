@@ -78,7 +78,7 @@ public class ModulesServiceImpl(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error listing modules");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to list modules", ex));
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to list modules"));
         }
     }
 
@@ -152,7 +152,7 @@ public class ModulesServiceImpl(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting module settings");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to get module settings", ex));
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to get module settings"));
         }
     }
 
@@ -196,7 +196,7 @@ public class ModulesServiceImpl(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error invoking action");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke action", ex));
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke action"));
         }
     }
 
@@ -292,7 +292,7 @@ public class ModulesServiceImpl(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error invoking design-time action");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke design-time action", ex));
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to invoke design-time action"));
         }
     }
 
@@ -402,7 +402,7 @@ public class ModulesServiceImpl(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating setting");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to update setting", ex));
+            throw new RpcException(new Status(StatusCode.Internal, "Failed to update setting"));
         }
     }
 

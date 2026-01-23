@@ -37,7 +37,8 @@ public class GrpcUpdatesApi : IUpdatesApi
                 response.LatestVersion,
                 response.DownloadUrl,
                 response.ReleaseNotes,
-                response.PublishedAt.ToDateTime());
+                response.PublishedAt.ToDateTime(),
+                response.Sha256Hash);
         }
         catch (RpcException ex)
         {
@@ -69,9 +70,11 @@ public class GrpcUpdatesApi : IUpdatesApi
             var buffer = new byte[8192];
             int bytesRead;
 
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
             while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
             {
                 await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                sha256.TransformBlock(buffer, 0, bytesRead, null, 0);
                 downloadedBytes += bytesRead;
 
                 if (totalBytes > 0)
@@ -81,13 +84,108 @@ public class GrpcUpdatesApi : IUpdatesApi
                 }
             }
 
-            _logger.LogInformation("Update downloaded successfully to {Path}", TelemetryGuard.SafePath(tempPath));
+            sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            var computedHash = Convert.ToHexString(sha256.Hash!);
+
+            _logger.LogInformation("Update downloaded successfully. SHA256: {Hash}", computedHash);
+
+            if (!string.IsNullOrWhiteSpace(updateInfo.Sha256Hash))
+            {
+                if (!string.Equals(computedHash, updateInfo.Sha256Hash, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(tempPath);
+                    throw new InvalidOperationException(
+                        $"Update file integrity check failed. Expected: {updateInfo.Sha256Hash}, Got: {computedHash}");
+                }
+
+                _logger.LogInformation("Update file integrity verified successfully");
+            }
+            else
+            {
+                _logger.LogWarning("No SHA256 hash provided for update verification. Proceeding without integrity check.");
+            }
+
+            if (OperatingSystem.IsWindows())
+            {
+                if (!VerifyAuthenticodeSignature(tempPath))
+                {
+                    File.Delete(tempPath);
+                    throw new InvalidOperationException(
+                        "Update file signature verification failed. The installer is not signed by a trusted publisher.");
+                }
+                _logger.LogInformation("Authenticode signature verified successfully");
+            }
+
             return tempPath;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to download update");
             throw;
+        }
+    }
+
+    private bool VerifyAuthenticodeSignature(string filePath)
+    {
+        try
+        {
+            using var cert2 = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(filePath);
+            
+            var expectedSubjects = new[]
+            {
+                "CN=Axorith Labs",
+                "CN=AxorithLabs",
+                "O=Axorith Labs"
+            };
+
+            var subjectMatches = expectedSubjects.Any(expected => 
+                cert2.Subject.Contains(expected, StringComparison.OrdinalIgnoreCase));
+
+            if (!subjectMatches)
+            {
+                _logger.LogError("Certificate subject mismatch. Expected one of: {Expected}, Got: {Actual}", 
+                    string.Join(", ", expectedSubjects), cert2.Subject);
+                return false;
+            }
+
+            var chain = new System.Security.Cryptography.X509Certificates.X509Chain
+            {
+                ChainPolicy =
+                {
+                    RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
+                    RevocationFlag = System.Security.Cryptography.X509Certificates.X509RevocationFlag.EntireChain,
+                    VerificationFlags = System.Security.Cryptography.X509Certificates.X509VerificationFlags.NoFlag
+                }
+            };
+
+            var isValid = chain.Build(cert2);
+
+            if (!isValid)
+            {
+                _logger.LogError("Certificate chain validation failed. Status: {Status}", 
+                    string.Join(", ", chain.ChainStatus.Select(s => s.StatusInformation)));
+                return false;
+            }
+
+            var now = DateTime.Now;
+            if (now < cert2.NotBefore || now > cert2.NotAfter)
+            {
+                _logger.LogError("Certificate is expired or not yet valid. Valid from {From} to {To}", 
+                    cert2.NotBefore, cert2.NotAfter);
+                return false;
+            }
+
+            return true;
+        }
+        catch (System.Security.Cryptography.CryptographicException ex)
+        {
+            _logger.LogError(ex, "File is not signed or signature is invalid");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify Authenticode signature");
+            return false;
         }
     }
 
