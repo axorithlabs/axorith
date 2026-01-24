@@ -2,121 +2,120 @@
   <img src="docs/assets/github-banner.jpg" alt="Axorith Banner" width="100%">
   <p/>
   <p>
-    <a href="https://discord.gg/axorith">
-      <img src="https://img.shields.io/discord/1433475181447352414?label=Join%20Discord&logo=discord&style=for-the-badge&color=5865F2" alt="Discord">
-    </a>
     <a href="https://github.com/axorithlabs/axorith/releases/latest">
       <img src="https://img.shields.io/github/downloads/axorithlabs/axorith/total?label=Downloads&style=for-the-badge&color=2ea44f" alt="Downloads">
     </a>
     <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md">
       <img src="https://img.shields.io/badge/License-BSL%201.1-blue?style=for-the-badge" alt="License">
     </a>
+    <a href="https://github.com/axorithlabs/axorith/discussions">
+      <img src="https://img.shields.io/badge/Discussions-Ask%20Questions-blueviolet?style=for-the-badge" alt="Discussions">
+    </a>
   </p>
-</div>  
+</div>
 
-<h1 align="center">The Problem: The "Context Switching Tax"</h1>
+# Axorith: Local Workspace Orchestrator
 
-Every time you start a task, you pay a tax in time and willpower. This 15-minute setup ritual is a barrier to entry. It's friction.
+**A Windows utility to automate environment switching (Apps, Network, IoT).**
 
-| The Old Way (Manual Chaos)            | The Axorith Way (Instant Context)       |
-|:--------------------------------------|:----------------------------------------|
-| 😩 Struggle to start working.         | ✅ **Deep Work.**          |
-| 🎮 Can't fully disconnect after work. | ✅ **Gaming Mode.**        |
-| 🎵 Fiddling with apps & smart home.   | ✅ **Lights & Media adjust instantly.** |
-| 🛡️ Manual distraction blocking.       | ✅ **Automatic Distraction Blocker.**   |
-| **15 minutes of friction.**           | **< 15 seconds to your flow state.**    |
+I built Axorith because I was tired of the manual ritual every morning: closing Steam, opening VS Code, finding the right playlist, and toggling smart lights. Existing tools were either too simple (just app launchers) or required cloud subscriptions.
 
-<h1 align="center">The Philosophy: Your Mind is the Kernel</h1>
+Axorith runs locally as a background service. It monitors your context and enforces rules: launching required tools, killing distractions, and triggering Home Assistant webhooks.
 
-Axorith was born from a simple, powerful observation: **the modern digital workspace is fundamentally broken.**
+## Key Features
 
-The very tools meant to help us have become the primary source of friction. Existing applications only treat the symptoms — they are features *within* the chaos.
+*   **Process Control:** Automatically launches work apps (VS Code, Docker) and terminates distractions (Steam, Discord) when a session starts.
+*   **Home Assistant Integration:** Triggers scenes, scripts, or lights via local API. Your physical room adapts to your digital context.
+*   **Hard Blocking:** Blocks distracting websites via a browser extension (Native Messaging) and kills blacklisted processes instantly using kernel events (ETW).
+*   **Spotify Control:** Automates playback, volume, and device selection.
+*   **Scheduler:** Cron-like scheduling to force context switches (e.g., "Work Mode" starts automatically at 9:00 AM).
 
-**Axorith is not another app. It's a remote control for your digital life.**
-We believe you shouldn't spend mental energy setting up your environment. Whether you are coding, gaming, or winding down for the night, Axorith automates your apps, your home, and your focus.
+## Tech Stack
 
-This philosophy is built on three core principles, embodied in our key features:
+Built with modern .NET technologies, focusing on performance and modularity:
 
----
+*   **Core:** .NET 10 & C# 14
+*   **UI:** Avalonia UI (Cross-platform foundation) + ReactiveUI (MVVM)
+*   **Communication:** gRPC (Protobuf) for inter-process communication.
+*   **Logging:** Serilog (Structured logging).
 
-### 1. ⚙️ You Are In Control, Not The Machine.
+## Architecture
 
-It's not about complex settings, but about meaningful control. You define the rules for your focus, codifying your entire workflow for different tasks into reusable presets.
+Unlike typical monolithic desktop apps, Axorith uses a **Client-Server architecture** running locally on your machine:
 
-> **Core Feature: Session Presets**
-> Design your ideal environment for "Work" or "Play." Axorith launches any application, arranges your windows, starts your media, and enables your distraction blocker.
+1.  **Axorith.Host:** A headless background service (Worker). It holds the state, manages timers, runs the scheduler, and handles hardware integrations. If the UI crashes, your session and blockers **keep running**.
+2.  **Axorith.Client:** A lightweight Avalonia UI that connects to the Host via gRPC.
 
-> **Core Feature: Session Scheduler**
-> True autopilot. Schedule your "Deep Work" session to start at 9:00 AM and auto-switch to "Rest" at 10:00 AM. Your PC and room adapt instantly without you touching a thing.
+### Plugin System
+Modules are loaded into isolated `AssemblyLoadContexts`. This allows for:
+*   Runtime loading/unloading of plugins.
+*   Dependency isolation (Plugin A can use Newtonsoft.Json v12, Plugin B can use v13).
+*   Prevention of memory leaks during development/hot-reload.
 
-### 2. 🧩 Radical Modularity, Not A Locked Cage.
+## Getting Started
 
-Your workflow is unique. We don't lock you into our way of thinking. The entire system is built on plugins. Axorith provides the foundation; you choose the instruments.
+### Installation
+Download the latest installer from the [Releases page](https://github.com/axorithlabs/axorith/releases).
+*   *Note: Windows SmartScreen might flag the installer because I don't have an EV code signing certificate yet.*
 
-> **Core Feature: A True Plugin Ecosystem**
-> The entire system is built on a powerful SDK that lets you and the community integrate any tool with an API. A clean, well-documented, developer-first approach makes creating and sharing your own modules simple.
+### Usage
 
-### 3. 🛡️ Unmatched Stability, Not Constant Fear.
+1.  **Create a Session:** Click "Create New Session" and name it (e.g., "Deep Work").
+2.  **Start On... (Triggers):**
+    *   Add a **Time Schedule** (e.g., Mon-Fri at 09:00) to auto-start.
+    *   Leave empty to start manually via the "Start" button.
+3.  **Configure Modules:**
+    *   Click **Add Module** to select tools from the library.
+    *   *App Blocker:* Select categories (Gaming, Social) or specific exes to kill.
+    *   *App Launcher:* Select `code.exe` and set your project path.
+    *   *Home Assistant:* Enter your Entity ID (e.g., `scene.focus_mode`).
+4.  **Stop On...:**
+    *   Add a **Session Duration** trigger (e.g., 2 hours) to auto-stop the session.
+5.  **Then... (Chaining):**
+    *   Optionally select another preset (e.g., "Rest") to start automatically when this session ends.
 
-Your focus is fragile. The tools that protect it must be bulletproof. We built Axorith to be the most reliable part of your workflow.
+## Roadmap
 
-> **Core Feature: Client-Server Architecture**
-> The UI (`Client`) is completely separate from the engine (`Host`). If the user interface crashes for any reason, your schedule and blockers **keep running** without interruption. Simply restart the UI and reconnect.
+*   [x] **Core:** Client-Server gRPC architecture.
+*   [x] **Modules:** App Blocker, Site Blocker, Spotify, Home Assistant, Steam, OBS.
+*   [ ] **Platform:** Linux & macOS support (Core is ready, UI needs adjustments).
+*   [ ] **Cloud:** Optional preset sync (Self-hosted or Cloud).
 
----
+## Support Development
+
+Axorith is free and open-source. I develop it in my spare time. If it helps you stay productive, consider supporting the development.
+
+**Card (RUB):**
+[**Support via CloudTips**](https://pay.cloudtips.ru/p/41eb7826)
 
 <details>
-  <summary><strong>Peek Under the Hood: Tech Stack & Architecture</strong></summary>
+  <summary><strong>Crypto (USDT, BTC, ETH, TON)</strong></summary>
 
-### Tech Stack
-*   **.NET 10** & **C# 14**
-*   **Avalonia UI** for a true cross-platform native UI on Windows, macOS, and Linux.
-*   **ReactiveUI (MVVM)** for a modern, reactive UI architecture.
-*   **Serilog** for structured, production-ready logging.
+*   **BTC:** `bc1q4p93zvy3pxdf293hwka2tmdyhr53zwju3xmwlf`
+*   **ETH / USDT / USDC (ERC-20):** `0xb1aec06166336cf717b244dbdc8620820824f1d7`
+*   **TON:** `UQAMfKB_qmJZp2CpIJb6oxrqH4cqe81H2iZ4Mbq9wrR7mHn1`
 
-### Architecture
-Axorith is built on a clean, modular architecture to ensure stability, testability, and extensibility. You can read the full guide [here](docs/architecture.md).
 </details>
 
----
+## Contributing
 
-<h1 align="center">Roadmap & Development</h1>
+This is an open-source project and I welcome contributions.
+If you want to write a module (e.g., for Hue, Yeelight, or Slack), check out the `src/Sdk` project.
 
-Axorith is under active development, moving towards a powerful, stable release. Our vision is ambitious, and our progress is transparent.
+1.  Fork the repository.
+2.  Create a feature branch.
+3.  Submit a Pull Request.
 
-*   **Milestone 1: The Foundation**
-    *   [x] Bulletproof client-server architecture for maximum stability.
-    *   [x] A powerful, reactive SDK for module development.
-    *   [x] A core set of powerful modules (App/Site Blocker, Media Control, Universal Launchers).
-    *   [x] Session scheduling.
+**Found a bug?** [Open an Issue](https://github.com/axorithlabs/axorith/issues).
+**Have an idea?** [Start a Discussion](https://github.com/axorithlabs/axorith/discussions).
 
-*   **Milestone 2: The Ecosystem**
-    *   [ ] Flawless onboarding and user experience.
-    *   [ ] Cloud sync for presets.
-    *   [ ] An in-app module browser and marketplace.
-    *   [ ] MacOS & Linux support.
+## License
 
-*   **Milestone 3: The "Digital Life System"**
-    *   [ ] Deeper OS integrations, team features, and focus analytics.
+Source-available under the **Business Source License (BSL 1.1)**.
+*   Free for personal use.
+*   Free for non-commercial use.
+*   See [LICENSE.md](LICENSE.md) for details.
 
-For a detailed, up-to-the-minute view of our task board, bug reports, and current development status, visit our public YouTrack project.
-
-[**➡️ View the Live Development Board on YouTrack**](https://axorithlabs.youtrack.cloud/agiles/192-1/current)
-
-<h1 align="center">Join the Community</h1>
-
-Have questions? Ideas? Want to see what's next? Join our community to chat with the developers and other users.
-
-[**➡️ Join the Axorith Labs Discord Server**](https://discord.gg/axorith)
-
-<h1 align="center">Contributing</h1>
-
-We believe in the power of community. If you share our philosophy, we welcome your input. Please see our [Contributing Guidelines](CONTRIBUTING.md) to get started.
-
-<h1 align="center">License & Monetization</h1>
-
-Axorith is source-available under the Business Source License (BSL). We aim to build a sustainable open-source project. For details on what this means for you and how we plan to fund development, please read our [Monetization Philosophy](docs/monetization.md).
-
-<h1 align="center">SAST Tools</h1>
+## SAST Tools
 
 [PVS-Studio](https://pvs-studio.com/en/pvs-studio/?utm_source=website&utm_medium=github&utm_campaign=open_source) - static analyzer for C, C++, C#, and Java code.
