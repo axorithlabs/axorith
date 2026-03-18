@@ -1,5 +1,5 @@
 ﻿<div align="center">
-  <img src="docs/assets/github-banner.jpg" alt="Axorith Banner" width="100%">
+  <img src="docs/assets/demo.gif" alt="Axorith Demo" width="100%">
   <p/>
   <p>
     <a href="https://github.com/axorithlabs/axorith/releases/latest">
@@ -16,7 +16,7 @@
 
 # Axorith: Local Workspace Orchestrator
 
-**A Windows utility to automate environment switching (Apps, Network, IoT).**
+**A free, local alternative to Freedom and Cold Turkey — with Home Assistant integration and a plugin system.**
 
 I built Axorith because I was tired of the manual ritual every morning: closing Steam, opening VS Code, finding the right playlist, and toggling smart lights. Existing tools were either too simple (just app launchers) or required cloud subscriptions.
 
@@ -26,10 +26,21 @@ Axorith runs locally as a background service. It monitors your context and enfor
 
 *   **Process Control:** Automatically launches work apps (VS Code, Docker) and terminates distractions (Steam, Discord) when a session starts.
 *   **Home Assistant Integration:** Triggers scenes, scripts, or lights via local API. Your physical room adapts to your digital context.
-*   **Hard Blocking:** Blocks distracting websites via a browser extension (Native Messaging) and kills blacklisted processes instantly using kernel events (ETW).
+*   **Hard Blocking:** Sites and apps are gone the moment your session starts — no way to accidentally open them mid-focus.
 *   **Spotify Control:** Automates playback, volume, and device selection.
 *   **Scheduler:** Cron-like scheduling to force context switches (e.g., "Work Mode" starts automatically at 9:00 AM).
 
+## Screenshots
+<table style="width: 100%;">
+  <tr>
+    <td><img src="docs/assets/Axorith.Client_1.png" alt="Axorith Screenshot 1"></td>
+    <td><img src="docs/assets/Axorith.Client_2.png" alt="Axorith Screenshot 2"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/Axorith.Client_3.png" alt="Axorith Screenshot 3"></td>
+    <td><img src="docs/assets/Axorith.Client_4.png" alt="Axorith Screenshot 4"></td>
+  </tr>
+</table>
 ## Tech Stack
 
 Built with modern .NET technologies, focusing on performance and modularity:
@@ -56,7 +67,7 @@ Modules are loaded into isolated `AssemblyLoadContexts`. This allows for:
 
 ### Installation
 Download the latest installer from the [Releases page](https://github.com/axorithlabs/axorith/releases).
-*   *Note: Windows SmartScreen might flag the installer because I don't have an EV code signing certificate yet.*
+*   *Note: Windows SmartScreen may show a warning on first launch — this is expected for unsigned open-source installers. Source code is fully available for review.*
 
 ### Usage
 
