@@ -41,6 +41,7 @@ Axorith runs locally as a background service. It monitors your context and enfor
     <td><img src="docs/assets/Axorith.Client_4.png" alt="Axorith Screenshot 4"></td>
   </tr>
 </table>
+
 ## Tech Stack
 
 Built with modern .NET technologies, focusing on performance and modularity:
