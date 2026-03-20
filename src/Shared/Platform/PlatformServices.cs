@@ -61,6 +61,11 @@ public static class PlatformServices
             return new WindowsProcessBlocker(logger);
         }
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxProcessBlocker(logger);
+        }
+
         throw new PlatformNotSupportedException(
             $"Process blocker is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
@@ -70,6 +75,11 @@ public static class PlatformServices
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             return new WindowsSystemNotificationService(logger);
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxSystemNotificationService(logger);
         }
 
         return new NoOpNotificationService();
