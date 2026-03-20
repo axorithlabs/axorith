@@ -2,9 +2,13 @@
     <PropertyGroup>
         <AssemblyName>Axorith.Shared.Platform</AssemblyName>
         <RootNamespace>Axorith.Shared.Platform</RootNamespace>
-
         <Description>Platform-specific implementations for Axorith (Windows, Linux, macOS)</Description>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Shared.Tests" />
+    </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
@@ -13,9 +17,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.28" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
         <PackageReference Include="System.Management" Version="10.0.0" />
         <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.28" />
+        <PackageReference Include="TerraFX.Interop.Xlib" Version="6.4.0.2" />
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.90.3" />
     </ItemGroup>
+
 </Project>
