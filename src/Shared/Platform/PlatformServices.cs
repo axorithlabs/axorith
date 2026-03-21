@@ -18,6 +18,16 @@ public static class PlatformServices
             return new WindowsAutoStartManager(logger);
         }
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxAutoStartManager(logger);
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return new MacOSAutoStartManager(logger);
+        }
+
         // Return no-op for unsupported platforms
         return new NoOpAutoStartManager();
     }
@@ -50,25 +60,35 @@ public static class PlatformServices
             return new WindowsAppDiscoveryService(loggerFactory.CreateLogger<WindowsAppDiscoveryService>());
         }
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxAppDiscoveryService(loggerFactory.CreateLogger<LinuxAppDiscoveryService>());
+        }
+
         throw new PlatformNotSupportedException(
             $"App discovery is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
 
-    public static IProcessBlocker CreateProcessBlocker(ILogger logger)
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsProcessBlocker(logger);
-        }
+	public static IProcessBlocker CreateProcessBlocker(ILogger logger)
+	{
+		if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+		{
+			return new WindowsProcessBlocker(logger);
+		}
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return new LinuxProcessBlocker(logger);
-        }
+		if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+		{
+			return new LinuxProcessBlocker(logger);
+		}
 
-        throw new PlatformNotSupportedException(
-            $"Process blocker is not supported on this platform: {RuntimeInformation.OSDescription}");
-    }
+		if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+		{
+			return new MacOSProcessBlocker(logger);
+		}
+
+		throw new PlatformNotSupportedException(
+			$"Process blocker is not supported on this platform: {RuntimeInformation.OSDescription}");
+	}
 
     public static ISystemNotificationService CreateNotificationService(ILogger logger)
     {
@@ -82,6 +102,11 @@ public static class PlatformServices
             return new LinuxSystemNotificationService(logger);
         }
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return new MacOSSystemNotificationService(logger);
+        }
+
         return new NoOpNotificationService();
     }
 
@@ -93,6 +118,11 @@ public static class PlatformServices
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             return new WindowsNativeMessagingManager(loggerFactory.CreateLogger<WindowsNativeMessagingManager>());
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return new LinuxNativeMessagingManager(loggerFactory.CreateLogger<LinuxNativeMessagingManager>());
         }
 
         throw new PlatformNotSupportedException(
