@@ -146,42 +146,8 @@ internal sealed class MacOSAutoStartManager(ILogger logger) : IAutoStartManager
 		return !string.IsNullOrEmpty(exePath) ? exePath : "Axorith.Host";
 	}
 
-	/// <summary>
-	///     Generates a LaunchAgent plist XML document.
-	/// </summary>
-	internal static string GeneratePlistXml(string executablePath, bool startMinimized)
+	private static string GeneratePlistXml(string executablePath, bool startMinimized)
 	{
-		var programArguments = startMinimized
-			? $"<string>{EscapeXml(executablePath)}</string><string>{TrayArgument}</string>"
-			: $"<string>{EscapeXml(executablePath)}</string>";
-
-		return $"""
-			<?xml version="1.0" encoding="UTF-8"?>
-			<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-			<plist version="1.0">
-			<dict>
-			    <key>Label</key>
-			    <string>{Label}</string>
-			    <key>ProgramArguments</key>
-			    <array>
-			        {programArguments}
-			    </array>
-			    <key>RunAtLoad</key>
-			    <true/>
-			    <key>KeepAlive</key>
-			    <false/>
-			</dict>
-			</plist>
-			""";
-	}
-
-	private static string EscapeXml(string value)
-	{
-		return value
-			.Replace("&", "&amp;")
-			.Replace("<", "&lt;")
-			.Replace(">", "&gt;")
-			.Replace("\"", "&quot;")
-			.Replace("'", "&apos;");
+		return LaunchAgentPlistGenerator.Generate(Label, executablePath, startMinimized);
 	}
 }
