@@ -4,7 +4,9 @@
   "description": "Launch new processes or attach to existing ones, control window state (maximized, minimized, custom size), and manage process lifecycle on session end.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.ApplicationLauncher.dll"
 }

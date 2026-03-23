@@ -36,6 +36,13 @@ public class App : Application
     private DesktopNotificationManager? _notificationManager;
 
     /// <summary>
+    ///     Static flag to indicate that an intentional shutdown is in progress.
+    ///     Set by tray exit or other code before calling <see cref="IClassicDesktopStyleApplicationLifetime.Shutdown()"/>
+    ///     to prevent the window Closing handler from cancelling shutdown (minimize-to-tray race condition).
+    /// </summary>
+    internal static bool IsShutdownInProgress { get; set; }
+
+    /// <summary>
     ///     Loads the application's XAML resources.
     /// </summary>
     public override void Initialize()
@@ -188,7 +195,7 @@ public class App : Application
         {
             try
             {
-                if (_isShuttingDown)
+                if (_isShuttingDown || IsShutdownInProgress)
                 {
                     return;
                 }

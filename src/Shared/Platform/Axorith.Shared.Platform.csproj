@@ -19,6 +19,7 @@
 
     <ItemGroup>
         <PackageReference Include="Ace4896.DBus.Services.Secrets" Version="1.4.0" />
+        <PackageReference Include="Tmds.DBus" Version="0.15.0" />
         <PackageReference Include="System.Management" Version="10.0.0" />
         <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />

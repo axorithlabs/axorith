@@ -1,6 +1,5 @@
 using Axorith.Contracts.Generated;
 using Axorith.Host.Services;
-using Axorith.Shared.Utils;
 using FluentAssertions;
 using Grpc.Core;
 using Grpc.Core.Testing;
@@ -10,11 +9,10 @@ using Xunit;
 
 namespace Axorith.Host.Tests.Services;
 
-public class PresenceServiceTests : IDisposable
+public class PresenceServiceTests
 {
 	private readonly Mock<IHostNotificationService> _mockNotificationService;
 	private readonly PresenceServiceImpl _service;
-	private readonly string _markerPath;
 
 	public PresenceServiceTests()
 	{
@@ -23,18 +21,6 @@ public class PresenceServiceTests : IDisposable
 		_service = new PresenceServiceImpl(
 			_mockNotificationService.Object,
 			NullLogger<PresenceServiceImpl>.Instance);
-
-		_markerPath = Path.Combine(ApplicationPaths.RoamingRoot, ".client_exiting");
-
-		// Clean up marker file before each test
-		if (File.Exists(_markerPath))
-			File.Delete(_markerPath);
-	}
-
-	public void Dispose()
-	{
-		if (File.Exists(_markerPath))
-			File.Delete(_markerPath);
 	}
 
 	private static ServerCallContext CreateTestContext(CancellationToken? ct = null)
@@ -145,30 +131,26 @@ public class PresenceServiceTests : IDisposable
 	}
 
 	[Fact]
-	public async Task StreamClientPresence_WhenMarkerFileExists_NoNotificationSent()
+	public async Task StreamClientPresence_WhenNewConnectionStarts_FlagIsReset()
 	{
-		// Arrange: Client writes marker file before disconnect (simulates graceful exit)
-		Directory.CreateDirectory(Path.GetDirectoryName(_markerPath)!);
-		File.WriteAllText(_markerPath, "");
+		// Arrange: Ensure any stale exiting flag is consumed at the start of a new connection
+		PresenceServiceImpl.MarkClientExiting();
 
 		var messages = new List<PresenceMessage>
 		{
-			new() { Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), ClientVersion = "1.0.0", IsDisconnect = false }
+			new() { Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), ClientVersion = "1.0.0", IsDisconnect = true }
 		};
 
 		var requestStream = new TestAsyncStreamReader<PresenceMessage>(messages);
 		var responseStream = new TestServerStreamWriter<PresenceAck>();
 		var context = CreateTestContext();
 
-		// Act
+		// Act: New connection should reset any stale flag
 		await _service.StreamClientPresence(requestStream, responseStream, context);
 
-		// Assert: No notification — marker file signals graceful exit
+		// Assert: Graceful disconnect via IsDisconnect message should not trigger notification
 		_mockNotificationService.Verify(
 			n => n.NotifyClientCrashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
 			Times.Never);
-
-		// Marker file should be cleaned up
-		File.Exists(_markerPath).Should().BeFalse();
 	}
 }

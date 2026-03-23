@@ -4,7 +4,9 @@
   "description": "Blocks distracting applications from running during your focus session. Supports both Blocklist and Allowlist modes.",
   "category": "Productivity",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.AppBlocker.dll"
 }

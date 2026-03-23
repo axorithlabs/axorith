@@ -48,11 +48,18 @@ public class NativeMessagingRegistrar(
             hostName);
 
         var baseDir = AppContext.BaseDirectory;
-        var shimPath = Path.GetFullPath(Path.Combine(baseDir, "..", "Axorith.Shim", "Axorith.Shim.exe"));
+        var shimName = OperatingSystem.IsWindows() ? "Axorith.Shim.exe" : "Axorith.Shim";
+        var shimPath = Path.GetFullPath(Path.Combine(baseDir, shimName));
 
         if (!File.Exists(shimPath))
         {
-            logger.LogWarning("Axorith.Shim.exe not found at expected path: {Path}. Skipping registration.",
+            shimPath = Path.GetFullPath(Path.Combine(baseDir, "..", "Axorith.Shim", shimName));
+        }
+
+        if (!File.Exists(shimPath))
+        {
+            logger.LogWarning(
+                "Axorith.Shim not found at expected path: {Path}. Skipping registration.",
                 TelemetryGuard.SafePath(shimPath));
             return;
         }

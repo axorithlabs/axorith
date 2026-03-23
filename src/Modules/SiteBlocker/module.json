@@ -4,7 +4,9 @@
   "description": "Blocks specified websites in your browser during a session. Requires the Axorith browser extension.",
   "category": "Productivity",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.SiteBlocker.dll"
 }

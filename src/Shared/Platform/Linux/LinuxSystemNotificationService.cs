@@ -1,116 +1,112 @@
 namespace Axorith.Shared.Platform.Linux;
 
-using System.Diagnostics;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
+using Tmds.DBus;
+
+[DBusInterface("org.freedesktop.Notifications")]
+internal interface IFreedesktopNotifications
+{
+    Task<uint> NotifyAsync(
+        string app_name,
+        uint replaces_id,
+        string app_icon,
+        string summary,
+        string body,
+        string[] actions,
+        IDictionary<string, object> hints,
+        int expire_timeout);
+
+    Task<string[]> GetCapabilitiesAsync();
+
+    Task<(string name, string vendor, string version, string spec_version)> GetServerInformationAsync();
+
+    Task CloseNotificationAsync(uint id);
+}
 
 [SupportedOSPlatform("linux")]
 internal sealed class LinuxSystemNotificationService : ISystemNotificationService, IDisposable
 {
     private readonly ILogger _logger;
-    private readonly string _notificationService;
+    private readonly Connection? _connection;
+    private readonly IFreedesktopNotifications? _notifications;
     private readonly bool _isAvailable;
+    private bool _disposed;
 
-    private const string FreedesktopService = "org.freedesktop.Notifications";
-    private const string FreedesktopObjectPath = "/org/freedesktop/Notifications";
+    private const string NotificationsService = "org.freedesktop.Notifications";
+    private const string NotificationsPath = "/org/freedesktop/Notifications";
 
     public LinuxSystemNotificationService(ILogger logger)
     {
         _logger = logger;
-        (_notificationService, _isAvailable) = DetectNotificationService();
+        (_connection, _notifications, _isAvailable) = ConnectAndCreateProxy();
     }
 
-    private (string service, bool available) DetectNotificationService()
+    private (Connection? connection, IFreedesktopNotifications? notifications, bool available) ConnectAndCreateProxy()
     {
-        var services = new[] { "org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher" };
-
-        foreach (var service in services)
+        try
         {
+            var connection = Connection.Session;
+            connection.ConnectAsync().GetAwaiter().GetResult();
+            _logger.LogDebug("Connected to D-Bus session bus at {Address}", Address.Session);
+
+            IFreedesktopNotifications? notifications = null;
+            var available = false;
+
             try
             {
-                using var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "dbus-send",
-                        Arguments = $"--session --dest={service} --type=method_call --print-reply {FreedesktopObjectPath} org.freedesktop.DBus.Ping",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    }
-                };
-                process.Start();
-                var completed = process.WaitForExit(2000);
+                notifications = connection.CreateProxy<IFreedesktopNotifications>(
+                    NotificationsService,
+                    new ObjectPath(NotificationsPath));
 
-                if (completed && process.ExitCode == 0)
-                {
-                    _logger.LogDebug("Detected notification service: {Service}", service);
-                    return (service, true);
-                }
+                // Verify the service is reachable
+                var info = notifications.GetServerInformationAsync().GetAwaiter().GetResult();
+                _logger.LogInformation(
+                    "D-Bus notification service available: {Name} v{Version} ({SpecVersion})",
+                    info.name, info.version, info.spec_version);
+                available = true;
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Failed to ping notification service {Service}", service);
+                _logger.LogWarning(ex,
+                    "D-Bus notification service not reachable. " +
+                    "Notifications will be unavailable on this session.");
             }
-        }
 
-        _logger.LogWarning("No D-Bus notification service available");
-        return (string.Empty, false);
+            return (connection, notifications, available);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to connect to D-Bus session bus. " +
+                "Ensure the D-Bus session daemon is running (DBUS_SESSION_BUS_ADDRESS is set).");
+            return (null, null, false);
+        }
     }
 
     public async Task ShowNotificationAsync(string title, string message, TimeSpan? expiration = null)
     {
-        if (!_isAvailable)
+        if (!_isAvailable || _notifications == null || _disposed)
         {
             _logger.LogDebug("Notification skipped (service unavailable): {Title}", title);
             return;
         }
 
-        var timeout = expiration?.TotalMilliseconds ?? 5000;
+        var timeout = (int)(expiration?.TotalMilliseconds ?? 5000);
 
         try
         {
-            var args = $"--session " +
-                       $"--dest={_notificationService} " +
-                       $"--type=method_call " +
-                       $"--print-reply " +
-                       $"{FreedesktopObjectPath} " +
-                       $"org.freedesktop.Notifications.Notify " +
-                       $"string:Axorith " +
-                       $"uint32:0 " +
-                       $"string: " +
-                       $"string:\"{EscapeDbusString(title)}\" " +
-                       $"string:\"{EscapeDbusString(message)}\" " +
-                       $"array:string: " +
-                       $"dict:string:variant: " +
-                       $"int32:{(int)timeout}";
+            var id = await _notifications.NotifyAsync(
+                app_name: "Axorith",
+                replaces_id: 0,
+                app_icon: string.Empty,
+                summary: title,
+                body: message,
+                actions: [],
+                hints: new Dictionary<string, object>(),
+                expire_timeout: timeout);
 
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "dbus-send",
-                    Arguments = args,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                }
-            };
-
-            process.Start();
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
-            {
-                _logger.LogDebug("Notification sent: {Title}", title);
-            }
-            else
-            {
-                var error = await process.StandardError.ReadToEndAsync();
-                _logger.LogWarning("Notification failed with exit code {ExitCode}: {Error}", process.ExitCode, error);
-            }
+            _logger.LogDebug("Notification sent (id={Id}): {Title}", id, title);
         }
         catch (Exception ex)
         {
@@ -118,17 +114,22 @@ internal sealed class LinuxSystemNotificationService : ISystemNotificationServic
         }
     }
 
-    private static string EscapeDbusString(string input)
-    {
-        return input
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"")
-            .Replace("\n", "\\n")
-            .Replace("\r", "\\r")
-            .Replace("\t", "\\t");
-    }
-
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        try
+        {
+            _connection?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error disposing D-Bus connection");
+        }
     }
 }

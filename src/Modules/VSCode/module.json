@@ -4,7 +4,9 @@
   "description": "Launches Visual Studio Code.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.VSCode.dll"
 }

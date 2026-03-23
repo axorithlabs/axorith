@@ -19,52 +19,34 @@ public class HostManagementServiceImpl(
     {
         logger.LogInformation("Shutdown requested: {Reason}", request.Reason);
 
-        try
+        _ = Task.Run(async () =>
         {
-            if (sessionManager.IsSessionRunning)
+            try
             {
-                logger.LogInformation("Stopping active session before shutdown...");
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await sessionManager.StopCurrentSessionAsync();
-                        logger.LogInformation("Session stopped successfully");
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to stop session gracefully");
-                    }
-                    finally
-                    {
-                        lifetime.StopApplication();
-                    }
-                });
+                await Task.Delay(100);
 
-                return Task.FromResult(new ShutdownResponse
+                if (sessionManager.IsSessionRunning)
                 {
-                    Accepted = true,
-                    Message = "Stopping session and shutting down..."
-                });
+                    logger.LogInformation("Stopping active session before shutdown...");
+                    await sessionManager.StopCurrentSessionAsync();
+                    logger.LogInformation("Session stopped successfully");
+                }
             }
-
-            lifetime.StopApplication();
-
-            return Task.FromResult(new ShutdownResponse
+            catch (Exception ex)
             {
-                Accepted = true,
-                Message = "Shutdown initiated"
-            });
-        }
-        catch (Exception ex)
+                logger.LogError(ex, "Error during background shutdown task");
+            }
+            finally
+            {
+                lifetime.StopApplication();
+            }
+        });
+
+        return Task.FromResult(new ShutdownResponse
         {
-            logger.LogError(ex, "Error during shutdown request");
-            return Task.FromResult(new ShutdownResponse
-            {
-                Accepted = false,
-                Message = $"Shutdown failed: {ex.Message}"
-            });
-        }
+            Accepted = true,
+            Message = "Shutdown initiated. Host will now terminate."
+        });
     }
 
     public override Task<Empty> NotifyClientExiting(Empty request, ServerCallContext context)

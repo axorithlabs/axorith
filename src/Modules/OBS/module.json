@@ -5,7 +5,9 @@
   "description": "Launches OBS Studio and controls streaming/recording via WebSocket.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.OBS.dll"
 }

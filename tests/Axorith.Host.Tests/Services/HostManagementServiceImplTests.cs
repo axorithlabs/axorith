@@ -68,6 +68,8 @@ public class HostManagementServiceImplTests
         response.Accepted.Should().BeTrue();
         response.Message.Should().Contain("Shutdown initiated");
 
+        // StopApplication is called in a background task after a short delay
+        await Task.Delay(500);
         _mockLifetime.Verify(l => l.StopApplication(), Times.Once);
     }
 
@@ -88,17 +90,21 @@ public class HostManagementServiceImplTests
         // Assert
         response.Should().NotBeNull();
         response.Accepted.Should().BeTrue();
-        response.Message.Should().Contain("Stopping session");
+        response.Message.Should().Contain("Shutdown initiated");
 
-        // Note: StopApplication is called async in background task
-        // We can't easily verify it without waiting
+        // Background task stops the session and then calls StopApplication
+        await Task.Delay(500);
+        _mockSessionManager.Verify(m => m.StopCurrentSessionAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _mockLifetime.Verify(l => l.StopApplication(), Times.Once);
     }
 
     [Fact]
-    public async Task RequestShutdown_WhenExceptionOccurs_ShouldReturnFailure()
+    public async Task RequestShutdown_WhenExceptionOccurs_ShouldStillAccept()
     {
-        // Arrange
-        _mockSessionManager.Setup(m => m.IsSessionRunning).Throws(new InvalidOperationException("Test exception"));
+        // Arrange: Shutdown is always accepted. Exceptions are logged but host still shuts down.
+        _mockSessionManager.Setup(m => m.IsSessionRunning).Returns(true);
+        _mockSessionManager.Setup(m => m.StopCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Test exception"));
 
         var request = new ShutdownRequest { Reason = "User requested" };
         var context = CreateTestContext();
@@ -106,10 +112,14 @@ public class HostManagementServiceImplTests
         // Act
         var response = await _service.RequestShutdown(request, context);
 
-        // Assert
+        // Assert: Response is always accepted
         response.Should().NotBeNull();
-        response.Accepted.Should().BeFalse();
-        response.Message.Should().Contain("Shutdown failed");
+        response.Accepted.Should().BeTrue();
+        response.Message.Should().Contain("Shutdown initiated");
+
+        // Background task catches exception but still calls StopApplication in finally
+        await Task.Delay(500);
+        _mockLifetime.Verify(l => l.StopApplication(), Times.Once);
     }
 
     #endregion

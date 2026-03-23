@@ -142,6 +142,10 @@ public class PresenceClient : IAsyncDisposable
 			_logger.LogWarning(ex, "Failed to send presence disconnect message");
 		}
 
+		// Small delay to ensure the disconnect packet is flushed from the TCP buffer
+		// before the process exits. This prevents the Host from seeing an abrupt disconnect.
+		await Task.Delay(100);
+
 		try
 		{
 			// Complete the request stream

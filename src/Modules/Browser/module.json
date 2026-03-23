@@ -5,7 +5,9 @@
   "description": "Launches any installed browser with optional URL and profile support.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.Browser.dll"
 }

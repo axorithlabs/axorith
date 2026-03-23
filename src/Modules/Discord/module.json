@@ -5,7 +5,9 @@
   "description": "Launches Discord automatically on session start.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.Discord.dll"
 }

@@ -5,7 +5,9 @@
   "description": "Launches Spotify and controls playback.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.Spotify.dll"
 }

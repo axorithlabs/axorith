@@ -5,7 +5,9 @@
   "description": "Launches Steam and starts your favorite games.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.Steam.dll"
 }

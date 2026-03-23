@@ -4,7 +4,9 @@
   "description": "Launches JetBrains IDE with a selected project.",
   "category": "App",
   "platforms": [
-    "Windows"
+    "Windows",
+    "Linux",
+    "MacOs"
   ],
   "assembly": "Axorith.Module.JetBrainsIDE.dll"
 }

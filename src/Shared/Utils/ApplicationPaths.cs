@@ -352,6 +352,16 @@ public static class ApplicationPaths
     public static string ExpandPath(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            path = path
+                .Replace("%AppData%", RoamingRoot, StringComparison.OrdinalIgnoreCase)
+                .Replace("%LocalAppData%", LocalRoot, StringComparison.OrdinalIgnoreCase)
+                .Replace("%ProgramFiles%", ProgramFiles, StringComparison.OrdinalIgnoreCase)
+                .Replace("%CommonAppData%", CommonAppData, StringComparison.OrdinalIgnoreCase);
+        }
+
         var expanded = Environment.ExpandEnvironmentVariables(path);
         return Path.GetFullPath(expanded);
     }

@@ -55,6 +55,12 @@ public sealed class HostTrayService(
             appLogger.LogInformation("Exit requested from tray");
             try
             {
+                App.IsShutdownInProgress = true;
+                if (desktop.MainWindow != null)
+                {
+                    desktop.MainWindow.ShowInTaskbar = false;
+                }
+
                 desktop.Shutdown();
             }
             catch (Exception ex)
