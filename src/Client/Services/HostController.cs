@@ -547,23 +547,41 @@ public class HostController(
     {
         try
         {
+            var exeName = OperatingSystem.IsWindows() ? "Axorith.Host.exe" : "Axorith.Host";
             #if DEBUG
-            var debugProbe =
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", "Axorith.Host.exe"));
-            if (File.Exists(debugProbe))
-            {
-                return debugProbe;
-            }
+            var oldDebugProbe = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Axorith.Host", exeName));
+            if (File.Exists(oldDebugProbe)) return oldDebugProbe;
             #else
-            var env = Environment.GetEnvironmentVariable("AXORITH_HOST_PATH", EnvironmentVariableTarget.User);
+            var localPath = Path.Combine(AppContext.BaseDirectory, exeName);
+            if (File.Exists(localPath))
+            {
+                return localPath;
+            }
+
+            if (OperatingSystem.IsMacOS())
+            {
+                var macOsBundlePath = Path.Combine(AppContext.BaseDirectory, exeName);
+                if (File.Exists(macOsBundlePath))
+                {
+                    return macOsBundlePath;
+                }
+
+                var helpersPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Helpers", exeName));
+                if (File.Exists(helpersPath))
+                {
+                    return helpersPath;
+                }
+            }
+
+            var env = Environment.GetEnvironmentVariable("AXORITH_HOST_PATH");
             if (!string.IsNullOrWhiteSpace(env))
             {
                 var expanded = Environment.ExpandEnvironmentVariables(env);
                 var candidate = Path.GetFullPath(expanded);
-                logger.LogInformation("Candidate: {Candidate}", candidate);
+                
                 if (Directory.Exists(candidate))
                 {
-                    var combined = Path.Combine(candidate, "Axorith.Host.exe");
+                    var combined = Path.Combine(candidate, exeName);
                     if (File.Exists(combined)) return combined;
                 }
                 else if (File.Exists(candidate))
