@@ -39,7 +39,7 @@ internal class GrpcModulesApi(
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(GrpcModulesApi));
 
-        if (_instanceStreams.TryGetValue(moduleInstanceId, out var stream))
+        if (_instanceStreams.TryGetValue(moduleInstanceId, out _))
         {
             return Disposable.Create(() => { });
         }

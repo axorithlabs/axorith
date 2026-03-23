@@ -10,6 +10,7 @@ public class Configuration
     public SessionConfiguration Session { get; init; } = new();
     public DesignTimeConfiguration DesignTime { get; init; } = new();
     public StreamingConfiguration Streaming { get; init; } = new();
+    public BrowserExtensionsConfiguration BrowserExtensions { get; init; } = new();
 }
 
 public class DesignTimeConfiguration
@@ -27,11 +28,35 @@ public class StreamingConfiguration
 
 public class GrpcConfiguration
 {
-    public int Port { get; init; } = 5901;
-    public string BindAddress { get; init; } = "127.0.0.1";
-    public int MaxConcurrentStreams { get; init; } = 100;
-    public int KeepAliveInterval { get; init; } = 30;
-    public int KeepAliveTimeout { get; init; } = 10;
+	public int Port { get; init; } = 5901;
+	public string BindAddress { get; init; } = "127.0.0.1";
+	public int MaxConcurrentStreams { get; init; } = 100;
+	public int KeepAliveInterval { get; init; } = 30;
+	public int KeepAliveTimeout { get; init; } = 10;
+
+	/// <summary>
+	///     When true, allows HTTP/2 keep-alive pings even when there are no active RPC calls.
+	///     This is essential for presence streaming to detect connection loss promptly.
+	/// </summary>
+	public bool KeepAlivePermitWithoutCalls { get; init; } = true;
+
+	/// <summary>
+	///     IPC endpoint path for local communication.
+	///     On Unix: path to Unix Domain Socket file.
+	///     On Windows: Named Pipe name.
+	///     Empty string uses the default from ApplicationPaths.IpcEndpoint.
+	/// </summary>
+	public string IpcEndpoint { get; init; } = string.Empty;
+
+	/// <summary>
+	///     Resolves the actual IPC endpoint path, using ApplicationPaths default if not configured.
+	/// </summary>
+	public string ResolveIpcEndpoint()
+	{
+		return string.IsNullOrWhiteSpace(IpcEndpoint)
+			? ApplicationPaths.IpcEndpoint
+			: IpcEndpoint;
+	}
 }
 
 public class ModulesConfiguration
@@ -118,4 +143,22 @@ public class SessionConfiguration
     ///     Default: 10 seconds.
     /// </summary>
     public int ShutdownTimeoutSeconds { get; init; } = 10;
+}
+
+/// <summary>
+///     Browser extension configuration for Native Messaging registration.
+/// </summary>
+public class BrowserExtensionsConfiguration
+{
+    /// <summary>
+    ///     Chrome/Chromium extension ID for Native Messaging host registration.
+    ///     Set this to your actual extension ID before deployment.
+    ///     Default: empty (Native Messaging will log an error and skip registration).
+    /// </summary>
+    public string ChromeExtensionId { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Firefox extension ID for Native Messaging host registration.
+    /// </summary>
+    public string FirefoxExtensionId { get; init; } = "site-blocker-firefox@axorithlabs.com";
 }

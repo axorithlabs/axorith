@@ -41,7 +41,6 @@ Axorith runs locally as a background service. It monitors your context and enfor
     <td><img src="docs/assets/Axorith.Client_4.png" alt="Axorith Screenshot 4"></td>
   </tr>
 </table>
-
 ## Tech Stack
 
 Built with modern .NET technologies, focusing on performance and modularity:
@@ -67,8 +66,59 @@ Modules are loaded into isolated `AssemblyLoadContexts`. This allows for:
 ## Getting Started
 
 ### Installation
+
+#### Windows
 Download the latest installer from the [Releases page](https://github.com/axorithlabs/axorith/releases).
 *   *Note: Windows SmartScreen may show a warning on first launch — this is expected for unsigned open-source installers. Source code is fully available for review.*
+
+#### Linux
+
+**Requirements:**
+- .NET 10 Runtime
+- A desktop environment (GNOME, KDE, XFCE, etc.)
+
+**Installation Options:**
+
+1. **AppImage (Recommended):**
+   ```bash
+   # Download Axorith-x.x.x.AppImage
+   chmod +x Axorith-x.x.x.AppImage
+   ./Axorith-x.x.x.AppImage
+   ```
+
+2. **Run from Source:**
+   ```bash
+   dotnet build Axorith.sln --configuration Release
+   dotnet run --project src/Host/Axorith.Host.csproj
+   ```
+
+3. **Flatpak:**
+   Axorith can run from Flatpak but some features may be limited due to sandbox restrictions. For full functionality, use AppImage.
+
+**Troubleshooting:**
+- If notifications don't appear: Ensure a notification daemon is running (e.g., `dunst`, `notify-osd`)
+- If window management doesn't work: Check if using Wayland or X11 (`echo $XDG_SESSION_TYPE`)
+
+#### macOS
+
+**Requirements:**
+- .NET 10 Runtime
+- macOS 12+ (Monterey or later)
+
+**Installation:**
+
+1. **DMG:**
+   - Download the latest `.dmg` from [Releases](https://github.com/axorithlabs/axorith/releases)
+   - Open the DMG and drag Axorith to `/Applications`
+   - On first launch, right-click and select "Open" (bypass Gatekeeper for unsigned apps)
+
+2. **First Run Permissions:**
+   - **Accessibility:** The app will prompt for Accessibility permissions (System Settings > Privacy & Security > Accessibility). Required for window management.
+   - **Automation:** Some features may require Automation permissions.
+
+**Troubleshooting:**
+- If app doesn't start: Check System Settings > Privacy & Security
+- If keychain access fails: Ensure Keychain is unlocked
 
 ### Usage
 

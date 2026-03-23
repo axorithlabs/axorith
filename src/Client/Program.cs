@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Axorith.Client.Services;
+using Axorith.Shared.Platform;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -32,7 +33,8 @@ internal static class Program
         var singleInstanceLogger = earlyLoggerFactory.CreateLogger<SingleInstanceManager>();
 
         // Check for single instance BEFORE any heavy initialization
-        _singleInstanceManager = new SingleInstanceManager(singleInstanceLogger);
+        var pipeFactory = PlatformServices.CreateNamedPipeFactory(earlyLoggerFactory);
+        _singleInstanceManager = new SingleInstanceManager(singleInstanceLogger, pipeFactory);
 
         if (!_singleInstanceManager.TryAcquireLock())
         {

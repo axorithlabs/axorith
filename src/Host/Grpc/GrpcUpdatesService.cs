@@ -27,12 +27,43 @@ public class GrpcUpdatesService : UpdatesService.UpdatesServiceBase
 
         if (_updateService.LatestUpdate != null)
         {
-            response.LatestVersion = _updateService.LatestUpdate.Version;
-            response.DownloadUrl = _updateService.LatestUpdate.DownloadUrl;
-            response.ReleaseNotes = _updateService.LatestUpdate.ReleaseNotes;
-            response.PublishedAt = Timestamp.FromDateTime(_updateService.LatestUpdate.PublishedAt.ToUniversalTime());
+            PopulateResponse(response, _updateService.LatestUpdate);
         }
 
         return response;
+    }
+
+    /// <summary>
+    ///     Returns update info without version check — callable even when client/host versions are incompatible.
+    ///     Used by ErrorViewModel's "Update and Restart" button.
+    /// </summary>
+    public override async Task<UpdateInfoResponse> GetLatestUpdateInfo(Empty request, ServerCallContext context)
+    {
+        var updateInfo = await _updateService.GetUpdateInfoAsync(context.CancellationToken);
+
+        var response = new UpdateInfoResponse
+        {
+            UpdateAvailable = updateInfo != null,
+            CurrentVersion = _updateService.CurrentVersion
+        };
+
+        if (updateInfo != null)
+        {
+            PopulateResponse(response, updateInfo);
+        }
+
+        return response;
+    }
+
+    private static void PopulateResponse(UpdateInfoResponse response, Models.UpdateInfo updateInfo)
+    {
+        response.LatestVersion = updateInfo.Version;
+        response.DownloadUrl = updateInfo.DownloadUrl;
+        response.ReleaseNotes = updateInfo.ReleaseNotes;
+        response.PublishedAt = Timestamp.FromDateTime(updateInfo.PublishedAt.ToUniversalTime());
+        response.Sha256Hash = updateInfo.Sha256;
+        response.Platform = updateInfo.Platform;
+        response.Architecture = updateInfo.Architecture;
+        response.InstallerType = updateInfo.InstallerType;
     }
 }

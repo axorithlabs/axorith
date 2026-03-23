@@ -85,9 +85,25 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             return;
         }
 
+        const string sessionName = "AxorithProcessBlocker";
+
         try
         {
-            var sessionName = "AxorithProcessBlocker-" + Guid.NewGuid();
+            // Clean up any leftover session from a previous crash (kernel-level sessions survive process death)
+            try
+            {
+                using var existing = TraceEventSession.GetActiveSession(sessionName);
+                if (existing != null)
+                {
+                    existing.Stop();
+                    logger.LogInformation("Stopped leftover ETW session from previous run");
+                }
+            }
+            catch
+            {
+                // No existing session — this is normal on first start
+            }
+
             _etwSession = new TraceEventSession(sessionName);
             _etwSession.EnableKernelProvider(KernelTraceEventParser.Keywords.Process);
 

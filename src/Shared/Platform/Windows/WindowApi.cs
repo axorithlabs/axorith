@@ -25,9 +25,9 @@ internal static class WindowApi
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
-    public const uint WINEVENT_OUTOFCONTEXT = 0;
-    public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
-    public const uint EVENT_OBJECT_CREATE = 0x8000;
+    public const uint WineventOutofcontext = 0;
+    public const uint EventSystemForeground = 0x0003;
+    public const uint EventObjectCreate = 0x8000;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy,

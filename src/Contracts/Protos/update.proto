@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package axorith;
+
+option csharp_namespace = "Axorith.Contracts.Generated";
+
+import "google/protobuf/timestamp.proto";
+
+message UpdateInfoResponse {
+  bool update_available = 1;
+  string current_version = 2;
+  string latest_version = 3;
+  string download_url = 4;
+  string release_notes = 5;
+  google.protobuf.Timestamp published_at = 6;
+  string sha256_hash = 7;
+  string platform = 8;
+  string architecture = 9;
+  string installer_type = 10;
+}
+
+message Empty {}

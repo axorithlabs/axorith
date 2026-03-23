@@ -1,12 +1,17 @@
+using System.Net.Sockets;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
+using Axorith.Contracts;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
+using Grpc.Core;
+using Grpc.Net.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,11 +20,7 @@ namespace Axorith.Client.Services;
 
 public sealed class ConnectionInitializer : IConnectionInitializer
 {
-    private const int MaxRetries = 3;
-    private const int RetryDelayMs = 1000;
-
-    private static readonly string HostInfoPath = Path.Combine(
-        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "config", "host-info.json");
+    private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
 
     public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger)
     {
@@ -103,6 +104,12 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             StartHealthMonitoring(app.Services, app, config, loggerFactory, logger);
 
             logger.LogInformation("Axorith Client initialization sequence complete.");
+        }
+        catch (Exception ex) when (IsVersionConflictError(ex))
+        {
+            logger.LogError(ex, "Version conflict detected during initialization");
+            var (clientVersion, hostVersion) = ParseVersionFromException(ex);
+            await ShowVersionConflictAsync(app, loggerFactory, clientVersion, hostVersion);
         }
         catch (Exception ex)
         {
@@ -217,17 +224,24 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 logger.LogInformation("Successfully connected to Host on attempt {Attempt}", attempt);
                 return connection;
             }
-            catch (Exception ex) when (attempt < maxRetries)
+            catch (Exception ex) when (attempt < maxRetries && !IsVersionConflictError(ex))
             {
                 lastException = ex;
                 logger.LogWarning(ex, "Connection attempt {Attempt}/{Max} failed: {Message}. Retrying in {Delay}ms...",
                     attempt, maxRetries, ex.Message, retryDelayMs);
-                await Task.Delay(retryDelayMs, default);
+                await Task.Delay(retryDelayMs, CancellationToken.None);
             }
             catch (Exception ex)
             {
-                // Last attempt failed
+                // Version conflict or last attempt failed — do not retry
                 lastException = ex;
+
+                if (IsVersionConflictError(ex))
+                {
+                    logger.LogError(ex, "Version conflict detected: {Message}", ex.Message);
+                    throw;
+                }
+
                 logger.LogError(ex, "Final connection attempt {Attempt}/{Max} failed: {Message}",
                     attempt, maxRetries, ex.Message);
             }
@@ -338,6 +352,10 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             logger.LogWarning("Host became unhealthy - triggering error flow.");
             Dispatcher.UIThread.Post(() =>
             {
+                var toastService = services.GetService<IToastNotificationService>();
+                toastService?.Show("Lost connection to Axorith.Host. Restarting may be required.",
+                    Sdk.Services.NotificationType.Error);
+
                 var errorViewModel = services.GetRequiredService<ErrorViewModel>();
                 errorViewModel.Configure(
                     "Lost connection to Axorith.Host.\n\nRestart the Host using the tray menu, then click 'Retry'.",
@@ -391,20 +409,178 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             {
                 var json = File.ReadAllText(HostInfoPath);
                 using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("port", out var portElement))
+
+                if (doc.RootElement.TryGetProperty("ipcEndpoint", out var endpointElement))
                 {
-                    var port = portElement.GetInt32();
-                    var address = config.Host.Address;
-                    logger.LogDebug("Discovered host port {Port} from host-info.json", port);
-                    return $"http://{address}:{port}";
+                    var endpoint = endpointElement.GetString();
+                    if (!string.IsNullOrEmpty(endpoint))
+                    {
+                        logger.LogDebug("Discovered IPC endpoint from host-info.json: {Endpoint}", endpoint);
+                        return endpoint;
+                    }
                 }
             }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to read host-info.json, using configured endpoint");
+            logger.LogWarning(ex, "Failed to read host-info.json, using default IPC endpoint");
         }
 
-        return config.Host.GetEndpointUrl();
+        return ApplicationPaths.IpcEndpoint;
+    }
+
+    /// <summary>
+    ///     Checks if an exception represents a version conflict (FailedPrecondition gRPC status).
+    /// </summary>
+    private static bool IsVersionConflictError(Exception ex)
+    {
+        return ex is RpcException { StatusCode: StatusCode.FailedPrecondition };
+    }
+
+    /// <summary>
+    ///     Parses client and host versions from a version conflict exception message.
+    ///     Expected format: "Client version X.Y.Z is incompatible with Host version A.B.C. Please update."
+    /// </summary>
+    private static (string clientVersion, string hostVersion) ParseVersionFromException(Exception ex)
+    {
+        var message = ex.Message;
+        var match = Regex.Match(message, @"Client version (\S+) is incompatible with Host version (\S+)");
+
+        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : ("unknown", "unknown");
+    }
+
+    /// <summary>
+    ///     Shows the ErrorViewModel configured for a version conflict.
+    ///     Wires the update callback to a standalone gRPC channel that bypasses version check.
+    /// </summary>
+    private async Task ShowVersionConflictAsync(
+        App app,
+        ILoggerFactory loggerFactory,
+        string clientVersion,
+        string hostVersion)
+    {
+        var logger = loggerFactory.CreateLogger<ConnectionInitializer>();
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
+            var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
+
+            var config = app.Services.GetRequiredService<IOptions<Configuration>>().Value;
+            var serverAddress = GetDiscoveredEndpointUrl(config, logger);
+
+            errorViewModel.ConfigureVersionConflict(
+                clientVersion,
+                hostVersion,
+                updateCallback: async () =>
+                {
+                    await ExecuteUpdateFlowAsync(
+                        errorViewModel, serverAddress, loggerFactory, logger);
+                });
+
+            shellViewModel.Content = errorViewModel;
+        });
+    }
+
+    /// <summary>
+    ///     Executes the full update flow: get info, download, verify, install.
+    ///     Uses a standalone gRPC channel since the main connection failed on version check.
+    /// </summary>
+    private static async Task ExecuteUpdateFlowAsync(
+        ErrorViewModel errorViewModel,
+        string serverAddress,
+        ILoggerFactory loggerFactory,
+        ILogger logger)
+    {
+        GrpcChannel? channel = null;
+
+        try
+        {
+            // Create standalone channel with "dev" version header to bypass version check
+            var callCredentials = CallCredentials.FromInterceptor((_, metadata) =>
+            {
+                metadata.Add(AuthConstants.VersionHeaderName, "dev");
+                return Task.CompletedTask;
+            });
+
+            var channelOptions = new GrpcChannelOptions
+            {
+                Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
+            };
+
+            // Handle IPC endpoint (Unix Domain Socket / Named Pipe)
+            if (!serverAddress.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                var address = serverAddress;
+                channelOptions.HttpHandler = new SocketsHttpHandler
+                {
+                    ConnectCallback = async (_, ct) =>
+                    {
+                        if (OperatingSystem.IsWindows())
+                        {
+                            var pipe = new System.IO.Pipes.NamedPipeClientStream(
+                                ".", address, System.IO.Pipes.PipeDirection.InOut,
+                                System.IO.Pipes.PipeOptions.Asynchronous);
+                            await pipe.ConnectAsync(5000, ct);
+                            return pipe;
+                        }
+
+                        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
+                        await socket.ConnectAsync(new UnixDomainSocketEndPoint(address), ct);
+                        return new NetworkStream(socket, ownsSocket: true);
+                    }
+                };
+                serverAddress = "http://localhost";
+            }
+
+            channel = GrpcChannel.ForAddress(serverAddress, channelOptions);
+
+            var updatesClient = new UpdatesService.UpdatesServiceClient(channel);
+            var updatesApi = new GrpcUpdatesApi(
+                updatesClient,
+                loggerFactory.CreateLogger<GrpcUpdatesApi>());
+
+            // Step 1: Get update info (bypasses version check)
+            errorViewModel.ErrorMessage = "Checking for updates...\n\nPlease wait...";
+            var updateInfo = await updatesApi.GetLatestUpdateInfoAsync();
+
+            if (updateInfo == null)
+            {
+                errorViewModel.ErrorMessage = "No updates available.\n\nYou are on the latest version.";
+                return;
+            }
+
+            logger.LogInformation("Update available: {Version}", updateInfo.Version);
+
+            // Step 2: Download with SHA256 verification
+            errorViewModel.ErrorMessage =
+                $"Downloading update {updateInfo.Version}...\n\nVerifying integrity...";
+
+            var progress = new Progress<double>(p =>
+            {
+                errorViewModel.UpdateProgress = p;
+                errorViewModel.ErrorMessage =
+                    $"Downloading update {updateInfo.Version}...\n{p:F0}% complete";
+            });
+
+            var installerPath = await updatesApi.DownloadUpdateAsync(updateInfo, progress);
+
+            // Step 3: Install
+            errorViewModel.ErrorMessage =
+                $"Update {updateInfo.Version} verified.\n\nInstalling...";
+
+            logger.LogInformation("Update downloaded and verified. Installing from {Path}", installerPath);
+            await updatesApi.InstallUpdateAsync(installerPath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Update flow failed");
+            errorViewModel.ErrorMessage = $"Update failed:\n{ex.Message}";
+            throw;
+        }
+        finally
+        {
+            channel?.Dispose();
+        }
     }
 }

@@ -111,7 +111,7 @@ public class SettingDisposeAndBackpressureTests
 
         setting.Value
             .Buffer(TimeSpan.FromTicks(TimeSpan.FromMilliseconds(50).Ticks), scheduler)
-            .Subscribe(batch => bufferedValues.Add(batch.ToList()));
+            .Subscribe(batch => bufferedValues.Add([.. batch]));
 
         // Act - rapid updates at virtual time 0
         for (var i = 1; i <= 100; i++) setting.SetValue(i);

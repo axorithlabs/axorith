@@ -189,7 +189,7 @@ public class ActionNegativeTests
         for (var i = 0; i < 100; i++) tasks.Add(Task.Run(() => action.Invoke()));
 
         #pragma warning disable xUnit1031
-        Task.WaitAll(tasks.ToArray());
+        Task.WaitAll([.. tasks]);
         #pragma warning restore xUnit1031
 
         // Assert

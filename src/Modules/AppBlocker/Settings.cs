@@ -8,7 +8,7 @@ namespace Axorith.Module.AppBlocker;
 internal sealed class Settings : IDisposable
 {
     private static Dictionary<string, string[]>? _categoryProcesses;
-    private static readonly Lock _loadLock = new();
+    private static readonly Lock LoadLock = new();
 
     private readonly Setting<List<string>> _categories;
     private readonly Setting<string> _customProcessList;
@@ -100,7 +100,7 @@ internal sealed class Settings : IDisposable
             return;
         }
 
-        lock (_loadLock)
+        lock (LoadLock)
         {
             if (_categoryProcesses != null)
             {

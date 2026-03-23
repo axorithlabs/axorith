@@ -1,128 +1,134 @@
 namespace Axorith.Shared.Platform.Linux;
 
+using System.Diagnostics;
 using System.Runtime.Versioning;
-using Axorith.Shared.Platform.Linux.Notifications.DBus;
 using Microsoft.Extensions.Logging;
-using Tmds.DBus.Protocol;
 
-/// <summary>
-///     Linux implementation of ISystemNotificationService using D-Bus org.freedesktop.Notifications.
-///     Works on GNOME, KDE, XFCE, and other freedesktop-compliant desktops.
-///     Gracefully degrades when the notification daemon is unavailable.
-/// </summary>
 [SupportedOSPlatform("linux")]
 internal sealed class LinuxSystemNotificationService : ISystemNotificationService, IDisposable
 {
     private readonly ILogger _logger;
-    private readonly DBusConnection? _connection;
-    private readonly NotificationsProxy? _proxy;
+    private readonly string _notificationService;
     private readonly bool _isAvailable;
-    private bool _disposed;
+
+    private const string FreedesktopService = "org.freedesktop.Notifications";
+    private const string FreedesktopObjectPath = "/org/freedesktop/Notifications";
 
     public LinuxSystemNotificationService(ILogger logger)
     {
         _logger = logger;
+        (_notificationService, _isAvailable) = DetectNotificationService();
+    }
 
-        DBusConnection? connection = null;
+    private (string service, bool available) DetectNotificationService()
+    {
+        var services = new[] { "org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher" };
+
+        foreach (var service in services)
+        {
+            try
+            {
+                using var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "dbus-send",
+                        Arguments = $"--session --dest={service} --type=method_call --print-reply {FreedesktopObjectPath} org.freedesktop.DBus.Ping",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    }
+                };
+                process.Start();
+                var completed = process.WaitForExit(2000);
+
+                if (completed && process.ExitCode == 0)
+                {
+                    _logger.LogDebug("Detected notification service: {Service}", service);
+                    return (service, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to ping notification service {Service}", service);
+            }
+        }
+
+        _logger.LogWarning("No D-Bus notification service available");
+        return (string.Empty, false);
+    }
+
+    public async Task ShowNotificationAsync(string title, string message, TimeSpan? expiration = null)
+    {
+        if (!_isAvailable)
+        {
+            _logger.LogDebug("Notification skipped (service unavailable): {Title}", title);
+            return;
+        }
+
+        var timeout = expiration?.TotalMilliseconds ?? 5000;
+
         try
         {
-            string? sessionBusAddress = DBusAddress.Session;
-            if (sessionBusAddress is null)
+            var args = $"--session " +
+                       $"--dest={_notificationService} " +
+                       $"--type=method_call " +
+                       $"--print-reply " +
+                       $"{FreedesktopObjectPath} " +
+                       $"org.freedesktop.Notifications.Notify " +
+                       $"string:Axorith " +
+                       $"uint32:0 " +
+                       $"string: " +
+                       $"string:\"{EscapeDbusString(title)}\" " +
+                       $"string:\"{EscapeDbusString(message)}\" " +
+                       $"array:string: " +
+                       $"dict:string:variant: " +
+                       $"int32:{(int)timeout}";
+
+            using var process = new Process
             {
-                _logger.LogDebug("No D-Bus session bus address found");
-                _isAvailable = false;
-                return;
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "dbus-send",
+                    Arguments = args,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+
+            process.Start();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0)
+            {
+                _logger.LogDebug("Notification sent: {Title}", title);
             }
-
-            connection = new DBusConnection(sessionBusAddress);
-            connection.ConnectAsync().GetAwaiter().GetResult();
-
-            // Probe: try to call GetCapabilities to verify service is reachable
-            var proxy = new NotificationsProxy(connection);
-            _ = proxy.GetCapabilitiesAsync().GetAwaiter().GetResult();
-
-            _connection = connection;
-            _proxy = proxy;
-            _isAvailable = true;
-            _logger.LogInformation("D-Bus notification service available");
-        }
-        catch (DBusConnectionException ex)
-        {
-            _logger.LogWarning(ex, "D-Bus connection failed: notification service unavailable");
-            _isAvailable = false;
-            connection?.Dispose();
-        }
-        catch (DBusErrorReplyException ex)
-        {
-            _logger.LogWarning(ex, "D-Bus notification service unavailable");
-            _isAvailable = false;
-            connection?.Dispose();
+            else
+            {
+                var error = await process.StandardError.ReadToEndAsync();
+                _logger.LogWarning("Notification failed with exit code {ExitCode}: {Error}", process.ExitCode, error);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unexpected error probing D-Bus notification service");
-            _isAvailable = false;
-            connection?.Dispose();
+            _logger.LogWarning(ex, "Failed to send notification: {Title}", title);
         }
     }
 
-    /// <inheritdoc />
-    public async Task ShowNotificationAsync(
-        string title,
-        string message,
-        TimeSpan? expiration = null)
+    private static string EscapeDbusString(string input)
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        if (!_isAvailable || _proxy is null)
-        {
-            _logger.LogDebug("Notification skipped: service unavailable");
-            return;
-        }
-
-        try
-        {
-            var expireTimeout = expiration.HasValue
-                ? (int)expiration.Value.TotalMilliseconds
-                : -1; // -1 = use server default
-
-            await _proxy.NotifyAsync(
-                appName: "Axorith",
-                replacesId: 0,
-                appIcon: string.Empty,
-                summary: title,
-                body: message,
-                actions: [],
-                hints: [],
-                expireTimeout: expireTimeout);
-
-            _logger.LogDebug("Notification sent: {Title}", title);
-        }
-        catch (DBusConnectionException ex)
-        {
-            _logger.LogWarning(ex, "Failed to send notification: connection lost");
-        }
-        catch (DBusErrorReplyException ex)
-        {
-            _logger.LogWarning(ex, "Failed to send notification: {Error}", ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Unexpected error sending notification");
-        }
+        return input
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\n", "\\n")
+            .Replace("\r", "\\r")
+            .Replace("\t", "\\t");
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        _connection?.Dispose();
     }
 }

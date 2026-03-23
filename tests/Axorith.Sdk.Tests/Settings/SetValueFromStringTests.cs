@@ -497,7 +497,7 @@ public class SetValueFromStringTests
         }
 
         // Assert
-        var act = () => Task.WaitAll(tasks.ToArray());
+        var act = () => Task.WaitAll([.. tasks]);
         act.Should().NotThrow();
     }
 

@@ -133,7 +133,6 @@ public class EventAggregatorBenchmarks
     public void ConcurrentPublishAndSubscribe()
     {
         var aggregator = new EventAggregator();
-        var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         Parallel.For(0, 10, i =>
         {

@@ -217,7 +217,7 @@ public sealed class ClientOnboardingService : IClientOnboardingService
     {
         _logger.LogInformation(
             "App discovery - IDEs: VSCode={VSCode}, Rider={Rider}, CLion={CLion}, IntelliJ={IntelliJ}, PyCharm={PyCharm}",
-            apps.VSCodePath != null, apps.RiderPath != null, apps.CLionPath != null,
+            apps.VsCodePath != null, apps.RiderPath != null, apps.CLionPath != null,
             apps.IntelliJPath != null, apps.PyCharmPath != null);
 
         _logger.LogInformation(
@@ -295,7 +295,7 @@ public sealed class ClientOnboardingService : IClientOnboardingService
 
         var scanTasks = new (string[] Names, Action<string?> Setter)[]
         {
-            (["Code", "Code - Insiders"], p => apps.VSCodePath = p),
+            (["Code", "Code - Insiders"], p => apps.VsCodePath = p),
             (["rider64", "rider"], p => apps.RiderPath = p),
             (["clion64", "clion"], p => apps.CLionPath = p),
             (["idea64", "idea"], p => apps.IntelliJPath = p),
@@ -353,7 +353,7 @@ public sealed class ClientOnboardingService : IClientOnboardingService
 
         var ideConfigs = new (string? Path, string PresetName, string ModuleName)[]
         {
-            (apps.VSCodePath, "VS Code", "VS Code"),
+            (apps.VsCodePath, "VS Code", "VS Code"),
             (apps.RiderPath, "Rider", "JetBrains IDE"),
             (apps.CLionPath, "CLion", "JetBrains IDE"),
             (apps.IntelliJPath, "IntelliJ", "JetBrains IDE"),
@@ -593,7 +593,7 @@ public sealed class ClientOnboardingService : IClientOnboardingService
 
     private sealed class DiscoveredApps
     {
-        public string? VSCodePath;
+        public string? VsCodePath;
         public string? RiderPath;
         public string? CLionPath;
         public string? IntelliJPath;

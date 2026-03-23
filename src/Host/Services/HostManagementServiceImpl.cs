@@ -67,6 +67,13 @@ public class HostManagementServiceImpl(
         }
     }
 
+    public override Task<Empty> NotifyClientExiting(Empty request, ServerCallContext context)
+    {
+        logger.LogDebug("Client exiting notification received");
+        PresenceServiceImpl.MarkClientExiting();
+        return Task.FromResult(new Empty());
+    }
+
     public override Task<HostStatusResponse> GetStatus(Empty request, ServerCallContext context)
     {
         var uptime = (long)(DateTime.UtcNow - SStartTime).TotalSeconds;

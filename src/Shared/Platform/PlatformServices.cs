@@ -25,7 +25,7 @@ public static class PlatformServices
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            return new MacOSAutoStartManager(logger);
+            return new MacOsAutoStartManager(logger);
         }
 
         // Return no-op for unsupported platforms
@@ -65,6 +65,11 @@ public static class PlatformServices
             return new LinuxAppDiscoveryService(loggerFactory.CreateLogger<LinuxAppDiscoveryService>());
         }
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return new MacOsAppDiscoveryService(loggerFactory.CreateLogger<MacOsAppDiscoveryService>());
+        }
+
         throw new PlatformNotSupportedException(
             $"App discovery is not supported on this platform: {RuntimeInformation.OSDescription}");
     }
@@ -83,7 +88,7 @@ public static class PlatformServices
 
 		if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
 		{
-			return new MacOSProcessBlocker(logger);
+			return new MacOsProcessBlocker(logger);
 		}
 
 		throw new PlatformNotSupportedException(
@@ -104,7 +109,7 @@ public static class PlatformServices
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            return new MacOSSystemNotificationService(logger);
+            return new MacOsSystemNotificationService(logger);
         }
 
         return new NoOpNotificationService();

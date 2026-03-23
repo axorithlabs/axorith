@@ -20,6 +20,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     private readonly ClientUiConfiguration? _uiConfig;
     private readonly IFilePickerService? _filePickerService;
     private readonly SettingsInputConfiguration _inputConfig;
+    private readonly List<IDisposable> _disposables = [];
 
     private const int ChoiceThrottleMs = 50;
 
@@ -234,7 +235,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         RemoveHistoryItemCommand = ReactiveCommand.Create<string>(RemoveHistoryItem);
         BrowseCommand = ReactiveCommand.CreateFromTask(BrowseAsync);
 
-        Setting.Label.Subscribe(newLabel =>
+        _disposables.Add(Setting.Label.Subscribe(newLabel =>
         {
             if (Dispatcher.UIThread.CheckAccess())
             {
@@ -244,9 +245,9 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             {
                 Dispatcher.UIThread.Post(() => Label = newLabel);
             }
-        });
+        }));
 
-        Setting.IsVisible.Subscribe(visible =>
+        _disposables.Add(Setting.IsVisible.Subscribe(visible =>
         {
             if (Dispatcher.UIThread.CheckAccess())
             {
@@ -256,9 +257,9 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             {
                 Dispatcher.UIThread.Post(() => IsVisible = visible);
             }
-        });
+        }));
 
-        Setting.IsReadOnly.Subscribe(readOnly =>
+        _disposables.Add(Setting.IsReadOnly.Subscribe(readOnly =>
         {
             if (Dispatcher.UIThread.CheckAccess())
             {
@@ -268,9 +269,9 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             {
                 Dispatcher.UIThread.Post(() => IsReadOnly = readOnly);
             }
-        });
+        }));
 
-        Setting.ValueAsObject.Subscribe(_ =>
+        _disposables.Add(Setting.ValueAsObject.Subscribe(_ =>
         {
             if (ShouldIgnoreBroadcast())
             {
@@ -296,7 +297,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
                     UpdateMultiChoices();
                 });
             }
-        });
+        }));
 
         if (setting.GetCurrentChoices() is { } initialChoices)
         {
@@ -317,23 +318,26 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             });
         }
 
-        Setting.Choices?.Subscribe(c =>
+        if (Setting.Choices != null)
         {
-            _rawChoices = c;
-            if (Dispatcher.UIThread.CheckAccess())
+            _disposables.Add(Setting.Choices.Subscribe(c =>
             {
-                UpdateDisplayedChoices();
-                UpdateMultiChoices();
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() =>
+                _rawChoices = c;
+                if (Dispatcher.UIThread.CheckAccess())
                 {
                     UpdateDisplayedChoices();
                     UpdateMultiChoices();
-                });
-            }
-        });
+                }
+                else
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        UpdateDisplayedChoices();
+                        UpdateMultiChoices();
+                    });
+                }
+            }));
+        }
     }
 
     private void HandleStringUpdate(string value)
@@ -642,6 +646,11 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        foreach (var disposable in _disposables)
+        {
+            disposable.Dispose();
+        }
+
         _stringDebounceTimer?.Dispose();
         _numberThrottleTimer?.Dispose();
     }

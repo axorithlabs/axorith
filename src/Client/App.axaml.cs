@@ -8,6 +8,7 @@ using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Client.Views;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +41,10 @@ public class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        
+        #if DEBUG
+        this.AttachDeveloperTools();
+        #endif
     }
 
     /// <summary>
@@ -243,6 +248,19 @@ public class App : Application
 
             logger.LogInformation("Client shutting down...");
 
+            // Write exit marker file BEFORE disconnecting so the Host knows this is intentional.
+            // The Host checks this file in PresenceServiceImpl to distinguish crash from graceful exit.
+            try
+            {
+                var markerPath = Path.Combine(ApplicationPaths.RoamingRoot, ".client_exiting");
+                Directory.CreateDirectory(ApplicationPaths.RoamingRoot);
+                File.WriteAllText(markerPath, DateTimeOffset.UtcNow.ToString("O"));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to write exit marker file");
+            }
+
             _notificationManager?.Dispose();
 
             var windowStateManager = Services.GetService<IWindowStateManager>();
@@ -281,15 +299,16 @@ public class App : Application
                 return;
             }
 
-            if (config.AutoStartEnabled && !autoStartManager.IsAutoStartEnabled)
+            switch (config.AutoStartEnabled)
             {
-                autoStartManager.EnableAutoStart(config.AutoStartMinimized);
-                logger.LogInformation("Auto-start enabled on first run");
-            }
-            else if (!config.AutoStartEnabled && autoStartManager.IsAutoStartEnabled)
-            {
-                autoStartManager.DisableAutoStart();
-                logger.LogInformation("Auto-start disabled per user settings");
+                case true when !autoStartManager.IsAutoStartEnabled:
+                    autoStartManager.EnableAutoStart(config.AutoStartMinimized);
+                    logger.LogInformation("Auto-start enabled on first run");
+                    break;
+                case false when autoStartManager.IsAutoStartEnabled:
+                    autoStartManager.DisableAutoStart();
+                    logger.LogInformation("Auto-start disabled per user settings");
+                    break;
             }
         }
         catch (Exception ex)

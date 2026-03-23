@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
@@ -18,17 +19,22 @@ public class HostController(
     ITokenProvider tokenProvider) : IHostController
 {
     private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
-    private static readonly Mutex HostStartMutex = new(false, "Global\\AxorithHostStartMutex");
 
-    private readonly object _portLock = new();
-    private int? _cachedPort;
+    private static readonly string HostStartMutexName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? "Global\\AxorithHostStartMutex"
+        : "AxorithHostStartMutex";
+
+    private static readonly Mutex HostStartMutex = new(false, HostStartMutexName);
+
+    private readonly Lock _endpointLock = new();
+    private string? _cachedEndpoint;
 
     public async Task<bool> IsHostReachableAsync(CancellationToken ct = default)
     {
         try
         {
             var token = await tokenProvider.GetTokenAsync(ct);
-            var port = GetDiscoveredPort();
+            var port = GetDiscoveredEndpoint();
             var channel = CreateAuthenticatedChannel(token ?? string.Empty, port);
             using (channel)
             {
@@ -46,9 +52,9 @@ public class HostController(
         catch
         {
             // Clear cached port on connection failure to re-read on next attempt
-            lock (_portLock)
+            lock (_endpointLock)
             {
-                _cachedPort = null;
+                _cachedEndpoint = null;
             }
 
             return false;
@@ -65,7 +71,15 @@ public class HostController(
         try
         {
             // Try to acquire mutex with timeout
-            mutexAcquired = HostStartMutex.WaitOne(TimeSpan.FromSeconds(30));
+            try
+            {
+                mutexAcquired = HostStartMutex.WaitOne(TimeSpan.FromSeconds(30));
+            }
+            catch (AbandonedMutexException)
+            {
+                logger.LogWarning("Host start mutex was abandoned by a crashed instance. Taking ownership.");
+                mutexAcquired = true;
+            }
 
             if (!mutexAcquired)
             {
@@ -188,9 +202,9 @@ public class HostController(
             var startTimestampUtc = DateTime.UtcNow;
 
             // Clear cached port before starting
-            lock (_portLock)
+            lock (_endpointLock)
             {
-                _cachedPort = null;
+                _cachedEndpoint = null;
             }
 
             // Check if configured port is available
@@ -276,30 +290,30 @@ public class HostController(
 
                         // Validate JSON structure
                         using var doc = JsonDocument.Parse(content);
-                        if (!doc.RootElement.TryGetProperty("port", out var portElement))
+                        if (!doc.RootElement.TryGetProperty("ipcEndpoint", out var endpointElement))
                         {
-                            logger.LogDebug("host-info.json missing 'port' property. Waiting for complete write...");
+                            logger.LogDebug("host-info.json missing 'ipcEndpoint' property. Waiting for complete write...");
                             await Task.Delay(200, ct);
                             continue;
                         }
 
-                        var port = portElement.GetInt32();
-                        if (port <= 0 || port > 65535)
+                        var endpoint = endpointElement.GetString();
+                        if (string.IsNullOrWhiteSpace(endpoint))
                         {
-                            logger.LogWarning("host-info.json contains invalid port {Port}. Waiting...", port);
+                            logger.LogWarning("host-info.json contains invalid or empty 'ipcEndpoint'. Waiting...");
                             await Task.Delay(200, ct);
                             continue;
                         }
 
                         // Clear cached port to force re-read
-                        lock (_portLock)
+                        lock (_endpointLock)
                         {
-                            _cachedPort = null;
+                            _cachedEndpoint = null;
                         }
 
                         logger.LogInformation(
-                            "Host info file detected with valid port {Port} after {ElapsedMs}ms. Host is ready.",
-                            port, sw.ElapsedMilliseconds);
+                            "Host info file detected with valid endpoint '{Endpoint}' after {ElapsedMs}ms. Host is ready.",
+                            endpoint, sw.ElapsedMilliseconds);
                         return;
                     }
                     catch (IOException ioEx)
@@ -337,7 +351,6 @@ public class HostController(
         }
         finally
         {
-            // Always release mutex when done
             if (mutexAcquired)
             {
                 try
@@ -365,7 +378,7 @@ public class HostController(
                 return;
             }
 
-            var port = GetDiscoveredPort();
+            var port = GetDiscoveredEndpoint();
             var channel = CreateAuthenticatedChannel(token, port);
             using (channel)
             {
@@ -407,12 +420,14 @@ public class HostController(
         await StartHostAsync(forceRestart: true, ct: ct);
     }
 
-    private GrpcChannel CreateAuthenticatedChannel(string token, int port)
+    private GrpcChannel CreateAuthenticatedChannel(string token, string ipcEndpoint)
     {
-        var addr = $"http://{config.Value.Host.Address}:{port}";
+        var clientVersion = VersionHelper.GetClientVersion();
 
         var credentials = CallCredentials.FromInterceptor((_, metadata) =>
         {
+            metadata.Add(AuthConstants.VersionHeaderName, clientVersion);
+
             if (!string.IsNullOrEmpty(token))
             {
                 metadata.Add(AuthConstants.TokenHeaderName, token);
@@ -423,20 +438,47 @@ public class HostController(
 
         var channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
 
-        return GrpcChannel.ForAddress(addr, new GrpcChannelOptions
+        var channelOptions = new GrpcChannelOptions
         {
             Credentials = channelCredentials,
             UnsafeUseInsecureChannelCallCredentials = true
-        });
+        };
+
+        // IPC endpoint: use ConnectCallback for Unix Domain Socket or Named Pipe
+        if (ipcEndpoint.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            return GrpcChannel.ForAddress(ipcEndpoint, channelOptions);
+        }
+        
+        channelOptions.HttpHandler = new SocketsHttpHandler
+        {
+            ConnectCallback = async (_, ct) =>
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    var pipe = new System.IO.Pipes.NamedPipeClientStream(
+                        ".", ipcEndpoint, System.IO.Pipes.PipeDirection.InOut,
+                        System.IO.Pipes.PipeOptions.Asynchronous);
+                    await pipe.ConnectAsync(5000, ct);
+                    return pipe;
+                }
+
+                var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
+                await socket.ConnectAsync(new UnixDomainSocketEndPoint(ipcEndpoint), ct);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+        };
+
+        return GrpcChannel.ForAddress("http://localhost", channelOptions);
     }
 
-    private int GetDiscoveredPort()
+    private string GetDiscoveredEndpoint()
     {
-        lock (_portLock)
+        lock (_endpointLock)
         {
-            if (_cachedPort.HasValue)
+            if (_cachedEndpoint != null)
             {
-                return _cachedPort.Value;
+                return _cachedEndpoint;
             }
 
             try
@@ -445,24 +487,27 @@ public class HostController(
                 {
                     var json = File.ReadAllText(HostInfoPath);
                     using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("port", out var portElement))
+                    if (doc.RootElement.TryGetProperty("ipcEndpoint", out var endpointElement))
                     {
-                        var port = portElement.GetInt32();
-                        _cachedPort = port;
-                        logger.LogDebug("Discovered host port {Port} from host-info.json", port);
-                        return port;
+                        var endpoint = endpointElement.GetString();
+                        if (!string.IsNullOrEmpty(endpoint))
+                        {
+                            _cachedEndpoint = endpoint;
+                            logger.LogDebug("Discovered IPC endpoint from host-info.json: {Endpoint}", endpoint);
+                            return endpoint;
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to read host-info.json, using configured port");
+                logger.LogWarning(ex, "Failed to read host-info.json");
             }
 
-            var fallbackPort = config.Value.Host.Port;
-            _cachedPort = fallbackPort;
-            logger.LogDebug("Using configured port {Port}", fallbackPort);
-            return fallbackPort;
+            var fallback = ApplicationPaths.IpcEndpoint;
+            _cachedEndpoint = fallback;
+            logger.LogDebug("Using default IPC endpoint: {Endpoint}", fallback);
+            return fallback;
         }
     }
 

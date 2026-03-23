@@ -27,7 +27,6 @@ public class ModulesServiceImplTests
     {
         _mockModuleRegistry = new Mock<IModuleRegistry>();
         _mockSessionManager = new Mock<ISessionManager>();
-        var mockPresetManager = new Mock<IPresetManager>();
 
         // Create real broadcaster with mocked dependencies
         var broadcaster = new SettingUpdateBroadcaster(

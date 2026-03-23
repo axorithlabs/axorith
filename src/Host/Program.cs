@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using System.Text.Json;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
@@ -17,8 +15,6 @@ using Axorith.Shared.Licensing;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
-using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -118,6 +114,9 @@ try
             .Enrich.FromLogContext()
             .Enrich.With<ShortSourceContextEnricher>()
             .Enrich.With<ModuleContextEnricher>()
+            .Filter.ByExcluding(e =>
+                e.Properties.TryGetValue("SourceContext", out var sc) &&
+                sc.ToString().StartsWith("\"Grpc.AspNetCore.Server", StringComparison.Ordinal))
             .WriteTo.File(
                 Path.Combine(resolvedLogsPath, "host-.log"),
                 rollingInterval: RollingInterval.Day,
@@ -137,24 +136,37 @@ try
     builder.Services.AddSingleton<UpdateService>();
     builder.Services.Configure<Configuration>(builder.Configuration);
 
-    // Determine actual port to use (check if configured port is available)
     var config = builder.Configuration.Get<Configuration>() ?? new Configuration();
-    var bindAddress = IPAddress.Parse(config.Grpc.BindAddress);
-    var configuredPort = config.Grpc.Port;
-    var actualPort = IsPortAvailable(bindAddress, configuredPort) ? configuredPort : 0;
 
-    if (actualPort == 0)
-    {
-        Log.Warning("Configured port {Port} is busy, will use dynamic port assignment", configuredPort);
-    }
+    // Resolve IPC endpoint for local communication (Unix Domain Socket / Named Pipe)
+    var ipcEndpoint = config.Grpc.ResolveIpcEndpoint();
+    EnsureIpcDirectoryExists(ipcEndpoint);
 
     builder.WebHost.ConfigureKestrel((_, options) =>
     {
-        options.Listen(bindAddress, actualPort, listenOptions =>
+        if (OperatingSystem.IsWindows())
         {
-            listenOptions.Protocols = HttpProtocols.Http2;
-            // NO TLS for local MVP - listening on loopback only
-        });
+            // Windows: Use Named Pipes for local IPC
+            options.ListenNamedPipe(ipcEndpoint, listenOptions =>
+            {
+                listenOptions.Protocols = HttpProtocols.Http2;
+            });
+        }
+        else
+        {
+            // Linux/macOS: Use Unix Domain Sockets for local IPC
+            // Remove stale socket file if it exists (from previous crash)
+            if (File.Exists(ipcEndpoint))
+            {
+                try { File.Delete(ipcEndpoint); }
+                catch (Exception ex) { Log.Warning(ex, "Failed to delete stale socket file: {Path}", ipcEndpoint); }
+            }
+
+            options.ListenUnixSocket(ipcEndpoint, listenOptions =>
+            {
+                listenOptions.Protocols = HttpProtocols.Http2;
+            });
+        }
 
         options.Limits.Http2.MaxStreamsPerConnection = config.Grpc.MaxConcurrentStreams;
         options.Limits.Http2.KeepAlivePingDelay = TimeSpan.FromSeconds(config.Grpc.KeepAliveInterval);
@@ -172,6 +184,8 @@ try
         options.MaxReceiveMessageSize = 16 * 1024 * 1024;
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 
+        // Version interceptor runs BEFORE authentication — fail fast on version mismatch
+        options.Interceptors.Add<VersionInterceptor>();
         options.Interceptors.Add<AuthenticationInterceptor>();
     });
 
@@ -287,6 +301,7 @@ try
     app.MapGrpcService<SchedulerServiceImpl>();
     app.MapGrpcService<NotificationServiceImpl>();
     app.MapGrpcService<GrpcUpdatesService>();
+    app.MapGrpcService<PresenceServiceImpl>();
 
     if (app.Environment.IsDevelopment())
     {
@@ -297,64 +312,30 @@ try
 
     await app.StartAsync();
 
-    var server = app.Services.GetRequiredService<IServer>();
-    var addressFeature = server.Features.Get<IServerAddressesFeature>();
-    var boundPort = 0;
-
-    if (addressFeature?.Addresses.FirstOrDefault() is { } address)
+    // Write IPC endpoint info to host-info.json for client discovery
+    try
     {
-        var uri = new Uri(address);
-        boundPort = uri.Port;
-    }
-    else if (actualPort != 0)
-    {
-        boundPort = actualPort;
-    }
-
-    if (boundPort > 0)
-    {
-        try
+        var hostInfoDir = Path.GetDirectoryName(hostInfoPath);
+        if (!string.IsNullOrEmpty(hostInfoDir) && !Directory.Exists(hostInfoDir))
         {
-            var hostInfoDir = Path.GetDirectoryName(hostInfoPath);
-            if (!string.IsNullOrEmpty(hostInfoDir) && !Directory.Exists(hostInfoDir))
-            {
-                Directory.CreateDirectory(hostInfoDir);
-            }
-
-            var hostInfo = new
-                { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };
-
-            // Use FileShare.Read to allow clients to read while we're writing
-            // This prevents "file is being used by another process" errors
-            var json = JsonSerializer.Serialize(hostInfo);
-            await using (var stream = new FileStream(
-                             hostInfoPath,
-                             FileMode.Create,
-                             FileAccess.Write,
-                             FileShare.Read, // Allow concurrent reads
-                             bufferSize: 4096,
-                             useAsync: true))
-            {
-                await using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(json);
-                await writer.FlushAsync();
-            }
-
-            Log.Information("Host info written to {Path} (port={Port})", hostInfoPath, boundPort);
+            Directory.CreateDirectory(hostInfoDir);
         }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to write host-info.json - clients may not auto-discover dynamic port");
-        }
+
+        var hostInfo = new { ipcEndpoint = ipcEndpoint, timestamp = DateTimeOffset.UtcNow };
+
+        var json = JsonSerializer.Serialize(hostInfo);
+        var tempPath = hostInfoPath + ".tmp";
+        await File.WriteAllTextAsync(tempPath, json);
+        File.Move(tempPath, hostInfoPath, overwrite: true);
+
+        Log.Information("Host info written to {Path} (ipcEndpoint={Endpoint})", hostInfoPath, ipcEndpoint);
     }
-    else
+    catch (Exception ex)
     {
-        Log.Warning("Could not determine bound port. Host info file will not be written.");
+        Log.Warning(ex, "Failed to write host-info.json - clients may not auto-discover IPC endpoint");
     }
 
-    Log.Information("Axorith.Host started successfully on {Address}:{Port}",
-        config.Grpc.BindAddress,
-        boundPort > 0 ? boundPort : "Unknown");
+    Log.Information("Axorith.Host started successfully (IPC: {Endpoint})", ipcEndpoint);
 
     // Log telemetry status after Serilog is fully configured
     Log.Information(
@@ -363,10 +344,9 @@ try
         telemetry.IsEnabled,
         telemetry.IsEnabled);
 
-    telemetry?.TrackEvent("HostReady", new Dictionary<string, object?>
+    telemetry.TrackEvent("HostReady", new Dictionary<string, object?>
     {
-        ["address"] = config.Grpc.BindAddress,
-        ["port"] = boundPort > 0 ? boundPort : null
+        ["ipcEndpoint"] = ipcEndpoint
     });
 
     await app.WaitForShutdownAsync();
@@ -403,6 +383,24 @@ finally
     catch
     {
         // Ignore cleanup errors
+    }
+
+    // Clean up Unix Domain Socket file on shutdown
+    if (!OperatingSystem.IsWindows())
+    {
+        try
+        {
+            var socketPath = ApplicationPaths.IpcEndpoint;
+            if (File.Exists(socketPath))
+            {
+                File.Delete(socketPath);
+                Log.Information("Cleaned up IPC socket file on shutdown");
+            }
+        }
+        catch
+        {
+            // Ignore cleanup errors
+        }
     }
 
     await Log.CloseAndFlushAsync();
@@ -468,7 +466,7 @@ static void RegisterCoreServices(ContainerBuilder builder)
 {
     builder.Register(ctx =>
         {
-            var loggerFactory = ctx.Resolve<ILoggerFactory>();
+            ctx.Resolve<ILoggerFactory>();
             return PlatformServices.CreateWindowService();
         })
         .As<IPlatformWindowService>()
@@ -608,6 +606,16 @@ static void RegisterCoreServices(ContainerBuilder builder)
         .As<INotifier>()
         .SingleInstance()
         .PreserveExistingDefaults();
+
+    builder.RegisterType<HostStateService>()
+        .As<IHostStateService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
+    builder.RegisterType<HostNotificationService>()
+        .As<IHostNotificationService>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
 }
 
 static void RegisterBroadcasters(ContainerBuilder builder)
@@ -634,17 +642,17 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .PreserveExistingDefaults();
 }
 
-static bool IsPortAvailable(IPAddress address, int port)
+static void EnsureIpcDirectoryExists(string ipcEndpoint)
 {
-    try
+    if (OperatingSystem.IsWindows())
     {
-        using var listener = new TcpListener(address, port);
-        listener.Start();
-        listener.Stop();
-        return true;
+        // Named Pipes don't need directory creation
+        return;
     }
-    catch (SocketException)
+
+    var dir = Path.GetDirectoryName(ipcEndpoint);
+    if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
     {
-        return false;
+        Directory.CreateDirectory(dir);
     }
 }

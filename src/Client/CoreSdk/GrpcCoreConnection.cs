@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Axorith.Client.CoreSdk.Abstractions;
@@ -34,6 +35,7 @@ public class GrpcCoreConnection : ICoreConnection
     private GrpcSchedulerApi? _schedulerApi;
     private GrpcNotificationApi? _notificationApi;
     private GrpcUpdatesApi? _updatesApi;
+    private PresenceClient? _presenceClient;
     private bool _disposed;
 
     /// <summary>
@@ -134,8 +136,11 @@ public class GrpcCoreConnection : ICoreConnection
 
             _logger.LogInformation("Connecting to Axorith.Host at {Address}", _serverAddress);
 
+            var clientVersion = VersionHelper.GetClientVersion();
+
             var credentials = CallCredentials.FromInterceptor((_, metadata) =>
             {
+                metadata.Add(AuthConstants.VersionHeaderName, clientVersion);
                 metadata.Add(AuthConstants.TokenHeaderName, token);
                 return Task.CompletedTask;
             });
@@ -172,7 +177,7 @@ public class GrpcCoreConnection : ICoreConnection
                     }
                 };
             }
-            else
+            else if (_serverAddress.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning(
                     "Using insecure channel for localhost communication. " +
@@ -206,8 +211,48 @@ public class GrpcCoreConnection : ICoreConnection
                     }
                 };
             }
+            else
+            {
+                _logger.LogInformation("Using IPC endpoint: {Endpoint}", _serverAddress);
 
-            _channel = GrpcChannel.ForAddress(_serverAddress, channelOptions);
+                channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
+                channelOptions = new GrpcChannelOptions
+                {
+                    MaxReceiveMessageSize = 16 * 1024 * 1024,
+                    MaxSendMessageSize = 16 * 1024 * 1024,
+                    Credentials = channelCredentials,
+                    UnsafeUseInsecureChannelCallCredentials = true,
+                    HttpHandler = new SocketsHttpHandler
+                    {
+                        ConnectCallback = CreateIpcConnectCallback(_serverAddress),
+                    },
+                    ServiceConfig = new ServiceConfig
+                    {
+                        MethodConfigs =
+                        {
+                            new MethodConfig
+                            {
+                                Names = { MethodName.Default },
+                                RetryPolicy = new RetryPolicy
+                                {
+                                    MaxAttempts = 5,
+                                    InitialBackoff = TimeSpan.FromSeconds(1),
+                                    MaxBackoff = TimeSpan.FromSeconds(5),
+                                    BackoffMultiplier = 1.5,
+                                    RetryableStatusCodes =
+                                        { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            _channel = GrpcChannel.ForAddress(
+                _serverAddress.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? _serverAddress
+                    : "http://localhost",
+                channelOptions);
 
             var presetsClient = new PresetsService.PresetsServiceClient(_channel);
             var sessionsClient = new SessionsService.SessionsServiceClient(_channel);
@@ -224,6 +269,13 @@ public class GrpcCoreConnection : ICoreConnection
             _schedulerApi = new GrpcSchedulerApi(schedulerClient, _retryPolicy);
             _notificationApi = new GrpcNotificationApi(notificationClient);
             _updatesApi = new GrpcUpdatesApi(updatesClient, _loggerFactory.CreateLogger<GrpcUpdatesApi>());
+
+            // Create and start presence streaming
+            var presenceServiceClient = new Contracts.Generated.PresenceService.PresenceServiceClient(_channel);
+            _presenceClient = new PresenceClient(
+                presenceServiceClient,
+                _loggerFactory.CreateLogger<PresenceClient>());
+            await _presenceClient.StartPresenceStreamAsync(ct).ConfigureAwait(false);
 
             var health = await _diagnosticsApi.GetHealthAsync(ct).ConfigureAwait(false);
 
@@ -253,6 +305,12 @@ public class GrpcCoreConnection : ICoreConnection
 
         _logger.LogInformation("Disconnecting from {Address}", _serverAddress);
 
+        // Stop presence stream gracefully before disconnecting
+        if (_presenceClient != null)
+        {
+            await _presenceClient.StopPresenceStreamAsync().ConfigureAwait(false);
+        }
+
         SetState(ConnectionState.Disconnected);
 
         await DisposeChannelAsync().ConfigureAwait(false);
@@ -262,6 +320,12 @@ public class GrpcCoreConnection : ICoreConnection
 
     private async Task DisposeChannelAsync()
     {
+        if (_presenceClient != null)
+        {
+            await _presenceClient.DisposeAsync().ConfigureAwait(false);
+            _presenceClient = null;
+        }
+
         if (_sessionsApi is IDisposable sessionsDisposable)
         {
             sessionsDisposable.Dispose();
@@ -307,6 +371,34 @@ public class GrpcCoreConnection : ICoreConnection
         _logger.LogDebug("Connection state changed: {OldState} -> {NewState}",
             _stateSubject.Value, newState);
         _stateSubject.OnNext(newState);
+    }
+
+    /// <summary>
+    ///     Creates a ConnectCallback for IPC transport (Unix Domain Socket or Named Pipe).
+    /// </summary>
+    private static Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>> CreateIpcConnectCallback(
+        string ipcEndpoint)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            // Named Pipe
+            return async (_, ct) =>
+            {
+                var pipe = new System.IO.Pipes.NamedPipeClientStream(
+                    ".", ipcEndpoint, System.IO.Pipes.PipeDirection.InOut,
+                    System.IO.Pipes.PipeOptions.Asynchronous);
+                await pipe.ConnectAsync(5000, ct);
+                return pipe;
+            };
+        }
+
+        // Unix Domain Socket
+        return async (_, ct) =>
+        {
+            var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.IP);
+            await socket.ConnectAsync(new UnixDomainSocketEndPoint(ipcEndpoint), ct);
+            return new NetworkStream(socket, ownsSocket: true);
+        };
     }
 
     /// <inheritdoc />

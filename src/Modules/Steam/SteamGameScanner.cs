@@ -17,9 +17,54 @@ internal static class SteamGameScanner
 
     /// <summary>
     ///     Gets Steam installation directory from executable path.
+    ///     Handles Steam installations on Windows, Linux (native + Flatpak) and macOS.
     /// </summary>
     public static string? GetSteamDirectory(string steamExePath)
     {
+        if (OperatingSystem.IsLinux())
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            // 1. Flatpak Steam
+            var flatpakPath = Path.Combine(home, ".var", "app",
+                "com.valvesoftware.Steam", ".local", "share", "Steam");
+            if (Directory.Exists(flatpakPath))
+            {
+                return flatpakPath;
+            }
+
+            // 2. Native package manager Steam (apt, pacman, dnf, etc.)
+            var nativePath = Path.Combine(home, ".local", "share", "Steam");
+            if (Directory.Exists(nativePath))
+            {
+                return nativePath;
+            }
+
+            // 3. Legacy symlink created by Steam installer
+            var legacyPath = Path.Combine(home, ".steam", "steam");
+            if (Directory.Exists(legacyPath))
+            {
+                return legacyPath;
+            }
+
+            // 4. Debian/Ubuntu-specific path
+            var debianPath = Path.Combine(home, ".steam", "debian-installation");
+            if (Directory.Exists(debianPath))
+            {
+                return debianPath;
+            }
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var macPath = Path.Combine(home, "Library", "Application Support", "Steam");
+            if (Directory.Exists(macPath))
+            {
+                return macPath;
+            }
+        }
+
         if (string.IsNullOrEmpty(steamExePath))
         {
             return null;
@@ -57,7 +102,7 @@ internal static class SteamGameScanner
             }
         }
 
-        return games.OrderBy(g => g.Name).ToList();
+        return [.. games.OrderBy(g => g.Name)];
     }
 
     private static List<string> GetLibraryFolders(string steamDirectory)
@@ -78,7 +123,7 @@ internal static class SteamGameScanner
 
             foreach (Match match in matches)
             {
-                var libPath = match.Groups[1].Value.Replace(@"\\", @"\");
+                var libPath = match.Groups[1].Value.Replace(@"\\", Path.DirectorySeparatorChar.ToString());
                 if (Directory.Exists(libPath) && !libraries.Contains(libPath, StringComparer.OrdinalIgnoreCase))
                 {
                     libraries.Add(libPath);

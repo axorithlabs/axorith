@@ -236,6 +236,21 @@ public static class ApplicationPaths
     public static string CommonAppData => LazyCommonAppData.Value;
 
     /// <summary>
+    ///     Gets the IPC endpoint path for local gRPC communication.
+    ///     On Unix (Linux/macOS), returns a Unix Domain Socket path.
+    ///     On Windows, returns a Named Pipe name.
+    /// </summary>
+    /// <value>
+    ///     The full path to the IPC endpoint.
+    ///     Linux/macOS: ~/.local/share/Axorith/axorith.sock
+    ///     Windows: axorith-ipc (Named Pipe name)
+    /// </value>
+    public static string IpcEndpoint =>
+        OperatingSystem.IsWindows()
+            ? "axorith-ipc"
+            : Path.Combine(LocalRoot, "axorith.sock");
+
+    /// <summary>
     ///     Gets the secrets directory path for Linux fallback storage.
     /// </summary>
     /// <value>

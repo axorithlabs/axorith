@@ -10,6 +10,39 @@ namespace Axorith.Shared.Platform.Linux;
 [SupportedOSPlatform("linux")]
 internal static class LinuxWindowApi
 {
+    private const string WaylandDisplayEnv = "WAYLAND_DISPLAY";
+    private const string XdgSessionTypeEnv = "XDG_SESSION_TYPE";
+
+    /// <summary>
+    ///     Gets whether the current Linux session uses Wayland instead of X11.
+    /// </summary>
+    public static bool IsWaylandSession()
+    {
+        var sessionType = Environment.GetEnvironmentVariable(XdgSessionTypeEnv);
+        if (string.Equals(sessionType, "wayland", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var waylandDisplay = Environment.GetEnvironmentVariable(WaylandDisplayEnv);
+        return !string.IsNullOrEmpty(waylandDisplay);
+    }
+
+    /// <summary>
+    ///     Gets a user-facing message explaining why window management is unavailable.
+    ///     Returns null if window management should work normally.
+    /// </summary>
+    public static string? GetWindowManagementStatusMessage()
+    {
+        if (IsWaylandSession())
+        {
+            return "Window management (move/resize/minimize) is unavailable on Wayland sessions. " +
+                   "Switch to X11/XWayland for full window control.";
+        }
+
+        return null;
+    }
+
     /// <summary>
     ///     Waits for a process to create its main window.
     /// </summary>
@@ -36,6 +69,11 @@ internal static class LinuxWindowApi
     /// </summary>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
+        if (IsWaylandSession())
+        {
+            return; // Silent failure — GetWindowManagementStatusMessage() provides UI visibility
+        }
+
         var windowId = windowHandle.ToInt64();
 
         var monitors = GetMonitors();
@@ -55,11 +93,27 @@ internal static class LinuxWindowApi
     /// <summary>
     ///     Checks if process has a window.
     /// </summary>
-    private static bool HasWindow(Process process)
+    internal static bool HasWindow(Process process)
     {
         try
         {
             var output = ExecuteCommand("xdotool", $"search --pid {process.Id}");
+            return !string.IsNullOrWhiteSpace(output);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Checks if a process with given PID has a window.
+    /// </summary>
+    internal static bool HasWindow(int processId)
+    {
+        try
+        {
+            var output = ExecuteCommand("xdotool", $"search --pid {processId}");
             return !string.IsNullOrWhiteSpace(output);
         }
         catch
@@ -158,5 +212,82 @@ internal static class LinuxWindowApi
         public int Y { get; init; }
         public int Width { get; set; }
         public int Height { get; set; }
+    }
+
+    // Stub implementations for IPlatformWindowService — return defaults on Wayland
+
+    public static void SetWindowState(IntPtr windowHandle, WindowState state)
+    {
+        if (IsWaylandSession()) return;
+        ExecuteCommand("xdotool", $"windowstate {'_' + state.ToString().ToLower()} {windowHandle.ToInt64()}");
+    }
+
+    public static WindowState GetWindowState(IntPtr windowHandle)
+    {
+        if (IsWaylandSession()) return WindowState.Normal;
+        return WindowState.Normal; // xdotool doesn't provide a direct query for state
+    }
+
+    public static void SetWindowSize(IntPtr windowHandle, int width, int height)
+    {
+        if (IsWaylandSession()) return;
+        ExecuteCommand("xdotool", $"windowsize {windowHandle.ToInt64()} {width} {height}");
+    }
+
+    public static void SetWindowPosition(IntPtr windowHandle, int x, int y)
+    {
+        if (IsWaylandSession()) return;
+        ExecuteCommand("xdotool", $"windowmove {windowHandle.ToInt64()} {x} {y}");
+    }
+
+    public static (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
+    {
+        if (IsWaylandSession()) return (0, 0, 0, 0);
+        var output = ExecuteCommand("xdotool", $"getwindowgeometry --shell {windowHandle.ToInt64()}");
+        return ParseGeometry(output);
+    }
+
+    public static void FocusWindow(IntPtr windowHandle)
+    {
+        if (IsWaylandSession()) return;
+        ExecuteCommand("xdotool", $"windowactivate {windowHandle.ToInt64()}");
+    }
+
+    public static int GetMonitorCount()
+    {
+        return IsWaylandSession() ? 1 : GetMonitors().Count;
+    }
+
+    public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
+    {
+        if (IsWaylandSession()) return (0, 0, 1920, 1080);
+        var monitors = GetMonitors();
+        if (monitorIndex < 0 || monitorIndex >= monitors.Count) return (0, 0, 1920, 1080);
+        var m = monitors[monitorIndex];
+        return (m.X, m.Y, m.Width, m.Height);
+    }
+
+    public static string GetMonitorName(int monitorIndex)
+    {
+        return $"Monitor {monitorIndex}";
+    }
+
+    private static (int X, int Y, int Width, int Height) ParseGeometry(string output)
+    {
+        int x = 0, y = 0, w = 0, h = 0;
+        foreach (var line in output.Split('\n'))
+        {
+            var parts = line.Split('=', 2);
+            if (parts.Length != 2) continue;
+            switch (parts[0].Trim())
+            {
+                case "X": int.TryParse(parts[1].Trim(), out x); break;
+                case "Y": int.TryParse(parts[1].Trim(), out y); break;
+                case "WIDTH": int.TryParse(parts[1].Trim(), out w); break;
+                case "HEIGHT": int.TryParse(parts[1].Trim(), out h); break;
+            }
+        }
+
+        return (x, y, w, h);
     }
 }

@@ -1,5 +1,7 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Text;
+using Axorith.Shared.Platform;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Client.Services;
@@ -16,6 +18,7 @@ public sealed class SingleInstanceManager : IDisposable
     private const string ActivateCommand = "ACTIVATE_WINDOW";
 
     private readonly ILogger<SingleInstanceManager> _logger;
+    private readonly INamedPipeFactory _pipeFactory;
     private Mutex? _mutex;
     private bool _isFirstInstance;
     private NamedPipeServerStream? _pipeServer;
@@ -24,11 +27,19 @@ public sealed class SingleInstanceManager : IDisposable
 
     public event EventHandler? ActivationRequested;
 
-    public SingleInstanceManager(ILogger<SingleInstanceManager> logger, string? instanceId = null)
+    public SingleInstanceManager(
+        ILogger<SingleInstanceManager> logger,
+        INamedPipeFactory pipeFactory,
+        string? instanceId = null)
     {
         _logger = logger;
+        _pipeFactory = pipeFactory;
         var suffix = instanceId ?? "Default";
-        _mutexName = $"Global\\AxorithClient_SingleInstance_Mutex_{suffix}";
+
+        _mutexName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? $"Global\\AxorithClient_SingleInstance_Mutex_{suffix}"
+            : $"AxorithClient_SingleInstance_Mutex_{suffix}";
+
         _pipeName = $"AxorithClient_SingleInstance_Pipe_{suffix}";
     }
 
@@ -137,12 +148,8 @@ public sealed class SingleInstanceManager : IDisposable
             NamedPipeServerStream? server = null;
             try
             {
-                server = new NamedPipeServerStream(
-                    _pipeName,
-                    PipeDirection.In,
-                    1,
-                    PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous);
+                server = _pipeFactory.CreateSecureServerPipe(
+                    _pipeName);
 
                 _pipeServer = server;
 

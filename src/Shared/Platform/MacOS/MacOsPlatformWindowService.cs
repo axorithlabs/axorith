@@ -19,46 +19,46 @@ internal class MacOsPlatformWindowService : IPlatformWindowService
 
     public void SetWindowState(IntPtr windowHandle, WindowState state)
     {
-        throw new PlatformNotSupportedException("SetWindowState is not yet implemented on macOS");
+        MacOsWindowApi.SetWindowState(windowHandle, state);
     }
 
     public WindowState GetWindowState(IntPtr windowHandle)
     {
-        throw new PlatformNotSupportedException("GetWindowState is not yet implemented on macOS");
+        return MacOsWindowApi.GetWindowState(windowHandle);
     }
 
     public void SetWindowSize(IntPtr windowHandle, int width, int height)
     {
-        throw new PlatformNotSupportedException("SetWindowSize is not yet implemented on macOS");
+        MacOsWindowApi.SetWindowSize(windowHandle, width, height);
     }
 
     public void SetWindowPosition(IntPtr windowHandle, int x, int y)
     {
-        throw new PlatformNotSupportedException("SetWindowPosition is not yet implemented on macOS");
+        MacOsWindowApi.SetWindowPosition(windowHandle, x, y);
     }
 
     public (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
     {
-        throw new PlatformNotSupportedException("GetWindowBounds is not yet implemented on macOS");
+        return MacOsWindowApi.GetWindowBounds(windowHandle);
     }
 
     public void FocusWindow(IntPtr windowHandle)
     {
-        throw new PlatformNotSupportedException("FocusWindow is not yet implemented on macOS");
+        MacOsWindowApi.FocusWindow(windowHandle);
     }
 
     public int GetMonitorCount()
     {
-        return 1;
+        return MacOsWindowApi.GetMonitorCount();
     }
 
     public (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
     {
-        throw new PlatformNotSupportedException("GetMonitorBounds is not yet implemented on macOS");
+        return MacOsWindowApi.GetMonitorBounds(monitorIndex);
     }
 
     public string GetMonitorName(int monitorIndex)
     {
-        return $"Monitor {monitorIndex + 1}";
+        return MacOsWindowApi.GetMonitorName(monitorIndex);
     }
 }

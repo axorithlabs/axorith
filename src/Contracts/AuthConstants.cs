@@ -14,4 +14,9 @@ public static class AuthConstants
     ///     The filename where the host writes the ephemeral session token.
     /// </summary>
     public const string TokenFileName = ".auth_token";
+
+    /// <summary>
+    ///     The HTTP/2 header name used for the client version in version handshake.
+    /// </summary>
+    public const string VersionHeaderName = "x-axorith-version";
 }

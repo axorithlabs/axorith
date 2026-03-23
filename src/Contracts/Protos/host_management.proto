@@ -9,6 +9,7 @@ option csharp_namespace = "Axorith.Contracts";
 service HostManagement {
   rpc RequestShutdown(ShutdownRequest) returns (ShutdownResponse);
   rpc GetStatus(google.protobuf.Empty) returns (HostStatusResponse);
+  rpc NotifyClientExiting(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message ShutdownRequest {

@@ -61,14 +61,14 @@ public class SessionSchedule
         }
 
         var localNow = now.LocalDateTime;
-        var tolerance = TimeSpan.FromSeconds(30); // Allow 30 second window for triggering
+        TimeSpan.FromSeconds(30);
 
         for (var i = 0; i <= 7; i++)
         {
             var candidateDate = localNow.Date.AddDays(i);
             var candidateRun = candidateDate + RecurringTime.Value;
 
-            if (i == 0 && candidateRun < localNow.Add(-tolerance))
+            if (i == 0 && candidateRun < localNow)
             {
                 continue;
             }

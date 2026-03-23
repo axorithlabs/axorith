@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axorith.Shared.Tests.Platform;
 
-public class MacOSAutoStartManagerTests
+public class MacOsAutoStartManagerTests
 {
 	private const string Label = "com.axorith.host";
 	private static readonly string PlistDirectory = Path.Combine(
@@ -30,7 +30,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		manager.IsAutoStartEnabled.Should().BeFalse();
 	}
@@ -44,7 +44,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		try
 		{
@@ -71,7 +71,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		manager.IsStartMinimized.Should().BeFalse();
 	}
@@ -85,7 +85,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		try
 		{
@@ -112,7 +112,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		try
 		{
@@ -139,7 +139,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		if (File.Exists(PlistPath))
 		{
@@ -158,7 +158,7 @@ public class MacOSAutoStartManagerTests
 		}
 
 		var logger = NullLogger.Instance;
-		var manager = new MacOSAutoStartManager(logger);
+		var manager = new MacOsAutoStartManager(logger);
 
 		try
 		{

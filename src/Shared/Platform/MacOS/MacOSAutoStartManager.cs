@@ -13,7 +13,7 @@ namespace Axorith.Shared.Platform.MacOS;
 ///     - Supports --tray flag for start minimized behavior
 /// </summary>
 [SupportedOSPlatform("macos")]
-internal sealed class MacOSAutoStartManager(ILogger logger) : IAutoStartManager
+internal sealed class MacOsAutoStartManager(ILogger logger) : IAutoStartManager
 {
 	private const string Label = "com.axorith.host";
 	private const string PlistFilename = "com.axorith.host.plist";

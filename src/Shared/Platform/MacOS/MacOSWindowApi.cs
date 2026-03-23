@@ -1,17 +1,15 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace Axorith.Shared.Platform.MacOS;
 
-/// <summary>
-///     macOS-specific window management API using AppKit/Cocoa.
-/// </summary>
 [SupportedOSPlatform("macos")]
 internal static class MacOsWindowApi
 {
-    /// <summary>
-    ///     Waits for a process to create its main window.
-    /// </summary>
+    private const string HiservicesFramework = "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/HIServices.framework/Versions/A/HIServices";
+    private const string CoreGraphicsFramework = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics";
+
     public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
         CancellationToken cancellationToken = default)
     {
@@ -30,92 +28,481 @@ internal static class MacOsWindowApi
         }
     }
 
-    /// <summary>
-    ///     Moves a window to a specific monitor/display by index.
-    /// </summary>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
-        // macOS uses display arrangement from System Preferences
-        // We'll use AppleScript to move windows between displays
+        if (!IsAccessibilityEnabled())
+        {
+            throw new InvalidOperationException("Accessibility permission is required to move windows");
+        }
 
-        var script = @"
-tell application ""System Events""
-    set frontProcess to first process whose frontmost is true
-    tell frontProcess
-        set position of window 1 to {100, 100}
-    end tell
-end tell";
-
-        ExecuteAppleScript(script);
+        var position = GetDisplayPosition(monitorIndex);
+        SetWindowPosition(windowHandle, position.X, position.Y);
     }
 
-    /// <summary>
-    ///     Checks if process has a window using lsappinfo.
-    /// </summary>
+    public static bool IsAccessibilityEnabled()
+    {
+        return AXIsProcessTrustedWithOptions(IntPtr.Zero);
+    }
+
+    public static bool CheckAccessibilityWithRetry(int maxAttempts = 5, int delayMs = 1000)
+    {
+        for (int i = 0; i < maxAttempts; i++)
+        {
+            if (AXIsProcessTrustedWithOptions(IntPtr.Zero))
+            {
+                return true;
+            }
+
+            if (i < maxAttempts - 1)
+            {
+                Thread.Sleep(delayMs);
+            }
+        }
+
+        return false;
+    }
+
     private static bool HasWindow(Process process)
     {
         try
         {
-            // Use lsappinfo to check if app has windows
-            var output = ExecuteCommand("lsappinfo", $"info -only name {process.Id}");
-            return !string.IsNullOrWhiteSpace(output) && output.Contains('"');
+            var appElement = AXUIElementCreateApplication(process.Id);
+            if (appElement == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            try
+            {
+                var windowsAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXWindows");
+                if (windowsAttribute == IntPtr.Zero)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    var result = AXUIElementCopyAttributeValue(appElement, windowsAttribute, out var windowsValue);
+                    if (result == 0 && windowsValue != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            var arraySize = CFArrayGetCount(windowsValue);
+                            return arraySize > 0;
+                        }
+                        finally
+                        {
+                            CFRelease(windowsValue);
+                        }
+                    }
+                }
+                finally
+                {
+                    CFRelease(windowsAttribute);
+                }
+            }
+            finally
+            {
+                CFRelease(appElement);
+            }
         }
-        catch
+        catch (Exception)
         {
-            return false;
+            // Accessibility API call failed — process has no accessible window
+        }
+
+        return false;
+    }
+
+    public static void SetWindowPosition(IntPtr windowHandle, int x, int y)
+    {
+        if (!IsAccessibilityEnabled())
+        {
+            throw new InvalidOperationException("Accessibility permission is required to move windows");
+        }
+
+        var positionAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXPosition");
+        if (positionAttribute == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Failed to create position attribute string");
+        }
+
+        try
+        {
+            var position = CreateAxValueFromPoint(x, y);
+            try
+            {
+                var result = AXUIElementSetAttributeValue(windowHandle, positionAttribute, position);
+                if (result != 0)
+                {
+                    throw new InvalidOperationException($"Failed to set window position. Error code: {result}");
+                }
+            }
+            finally
+            {
+                CFRelease(position);
+            }
+        }
+        finally
+        {
+            CFRelease(positionAttribute);
         }
     }
 
-    /// <summary>
-    ///     Executes AppleScript command.
-    /// </summary>
-    private static void ExecuteAppleScript(string script)
+    public static void SetWindowSize(IntPtr windowHandle, int width, int height)
     {
-        var psi = new ProcessStartInfo
+        if (!IsAccessibilityEnabled())
         {
-            FileName = "osascript",
-            Arguments = $"-e \"{script.Replace("\"", "\\\"")}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            throw new InvalidOperationException("Accessibility permission is required to resize windows");
+        }
 
-        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start osascript");
-        process.WaitForExit(5000);
-
-        if (process.ExitCode != 0)
+        var sizeAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXSize");
+        if (sizeAttribute == IntPtr.Zero)
         {
-            var error = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"AppleScript failed: {error}");
+            throw new InvalidOperationException("Failed to create size attribute string");
+        }
+
+        try
+        {
+            var size = CreateAxValueFromSize(width, height);
+            try
+            {
+                var result = AXUIElementSetAttributeValue(windowHandle, sizeAttribute, size);
+                if (result != 0)
+                {
+                    throw new InvalidOperationException($"Failed to set window size. Error code: {result}");
+                }
+            }
+            finally
+            {
+                CFRelease(size);
+            }
+        }
+        finally
+        {
+            CFRelease(sizeAttribute);
         }
     }
 
-    /// <summary>
-    ///     Executes a shell command and returns output.
-    /// </summary>
-    private static string ExecuteCommand(string command, string arguments)
+    public static (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
     {
-        var psi = new ProcessStartInfo
+        if (!IsAccessibilityEnabled())
         {
-            FileName = command,
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {command}");
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(5000);
-
-        if (process.ExitCode != 0)
-        {
-            var error = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"{command} failed: {error}");
+            throw new InvalidOperationException("Accessibility permission is required to get window bounds");
         }
 
-        return output;
+        var position = GetWindowPosition(windowHandle);
+        var size = GetWindowSize(windowHandle);
+
+        return (position.X, position.Y, size.Width, size.Height);
+    }
+
+    private static (int X, int Y) GetWindowPosition(IntPtr windowHandle)
+    {
+        var positionAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXPosition");
+        if (positionAttribute == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Failed to create position attribute string");
+        }
+
+        try
+        {
+            var result = AXUIElementCopyAttributeValue(windowHandle, positionAttribute, out var positionValue);
+            if (result != 0 || positionValue == IntPtr.Zero)
+            {
+                throw new InvalidOperationException($"Failed to get window position. Error code: {result}");
+            }
+
+            try
+            {
+                return GetPointFromAxValue(positionValue);
+            }
+            finally
+            {
+                CFRelease(positionValue);
+            }
+        }
+        finally
+        {
+            CFRelease(positionAttribute);
+        }
+    }
+
+    private static (int Width, int Height) GetWindowSize(IntPtr windowHandle)
+    {
+        var sizeAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXSize");
+        if (sizeAttribute == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Failed to create size attribute string");
+        }
+
+        try
+        {
+            var result = AXUIElementCopyAttributeValue(windowHandle, sizeAttribute, out var sizeValue);
+            if (result != 0 || sizeValue == IntPtr.Zero)
+            {
+                throw new InvalidOperationException($"Failed to get window size. Error code: {result}");
+            }
+
+            try
+            {
+                return GetSizeFromAxValue(sizeValue);
+            }
+            finally
+            {
+                CFRelease(sizeValue);
+            }
+        }
+        finally
+        {
+            CFRelease(sizeAttribute);
+        }
+    }
+
+    public static WindowState GetWindowState(IntPtr windowHandle)
+    {
+        if (!IsAccessibilityEnabled())
+        {
+            throw new InvalidOperationException("Accessibility permission is required to get window state");
+        }
+
+        var minimizedAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXMinimized");
+        if (minimizedAttribute == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Failed to create minimized attribute string");
+        }
+
+        try
+        {
+            var result = AXUIElementCopyAttributeValue(windowHandle, minimizedAttribute, out var minimizedValue);
+            if (result != 0 || minimizedValue == IntPtr.Zero)
+            {
+                return WindowState.Normal;
+            }
+
+            try
+            {
+                var isMinimized = Marshal.ReadInt32(minimizedValue) != 0;
+                return isMinimized ? WindowState.Minimized : WindowState.Normal;
+            }
+            finally
+            {
+                CFRelease(minimizedValue);
+            }
+        }
+        finally
+        {
+            CFRelease(minimizedAttribute);
+        }
+    }
+
+    public static void SetWindowState(IntPtr windowHandle, WindowState state)
+    {
+        if (!IsAccessibilityEnabled())
+        {
+            throw new InvalidOperationException("Accessibility permission is required to set window state");
+        }
+
+        var minimizedAttribute = CFStringCreateWithCString(IntPtr.Zero, "AXMinimized");
+        if (minimizedAttribute == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Failed to create minimized attribute string");
+        }
+
+        try
+        {
+            var minimizedValue = state == WindowState.Minimized ? 1 : 0;
+            var cfNumber = CFNumberCreate(IntPtr.Zero, 0, ref minimizedValue);
+            if (cfNumber == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("Failed to create CFNumber");
+            }
+
+            try
+            {
+                var result = AXUIElementSetAttributeValue(windowHandle, minimizedAttribute, cfNumber);
+                if (result != 0)
+                {
+                    throw new InvalidOperationException($"Failed to set window state. Error code: {result}");
+                }
+            }
+            finally
+            {
+                CFRelease(cfNumber);
+            }
+        }
+        finally
+        {
+            CFRelease(minimizedAttribute);
+        }
+    }
+
+    public static void FocusWindow(IntPtr windowHandle)
+    {
+        if (!IsAccessibilityEnabled())
+        {
+            throw new InvalidOperationException("Accessibility permission is required to focus windows");
+        }
+
+        var raiseAction = CFStringCreateWithCString(IntPtr.Zero, "AXRaise");
+        if (raiseAction == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Failed to create raise action string");
+        }
+
+        try
+        {
+            var result = AXUIElementPerformAction(windowHandle, raiseAction);
+            if (result != 0)
+            {
+                throw new InvalidOperationException($"Failed to raise window. Error code: {result}");
+            }
+        }
+        finally
+        {
+            CFRelease(raiseAction);
+        }
+    }
+
+    public static int GetMonitorCount()
+    {
+        var displays = new IntPtr[16];
+        var count = CGGetActiveDisplayList(16, displays, out var displayCount);
+        if (count != 0)
+        {
+            return 1;
+        }
+
+        return (int)displayCount;
+    }
+
+    public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
+    {
+        var displays = new IntPtr[16];
+        var count = CGGetActiveDisplayList(16, displays, out var displayCount);
+        if (count != 0 || monitorIndex >= displayCount)
+        {
+            return (0, 0, 1920, 1080);
+        }
+
+        var display = displays[monitorIndex];
+        var bounds = CGDisplayBounds(display);
+
+        return (bounds.X, bounds.Y, bounds.Width, bounds.Height);
+    }
+
+    public static string GetMonitorName(int monitorIndex)
+    {
+        var displays = new IntPtr[16];
+        var count = CGGetActiveDisplayList(16, displays, out var displayCount);
+        if (count != 0 || monitorIndex >= displayCount)
+        {
+            return $"Display {monitorIndex + 1}";
+        }
+
+        return $"Display {monitorIndex + 1}";
+    }
+
+    private static (int X, int Y) GetDisplayPosition(int monitorIndex)
+    {
+        var bounds = GetMonitorBounds(monitorIndex);
+        return (bounds.X + 50, bounds.Y + 50);
+    }
+
+    private static IntPtr CreateAxValueFromPoint(int x, int y)
+    {
+        var point = new CgPoint { X = x, Y = y };
+        return CFTypeCreateWithPoint(point);
+    }
+
+    private static IntPtr CreateAxValueFromSize(int width, int height)
+    {
+        var size = new CgSize { Width = width, Height = height };
+        return CFTypeCreateWithSize(size);
+    }
+
+    private static (int X, int Y) GetPointFromAxValue(IntPtr axValue)
+    {
+        var point = new CgPoint();
+        CFTypeGetValueAsPoint(axValue, ref point);
+        return ((int)point.X, (int)point.Y);
+    }
+
+    private static (int Width, int Height) GetSizeFromAxValue(IntPtr axValue)
+    {
+        var size = new CgSize();
+        CFTypeGetValueAsSize(axValue, ref size);
+        return ((int)size.Width, (int)size.Height);
+    }
+
+    [DllImport(HiservicesFramework)]
+    private static extern bool AXIsProcessTrustedWithOptions(IntPtr options);
+
+    [DllImport(HiservicesFramework)]
+    private static extern IntPtr AXUIElementCreateApplication(int pid);
+
+    [DllImport(HiservicesFramework)]
+    private static extern int AXUIElementCopyAttributeValue(IntPtr element, IntPtr attribute, out IntPtr value);
+
+    [DllImport(HiservicesFramework)]
+    private static extern int AXUIElementSetAttributeValue(IntPtr element, IntPtr attribute, IntPtr value);
+
+    [DllImport(HiservicesFramework)]
+    private static extern int AXUIElementPerformAction(IntPtr element, IntPtr action);
+
+    [DllImport(CoreGraphicsFramework)]
+    private static extern int CGGetActiveDisplayList(uint maxDisplays, IntPtr[] displays, out uint displayCount);
+
+    [DllImport(CoreGraphicsFramework)]
+    private static extern CgRect CGDisplayBounds(IntPtr display);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern void CFRelease(IntPtr cf);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFStringCreateWithCString(IntPtr allocator, string str);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFNumberCreate(IntPtr allocator, int type, ref int value);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFArrayGetCount(IntPtr array);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFTypeCreateWithPoint(CgPoint point);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFTypeCreateWithSize(CgSize size);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern void CFTypeGetValueAsPoint(IntPtr type, ref CgPoint point);
+
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern void CFTypeGetValueAsSize(IntPtr type, ref CgSize size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CgPoint
+    {
+        public float X;
+        public float Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CgSize
+    {
+        public float Width;
+        public float Height;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CgRect
+    {
+        public CgPoint Origin;
+        public CgSize Size;
+
+        public int X => (int)Origin.X;
+        public int Y => (int)Origin.Y;
+        public int Width => (int)Size.Width;
+        public int Height => (int)Size.Height;
     }
 }

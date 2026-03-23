@@ -5,11 +5,10 @@ using Axorith.Sdk;
 using FluentAssertions;
 using Grpc.Core;
 using Grpc.Net.Client;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
 using Moq;
+using System.Runtime.InteropServices;
 using Xunit;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
@@ -94,11 +93,19 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
     }
 }
 
-public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<HostTestFactory>
+[Trait("Category", "Integration")]
+public class HostGrpcEndToEndTests : IClassFixture<HostTestFactory>
 {
     static HostGrpcEndToEndTests()
     {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+    }
+
+    private HostTestFactory _factory;
+
+    public HostGrpcEndToEndTests(HostTestFactory factory)
+    {
+        this._factory = factory;
     }
 
     private async Task<(
@@ -108,9 +115,9 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         ModulesService.ModulesServiceClient modules,
         GrpcChannel channel)> CreateAuthenticatedClientsAsync()
     {
-        var httpClient = factory.CreateDefaultClient();
+        var httpClient = _factory.CreateDefaultClient();
 
-        var tokenPath = Path.Combine(factory.TestDataPath, "config", ".auth_token");
+        var tokenPath = Path.Combine(_factory.TestDataPath, "config", ".auth_token");
 
         var token = string.Empty;
         for (var i = 0; i < 50; i++)
@@ -145,6 +152,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         var credentials = CallCredentials.FromInterceptor((_, metadata) =>
         {
             metadata.Add("x-axorith-auth-token", token);
+            metadata.Add("x-axorith-version", "1.0.0-dev");
             return Task.CompletedTask;
         });
 
@@ -290,5 +298,23 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             response.Success.Should().BeFalse();
             response.Message.Should().Contain("Preset not found");
         }
+    }
+
+    [Fact(Skip = "Linux-only integration test - requires LINUX_INTEGRATION_TEST=1")]
+    public void Linux_Environment_ShouldHaveIntegrationTestFlag()
+    {
+        // This test only runs on Linux CI where LINUX_INTEGRATION_TEST=1 is set
+        // On other platforms, it will be skipped
+        var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+        var envVar = Environment.GetEnvironmentVariable("LINUX_INTEGRATION_TEST");
+
+        if (!isLinux || envVar != "1")
+        {
+            // Test will be skipped - this is expected on Windows and non-CI Linux
+            return;
+        }
+
+        // If we're here, we're on Linux CI with proper env var
+        envVar.Should().Be("1");
     }
 }

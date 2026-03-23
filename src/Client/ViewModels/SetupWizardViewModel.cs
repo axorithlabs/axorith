@@ -116,7 +116,7 @@ public class SetupWizardViewModel : ReactiveObject
         {
             Success = result.Success,
             CreatedCount = result.CreatedCount,
-            CreatedPresets = result.CreatedPresetNames.ToList()
+            CreatedPresets = [.. result.CreatedPresetNames]
         });
     }
 

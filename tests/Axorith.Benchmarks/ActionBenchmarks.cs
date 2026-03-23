@@ -25,7 +25,7 @@ public class ActionBenchmarks
     [Benchmark(Baseline = true)]
     public void CreateAction()
     {
-        var action = Action.Create("key", "Label", isEnabled: true);
+        Action.Create("key", "Label", isEnabled: true);
     }
 
     [Benchmark]

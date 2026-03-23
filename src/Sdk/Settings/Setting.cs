@@ -107,7 +107,20 @@ public abstract class Setting
     {
         return new Setting<decimal>(key, label, description, defaultValue, SettingControlType.Number, isVisible,
             isReadOnly, SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
-            s => decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : defaultValue);
+            s =>
+            {
+                if (string.IsNullOrEmpty(s) ||
+                    s.Equals("nan", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("infinity", StringComparison.OrdinalIgnoreCase) ||
+                    s.Equals("-infinity", StringComparison.OrdinalIgnoreCase))
+                {
+                    return defaultValue;
+                }
+
+                return decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)
+                    ? d
+                    : defaultValue;
+            });
     }
 
     /// <summary>

@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 
 service UpdatesService {
   rpc GetUpdateInfo(google.protobuf.Empty) returns (UpdateInfoResponse);
+  rpc GetLatestUpdateInfo(google.protobuf.Empty) returns (UpdateInfoResponse);
 }
 
 message UpdateInfoResponse {
@@ -17,4 +18,7 @@ message UpdateInfoResponse {
   string release_notes = 5;
   google.protobuf.Timestamp published_at = 6;
   string sha256_hash = 7;
+  string platform = 8;
+  string architecture = 9;
+  string installer_type = 10;
 }

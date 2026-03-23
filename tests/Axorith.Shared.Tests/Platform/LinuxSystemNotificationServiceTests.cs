@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Axorith.Shared.Platform.Linux;
 using FluentAssertions;

@@ -398,6 +398,20 @@ public class SettingUpdateBroadcaster : IDisposable
 
         _moduleSubscriptions.Clear();
 
+        foreach (var sub in _subscribers.Values)
+        {
+            try
+            {
+                sub.Cts.Cancel();
+                sub.Queue.Writer.TryComplete();
+                sub.Cts.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed
+            }
+        }
+
         _subscribers.Clear();
 
         _logger.LogInformation("SettingUpdateBroadcaster disposed");

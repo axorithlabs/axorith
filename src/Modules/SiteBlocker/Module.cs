@@ -14,7 +14,7 @@ namespace Axorith.Module.SiteBlocker;
 public class Module(IModuleLogger logger, INotifier notifier) : IModule
 {
     private static Dictionary<string, string[]>? _categorySites;
-    private static readonly Lock _loadLock = new();
+    private static readonly Lock LoadLock = new();
 
     private readonly Setting<string> _mode = Setting.AsChoice(
         key: "Mode",
@@ -150,7 +150,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule
             return;
         }
 
-        lock (_loadLock)
+        lock (LoadLock)
         {
             if (_categorySites != null)
             {

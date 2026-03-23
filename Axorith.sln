@@ -72,6 +72,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Module.Steam", "src
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Shared.Licensing", "src\Shared\Licensing\Axorith.Shared.Licensing.csproj", "{0DD144EB-6846-4B19-8B8C-CD05AC2BA5AC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Axorith.Client.Tests", "tests\Axorith.Client.Tests\Axorith.Client.Tests.csproj", "{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -442,6 +444,18 @@ Global
 		{0DD144EB-6846-4B19-8B8C-CD05AC2BA5AC}.Release|x64.Build.0 = Release|Any CPU
 		{0DD144EB-6846-4B19-8B8C-CD05AC2BA5AC}.Release|x86.ActiveCfg = Release|Any CPU
 		{0DD144EB-6846-4B19-8B8C-CD05AC2BA5AC}.Release|x86.Build.0 = Release|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Debug|x64.Build.0 = Debug|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Debug|x86.Build.0 = Debug|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Release|x64.ActiveCfg = Release|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Release|x64.Build.0 = Release|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Release|x86.ActiveCfg = Release|Any CPU
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -477,5 +491,6 @@ Global
 		{CF0CF5CD-6C1C-4FCB-B756-8AB6936D6C99} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{5CE9258B-6525-461D-A8F0-E6827CC9C33D} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{0DD144EB-6846-4B19-8B8C-CD05AC2BA5AC} = {4F52FD11-658E-A102-6CD3-7D7C16FFA15B}
+		{D1ECBC27-DEEB-4848-AD37-B4E8D1C1BED6} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

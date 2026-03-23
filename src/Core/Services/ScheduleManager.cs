@@ -17,7 +17,35 @@ public class ScheduleManager(
     : IScheduleManager
 {
     private readonly string _storagePath = Path.Combine(storageDirectory, "config", "schedules.json");
+    private readonly string _notificationStatePath = Path.Combine(storageDirectory, "config", "notifications.json");
     private const long MaxScheduleFileSizeBytes = 5 * 1024 * 1024; // 5 MB max
+
+    // ── Persistent notification state ────────────────────────────────────
+    // Each schedule tracks which notification thresholds have been sent
+    // for its current next-run-time via a bitmask. This state survives
+    // app restarts so notifications are never duplicated.
+    //
+    // When the next-run-time changes (schedule fires or is rescheduled),
+    // the bitmask resets to 0 and notifications start fresh for the new run.
+
+    private const int Threshold5Min = 1;   // bit 0 — 5-minute warning
+    private const int Threshold1Min = 2;   // bit 1 — 1-minute warning
+    private const int Threshold15Sec = 4;  // bit 2 — 15-second warning
+
+    private sealed class ScheduleNotificationState
+    {
+        public long NextRunTicks { get; set; }
+        public int SentThresholds { get; set; }
+    }
+
+    private sealed class NotificationStateFile
+    {
+        public int Version { get; set; } = 1;
+        public Dictionary<string, ScheduleNotificationState> Schedules { get; set; } = new();
+    }
+
+    private NotificationStateFile _notificationState = new();
+    private DateTimeOffset _lastNotificationSave = DateTimeOffset.MinValue;
 
     private readonly List<SessionSchedule> _schedules = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -28,9 +56,6 @@ public class ScheduleManager(
         MaxDepth = 64
     };
 
-    private readonly HashSet<string> _sentNotificationKeys = [];
-    private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
-
     private volatile bool _isProcessingSchedule;
 
     private Task? _loopTask;
@@ -39,6 +64,7 @@ public class ScheduleManager(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await LoadAsync(cancellationToken);
+        await LoadNotificationStateAsync(cancellationToken);
 
         sessionManager.SessionStarted += OnSessionStarted;
 
@@ -118,7 +144,12 @@ public class ScheduleManager(
             }
 
             _schedules.Add(schedule);
+
+            // Reset notification state — schedule was modified, next run may have changed
+            _notificationState.Schedules.Remove(schedule.Id.ToString());
+
             await SaveToDiskAsync(cancellationToken);
+            await SaveNotificationStateAsync(cancellationToken);
             return schedule;
         }
         finally
@@ -133,7 +164,9 @@ public class ScheduleManager(
         try
         {
             _schedules.RemoveAll(s => s.Id == scheduleId);
+            _notificationState.Schedules.Remove(scheduleId.ToString());
             await SaveToDiskAsync(cancellationToken);
+            await SaveNotificationStateAsync(cancellationToken);
         }
         finally
         {
@@ -171,7 +204,7 @@ public class ScheduleManager(
             try
             {
                 await CheckAndRunSchedulesAsync(ct);
-                CleanupNotificationCache();
+                await PruneOrphanedNotificationStatesAsync(ct);
             }
             catch (Exception ex)
             {
@@ -216,69 +249,83 @@ public class ScheduleManager(
                     continue;
                 }
 
-                if (schedule.Type == ScheduleType.StopRecurring)
+                switch (schedule.Type)
                 {
-                    if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
+                    case ScheduleType.StopRecurring:
                     {
-                        await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromSeconds(15), "15 seconds", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromMinutes(1), "1 minute", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromMinutes(5), "5 minutes", ct);
-                    }
+                        if (timeLeft <= TimeSpan.FromSeconds(16) && timeLeft > TimeSpan.Zero)
+                        {
+                            await CheckAndNotifyWithStateAsync(schedule, runTime,
+                                "15 seconds", Threshold15Sec, isStop: true, ct);
+                        }
 
-                    if (timeLeft > TimeSpan.FromSeconds(2) || timeLeft < TimeSpan.FromSeconds(-30))
-                    {
-                        continue;
-                    }
+                        if (timeLeft <= TimeSpan.FromSeconds(61) && timeLeft > TimeSpan.FromSeconds(16))
+                        {
+                            await CheckAndNotifyWithStateAsync(schedule, runTime,
+                                "1 minute", Threshold1Min, isStop: true, ct);
+                        }
 
-                    if (schedule.LastRun.HasValue && (now - schedule.LastRun.Value).TotalSeconds < 60)
-                    {
-                        continue;
-                    }
+                        if (timeLeft <= TimeSpan.FromSeconds(301) && timeLeft > TimeSpan.FromSeconds(61))
+                        {
+                            await CheckAndNotifyWithStateAsync(schedule, runTime,
+                                "5 minutes", Threshold5Min, isStop: true, ct);
+                        }
 
-                    toStop.Add((schedule, runTime));
-                }
-                else if (schedule.Type == ScheduleType.StopDuration)
-                {
-                    // StopDuration schedules are handled by ISessionAutoStopService when session starts
-                    // They don't run on a fixed time, but track duration from session start
-                }
-                else
-                {
-                    if (sessionManager.IsSessionRunning)
-                    {
-                        continue;
-                    }
+                        if (timeLeft > TimeSpan.FromSeconds(2) || timeLeft < TimeSpan.FromSeconds(-30))
+                        {
+                            continue;
+                        }
 
-                    if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromSeconds(15), "15 seconds", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromMinutes(1), "1 minute", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromMinutes(5), "5 minutes", ct);
-                    }
+                        if (schedule.LastRun.HasValue && (now - schedule.LastRun.Value).TotalSeconds < 60)
+                        {
+                            continue;
+                        }
 
-                    if (timeLeft > TimeSpan.FromSeconds(2) || timeLeft < TimeSpan.FromSeconds(-30))
-                    {
-                        continue;
+                        toStop.Add((schedule, runTime));
+                        break;
                     }
-
-                    if (schedule.LastRun.HasValue && (now - schedule.LastRun.Value).TotalSeconds < 60)
+                    case ScheduleType.StopDuration:
+                        // StopDuration schedules are handled by ISessionAutoStopService when session starts
+                        // They don't run on a fixed time, but track duration from session start
+                        break;
+                    default:
                     {
-                        continue;
-                    }
+                        if (sessionManager.IsSessionRunning)
+                        {
+                            continue;
+                        }
 
-                    toRun.Add((schedule, runTime));
+                        if (timeLeft <= TimeSpan.FromSeconds(16) && timeLeft > TimeSpan.Zero)
+                        {
+                            await CheckAndNotifyWithStateAsync(schedule, runTime,
+                                "15 seconds", Threshold15Sec, isStop: false, ct);
+                        }
+
+                        if (timeLeft <= TimeSpan.FromSeconds(61) && timeLeft > TimeSpan.FromSeconds(16))
+                        {
+                            await CheckAndNotifyWithStateAsync(schedule, runTime,
+                                "1 minute", Threshold1Min, isStop: false, ct);
+                        }
+
+                        if (timeLeft <= TimeSpan.FromSeconds(301) && timeLeft > TimeSpan.FromSeconds(61))
+                        {
+                            await CheckAndNotifyWithStateAsync(schedule, runTime,
+                                "5 minutes", Threshold5Min, isStop: false, ct);
+                        }
+
+                        if (timeLeft > TimeSpan.FromSeconds(2) || timeLeft < TimeSpan.FromSeconds(-30))
+                        {
+                            continue;
+                        }
+
+                        if (schedule.LastRun.HasValue && (now - schedule.LastRun.Value).TotalSeconds < 60)
+                        {
+                            continue;
+                        }
+
+                        toRun.Add((schedule, runTime));
+                        break;
+                    }
                 }
             }
         }
@@ -287,8 +334,8 @@ public class ScheduleManager(
             _lock.Release();
         }
 
-        toStop = toStop.OrderBy(x => x.RunTime).ToList();
-        toRun = toRun.OrderBy(x => x.RunTime).ToList();
+        toStop = [.. toStop.OrderBy(x => x.RunTime)];
+        toRun = [.. toRun.OrderBy(x => x.RunTime)];
 
         foreach (var (schedule, runTime) in toStop)
         {
@@ -410,51 +457,136 @@ public class ScheduleManager(
         }
     }
 
-    private async Task CheckAndNotifyStopAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
-        string timeText, CancellationToken ct)
+    private async Task CheckAndNotifyWithStateAsync(SessionSchedule schedule, DateTimeOffset runTime, string timeText, int thresholdBit, bool isStop, CancellationToken ct)
     {
-        var key = $"stop_{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
+        var scheduleKey = schedule.Id.ToString();
 
-        if (!_sentNotificationKeys.Add(key))
+        if (!_notificationState.Schedules.TryGetValue(scheduleKey, out var state))
+        {
+            state = new ScheduleNotificationState();
+            _notificationState.Schedules[scheduleKey] = state;
+        }
+
+        // Run time changed (new occurrence or reschedule) — reset bitmask
+        if (state.NextRunTicks != runTime.Ticks)
+        {
+            state.NextRunTicks = runTime.Ticks;
+            state.SentThresholds = 0;
+        }
+
+        // Already sent this threshold — skip
+        if ((state.SentThresholds & thresholdBit) != 0)
         {
             return;
         }
 
-        logger.LogInformation("Sending stop schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
+        // Mark as sent and persist immediately
+        state.SentThresholds |= thresholdBit;
+        await SaveNotificationStateAsync(ct);
 
-        await notifier.ShowSystemAsync("Session Scheduler", $"Session will stop in {timeText}.");
+        if (isStop)
+        {
+            logger.LogInformation("Sending stop schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
+            await notifier.ShowSystemAsync("Session Scheduler", $"Session will stop in {timeText}.");
+        }
+        else
+        {
+            var preset = await presetManager.GetPresetByIdAsync(schedule.PresetId, ct);
+            if (preset == null)
+            {
+                return;
+            }
+
+            logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
+            await notifier.ShowSystemAsync("Session Scheduler",
+                $"Session '{preset.Name}' will start in {timeText}.");
+        }
     }
 
-    private async Task CheckAndNotifyAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
-        string timeText, CancellationToken ct)
+    private async Task PruneOrphanedNotificationStatesAsync(CancellationToken ct)
     {
-        var key = $"{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
-
-        if (!_sentNotificationKeys.Add(key))
+        if ((DateTimeOffset.Now - _lastNotificationSave).TotalHours < 1)
         {
             return;
         }
 
-        var preset = await presetManager.GetPresetByIdAsync(schedule.PresetId, ct);
-        if (preset == null)
+        _lastNotificationSave = DateTimeOffset.Now;
+
+        var existingIds = new HashSet<string>(_schedules.Select(s => s.Id.ToString()));
+        var keysToRemove = _notificationState.Schedules.Keys
+            .Where(k => !existingIds.Contains(k))
+            .ToList();
+
+        if (keysToRemove.Count > 0)
         {
-            return;
+            foreach (var key in keysToRemove)
+            {
+                _notificationState.Schedules.Remove(key);
+            }
+
+            await SaveNotificationStateAsync(ct);
+            logger.LogDebug("Pruned {Count} orphaned notification states", keysToRemove.Count);
         }
-
-        logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
-
-        await notifier.ShowSystemAsync("Session Scheduler", $"Session '{preset.Name}' will start in {timeText}.");
     }
 
-    private void CleanupNotificationCache()
+    private async Task LoadNotificationStateAsync(CancellationToken ct)
     {
-        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1)
+        if (!File.Exists(_notificationStatePath))
         {
             return;
         }
 
-        _sentNotificationKeys.Clear();
-        _lastCleanup = DateTimeOffset.Now;
+        try
+        {
+            var fileInfo = new FileInfo(_notificationStatePath);
+            if (fileInfo.Length > MaxScheduleFileSizeBytes)
+            {
+                logger.LogWarning("Notification state file {Path} exceeds size limit ({Size} bytes)",
+                    TelemetryGuard.SafePath(_notificationStatePath), fileInfo.Length);
+                return;
+            }
+
+            await using var stream = File.OpenRead(_notificationStatePath);
+            var loaded = await JsonSerializer.DeserializeAsync<NotificationStateFile>(stream, _jsonOptions, ct);
+            if (loaded != null)
+            {
+                _notificationState = loaded;
+                logger.LogDebug("Loaded notification state for {Count} schedules",
+                    _notificationState.Schedules.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load notification state — starting with empty state");
+            _notificationState = new NotificationStateFile();
+        }
+    }
+
+    private async Task SaveNotificationStateAsync(CancellationToken ct)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(_notificationStatePath);
+            if (dir != null)
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            // Atomic write: write to temp file, then rename
+            // Prevents corruption if app crashes mid-write
+            var tempPath = _notificationStatePath + ".tmp";
+            await using (var stream = File.Create(tempPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, _notificationState, _jsonOptions, ct);
+            }
+
+            File.Move(tempPath, _notificationStatePath, overwrite: true);
+            _lastNotificationSave = DateTimeOffset.Now;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to save notification state");
+        }
     }
 
     private async Task LoadAsync(CancellationToken ct)

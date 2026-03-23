@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            output-name: Axorith-win-x64.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            output-name: Axorith-linux-x64.AppImage
+          - os: macos-latest
+            rid: osx-arm64
+            output-name: Axorith-osx-arm64.dmg
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build Axorith.sln --configuration Release
+
+      - name: Publish
+        run: |
+          dotnet publish src/Client/Axorith.Client.csproj `
+            --configuration Release `
+            --runtime ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o publish/${{ matrix.rid }}
+
+      - name: Set executable permissions (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          find publish/${{ matrix.rid }} -type f -name "Axorith*" -exec chmod +x {} \;
+          echo "Restored executable permissions"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.rid }}
+          path: publish/
+
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Restore executable permissions on downloaded artifacts
+        run: |
+          find artifacts/ -type f \( -name "*.AppImage" -o -name "*.dmg" -o -name "Axorith.Host" \) -exec chmod +x {} \;
+          echo "Restored executable permissions on all artifacts"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*
+          draft: true
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
