@@ -126,7 +126,7 @@ public class HostGrpcEndToEndTests : IClassFixture<HostTestFactory>
             {
                 try
                 {
-                    using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    await using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var reader = new StreamReader(fs);
                     token = await reader.ReadToEndAsync();
                     if (!string.IsNullOrWhiteSpace(token))

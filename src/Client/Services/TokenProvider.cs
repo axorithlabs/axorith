@@ -14,8 +14,8 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
 
         // Extended retry logic: Host initialization can take 5-10 seconds
         // We try for up to 12 seconds (60 * 200ms) to accommodate slower systems
-        var maxAttempts = 60;
-        var delayMs = 200;
+        const int maxAttempts = 60;
+        const int delayMs = 200;
         var lastLogTime = DateTime.UtcNow;
 
         for (var i = 0; i < maxAttempts; i++)
@@ -23,7 +23,7 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
             // Log progress every 3 seconds
             if ((DateTime.UtcNow - lastLogTime).TotalSeconds >= 3)
             {
-                logger.LogInformation("Waiting for auth token... (attempt {Attempt}/{Max}, elapsed {Elapsed}s)",
+                logger.LogInformation("Waiting for auth token '{TokenPath}'... (attempt {Attempt}/{Max}, elapsed {Elapsed}s)", tokenPath,
                     i + 1, maxAttempts, i * delayMs / 1000);
                 lastLogTime = DateTime.UtcNow;
             }
@@ -32,7 +32,7 @@ public class FileTokenProvider(ILogger<FileTokenProvider> logger) : ITokenProvid
             {
                 try
                 {
-                    using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    await using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var reader = new StreamReader(fs);
                     var token = await reader.ReadToEndAsync(ct);
 
