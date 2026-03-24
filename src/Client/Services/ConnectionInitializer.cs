@@ -121,16 +121,20 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     private async Task SubscribeToNotifications(INotificationApi api, IToastNotificationService toastService,
         ILogger logger)
     {
-        try
+        while (true)
         {
-            await foreach (var notification in api.StreamNotificationsAsync())
+            try
             {
-                toastService.Show(notification.Message, notification.Type);
+                await foreach (var notification in api.StreamNotificationsAsync())
+                {
+                    toastService.Show(notification.Message, notification.Type);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Notification stream disconnected");
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Notification stream disconnected. Reconnecting in 5s...");
+                await Task.Delay(5000);
+            }
         }
     }
 

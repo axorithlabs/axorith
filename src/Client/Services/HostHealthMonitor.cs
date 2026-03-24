@@ -69,7 +69,6 @@ public class HostHealthMonitor(
     {
         if (_monitoringTask != null)
         {
-            logger.LogWarning("Health monitoring already started");
             return;
         }
 

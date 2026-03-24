@@ -173,6 +173,8 @@ try
         options.Limits.Http2.KeepAlivePingTimeout = TimeSpan.FromSeconds(config.Grpc.KeepAliveTimeout);
     });
 
+    builder.WebHost.UseShutdownTimeout(TimeSpan.FromSeconds(1));
+
     builder.Services.AddSingleton(sp =>
         PlatformServices.CreateFilePermissionsService(sp.GetRequiredService<ILoggerFactory>()));
     builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();

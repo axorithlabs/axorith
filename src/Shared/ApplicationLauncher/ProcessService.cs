@@ -126,7 +126,7 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
                 TelemetryGuard.SafePath(path), args,
                 string.IsNullOrWhiteSpace(workingDirectory) ? "<default>" : workingDirectory);
 
-            if (!File.Exists(path))
+            if (Path.IsPathRooted(path) && !File.Exists(path))
             {
                 logger.LogError(null, "Executable not found: {Path}", TelemetryGuard.SafePath(path));
                 return Task.FromResult<Process?>(null);
