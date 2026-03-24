@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Tmds.DBus;
 
 [DBusInterface("org.freedesktop.Notifications")]
-internal interface IFreedesktopNotifications
+internal interface IFreedesktopNotifications : IDBusObject
 {
     Task<uint> NotifyAsync(
         string app_name,
