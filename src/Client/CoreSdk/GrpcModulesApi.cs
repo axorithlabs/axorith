@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net.Http;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -488,6 +489,11 @@ internal class GrpcModulesApi(
                 logger.LogDebug("Setting updates stream cancelled");
                 break;
             }
+            catch (Exception ex) when (IsGracefulShutdown(ex))
+            {
+                logger.LogDebug("Setting updates stream closed (server shutdown)");
+                break;
+            }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Setting updates stream error, reconnecting in 5s...");
@@ -525,6 +531,28 @@ internal class GrpcModulesApi(
             Platforms = platforms,
             AssemblyFileName = message.Assembly
         };
+    }
+
+    private static bool IsGracefulShutdown(Exception ex)
+    {
+        if (ex is HttpProtocolException httpEx && httpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (ex.InnerException is HttpProtocolException innerHttpEx &&
+            innerHttpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (ex is RpcException { InnerException: HttpProtocolException rpcInnerHttpEx } &&
+            rpcInnerHttpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public void Dispose()

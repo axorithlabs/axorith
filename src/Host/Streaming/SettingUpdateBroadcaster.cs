@@ -193,7 +193,7 @@ public class SettingUpdateBroadcaster : IDisposable
         var activePreset = _sessionManager.ActiveSession;
         if (activePreset == null)
         {
-            _logger.LogWarning("Session started event fired but ActiveSession is null");
+            _logger.LogDebug("Session started event fired but ActiveSession is null (session may have been stopped)");
             return;
         }
 

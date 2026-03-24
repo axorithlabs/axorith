@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Axorith.Client.CoreSdk.Abstractions;
@@ -145,6 +146,11 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 _logger.LogInformation("Session events stream cancelled");
                 break;
             }
+            catch (Exception ex) when (IsGracefulShutdown(ex))
+            {
+                _logger.LogDebug("Session events stream closed (server shutdown)");
+                break;
+            }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Session events stream error, reconnecting in 5s...");
@@ -158,6 +164,31 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                     break;
                 }
             }
+    }
+
+    private static bool IsGracefulShutdown(Exception ex)
+    {
+        // HTTP/2 NO_ERROR (0x0) indicates the server closed the connection gracefully during shutdown
+        if (ex is HttpProtocolException httpEx && httpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // Also check inner exception
+        if (ex.InnerException is HttpProtocolException innerHttpEx &&
+            innerHttpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // RpcException wrapping HttpProtocolException
+        if (ex is RpcException { InnerException: HttpProtocolException rpcInnerHttpEx } &&
+            rpcInnerHttpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public void Dispose()

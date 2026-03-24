@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Axorith.Contracts;
 using Axorith.Contracts.Generated;
 using Grpc.Core;
@@ -83,6 +84,10 @@ public class PresenceClient : IAsyncDisposable
 				catch (OperationCanceledException)
 				{
 					_logger.LogDebug("Presence read loop cancelled");
+				}
+				catch (Exception ex) when (IsGracefulShutdown(ex))
+				{
+					_logger.LogDebug("Presence stream closed (server shutdown)");
 				}
 				catch (Exception ex)
 				{
@@ -198,6 +203,28 @@ public class PresenceClient : IAsyncDisposable
 		_readLoopTask = null;
 
 		await Task.CompletedTask;
+	}
+
+	private static bool IsGracefulShutdown(Exception ex)
+	{
+		if (ex is HttpProtocolException httpEx && httpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+		{
+			return true;
+		}
+
+		if (ex.InnerException is HttpProtocolException innerHttpEx &&
+			innerHttpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+		{
+			return true;
+		}
+
+		if (ex is RpcException { InnerException: HttpProtocolException rpcInnerHttpEx } &&
+			rpcInnerHttpEx.Message.Contains("NO_ERROR", StringComparison.Ordinal))
+		{
+			return true;
+		}
+
+		return false;
 	}
 
 	/// <inheritdoc />

@@ -141,6 +141,10 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            logger.LogDebug("Window configuration cancelled (session stopped during setup)");
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error during window configuration");
