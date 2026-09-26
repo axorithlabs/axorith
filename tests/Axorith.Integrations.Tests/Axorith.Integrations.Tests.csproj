@@ -26,8 +26,5 @@
         <ProjectReference Include="..\..\src\Host\Axorith.Host.csproj" />
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\..\src\Modules\ApplicationLauncher\Axorith.Module.ApplicationLauncher.csproj" />
-        <ProjectReference Include="..\..\src\Client\Axorith.Client.csproj" />
-        <ProjectReference Include="..\..\src\Modules\Spotify\Axorith.Module.Spotify.csproj" />
-        <ProjectReference Include="..\..\src\Shim\Axorith.Shim.csproj" />
     </ItemGroup>
 </Project>
