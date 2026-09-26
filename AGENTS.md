@@ -1,5 +1,5 @@
-# Правила работы с изменениями
+# Change Management Rules
 
-- Не используй Git для отмены изменений. Не применяй `git checkout`, `git restore`, `git reset`, `git revert` и другие Git-команды, чтобы откатить или удалить изменения. Исправляй файлы напрямую, сохраняя посторонние изменения.
-- Если попытка исправить баг не устранила его, сначала удали код, добавленный именно этой неудачной попыткой. Затем реализуй новую попытку исправления, не наслаивая её на неработающий код. Сохраняй изменения, не относящиеся к этой попытке.
-- Исправление бага или ошибки обязательно проверяй автотестом, который воспроизводит реальное поведение и запускает проверяемый код без моков.
+- Do not use Git commands to undo or discard changes. In particular, do not use `git checkout`, `git restore`, `git reset`, `git revert`, or any other Git command for rollback or deletion. Edit files directly and preserve unrelated changes.
+- If a bug-fix attempt does not fix the bug, first remove only the code introduced by that failed attempt. Then try a different fix; do not layer it on top of the failed attempt. Preserve unrelated changes.
+- Verify every bug or software-error fix with an automated test that reproduces the real behavior and runs the code under test without mocks.
