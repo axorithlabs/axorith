@@ -15,40 +15,74 @@ internal static class Program
     private static readonly ConcurrentQueue<string> LogQueue = new();
     private static readonly SemaphoreSlim LogSemaphore = new(1, 1);
     private static CancellationTokenSource? _logFlushCts;
+    private static Task? _logFlushTask;
 
-    public static void Main()
+    public static async Task Main()
     {
         StartLogFlusher();
 
         var loggerFactory = NullLoggerFactory.Instance;
         var pipeFactory = PlatformServices.CreateNamedPipeFactory(loggerFactory);
+        using var shutdown = new CancellationTokenSource();
+        var inputMonitor = MonitorStandardInputAsync(shutdown);
 
         try
         {
-            while (true)
-            {
-                try
-                {
-                    using var pipeServer = pipeFactory.CreateSecureServerPipe(PipeName);
-                    pipeServer.WaitForConnection();
-
-                    using var reader = new StreamReader(pipeServer);
-                    var message = reader.ReadToEnd();
-
-                    if (!string.IsNullOrWhiteSpace(message))
-                    {
-                        SendMessageToExtension(message);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogExceptionAsync(ex).GetAwaiter().GetResult();
-                }
-            }
+            await ListenForExtensionAsync(pipeFactory, shutdown.Token).ConfigureAwait(false);
         }
         finally
         {
-            StopLogFlusher();
+            shutdown.Cancel();
+            await inputMonitor.ConfigureAwait(false);
+            await StopLogFlusherAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static async Task ListenForExtensionAsync(INamedPipeFactory pipeFactory, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                using var pipeServer = pipeFactory.CreateSecureServerPipe(PipeName);
+                await pipeServer.WaitForConnectionAsync(ct).ConfigureAwait(false);
+
+                using var reader = new StreamReader(pipeServer);
+                var message = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    SendMessageToExtension(message);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                await LogExceptionAsync(ex).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static async Task MonitorStandardInputAsync(CancellationTokenSource shutdown)
+    {
+        try
+        {
+            await Console.OpenStandardInput().CopyToAsync(Stream.Null, shutdown.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
+        {
+            // Expected when the named pipe loop ends.
+        }
+        catch (Exception ex)
+        {
+            await LogExceptionAsync(ex, "Native messaging input closed with an error").ConfigureAwait(false);
+        }
+        finally
+        {
+            shutdown.Cancel();
         }
     }
 
@@ -75,22 +109,41 @@ internal static class Program
         _logFlushCts = new CancellationTokenSource();
         var token = _logFlushCts.Token;
 
-        Task.Run(async () =>
+        _logFlushTask = Task.Run(async () =>
         {
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(LogFlushIntervalMs));
 
-            while (await timer.WaitForNextTickAsync(token))
+            try
             {
-                await FlushLogsAsync();
+                while (await timer.WaitForNextTickAsync(token))
+                {
+                    await FlushLogsAsync();
+                }
             }
-        }, token);
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // Expected during shutdown.
+            }
+        });
     }
 
-    private static void StopLogFlusher()
+    private static async Task StopLogFlusherAsync()
     {
-        _logFlushCts?.Cancel();
-        FlushLogsAsync().GetAwaiter().GetResult();
-        _logFlushCts?.Dispose();
+        if (_logFlushCts == null)
+        {
+            return;
+        }
+
+        _logFlushCts.Cancel();
+        if (_logFlushTask != null)
+        {
+            await _logFlushTask.ConfigureAwait(false);
+        }
+
+        await FlushLogsAsync().ConfigureAwait(false);
+        _logFlushCts.Dispose();
+        _logFlushCts = null;
+        _logFlushTask = null;
     }
 
     private static async Task FlushLogsAsync()

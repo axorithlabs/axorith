@@ -172,10 +172,9 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             if (beginResult == null)
             {
                 // Do not block indefinitely: surface a degraded result and observe completion separately
-                _ = beginTask.ContinueWith(_ =>
-                {
-                    /* swallow */
-                }, TaskContinuationOptions.ExecuteSynchronously);
+                _ = beginTask.ContinueWith(task => _ = task.Exception, CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
                 beginResult = new BeginEditResult(
                     new ModuleSettingsInfo([], []),
                     new OperationResult(false, "BeginEdit timed out; using empty settings"));
@@ -459,8 +458,20 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         Actions.Clear();
 
-        _ = _modulesApi.EndEditAsync(Model.InstanceId);
+        _ = EndEditSafelyAsync();
 
         GC.SuppressFinalize(this);
+    }
+
+    private async Task EndEditSafelyAsync()
+    {
+        try
+        {
+            await _modulesApi.EndEditAsync(Model.InstanceId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to end editing module instance {InstanceId}", Model.InstanceId);
+        }
     }
 }

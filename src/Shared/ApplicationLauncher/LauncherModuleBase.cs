@@ -143,16 +143,17 @@ public abstract class LauncherModuleBase(
     /// <inheritdoc />
     public virtual void Dispose()
     {
+        var process = CurrentProcess;
         try
         {
-            if (CurrentProcess is { HasExited: false })
+            if (process is { HasExited: false })
             {
                 var lifecycleSetting = Settings.LifecycleMode.GetCurrentValue();
                 var lifecycle = lifecycleSetting == "KeepRunning"
                     ? ProcessLifecycleMode.KeepRunning
                     : ProcessLifecycleMode.TerminateGraceful;
 
-                _ = Task.Run(() => ProcessService.TerminateAsync(CurrentProcess, lifecycle, AttachedToExisting));
+                ProcessService.TerminateAsync(process, lifecycle, AttachedToExisting).GetAwaiter().GetResult();
             }
         }
         catch
@@ -161,7 +162,7 @@ public abstract class LauncherModuleBase(
         }
         finally
         {
-            CurrentProcess?.Dispose();
+            process?.Dispose();
             CurrentProcess = null;
         }
 

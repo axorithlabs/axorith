@@ -13,4 +13,8 @@
         <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\..\Shared\ApplicationLauncher\Axorith.Shared.ApplicationLauncher.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Integrations.Tests" />
+    </ItemGroup>
 </Project>

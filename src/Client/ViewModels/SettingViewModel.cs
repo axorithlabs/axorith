@@ -7,6 +7,7 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Sdk.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
 
@@ -17,6 +18,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     private readonly Guid _moduleInstanceId;
     private readonly Guid _moduleId;
     private readonly IModulesApi _modulesApi;
+    private readonly ILogger<SettingViewModel>? _logger;
     private readonly IClientUiSettingsStore? _uiSettingsStore;
     private readonly ClientUiConfiguration? _uiConfig;
     private readonly IFilePickerService? _filePickerService;
@@ -173,7 +175,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             Setting.SetValueFromObject(value);
             OnPropertyChanged();
 
-            _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value);
+            _ = SendSettingUpdateAsync(value);
             ValueChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -271,6 +273,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         _moduleId = moduleId;
         _moduleInstanceId = moduleInstanceId;
         _modulesApi = modulesApi;
+        _logger = serviceProvider?.GetService<ILogger<SettingViewModel>>();
 
         _inputConfig = serviceProvider?.GetService<IOptions<Configuration>>()?.Value.Ui.SettingsInput
                        ?? new SettingsInputConfiguration();
@@ -483,7 +486,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             var valueToSend = _pendingStringValue;
             if (valueToSend != null)
             {
-                _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, valueToSend);
+                _ = SendSettingUpdateAsync(valueToSend);
 
                 if (IsTextBasedSetting())
                 {
@@ -503,7 +506,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             var valueToSend = _pendingNumberValue;
             if (valueToSend != null)
             {
-                _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, valueToSend);
+                _ = SendSettingUpdateAsync(valueToSend);
             }
         }, null, _inputConfig.NumberThrottleMs, Timeout.Infinite);
     }
@@ -768,13 +771,25 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         if (_isUserEditing && _inputConfig.FlushOnFocusLoss)
         {
             var currentValue = Setting.GetCurrentValueAsObject() as string;
-            _ = _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, currentValue);
+            _ = SendSettingUpdateAsync(currentValue);
         }
 
         _isUserEditing = false;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private async Task SendSettingUpdateAsync(object? value)
+    {
+        try
+        {
+            await _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to update setting {SettingKey}", Setting.Key);
+        }
+    }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {

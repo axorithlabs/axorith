@@ -151,15 +151,16 @@ public class Module : IModule
 
         _webSocketService.Dispose();
 
+        var process = _currentProcess;
         try
         {
-            if (_currentProcess is { HasExited: false })
+            if (process is { HasExited: false })
             {
                 var lifecycle = _settings.LifecycleMode.GetCurrentValue() == "KeepRunning"
                     ? ProcessLifecycleMode.KeepRunning
                     : ProcessLifecycleMode.TerminateGraceful;
 
-                _ = Task.Run(() => _processService.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting));
+                _processService.TerminateAsync(process, lifecycle, _attachedToExisting).GetAwaiter().GetResult();
             }
         }
         catch
@@ -168,7 +169,7 @@ public class Module : IModule
         }
         finally
         {
-            _currentProcess?.Dispose();
+            process?.Dispose();
             _currentProcess = null;
         }
 

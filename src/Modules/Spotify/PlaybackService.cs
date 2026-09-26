@@ -501,6 +501,5 @@ internal sealed class PlaybackService : IDisposable
         }
 
         _disposables.Dispose();
-        _choicesRefreshLock.Dispose();
     }
 }
