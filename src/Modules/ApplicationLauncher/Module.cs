@@ -4,30 +4,21 @@ using Axorith.Sdk.Services;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
 using System.Net.Http;
-using BrowserModule = Axorith.Module.Browser.Module;
-using DiscordModule = Axorith.Module.Discord.Module;
-using JetBrainsModule = Axorith.Module.JetBrainsIDE.Module;
-using ObsModule = Axorith.Module.OBS.Module;
-using SpotifyModule = Axorith.Module.Spotify.Module;
-using SteamModule = Axorith.Module.Steam.Module;
-using VsCodeModule = Axorith.Module.VSCode.Module;
+using BrowserApp = Axorith.Module.ApplicationLauncher.Apps.Browser.BrowserApp;
+using DiscordApp = Axorith.Module.ApplicationLauncher.Apps.Discord.DiscordApp;
+using JetBrainsApp = Axorith.Module.ApplicationLauncher.Apps.JetBrainsIDE.JetBrainsIDEApp;
+using ObsApp = Axorith.Module.ApplicationLauncher.Apps.OBS.OBSApp;
+using SpotifyApp = Axorith.Module.ApplicationLauncher.Apps.Spotify.SpotifyApp;
+using SteamApp = Axorith.Module.ApplicationLauncher.Apps.Steam.SteamApp;
+using VsCodeApp = Axorith.Module.ApplicationLauncher.Apps.VSCode.VSCodeApp;
 
 namespace Axorith.Module.ApplicationLauncher;
 
-public sealed class Module : LauncherModuleBase
+public sealed class Module : LauncherAppBase, IModule
 {
-    private static readonly ModuleDefinition SpotifyDefinition = new()
-    {
-        Id = Guid.Parse("04399d2f-43c9-4182-b99d-2f43c97182a6"),
-        Name = "Spotify",
-        Description = "Spotify playback submodule",
-        Category = "App",
-        Platforms = [Axorith.Sdk.Platform.Windows]
-    };
-
     private readonly Settings _settings;
-    private readonly IReadOnlyDictionary<string, IModule> _modules;
-    private IModule? _activeModule;
+    private readonly IReadOnlyDictionary<string, ILauncherApp> _modules;
+    private ILauncherApp? _activeModule;
 
     public Module(
         IModuleLogger logger,
@@ -39,16 +30,16 @@ public sealed class Module : LauncherModuleBase
         IPlatformWindowService windowService)
         : base(logger, processService, windowService)
     {
-        _modules = new Dictionary<string, IModule>
+        _modules = new Dictionary<string, ILauncherApp>
         {
-            ["Browser"] = new BrowserModule(logger, appDiscovery, processService, windowService),
-            ["OBS"] = new ObsModule(logger, appDiscovery, notifier, processService, windowService),
-            ["Discord"] = new DiscordModule(logger, appDiscovery, processService, windowService),
-            ["VSCode"] = new VsCodeModule(logger, appDiscovery, processService, windowService),
-            ["JetBrainsIDE"] = new JetBrainsModule(logger, appDiscovery, processService, windowService),
-            ["Steam"] = new SteamModule(logger, notifier, appDiscovery, processService, windowService),
-            ["Spotify"] = new SpotifyModule(logger, httpClientFactory, secureStorage, notifier, appDiscovery,
-                processService, windowService, SpotifyDefinition)
+            ["Browser"] = new BrowserApp(logger, appDiscovery, processService, windowService),
+            ["OBS"] = new ObsApp(logger, appDiscovery, notifier, processService, windowService),
+            ["Discord"] = new DiscordApp(logger, appDiscovery, processService, windowService),
+            ["VSCode"] = new VsCodeApp(logger, appDiscovery, processService, windowService),
+            ["JetBrainsIDE"] = new JetBrainsApp(logger, appDiscovery, processService, windowService),
+            ["Steam"] = new SteamApp(logger, notifier, appDiscovery, processService, windowService),
+            ["Spotify"] = new SpotifyApp(logger, httpClientFactory, secureStorage, notifier, appDiscovery,
+                processService, windowService)
         };
         _settings = new Settings(appDiscovery, _modules);
     }

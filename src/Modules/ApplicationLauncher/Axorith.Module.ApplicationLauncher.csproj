@@ -13,12 +13,8 @@
         <ProjectReference Include="..\..\Shared\Exceptions\Axorith.Shared.Exceptions.csproj" />
         <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\..\Shared\ApplicationLauncher\Axorith.Shared.ApplicationLauncher.csproj" />
-        <ProjectReference Include="..\Browser\Axorith.Module.Browser.csproj" />
-        <ProjectReference Include="..\OBS\Axorith.Module.OBS.csproj" />
-        <ProjectReference Include="..\Discord\Axorith.Module.Discord.csproj" />
-        <ProjectReference Include="..\VSCode\Axorith.Module.VSCode.csproj" />
-        <ProjectReference Include="..\JetBrainsIDE\Axorith.Module.JetBrainsIDE.csproj" />
-        <ProjectReference Include="..\Steam\Axorith.Module.Steam.csproj" />
-        <ProjectReference Include="..\Spotify\Axorith.Module.Spotify.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Integrations.Tests" />
     </ItemGroup>
 </Project>

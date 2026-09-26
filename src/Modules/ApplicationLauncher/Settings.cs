@@ -20,7 +20,7 @@ internal sealed class Settings : LauncherSettingsBase
     };
 
     private readonly IAppDiscoveryService _appDiscovery;
-    private readonly IReadOnlyDictionary<string, IModule> _modules;
+    private readonly IReadOnlyDictionary<string, ILauncherApp> _modules;
     private readonly ConcurrentDictionary<string, Task> _moduleInitialization = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ISetting> _modulePaths = new(StringComparer.Ordinal);
     private readonly List<(string Module, SelectedAppSetting Setting)> _moduleSettings = [];
@@ -35,7 +35,7 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<bool> UseCustomWorkingDirectory { get; }
     public Setting<string> WorkingDirectory { get; }
 
-    public Settings(IAppDiscoveryService appDiscovery, IReadOnlyDictionary<string, IModule> modules)
+    public Settings(IAppDiscoveryService appDiscovery, IReadOnlyDictionary<string, ILauncherApp> modules)
     {
         _appDiscovery = appDiscovery;
         _modules = modules;
