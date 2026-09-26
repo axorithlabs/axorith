@@ -5,9 +5,9 @@
         <_ModuleName Condition="$(AssemblyName.StartsWith('Axorith.Module.'))">$(AssemblyName.Replace('Axorith.Module.', '').Split('.')[0])</_ModuleName>
         <_ModuleName Condition="'$(_ModuleName)' == ''">$(MSBuildProjectName.Replace('Axorith.Module.', ''))</_ModuleName>
 
-        <BaseOutputPath>$(SolutionDir)build/$(Configuration)/Modules/$(_ModuleName)/</BaseOutputPath>
+        <BaseOutputPath>$(SolutionDir)build/$(BuildConfiguration)/Modules/$(_ModuleName)/</BaseOutputPath>
         <OutputPath>$(BaseOutputPath)</OutputPath>
-        <BaseIntermediateOutputPath>$(SolutionDir)build/$(Configuration)/Modules/$(_ModuleName)/obj/</BaseIntermediateOutputPath>
+        <BaseIntermediateOutputPath>$(SolutionDir)build/$(BuildConfiguration)/Modules/$(_ModuleName)/obj/</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
         <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
@@ -9,141 +10,207 @@ namespace Axorith.Module.ApplicationLauncher;
 
 internal sealed class Settings : LauncherSettingsBase
 {
+    public const string CustomApp = "custom-app";
+
+    private static readonly HashSet<string> SharedSettings = new(StringComparer.Ordinal)
+    {
+        "ProcessMode", "WindowState", "UseCustomSize", "WindowWidth", "WindowHeight",
+        "MoveToMonitor", "TargetMonitor", "LifecycleMode", "BringToForeground",
+        "ApplicationArgs", "ProjectPath"
+    };
+
+    private readonly IAppDiscoveryService _appDiscovery;
+    private readonly IReadOnlyDictionary<string, IModule> _modules;
+    private readonly ConcurrentDictionary<string, Task> _moduleInitialization = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ISetting> _modulePaths = new(StringComparer.Ordinal);
+    private readonly List<(string Module, SelectedAppSetting Setting)> _moduleSettings = [];
+    private readonly List<Action> _moduleActions = [];
+    private readonly List<IDisposable> _subscriptions = [];
+    private string? _selectedModule;
+
     public override Setting<string> ApplicationPath { get; }
+    public Setting<string> CustomPath { get; }
     public Setting<string> ApplicationArgs { get; }
+    public Setting<string> ProjectPath { get; }
     public Setting<bool> UseCustomWorkingDirectory { get; }
     public Setting<string> WorkingDirectory { get; }
 
-    public Action AutoDetectAction { get; }
-
-    private readonly IAppDiscoveryService _appDiscovery;
-
-    public Settings(IAppDiscoveryService appDiscovery)
+    public Settings(IAppDiscoveryService appDiscovery, IReadOnlyDictionary<string, IModule> modules)
     {
         _appDiscovery = appDiscovery;
+        _modules = modules;
 
-        ApplicationPath = Setting.AsFilePicker(
-            key: "ApplicationPath",
-            label: "Application Path",
-            description:
-            "Path to the application executable. You can enter a simple name (e.g. 'chrome') and click 'Auto-Detect'.",
-            defaultValue: "",
-            filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*"
-        );
+        ApplicationPath = Setting.AsChoice("ApplicationPath", "Application", string.Empty,
+            [new KeyValuePair<string, string>(CustomApp, "Custom App")],
+            "");
+        CustomPath = Setting.AsFilePicker("CustomPath", "Application Path", "",
+            filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*", isVisible: false);
+        ApplicationArgs = Setting.AsText("ApplicationArgs", "Launch Arguments", "", isVisible: false);
+        ProjectPath = Setting.AsDirectoryPicker("ProjectPath", "Project Folder", "", isVisible: false);
+        UseCustomWorkingDirectory = Setting.AsCheckbox("UseCustomWorkingDirectory", "Use Custom Working Directory", false);
+        WorkingDirectory = Setting.AsDirectoryPicker("WorkingDirectory", "Working Directory",
+            Environment.CurrentDirectory, isVisible: false);
 
-        ApplicationArgs = Setting.AsText(
-            key: "ApplicationArgs",
-            label: "Launch Arguments",
-            description: "Command-line arguments to pass when launching a new process.",
-            defaultValue: ""
-        );
+        foreach (var (moduleKey, module) in modules)
+        {
+            var moduleSettings = module.GetSettings();
+            if (moduleSettings.Count > 0)
+                _modulePaths[moduleKey] = moduleSettings[0];
 
-        UseCustomWorkingDirectory = Setting.AsCheckbox(
-            key: "UseCustomWorkingDirectory",
-            label: "Use Custom Working Directory",
-            defaultValue: false,
-            description:
-            "If enabled, the application will be started with the specified working directory instead of the executable's folder."
-        );
+            foreach (var setting in moduleSettings.Skip(1))
+            {
+                if (SharedSettings.Contains(setting.Key) || setting.Key.EndsWith("Path", StringComparison.Ordinal))
+                    continue;
+                if (_moduleSettings.Any(entry => entry.Setting.Key == setting.Key))
+                    continue;
 
-        WorkingDirectory = Setting.AsDirectoryPicker(
-            key: "WorkingDirectory",
-            label: "Working Directory",
-            defaultValue: Environment.CurrentDirectory,
-            description: "Custom working directory for the application.",
-            isVisible: false
-        );
+                _moduleSettings.Add((moduleKey, new SelectedAppSetting(setting)));
+            }
 
-        AutoDetectAction = Action.Create("AutoDetect", "Auto-Detect Path");
-        AutoDetectAction.OnInvokeAsync(AutoDetectPathAsync);
+            foreach (var action in module.GetActions())
+            {
+                var proxy = Action.Create($"{moduleKey}.{action.Key}", action.GetCurrentLabel(),
+                    action.GetCurrentEnabled() && _selectedModule == moduleKey);
+                proxy.OnInvokeAsync(action.InvokeAsync);
+                _subscriptions.Add(action.Label.Subscribe(proxy.SetLabel));
+                _subscriptions.Add(action.IsEnabled.Subscribe(enabled =>
+                    proxy.SetEnabled(enabled && _selectedModule == moduleKey)));
+                _moduleActions.Add(proxy);
+            }
+        }
 
+        ApplicationPath.Value.Subscribe(UpdateModuleVisibility);
+        ProcessMode.Value.Subscribe(_ => UpdateOwnVisibility());
         SetupBaseReactiveVisibility();
+        _subscriptions.Add(WindowState.Value.Subscribe(_ => UpdateOwnVisibility()));
+        _subscriptions.Add(UseCustomSize.Value.Subscribe(_ => UpdateOwnVisibility()));
+        _subscriptions.Add(MoveToMonitor.Value.Subscribe(_ => UpdateOwnVisibility()));
+        _subscriptions.Add(UseCustomWorkingDirectory.Value.Subscribe(_ => UpdateOwnVisibility()));
+        UpdateModuleVisibility(ApplicationPath.GetCurrentValue());
     }
 
     protected override IEnumerable<ISetting> GetAdditionalSettings()
     {
+        yield return CustomPath;
         yield return ApplicationArgs;
+        yield return ProjectPath;
         yield return UseCustomWorkingDirectory;
         yield return WorkingDirectory;
+        foreach (var (_, setting) in _moduleSettings)
+            yield return setting;
     }
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
+    protected override IEnumerable<IAction> GetAdditionalActions() => _moduleActions;
+
+    protected override async Task InitializeAdditionalAsync()
     {
-        yield return AutoDetectAction;
+        var choices = ApplicationSelector.GetInstalledChoices(
+            _appDiscovery,
+            app => app.ExecutablePath,
+            ApplicationSelector.IsSupportedLauncherApp);
+        choices.Add(new KeyValuePair<string, string>(CustomApp, "Custom App"));
+        ApplicationPath.SetChoices(choices);
     }
 
-    protected override Task InitializeAdditionalAsync()
+    public Task EnsureModuleInitializedAsync(string moduleKey, CancellationToken cancellationToken = default)
     {
-        return Task.Run(() => _appDiscovery.GetInstalledApplicationsIndex());
+        if (!_modules.TryGetValue(moduleKey, out var module))
+            return Task.CompletedTask;
+
+        return _moduleInitialization.GetOrAdd(moduleKey, _ => module.InitializeAsync(cancellationToken));
     }
 
-    protected override Task<ValidationResult> ValidateAdditionalAsync()
+    protected override async Task<ValidationResult> ValidateAdditionalAsync()
     {
-        if (!UseCustomWorkingDirectory.GetCurrentValue())
+        if (ApplicationPath.GetCurrentValue() == CustomApp &&
+            (string.IsNullOrWhiteSpace(CustomPath.GetCurrentValue()) || !File.Exists(CustomPath.GetCurrentValue())))
         {
-            return Task.FromResult(ValidationResult.Success);
+            return ValidationResult.Fail(
+                new Dictionary<string, string> { [CustomPath.Key] = "Select an existing application executable." },
+                "Configuration contains errors.");
         }
 
-        var workingDir = WorkingDirectory.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(workingDir))
-        {
-            return Task.FromResult(ValidationResult.Fail(
-                new Dictionary<string, string> { [WorkingDirectory.Key] = "Working Directory is required." },
-                "Configuration contains errors."));
-        }
+        var moduleKey = ApplicationSelector.GetLauncherModuleKey(ApplicationPath.GetCurrentValue());
+        if (moduleKey == null || !_modules.TryGetValue(moduleKey, out var module))
+            return ValidationResult.Success;
 
-        if (!Directory.Exists(workingDir))
-        {
-            return Task.FromResult(ValidationResult.Fail(
-                new Dictionary<string, string> { [WorkingDirectory.Key] = $"Directory '{workingDir}' does not exist." },
-                "Configuration contains errors."));
-        }
-
-        return Task.FromResult(ValidationResult.Success);
+        await EnsureModuleInitializedAsync(moduleKey).ConfigureAwait(false);
+        SynchronizeModule(moduleKey);
+        return await module.ValidateSettingsAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
-    protected override void SetupAdditionalReactiveVisibility()
+    public void SynchronizeModule(string moduleKey)
     {
-        ProcessMode.Value.Subscribe(mode =>
-        {
-            var showArgs = mode is "LaunchNew" or "LaunchOrAttach";
-            ApplicationArgs.SetVisibility(showArgs);
-        });
-
-        UseCustomWorkingDirectory.Value.Subscribe(useCustomWorkingDir =>
-        {
-            WorkingDirectory.SetVisibility(useCustomWorkingDir);
-        });
-    }
-
-    private async Task AutoDetectPathAsync()
-    {
-        var currentInput = ApplicationPath.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(currentInput))
-        {
+        if (!_modules.TryGetValue(moduleKey, out var module))
             return;
-        }
 
-        if (Path.IsPathRooted(currentInput) && File.Exists(currentInput))
-        {
-            return;
-        }
+        if (_modulePaths.TryGetValue(moduleKey, out var pathSetting))
+            pathSetting.SetValueFromObject(ApplicationPath.GetCurrentValue());
 
-        var foundPath = await Task.Run(() => _appDiscovery.FindKnownApp(currentInput)).ConfigureAwait(false);
+        var childSettings = module.GetSettings().ToDictionary(setting => setting.Key, StringComparer.Ordinal);
+        foreach (var setting in GetAllSettings())
+            if (SharedSettings.Contains(setting.Key) && childSettings.TryGetValue(setting.Key, out var childSetting))
+                childSetting.SetValueFromObject(setting.GetCurrentValueAsObject());
+    }
 
-        if (!string.IsNullOrEmpty(foundPath))
-        {
-            ApplicationPath.SetValue(foundPath);
-        }
+    private void UpdateModuleVisibility(string selectedPath)
+    {
+        _selectedModule = ApplicationSelector.GetLauncherModuleKey(selectedPath);
+        SynchronizeModule(_selectedModule ?? string.Empty);
+        if (_selectedModule != null)
+            _ = EnsureModuleInitializedAsync(_selectedModule);
+
+        foreach (var (moduleKey, setting) in _moduleSettings)
+            setting.SetSelected(moduleKey == _selectedModule);
+
+        foreach (var module in _modules)
+            foreach (var action in module.Value.GetActions())
+            {
+                var proxy = _moduleActions.FirstOrDefault(item => item.Key == $"{module.Key}.{action.Key}");
+                proxy?.SetEnabled(module.Key == _selectedModule && action.GetCurrentEnabled());
+            }
+
+        UpdateOwnVisibility();
+    }
+
+    private void UpdateOwnVisibility()
+    {
+        var application = ApplicationPath.GetCurrentValue();
+        var hasApplication = !string.IsNullOrWhiteSpace(application);
+        var custom = application == CustomApp;
+        var isIde = _selectedModule is "VSCode" or "JetBrainsIDE";
+        var acceptsArguments = ProcessMode.GetCurrentValue() is "LaunchNew" or "LaunchOrAttach";
+
+        ProcessMode.SetVisibility(hasApplication);
+        WindowState.SetVisibility(hasApplication);
+        UseCustomSize.SetVisibility(hasApplication && WindowState.GetCurrentValue() == "Normal");
+        WindowWidth.SetVisibility(hasApplication && WindowState.GetCurrentValue() == "Normal" && UseCustomSize.GetCurrentValue());
+        WindowHeight.SetVisibility(hasApplication && WindowState.GetCurrentValue() == "Normal" && UseCustomSize.GetCurrentValue());
+        MoveToMonitor.SetVisibility(hasApplication);
+        TargetMonitor.SetVisibility(hasApplication && MoveToMonitor.GetCurrentValue());
+        LifecycleMode.SetVisibility(hasApplication);
+        BringToForeground.SetVisibility(hasApplication && WindowState.GetCurrentValue() != "Minimized");
+        UseCustomWorkingDirectory.SetVisibility(hasApplication);
+        WorkingDirectory.SetVisibility(hasApplication && UseCustomWorkingDirectory.GetCurrentValue());
+        CustomPath.SetVisibility(custom);
+        ApplicationArgs.SetVisibility(hasApplication && acceptsArguments && (custom || isIde));
+        ProjectPath.SetVisibility(hasApplication && isIde);
     }
 
     public override void Dispose()
     {
-        ApplicationPath.Dispose();
+        foreach (var subscription in _subscriptions)
+            subscription.Dispose();
+        foreach (var (_, setting) in _moduleSettings)
+            setting.Dispose();
+        foreach (var action in _moduleActions)
+            action.Dispose();
+
+        CustomPath.Dispose();
         ApplicationArgs.Dispose();
+        ProjectPath.Dispose();
         UseCustomWorkingDirectory.Dispose();
         WorkingDirectory.Dispose();
-        AutoDetectAction.Dispose();
         base.Dispose();
     }
 }

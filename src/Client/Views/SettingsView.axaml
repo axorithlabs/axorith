@@ -274,15 +274,6 @@
                                 </StackPanel>
                             </Button>
                             
-                            <Button Command="{Binding OpenDiscordCommand}"
-                                    Classes="accent"
-                                    ToolTip.Tip="Join our Discord">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <PathIcon Data="{StaticResource DiscordIcon}" 
-                                              Width="16" Height="16"/>
-                                    <TextBlock Text="Discord" FontSize="13"/>
-                                </StackPanel>
-                            </Button>
                         </StackPanel>
                     </StackPanel>
                 </Border>

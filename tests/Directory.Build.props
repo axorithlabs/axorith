@@ -2,7 +2,7 @@
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
     <PropertyGroup>
-        <BaseOutputPath>$(SolutionDir)build/$(Configuration)/Tests/$(MSBuildProjectName)/</BaseOutputPath>
+        <BaseOutputPath>$(SolutionDir)build/$(BuildConfiguration)/Tests/$(MSBuildProjectName)/</BaseOutputPath>
         <OutputPath>$(BaseOutputPath)</OutputPath>
         <BaseIntermediateOutputPath>$(BaseOutputPath)obj/</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>

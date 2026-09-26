@@ -11,8 +11,10 @@
         <RepositoryType>git</RepositoryType>
 
         <SolutionDir Condition="'$(SolutionDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</SolutionDir>
+        <BuildConfiguration Condition="'$(Configuration)' == ''">Debug</BuildConfiguration>
+        <BuildConfiguration Condition="'$(Configuration)' != ''">$(Configuration)</BuildConfiguration>
 
-        <BaseOutputPath>$(SolutionDir)build/$(Configuration)/$(MSBuildProjectName)/</BaseOutputPath>
+        <BaseOutputPath>$(SolutionDir)build/$(BuildConfiguration)/$(MSBuildProjectName)/</BaseOutputPath>
         <OutputPath>$(BaseOutputPath)</OutputPath>
         <BaseIntermediateOutputPath>$(BaseOutputPath)/obj/</BaseIntermediateOutputPath>
         <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>

@@ -59,6 +59,11 @@ public interface ISetting
     void SetValueFromObject(object? value);
 
     /// <summary>
+    ///     Updates whether the setting is shown in the module editor.
+    /// </summary>
+    void SetVisibility(bool isVisible);
+
+    /// <summary>
     ///     Returns the current label value synchronously (snapshot).
     /// </summary>
     string GetCurrentLabel();

@@ -33,6 +33,55 @@
 <UserControl.Resources>
         <converters:EqualsConverter x:Key="EqualsConverter"/>
         <converters:IsNotNullOrEmptyConverter x:Key="IsNotNullOrEmptyConverter"/>
+        <converters:ApplicationIconConverter x:Key="ApplicationIconConverter"/>
+        <converters:ApplicationChoiceTextConverter x:Key="ApplicationChoiceTextConverter"/>
+
+        <DataTemplate x:Key="ApplicationChoiceItemTemplate" x:DataType="vm:ApplicationChoiceViewModel">
+            <Border Background="#111" BorderBrush="#292929" BorderThickness="1"
+                    CornerRadius="6" Padding="8" Margin="0,0,0,4">
+                <Grid ColumnDefinitions="36,*,76" ColumnSpacing="10" MinHeight="52">
+                    <Border Grid.Column="0" Width="32" Height="32" Background="#1B1B1B"
+                            CornerRadius="6" VerticalAlignment="Center">
+                        <Grid>
+                            <PathIcon Data="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V8H20V6H4M4,18H20V10H4V18Z"
+                                      Width="18" Height="18" Foreground="#888"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image Source="{Binding Value, Converter={StaticResource ApplicationIconConverter}}"
+                                   Width="26" Height="26" Stretch="Uniform"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="{Binding Value, Converter={StaticResource ApplicationChoiceTextConverter}, ConverterParameter=name}"
+                                   FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Value, Converter={StaticResource ApplicationChoiceTextConverter}, ConverterParameter=path}"
+                                   FontSize="11" Foreground="#777" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <Button Grid.Column="2"
+                            Command="{Binding SelectCommand}"
+                            CommandParameter="{Binding Choice}"
+                            Content="{Binding SelectorItemActionLabel}"
+                            Width="76" Height="30" Padding="4"
+                            HorizontalAlignment="Stretch" VerticalAlignment="Center" Classes="accent"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ApplicationPickerPopupTemplate" x:DataType="vm:SettingViewModel">
+            <Border Background="#101010" BorderBrush="#333" BorderThickness="1"
+                    CornerRadius="7" Padding="6" BoxShadow="0 10 28 0 #80000000">
+                <StackPanel Spacing="6">
+                    <TextBox Text="{Binding SearchText, Mode=TwoWay}"
+                             IsVisible="{Binding ShowPopupSearch}" Watermark="Search apps..."
+                             Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+                    <ListBox ItemsSource="{Binding ApplicationChoices}" MaxHeight="320"
+                             Background="Transparent" BorderThickness="0" Padding="0"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.IsScrollChainingEnabled="False"
+                             ItemTemplate="{StaticResource ApplicationChoiceItemTemplate}"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
         
         <StreamGeometry x:Key="TimerIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</StreamGeometry>
         <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
@@ -62,24 +111,32 @@
         </DataTemplate>
 
         <DataTemplate x:Key="TextAreaSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
-                     AcceptsReturn="True" 
-                     TextWrapping="Wrap" 
-                     MinHeight="80" 
-                     IsEnabled="{Binding !IsReadOnly}" 
-                     HorizontalAlignment="Stretch" 
-                     Background="#050505" 
-                     BorderBrush="#333" 
-                     CornerRadius="6" 
-                     Padding="10,8"
-                     Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                <TextBox.Styles>
-                    <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-                        <Setter Property="BorderBrush" Value="#FF4444"/>
-                        <Setter Property="BorderThickness" Value="1"/>
-                    </Style>
-                </TextBox.Styles>
-            </TextBox>
+            <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*,44">
+                    <TextBox Grid.Column="0" Text="{Binding StringValue, Mode=TwoWay}"
+                             AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
+                             IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch"
+                             Background="#050505" BorderBrush="#333" CornerRadius="6,0,0,6" Padding="10,8"
+                             Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                        <TextBox.Styles>
+                            <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+                                <Setter Property="BorderBrush" Value="#FF4444"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                            </Style>
+                        </TextBox.Styles>
+                    </TextBox>
+                    <Button Grid.Column="1" Command="{Binding ApplicationPicker.OpenApplicationSelectorCommand}"
+                            IsVisible="{Binding IsCustomAppsField}" IsEnabled="{Binding !IsReadOnly}"
+                            Background="#111" BorderBrush="#333" BorderThickness="1"
+                            CornerRadius="0,6,6,0" Padding="0" MinHeight="80" Width="44"
+                            ToolTip.Tip="Add an installed app">
+                        <PathIcon Data="{StaticResource SearchIcon}" Width="17" Height="17" Foreground="#AAA"/>
+                    </Button>
+                </Grid>
+                <ContentControl Content="{Binding ApplicationPicker}"
+                                ContentTemplate="{StaticResource ApplicationPickerPopupTemplate}"
+                                IsVisible="{Binding ApplicationPicker.IsSelectorOpen}"/>
+            </StackPanel>
         </DataTemplate>
 
         <DataTemplate x:Key="SecretSettingTemplate" x:DataType="vm:SettingViewModel">
@@ -129,12 +186,36 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ChoiceSettingTemplate" x:DataType="vm:SettingViewModel">
-            <ComboBox ItemsSource="{Binding DisplayedChoices}" 
-                      SelectedItem="{Binding SelectedChoice}"
-                      HorizontalAlignment="Stretch" 
-                      IsEnabled="{Binding !IsReadOnly}"
-                      MaxDropDownHeight="300"
-                      Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+            <StackPanel Spacing="6">
+                <Grid x:Name="ApplicationSelectorRoot" ColumnDefinitions="*,44"
+                      IsVisible="{Binding IsApplicationSelector}">
+                    <TextBox x:Name="ApplicationInput"
+                             Grid.Column="0"
+                             Text="{Binding ApplicationInputText, Mode=TwoWay}"
+                             Watermark="Select application..."
+                             HorizontalAlignment="Stretch"
+                             Background="#050505" BorderBrush="#333" CornerRadius="6,0,0,6" Padding="10,8"/>
+                    <Button Grid.Column="1"
+                            Command="{Binding OpenApplicationSelectorCommand}"
+                            Background="#111" BorderBrush="#333" BorderThickness="1,1,1,1"
+                            CornerRadius="0,6,6,0" Padding="0" Width="44" Height="38">
+                        <PathIcon Data="{StaticResource SearchIcon}" Width="17" Height="17" Foreground="#AAA"/>
+                    </Button>
+                    <Popup PlacementTarget="{Binding #ApplicationSelectorRoot}"
+                           Placement="Bottom"
+                           IsOpen="{Binding IsSelectorOpen, Mode=TwoWay}"
+                           IsLightDismissEnabled="False"
+                           Width="540">
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ApplicationPickerPopupTemplate}"/>
+                    </Popup>
+                </Grid>
+                <ComboBox ItemsSource="{Binding DisplayedChoices}"
+                          SelectedItem="{Binding SelectedChoice}"
+                          IsVisible="{Binding !IsApplicationSelector}"
+                          HorizontalAlignment="Stretch"
+                          IsEnabled="{Binding !IsReadOnly}"
+                          MaxDropDownHeight="300"
+                          Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
                 <ComboBox.Styles>
                     <Style Selector="ComboBox.error /template/ Border#Border">
                         <Setter Property="BorderBrush" Value="#FF4444"/>
@@ -153,7 +234,8 @@
                                    ToolTip.Tip="{Binding Value}"/>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
-            </ComboBox>
+                </ComboBox>
+            </StackPanel>
         </DataTemplate>
 
         <DataTemplate x:Key="FilePickerSettingTemplate" x:DataType="vm:SettingViewModel">
@@ -1135,7 +1217,8 @@
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
-                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled"
+                                              IsScrollChainingEnabled="False">
                                     <StackPanel Spacing="0">
                                         <StackPanel Spacing="8" Margin="30,24,30,24">
                                             <TextBlock Text="Instance Name" Foreground="#E0E0E0" FontSize="14" FontWeight="Medium"/>
@@ -1146,7 +1229,7 @@
                                             <ItemsControl ItemsSource="{Binding Actions}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:ActionViewModel">
-                                                        <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}" HorizontalAlignment="Stretch" Margin="0,0,0,16" Padding="10"/>
+                                                        <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch" Margin="0,0,0,16" Padding="10"/>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>

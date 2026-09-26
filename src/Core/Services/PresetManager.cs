@@ -11,7 +11,18 @@ namespace Axorith.Core.Services;
 /// </summary>
 public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
-    private const int CurrentPresetVersion = 1;
+    private const int CurrentPresetVersion = 2;
+    private static readonly Guid ApplicationLauncherId = Guid.Parse("9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd");
+    private static readonly IReadOnlyDictionary<Guid, string> LegacyLauncherPathKeys = new Dictionary<Guid, string>
+    {
+        [Guid.Parse("6072c5d0-68eb-483c-b2c5-d068eb783c9e")] = "BrowserPath",
+        [Guid.Parse("4f083ec9-518f-460a-883e-c9518fc60a28")] = "ObsPath",
+        [Guid.Parse("30741589-7dba-42a2-b415-897dba32a2ef")] = "DiscordPath",
+        [Guid.Parse("6b3271d3-3eae-41f4-b271-d33eaea1f40a")] = "CodePath",
+        [Guid.Parse("c5f5e7b2-9d2b-4e1a-9f4b-3f4b7e8c5a21")] = "IdePath",
+        [Guid.Parse("f4996a05-373d-4fa4-996a-05373d8fa4ea")] = "SteamPath",
+        [Guid.Parse("04399d2f-43c9-4182-b99d-2f43c97182a6")] = "SpotifyPath"
+    };
     private const long MaxPresetFileSizeBytes = 10 * 1024 * 1024; // 10 MB max
 
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -203,6 +214,20 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
     private void MigratePreset(SessionPreset preset)
     {
+        foreach (var module in preset.Modules)
+        {
+            if (!LegacyLauncherPathKeys.TryGetValue(module.ModuleId, out var pathKey))
+                continue;
+
+            if (module.Settings.TryGetValue(pathKey, out var appPath))
+            {
+                module.Settings.Remove(pathKey);
+                module.Settings["ApplicationPath"] = appPath;
+            }
+
+            module.ModuleId = ApplicationLauncherId;
+        }
+
         logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);
     }
 }

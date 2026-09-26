@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
@@ -111,8 +110,6 @@ public class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public ICommand CreateSessionCommand { get; }
 
-    public ICommand JoinDiscordCommand { get; }
-
     public ICommand OpenSettingsCommand { get; }
 
     public ICommand InstallUpdateCommand { get; }
@@ -210,7 +207,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         StopSessionCommand = ReactiveCommand.CreateFromTask(StopCurrentSessionAsync, canStopSession);
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canDoGlobalActions);
         CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canDoGlobalActions);
-        JoinDiscordCommand = ReactiveCommand.Create(OpenDiscordInvite);
         OpenSettingsCommand = ReactiveCommand.Create(OpenSettings);
 
         var canInstallUpdate = this
@@ -378,18 +374,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
         editor.PresetToEdit = null;
         _shell.NavigateTo(editor);
-    }
-
-    private void OpenDiscordInvite()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo("https://discord.gg/axorith") { UseShellExecute = true });
-        }
-        catch
-        {
-            // Ignore if browser fails to open
-        }
     }
 
     private void OpenSettings()

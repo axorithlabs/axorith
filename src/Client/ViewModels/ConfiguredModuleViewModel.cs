@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using Axorith.Client.Adapters;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
+using Axorith.Shared.Platform;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
 using Axorith.Telemetry;
@@ -195,12 +196,32 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     var savedValue = Model.Settings.GetValueOrDefault(setting.Key);
                     var adaptedSetting = new ModuleSettingAdapter(setting, savedValue);
 
-                    var vm = new SettingViewModel(adaptedSetting, Model.InstanceId, _modulesApi, _serviceProvider);
+                    var vm = new SettingViewModel(adaptedSetting, Definition.Id, Model.InstanceId, _modulesApi, _serviceProvider);
                     Settings.Add(vm);
+                }
+
+                if (Definition.Name == "App Blocker")
+                {
+                    var appPicker = Settings.FirstOrDefault(setting => setting.Setting.Key == "AppToAdd");
+                    var customApps = Settings.FirstOrDefault(setting => setting.Setting.Key == "CustomProcessList");
+                    if (appPicker != null && customApps != null)
+                        customApps.AttachApplicationPicker(appPicker);
+                }
+
+                if (Definition.Name == "Application Launcher")
+                {
+                    var applicationSetting = Settings.FirstOrDefault(setting => setting.Setting.Key == "ApplicationPath");
+                    if (applicationSetting != null)
+                    {
+                        applicationSetting.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
+                    }
                 }
 
                 foreach (var action in settingsInfo.Actions)
                 {
+                    if (Definition.Name == "App Blocker" && action.Key == "AddApp")
+                        continue;
+
                     var adaptedAction = new ModuleActionAdapter(
                         action,
                         _modulesApi,
@@ -210,6 +231,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                         _telemetry);
                     Actions.Add(new ActionViewModel(adaptedAction));
                 }
+
+                UpdateLauncherActionVisibility();
 
                 SetupValidation();
             });
@@ -238,6 +261,20 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         {
             IsLoading = false;
         }
+    }
+
+    private void UpdateLauncherActionVisibility()
+    {
+        if (Definition.Name != "Application Launcher")
+            return;
+
+        var applicationPath = Settings.FirstOrDefault(setting => setting.Setting.Key == "ApplicationPath")?.StringValue;
+        var moduleKey = string.IsNullOrWhiteSpace(applicationPath)
+            ? null
+            : ApplicationSelector.GetLauncherModuleKey(applicationPath);
+
+        foreach (var action in Actions)
+            action.SetVisible(moduleKey != null && action.Key.StartsWith($"{moduleKey}.", StringComparison.Ordinal));
     }
 
     private void SetupValidation()

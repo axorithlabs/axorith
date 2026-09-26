@@ -254,16 +254,6 @@
                     </Button>
                 </StackPanel>
 
-                <Button Grid.Column="2"
-                        Command="{Binding JoinDiscordCommand}"
-                        Classes="accent"
-                        MinWidth="140"
-                        HorizontalContentAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource DiscordIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="Join Discord" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
             </Grid>
         </Border>
     </Grid>

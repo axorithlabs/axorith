@@ -60,13 +60,13 @@ public abstract class LauncherModuleBase(
     }
 
     /// <inheritdoc />
-    public Task InitializeAsync(CancellationToken cancellationToken)
+    public virtual Task InitializeAsync(CancellationToken cancellationToken)
     {
         return Settings.InitializeAsync();
     }
 
     /// <inheritdoc />
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
+    public virtual Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
         return Settings.ValidateAsync();
     }

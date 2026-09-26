@@ -15,6 +15,7 @@ namespace Axorith.Client.ViewModels;
 public class SettingViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly Guid _moduleInstanceId;
+    private readonly Guid _moduleId;
     private readonly IModulesApi _modulesApi;
     private readonly IClientUiSettingsStore? _uiSettingsStore;
     private readonly ClientUiConfiguration? _uiConfig;
@@ -50,6 +51,54 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     }
 
     private bool _isReadOnly;
+
+    private string _searchText = string.Empty;
+    private string _applicationInputText = string.Empty;
+    private bool _isSelectorOpen;
+    private SettingViewModel? _applicationPicker;
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value))
+                UpdateDisplayedChoices();
+        }
+    }
+
+    public bool IsApplicationSelector => Setting.Key is "ApplicationPath" or "AppToAdd";
+    public bool IsCustomAppsField => Setting.Key == "CustomProcessList";
+    public string SelectorItemActionLabel => Setting.Key == "AppToAdd" ? "Add" : "Select";
+    public bool ShowPopupSearch => Setting.Key == "AppToAdd";
+    public SettingViewModel? ApplicationPicker
+    {
+        get => _applicationPicker;
+        private set => SetProperty(ref _applicationPicker, value);
+    }
+
+    public string ApplicationInputText
+    {
+        get => _applicationInputText;
+        set
+        {
+            if (!SetProperty(ref _applicationInputText, value))
+                return;
+
+            SearchText = value;
+            IsSelectorOpen = true;
+            if (Setting.Key == "ApplicationPath" && !string.IsNullOrEmpty(StringValue))
+                StringValue = string.Empty;
+        }
+    }
+
+    public bool IsSelectorOpen
+    {
+        get => _isSelectorOpen;
+        set => SetProperty(ref _isSelectorOpen, value);
+    }
+
+    public void AttachApplicationPicker(SettingViewModel picker) => ApplicationPicker = picker;
 
     public bool IsReadOnly
     {
@@ -170,8 +219,11 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public ObservableCollection<KeyValuePair<string, string>> DisplayedChoices { get; } = [];
+    public ObservableCollection<ApplicationChoiceViewModel> ApplicationChoices { get; } = [];
 
     public ObservableCollection<MultiChoiceItemViewModel> MultiChoices { get; } = [];
+    public ICommand SelectChoiceCommand { get; }
+    public ICommand OpenApplicationSelectorCommand { get; }
 
     public decimal NumberIncrement => Setting.ValueType == typeof(int) ? 1 : 0.1m;
 
@@ -197,6 +249,8 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             }
 
             StringValue = value.Value.Key;
+            if (IsApplicationSelector)
+                SearchText = string.Empty;
             OnPropertyChanged(nameof(StringValue));
             OnPropertyChanged();
         }
@@ -208,11 +262,13 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
 
     public SettingViewModel(
         ISetting setting,
+        Guid moduleId,
         Guid moduleInstanceId,
         IModulesApi modulesApi,
         IServiceProvider? serviceProvider = null)
     {
         Setting = setting;
+        _moduleId = moduleId;
         _moduleInstanceId = moduleInstanceId;
         _modulesApi = modulesApi;
 
@@ -231,6 +287,8 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         }
 
         ClickCommand = ReactiveCommand.Create(() => { BoolValue = true; });
+        SelectChoiceCommand = ReactiveCommand.CreateFromTask<KeyValuePair<string, string>>(SelectChoiceAsync);
+        OpenApplicationSelectorCommand = ReactiveCommand.Create(OpenApplicationSelector);
         RemoveHistoryItemCommand = ReactiveCommand.Create<string>(RemoveHistoryItem);
         BrowseCommand = ReactiveCommand.CreateFromTask(BrowseAsync);
 
@@ -284,6 +342,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
                 OnPropertyChanged(nameof(DecimalValue));
                 UpdateDisplayedChoices();
                 UpdateMultiChoices();
+                RefreshApplicationInputText();
             }
             else
             {
@@ -294,6 +353,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
                     OnPropertyChanged(nameof(DecimalValue));
                     UpdateDisplayedChoices();
                     UpdateMultiChoices();
+                    RefreshApplicationInputText();
                 });
             }
         });
@@ -302,6 +362,8 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         {
             _rawChoices = initialChoices;
         }
+
+        _applicationInputText = GetSelectedApplicationName();
 
         if (Dispatcher.UIThread.CheckAccess())
         {
@@ -314,6 +376,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             {
                 UpdateDisplayedChoices();
                 UpdateMultiChoices();
+                RefreshApplicationInputText();
             });
         }
 
@@ -331,9 +394,81 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
                 {
                     UpdateDisplayedChoices();
                     UpdateMultiChoices();
+                    RefreshApplicationInputText();
                 });
             }
         });
+    }
+
+    private async Task SelectChoiceAsync(KeyValuePair<string, string> choice)
+    {
+        SelectedChoice = choice;
+        if (Setting.Key != "AppToAdd")
+        {
+            if (IsApplicationSelector)
+            {
+                SetApplicationInputText(GetChoiceName(choice.Value));
+                IsSelectorOpen = false;
+                SearchText = string.Empty;
+            }
+            return;
+        }
+
+        var update = await _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, choice.Key);
+        if (!update.Success)
+        {
+            Error = update.Message;
+            return;
+        }
+
+        var result = await _modulesApi.InvokeDesignTimeActionAsync(_moduleId, _moduleInstanceId, "AddApp");
+        if (!result.Success)
+        {
+            Error = result.Message;
+            return;
+        }
+
+        var reset = await _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, string.Empty);
+        if (!reset.Success)
+            Error = reset.Message;
+        Setting.SetValueFromString(string.Empty);
+        SetApplicationInputText(string.Empty);
+        SearchText = string.Empty;
+        IsSelectorOpen = false;
+    }
+
+    private void OpenApplicationSelector()
+    {
+        if (IsSelectorOpen)
+        {
+            IsSelectorOpen = false;
+            return;
+        }
+
+        var selectedName = GetSelectedApplicationName();
+        SearchText = string.Equals(ApplicationInputText, selectedName, StringComparison.Ordinal)
+            ? string.Empty
+            : ApplicationInputText;
+        IsSelectorOpen = true;
+    }
+
+    private string GetSelectedApplicationName()
+    {
+        var selected = _rawChoices.FirstOrDefault(choice => choice.Key == StringValue);
+        return string.IsNullOrEmpty(selected.Key) ? string.Empty : GetChoiceName(selected.Value);
+    }
+
+    private static string GetChoiceName(string value) => value.Split('\n', 2)[0].TrimEnd('\r');
+
+    private void SetApplicationInputText(string value)
+    {
+        SetProperty(ref _applicationInputText, value, nameof(ApplicationInputText));
+    }
+
+    private void RefreshApplicationInputText()
+    {
+        if (IsApplicationSelector && !IsSelectorOpen && string.IsNullOrEmpty(SearchText))
+            SetApplicationInputText(GetSelectedApplicationName());
     }
 
     private void HandleStringUpdate(string value)
@@ -389,9 +524,25 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         var currentValue = StringValue;
         var newDisplayList = new List<KeyValuePair<string, string>>(_rawChoices);
 
+        if (IsApplicationSelector && !string.IsNullOrWhiteSpace(SearchText))
+        {
+            var matches = newDisplayList.Where(choice =>
+                choice.Value.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                choice.Key.Contains(SearchText, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0 && Setting.Key == "ApplicationPath")
+            {
+                var customApp = newDisplayList.FirstOrDefault(choice => choice.Key == "custom-app");
+                if (!string.IsNullOrEmpty(customApp.Key))
+                    matches.Add(customApp);
+            }
+
+            newDisplayList = matches;
+        }
+
         var exists = newDisplayList.Any(c => c.Key == currentValue);
 
-        if (!exists && !string.IsNullOrEmpty(currentValue))
+        if (!exists && !string.IsNullOrEmpty(currentValue) &&
+            (!IsApplicationSelector || string.IsNullOrWhiteSpace(SearchText)))
         {
             newDisplayList.Insert(0, new KeyValuePair<string, string>(
                 currentValue,
@@ -413,9 +564,11 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         }
 
         DisplayedChoices.Clear();
+        ApplicationChoices.Clear();
         foreach (var item in newDisplayList)
         {
             DisplayedChoices.Add(item);
+            ApplicationChoices.Add(new ApplicationChoiceViewModel(item, SelectChoiceCommand, SelectorItemActionLabel));
         }
 
         OnPropertyChanged(nameof(SelectedChoice));
@@ -645,6 +798,17 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         _stringDebounceTimer?.Dispose();
         _numberThrottleTimer?.Dispose();
     }
+}
+
+public sealed class ApplicationChoiceViewModel(
+    KeyValuePair<string, string> choice,
+    ICommand selectCommand,
+    string actionLabel)
+{
+    public KeyValuePair<string, string> Choice { get; } = choice;
+    public ICommand SelectCommand { get; } = selectCommand;
+    public string SelectorItemActionLabel { get; } = actionLabel;
+    public string Value => Choice.Value;
 }
 
 // Helper VM for MultiChoice items

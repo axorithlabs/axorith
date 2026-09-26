@@ -84,7 +84,6 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     public ICommand BackCommand { get; }
     public ICommand OpenPrivacyPolicyCommand { get; }
     public ICommand OpenGitHubCommand { get; }
-    public ICommand OpenDiscordCommand { get; }
     public ICommand RunSetupWizardCommand { get; }
 
     public bool IsRunningSetup
@@ -120,7 +119,6 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         BackCommand = ReactiveCommand.Create(NavigateBack);
         OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
-        OpenDiscordCommand = ReactiveCommand.Create(() => OpenUrl("https://discord.gg/axorith"));
 
         var canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
         RunSetupWizardCommand = ReactiveCommand.CreateFromTask(RunSetupWizardAsync, canRunSetup);

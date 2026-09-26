@@ -65,7 +65,7 @@ public class NativeMessagingRegistrar(
             "This is insecure and must be replaced with actual extension ID in production.");
         manager.RegisterChromeHost(hostName, shimPath, ["chrome-extension://*/*"]);
         #else
-        if (ChromeExtensionId == "CHROME_EXTENSION_ID_PLACEHOLDER")
+        if (string.Equals(ChromeExtensionId, "CHROME_EXTENSION_ID_PLACEHOLDER", StringComparison.Ordinal))
         {
             logger.LogError(
                 "Chrome extension ID not configured. Native Messaging for Chrome will not work. " +

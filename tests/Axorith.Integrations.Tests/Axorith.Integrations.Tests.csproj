@@ -25,5 +25,6 @@
         <ProjectReference Include="..\..\src\Contracts\Axorith.Contracts.csproj" />
         <ProjectReference Include="..\..\src\Host\Axorith.Host.csproj" />
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
+        <ProjectReference Include="..\..\src\Modules\ApplicationLauncher\Axorith.Module.ApplicationLauncher.csproj" />
     </ItemGroup>
 </Project>

@@ -29,6 +29,14 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     } = true;
 
+    public bool IsVisible
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = true;
+
+    public void SetVisible(bool visible) => IsVisible = visible;
+
     public ICommand InvokeCommand { get; }
 
     public ActionViewModel(IAction action)

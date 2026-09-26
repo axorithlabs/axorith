@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Axorith.Client.ViewModels;
 
@@ -67,6 +68,10 @@ public partial class SessionEditorView : UserControl
                 return;
             }
 
+            if (e.Key == Key.Escape && textBox.Name == "ApplicationInput" &&
+                textBox.DataContext is SettingViewModel appSetting)
+                appSetting.IsSelectorOpen = false;
+
             var topLevel = TopLevel.GetTopLevel(this);
             #pragma warning disable CS0618
             topLevel?.FocusManager?.ClearFocus();
@@ -89,6 +94,12 @@ public partial class SessionEditorView : UserControl
         if (textBox.DataContext is SettingViewModel settingVm)
         {
             settingVm.OnFocusGained();
+            if (textBox.Name == "ApplicationInput")
+            {
+                settingVm.IsSelectorOpen = true;
+                if (!string.IsNullOrWhiteSpace(settingVm.StringValue))
+                    Dispatcher.UIThread.Post(textBox.SelectAll);
+            }
         }
     }
 

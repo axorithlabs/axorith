@@ -2,6 +2,8 @@ using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Platform;
+using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.AppBlocker;
 
@@ -12,10 +14,12 @@ internal sealed class Settings : IDisposable
 
     private readonly Setting<List<string>> _categories;
     private readonly Setting<string> _customProcessList;
+    private readonly Setting<string> _appToAdd;
+    private readonly Action _addAppAction;
     private readonly IReadOnlyList<ISetting> _allSettings;
     private readonly IReadOnlyList<IAction> _allActions;
 
-    public Settings()
+    public Settings(IAppDiscoveryService appDiscovery)
     {
         EnsureCategoriesLoaded();
 
@@ -34,8 +38,28 @@ internal sealed class Settings : IDisposable
             description: "Additional process names to block (comma or newline separated). Example: notepad, calc"
         );
 
-        _allSettings = [_categories, _customProcessList];
-        _allActions = [];
+        var appChoices = ApplicationSelector.GetInstalledChoices(appDiscovery,
+            app => Path.GetFileNameWithoutExtension(app.ExecutablePath));
+        _appToAdd = Setting.AsChoice("AppToAdd", "Select app", "", appChoices,
+            "Choose an installed app to add to the block list.", isVisible: false);
+        _addAppAction = Action.Create("AddApp", "Add app");
+        _addAppAction.OnInvokeAsync(() =>
+        {
+            var selected = _appToAdd.GetCurrentValue();
+            if (string.IsNullOrWhiteSpace(selected))
+                return Task.CompletedTask;
+
+            var existing = _customProcessList.GetCurrentValue();
+            var names = existing.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(name => name.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (names.Add(selected))
+                _customProcessList.SetValue(string.Join(Environment.NewLine, names));
+            return Task.CompletedTask;
+        });
+
+        _allSettings = [_categories, _appToAdd, _customProcessList];
+        _allActions = [_addAppAction];
     }
 
     public IReadOnlyList<ISetting> GetSettings()
@@ -107,7 +131,8 @@ internal sealed class Settings : IDisposable
                 return;
             }
 
-            var jsonPath = Path.Combine(AppContext.BaseDirectory, "Modules", "AppBlocker", "Data", "blocked_apps.json");
+            var moduleDirectory = Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? AppContext.BaseDirectory;
+            var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_apps.json");
 
             if (!File.Exists(jsonPath))
             {
@@ -162,6 +187,8 @@ internal sealed class Settings : IDisposable
     public void Dispose()
     {
         _categories.Dispose();
+        _appToAdd.Dispose();
         _customProcessList.Dispose();
+        _addAppAction.Dispose();
     }
 }

@@ -16,7 +16,6 @@ public class WindowsAppDiscoveryService(
 {
     private const int DefaultFallbackSearchDepth = 6;
     private const int InstallLocationSearchDepth = 2;
-    private const int KnownFolderSearchDepth = 3;
 
     /// <summary>
     ///     Directories to skip during filesystem search for performance and safety.
@@ -157,7 +156,7 @@ public class WindowsAppDiscoveryService(
             ScanStartMenu(Environment.SpecialFolder.CommonStartMenu, AddApp);
             ScanStartMenu(Environment.SpecialFolder.StartMenu, AddApp);
             ScanUninstallRegistry(AddApp);
-            ScanKnownInstallFolders(AddApp);
+            ScanAppPathsRegistry(AddApp);
 
             _lastIndexTime = DateTime.UtcNow;
             return [.. _cachedIndex];
@@ -259,28 +258,31 @@ public class WindowsAppDiscoveryService(
         }
     }
 
-    private void ScanKnownInstallFolders(Action<string?, string, string?> onFound)
+    private void ScanAppPathsRegistry(Action<string?, string, string?> onFound)
     {
-        var targets = new List<(string Path, int Depth)>
+        foreach (var hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
         {
-            (ApplicationPaths.ProgramFiles, KnownFolderSearchDepth),
-            (ApplicationPaths.ProgramFilesX86, KnownFolderSearchDepth),
-            (ApplicationPaths.CommonAppData, InstallLocationSearchDepth),
-            (ApplicationPaths.LocalRoot, InstallLocationSearchDepth),
-            (ApplicationPaths.RoamingRoot, InstallLocationSearchDepth)
-        };
-
-        foreach (var (path, depth) in targets)
-        {
-            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            try
             {
-                continue;
+                using var baseKey = RegistryKey.OpenBaseKey(hive, view);
+                using var appPaths = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths");
+                if (appPaths == null)
+                    continue;
+
+                foreach (var exeName in appPaths.GetSubKeyNames())
+                {
+                    if (!exeName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    using var appKey = appPaths.OpenSubKey(exeName);
+                    if (appKey?.GetValue(null) is string path)
+                        onFound(Path.GetFileNameWithoutExtension(exeName), path, path);
+                }
             }
-
-            foreach (var exe in SafeEnumerateFiles(path, "*.exe", depth))
+            catch (Exception ex)
             {
-                var name = Path.GetFileNameWithoutExtension(exe);
-                onFound(name, exe, exe);
+                logger.LogDebug(ex, "Failed to enumerate App Paths for {Hive} {View}", hive, view);
             }
         }
     }
