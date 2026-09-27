@@ -1,4 +1,7 @@
 using System.Reflection;
+using System.Security.Principal;
+using System.Text.Json.Nodes;
+using Axorith.Core.Services;
 using Axorith.Host.Services;
 using Axorith.Shared.Platform;
 using FluentAssertions;
@@ -55,5 +58,60 @@ public sealed class WindowsCommitmentProtectionServiceTests
         entryInUse.Invoke(null, ["user-owned startup command"]).Should().Be(true);
         isHostEntry.Invoke(null, [hostCommand]).Should().Be(true);
         isHostEntry.Invoke(null, ["user-owned startup command"]).Should().Be(false);
+    }
+
+    [Fact]
+    public async Task StrictRecoveryFailsClosedWhenItsPolicySnapshotIsMissingOrTampered()
+    {
+        var directory = Directory.CreateTempSubdirectory("axorith-strict-state-test-");
+        var statePath = Path.Combine(directory.FullName, "strict-protection.json");
+        var service = new WindowsCommitmentProtectionService(directory.FullName,
+            NullLogger<WindowsCommitmentProtectionService>.Instance);
+
+        try
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => service.CheckRecoveryStateAsync());
+            File.Exists(statePath).Should().BeFalse();
+
+            CommittedSessionStateFile.WritePayload(statePath, "{\"Values\":[]}");
+            var envelope = JsonNode.Parse(await File.ReadAllTextAsync(statePath))!.AsObject();
+            envelope["Payload"] = envelope["Payload"]!.GetValue<string>() + " ";
+            await File.WriteAllTextAsync(statePath, envelope.ToJsonString());
+
+            await Assert.ThrowsAsync<InvalidDataException>(() => service.CheckRecoveryStateAsync());
+            File.Exists(statePath).Should().BeTrue();
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StrictPreflightRejectsAnUnelevatedHost()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var identity = WindowsIdentity.GetCurrent();
+        if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+        {
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("axorith-strict-elevation-test-");
+        try
+        {
+            var service = new WindowsCommitmentProtectionService(directory.FullName,
+                NullLogger<WindowsCommitmentProtectionService>.Instance);
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CheckCanEnableAsync());
+            error.Message.Should().Contain("run as administrator");
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 }

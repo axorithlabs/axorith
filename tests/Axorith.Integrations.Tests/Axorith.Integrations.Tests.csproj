@@ -27,5 +27,6 @@
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\..\src\Client\Axorith.Client.csproj" />
         <ProjectReference Include="..\..\src\Modules\ApplicationLauncher\Axorith.Module.ApplicationLauncher.csproj" />
+        <ProjectReference Include="..\..\src\Modules\SiteBlocker\Axorith.Module.SiteBlocker.csproj" />
     </ItemGroup>
 </Project>

@@ -4,6 +4,7 @@ namespace Axorith.Core.Services.Abstractions;
 public interface ICommitmentProtectionService
 {
     Task CheckCanEnableAsync(CancellationToken cancellationToken = default);
+    Task CheckRecoveryStateAsync(CancellationToken cancellationToken = default);
     Task CheckCanSetRecoveryStartupAsync(CancellationToken cancellationToken = default);
     Task SetRecoveryStartupAsync(bool active, CancellationToken cancellationToken = default);
     Task EnableAsync(CancellationToken cancellationToken = default);

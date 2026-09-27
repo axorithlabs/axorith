@@ -61,6 +61,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     ];
 
     private List<string> _activeSiteList = [];
+    private bool _isAllowList;
     private bool _pausedForBreak;
     private readonly HashSet<string> _connectedBrowsers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _browserStatuses = BrowserEndpoints.ToDictionary(
@@ -70,10 +71,10 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private bool _disposed;
 
     public bool IsProtectionDegraded => _browserFallbackFailed ||
-        (_activeSiteList.Count > 0 && !_pausedForBreak &&
+        ((_activeSiteList.Count > 0 || _isAllowList) && !_pausedForBreak &&
          _browserStatuses.Values.Any(status => status != "Connected"));
 
-    public string? ProtectionStatusMessage => _activeSiteList.Count == 0
+    public string? ProtectionStatusMessage => _activeSiteList.Count == 0 && !_isAllowList
         ? "Site Blocker has no configured sites"
         : _pausedForBreak
             ? "Site Blocker paused for break"
@@ -107,8 +108,9 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
         if (categories.Count == 0 && string.IsNullOrWhiteSpace(custom))
         {
-            return Task.FromResult(
-                ValidationResult.Warn("No categories or sites selected. The module will not block anything."));
+            return Task.FromResult(_mode.GetCurrentValue() == "AllowList"
+                ? ValidationResult.Success
+                : ValidationResult.Warn("No categories or sites selected. The module will not block anything."));
         }
 
         return Task.FromResult(ValidationResult.Success);
@@ -117,8 +119,9 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
         _activeSiteList = GetAllSites();
+        _isAllowList = _mode.GetCurrentValue() == "AllowList";
         _pausedForBreak = false;
-        if (_activeSiteList.Count == 0)
+        if (_activeSiteList.Count == 0 && !_isAllowList)
         {
             logger.LogWarning("No sites specified. Module will do nothing.");
             return;
@@ -128,7 +131,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         var results = await SendToAllExtensionsAsync(new
         {
             command = "block",
-            mode = _mode.GetCurrentValue(),
+            mode = _isAllowList ? "AllowList" : "BlockList",
             sites = _activeSiteList
         }, cancellationToken).ConfigureAwait(false);
         UpdateBrowserStatuses(results);
@@ -136,19 +139,20 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        if (_activeSiteList.Count > 0)
+        if (_activeSiteList.Count > 0 || _isAllowList)
         {
             await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken).ConfigureAwait(false);
         }
 
         _activeSiteList.Clear();
+        _isAllowList = false;
         _pausedForBreak = false;
         ApplyBrowserFallback([]);
     }
 
     public async Task PauseForBreakAsync(CancellationToken cancellationToken)
     {
-        if (_activeSiteList.Count == 0)
+        if (_activeSiteList.Count == 0 && !_isAllowList)
         {
             return;
         }
@@ -162,7 +166,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task ResumeAfterBreakAsync(CancellationToken cancellationToken)
     {
-        if (_activeSiteList.Count == 0)
+        if (_activeSiteList.Count == 0 && !_isAllowList)
         {
             return;
         }
@@ -170,7 +174,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         var results = await SendToAllExtensionsAsync(new
         {
             command = "block",
-            mode = _mode.GetCurrentValue(),
+            mode = _isAllowList ? "AllowList" : "BlockList",
             sites = _activeSiteList
         }, cancellationToken).ConfigureAwait(false);
         _pausedForBreak = false;
@@ -180,7 +184,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task<bool> IsProtectionHealthyAsync(CancellationToken cancellationToken)
     {
-        if (_activeSiteList.Count == 0)
+        if (_activeSiteList.Count == 0 && !_isAllowList)
         {
             return true;
         }
@@ -197,7 +201,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         var results = (await SendToAllExtensionsAsync(new
         {
             command = "health",
-            mode = _mode.GetCurrentValue(),
+            mode = _isAllowList ? "AllowList" : "BlockList",
             sites = _activeSiteList
         }, cancellationToken).ConfigureAwait(false)).ToList();
 
@@ -221,7 +225,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task<bool> CanStartCommittedSessionAsync(CancellationToken cancellationToken)
     {
-        if (GetAllSites().Count == 0)
+        if (GetAllSites().Count == 0 && _mode.GetCurrentValue() != "AllowList")
         {
             return true;
         }
@@ -543,7 +547,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
         _disposed = true;
 
-        if (_activeSiteList.Count > 0)
+        if (_activeSiteList.Count > 0 || _isAllowList)
         {
             logger.LogWarning(
                 "Disposing module while sites are still blocked. Attempting to send final unblock command.");

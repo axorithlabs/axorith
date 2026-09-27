@@ -1,5 +1,6 @@
 using Autofac;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services;
@@ -54,6 +55,7 @@ public sealed class CommittedModuleMutationTests
         var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
             TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
             new NoopTelemetryService(), recoveryPath, protection);
+        TestBlockerModule.SessionEndCount = 0;
 
         try
         {
@@ -81,11 +83,55 @@ public sealed class CommittedModuleMutationTests
             exception.Message.Should().Contain("Windows protection could not be restored");
             protection.RecoveryStartupChanges.Should().Equal(true);
             protection.Calls.Should().Equal("startup:active", "enable", "restore");
-            sessionManager.IsSessionRunning.Should().BeFalse();
+            sessionManager.IsSessionRunning.Should().BeTrue();
+            File.Exists(recoveryPath).Should().BeTrue();
+            TestBlockerModule.SessionEndCount.Should().Be(0);
         }
         finally
         {
             await sessionManager.DisposeAsync();
+            recoveryDirectory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TamperedCommittedRecoveryIsRejectedAndRetained()
+    {
+        using var rootScope = new ContainerBuilder().Build();
+        var definition = new ModuleDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Blocker",
+            ModuleType = typeof(TestBlockerModule)
+        };
+        var registry = new TestModuleRegistry(rootScope, definition);
+        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-tamper-test-");
+        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
+        var runningManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
+            new NoopTelemetryService(), recoveryPath);
+        var recoveringManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
+            new NoopTelemetryService(), recoveryPath);
+
+        try
+        {
+            await runningManager.StartSessionAsync(CreateCommittedPreset("Tamper test", TimeSpan.FromMinutes(10),
+                definition.Id));
+            var envelope = JsonNode.Parse(await File.ReadAllTextAsync(recoveryPath))!.AsObject();
+            envelope["Payload"] = envelope["Payload"]!.GetValue<string>() + " ";
+            await File.WriteAllTextAsync(recoveryPath, envelope.ToJsonString());
+
+            await Assert.ThrowsAsync<SessionException>(() => recoveringManager.RecoverCommittedSessionAsync());
+
+            File.Exists(recoveryPath).Should().BeTrue();
+            runningManager.IsSessionRunning.Should().BeTrue();
+        }
+        finally
+        {
+            await runningManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
+            await recoveringManager.DisposeAsync();
+            await runningManager.DisposeAsync();
             recoveryDirectory.Delete(recursive: true);
         }
     }
@@ -287,7 +333,7 @@ public sealed class CommittedModuleMutationTests
             sessionManager.BreaksRemaining.Should().Be(1);
             sessionManager.BreakEndsAt.Should().BeNull();
             module.ResumeAfterBreakCount.Should().Be(1);
-            using var state = JsonDocument.Parse(await File.ReadAllTextAsync(recoveryPath));
+            using var state = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(recoveryPath));
             state.RootElement.GetProperty("BreaksUsed").GetInt32().Should().Be(0);
             state.RootElement.GetProperty("BreakEndsAt").ValueKind.Should().Be(JsonValueKind.Null);
         }
@@ -298,6 +344,84 @@ public sealed class CommittedModuleMutationTests
                 await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
             }
 
+            await sessionManager.DisposeAsync();
+            recoveryDirectory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task FailedRecoveryWriteKeepsPreviousCommittedSnapshot()
+    {
+        using var rootScope = new ContainerBuilder().Build();
+        var definition = new ModuleDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Blocker",
+            ModuleType = typeof(TestBlockerModule)
+        };
+        var registry = new TestModuleRegistry(rootScope, definition);
+        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-recovery-write-test-");
+        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
+        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
+            new NoopTelemetryService(), recoveryPath);
+
+        try
+        {
+            await sessionManager.StartSessionAsync(CreateCommittedPreset("Recovery write test", TimeSpan.FromMinutes(10),
+                definition.Id, breakCount: 1));
+            using (File.Open(recoveryPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                await Assert.ThrowsAsync<SessionException>(() => sessionManager.StartBreakAsync());
+            }
+
+            sessionManager.BreaksRemaining.Should().Be(1);
+            using var state = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(recoveryPath));
+            state.RootElement.GetProperty("BreaksUsed").GetInt32().Should().Be(0);
+        }
+        finally
+        {
+            if (sessionManager.IsSessionRunning)
+            {
+                await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
+            }
+
+            await sessionManager.DisposeAsync();
+            recoveryDirectory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DirectCommittedStartRunsPreflightBeforeModuleSideEffects()
+    {
+        using var rootScope = new ContainerBuilder().Build();
+        var definition = new ModuleDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Blocker",
+            ModuleType = typeof(TestBlockerModule)
+        };
+        var registry = new TestModuleRegistry(rootScope, definition);
+        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-committed-preflight-test-");
+        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
+        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
+            new NoopTelemetryService(), recoveryPath);
+        TestBlockerModule.SessionStartCount = 0;
+
+        try
+        {
+            var preset = CreateCommittedPreset("Preflight test", TimeSpan.FromMinutes(10), definition.Id);
+            preset.Modules[0].Settings["BlockRule"] = "unavailable";
+
+            await Assert.ThrowsAsync<SessionException>(() => sessionManager.StartSessionAsync(preset));
+
+            TestBlockerModule.SessionStartCount.Should().Be(0);
+            sessionManager.IsSessionRunning.Should().BeFalse();
+            File.Exists(recoveryPath).Should().BeFalse();
+        }
+        finally
+        {
             await sessionManager.DisposeAsync();
             recoveryDirectory.Delete(recursive: true);
         }
@@ -428,6 +552,22 @@ public sealed class CommittedModuleMutationTests
         writeOptionsGetter: () => new WriteOptions(),
         writeOptionsSetter: _ => { });
 
+    private static SessionPreset CreateCommittedPreset(string name, TimeSpan duration, Guid moduleId,
+        int breakCount = 0) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        FocusCommitment = new FocusCommitmentOptions
+        {
+            Mode = FocusCommitmentMode.Locked,
+            EndCondition = FocusEndCondition.Duration,
+            Duration = duration,
+            BreakCount = breakCount,
+            BreakDuration = TimeSpan.FromMinutes(1)
+        },
+        Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = moduleId }]
+    };
+
     private sealed class TestModuleRegistry(ILifetimeScope rootScope, ModuleDefinition definition) : IModuleRegistry
     {
         public IReadOnlyList<ModuleDefinition> GetAllDefinitions() => [definition];
@@ -453,6 +593,8 @@ public sealed class CommittedModuleMutationTests
     private sealed class TestBlockerModule : IModule, ICommittedSessionValidator, ISessionBreakParticipant
     {
         private readonly Action _weakenAction;
+        public static int SessionStartCount { get; set; }
+        public static int SessionEndCount { get; set; }
 
         public Setting<string> BlockRule { get; } = Setting.AsText("BlockRule", "Block rule", "fixed");
         public bool WeakenActionInvoked { get; private set; }
@@ -480,11 +622,20 @@ public sealed class CommittedModuleMutationTests
         public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(ValidationResult.Success);
 
-        public Task OnSessionStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnSessionStartAsync(CancellationToken cancellationToken)
+        {
+            SessionStartCount++;
+            return Task.CompletedTask;
+        }
 
-        public Task OnSessionEndAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task OnSessionEndAsync(CancellationToken cancellationToken)
+        {
+            SessionEndCount++;
+            return Task.CompletedTask;
+        }
 
-        public Task<bool> CanStartCommittedSessionAsync(CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<bool> CanStartCommittedSessionAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(BlockRule.GetCurrentValue() != "unavailable");
 
         public Task<bool> IsProtectionHealthyAsync(CancellationToken cancellationToken) => Task.FromResult(IsHealthy);
 
@@ -523,6 +674,8 @@ public sealed class CommittedModuleMutationTests
         public List<string> Calls { get; } = [];
 
         public Task CheckCanEnableAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task CheckRecoveryStateAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task CheckCanSetRecoveryStartupAsync(CancellationToken cancellationToken = default) =>
             Task.CompletedTask;

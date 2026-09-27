@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Principal;
+using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Platform;
 using Microsoft.Win32;
@@ -9,7 +11,7 @@ using Microsoft.Win32;
 namespace Axorith.Host.Services;
 
 public sealed class WindowsCommitmentProtectionService(string stateDirectory,
-    ILogger<WindowsCommitmentProtectionService> logger) : ICommitmentProtectionService
+    ILogger<WindowsCommitmentProtectionService> logger, bool allowLegacyState = false) : ICommitmentProtectionService
 {
     private sealed record SavedValue(string KeyPath, string Name, bool KeyExisted, bool Exists,
         RegistryValueKind Kind = RegistryValueKind.String, long Number = 0, string? Text = null,
@@ -39,6 +41,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     private readonly string _statePath = Path.Combine(stateDirectory, "strict-protection.json");
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IProcessBlocker? _processBlocker;
+    private bool _protectionStateRequired;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public Task CheckCanEnableAsync(CancellationToken cancellationToken = default)
@@ -51,11 +54,17 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
 
         try
         {
+            if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
+            {
+                throw new InvalidOperationException("Strict protection requires Axorith Host to run as administrator.");
+            }
+
             using var softwareKey = Registry.CurrentUser.OpenSubKey("Software", writable: true);
             _ = softwareKey ?? throw new InvalidOperationException("The current user's registry is not writable.");
             if (File.Exists(_statePath))
             {
-                var state = JsonSerializer.Deserialize<SavedState>(File.ReadAllText(_statePath), JsonOptions);
+                var state = JsonSerializer.Deserialize<SavedState>(
+                    CommittedSessionStateFile.ReadPayload(_statePath), JsonOptions);
                 if (state == null || state.Values == null || state.Values.Count == 0)
                 {
                     throw new InvalidDataException("Saved Windows protection state is empty.");
@@ -65,6 +74,23 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Axorith cannot write the current user's Windows policies: {ex.Message}", ex);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task CheckRecoveryStateAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!File.Exists(_statePath))
+        {
+            throw new InvalidDataException("The saved Windows policy snapshot is missing; Strict recovery cannot continue safely.");
+        }
+
+        var state = JsonSerializer.Deserialize<SavedState>(ReadStatePayload(), JsonOptions);
+        if (state?.Values is not { Count: > 0 })
+        {
+            throw new InvalidDataException("The saved Windows policy snapshot is invalid.");
         }
 
         return Task.CompletedTask;
@@ -155,13 +181,15 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         try
         {
             var state = File.Exists(_statePath)
-                ? await ReadStateAsync(cancellationToken).ConfigureAwait(false)
+                ? ReadState(cancellationToken)
                 : CaptureState();
 
             if (!File.Exists(_statePath))
             {
-                await SaveStateAsync(state, cancellationToken).ConfigureAwait(false);
+                SaveState(state, cancellationToken);
             }
+
+            _protectionStateRequired = true;
 
             SetDword(SystemPolicy, "DisableTaskMgr", 1);
             SetDword(WindowsPolicy, "DisableCMD", 2);
@@ -197,14 +225,21 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var restored = false;
         try
         {
             if (!File.Exists(_statePath))
             {
+                if (_protectionStateRequired)
+                {
+                    throw new InvalidDataException(
+                        "The saved Windows policy snapshot is missing; refusing to discard Strict protection.");
+                }
+
                 return;
             }
 
-            var state = await ReadStateAsync(cancellationToken).ConfigureAwait(false);
+            var state = ReadState(cancellationToken);
             foreach (var saved in state.Values)
             {
                 using var key = Registry.CurrentUser.OpenSubKey(saved.KeyPath, writable: true);
@@ -248,6 +283,8 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
 
             NotifyPolicyChanged();
             File.Delete(_statePath);
+            _protectionStateRequired = false;
+            restored = true;
             logger.LogInformation("Restored original current-user Windows policy values after Strict session.");
         }
         catch (Exception ex)
@@ -259,19 +296,30 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         {
             try
             {
-                _processBlocker?.Dispose();
+                if (restored)
+                {
+                    try
+                    {
+                        _processBlocker?.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to stop Strict process monitoring after restoring Windows policies.");
+                    }
+
+                    _processBlocker = null;
+                }
             }
             finally
             {
-                _processBlocker = null;
+                _gate.Release();
             }
-
-            _gate.Release();
         }
     }
 
     public Task ReconcileAsync(bool strictSessionActive, CancellationToken cancellationToken = default) =>
-        strictSessionActive ? EnableAsync(cancellationToken) : RestoreAsync(cancellationToken);
+        strictSessionActive ? EnableAsync(cancellationToken) :
+        File.Exists(_statePath) ? RestoreAsync(cancellationToken) : Task.CompletedTask;
 
     private static string GetRecoveryCommand() =>
         $"\"{Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Axorith.Host.exe"))}\"";
@@ -345,24 +393,21 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         }
     }
 
-    private async Task<SavedState> ReadStateAsync(CancellationToken cancellationToken)
+    private SavedState ReadState(CancellationToken cancellationToken)
     {
-        await using var stream = File.OpenRead(_statePath);
-        return await JsonSerializer.DeserializeAsync<SavedState>(stream, JsonOptions, cancellationToken)
-                   .ConfigureAwait(false)
-               ?? throw new InvalidDataException("Saved Windows protection state is empty.");
+        cancellationToken.ThrowIfCancellationRequested();
+        return JsonSerializer.Deserialize<SavedState>(ReadStatePayload(), JsonOptions)
+            ?? throw new InvalidDataException("Saved Windows protection state is empty.");
     }
 
-    private async Task SaveStateAsync(SavedState state, CancellationToken cancellationToken)
-    {
-        Directory.CreateDirectory(stateDirectory);
-        var tempPath = _statePath + ".tmp";
-        await using (var stream = File.Create(tempPath))
-        {
-            await JsonSerializer.SerializeAsync(stream, state, JsonOptions, cancellationToken).ConfigureAwait(false);
-        }
+    private string ReadStatePayload() => allowLegacyState
+        ? CommittedSessionStateFile.ReadPayloadOrLegacy(_statePath)
+        : CommittedSessionStateFile.ReadPayload(_statePath);
 
-        File.Move(tempPath, _statePath, overwrite: true);
+    private void SaveState(SavedState state, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        CommittedSessionStateFile.WritePayload(_statePath, JsonSerializer.Serialize(state, JsonOptions));
     }
 
     private static void SetDword(string keyPath, string name, int value)

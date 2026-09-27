@@ -90,22 +90,31 @@ public class SessionManager(
         PersistedCommittedSession? state;
         try
         {
-            await using var stream = File.OpenRead(_committedSessionPath);
-            state = await JsonSerializer.DeserializeAsync<PersistedCommittedSession>(stream,
-                CommittedSessionJsonOptions, cancellationToken).ConfigureAwait(false);
+            using var document = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(_committedSessionPath));
+            state = document.RootElement.Deserialize<PersistedCommittedSession>(CommittedSessionJsonOptions);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Could not read committed session recovery state; refusing to restore it.");
-            DeleteCommittedSessionState();
-            return;
+            logger.LogError(ex, "Could not verify committed session recovery state; refusing to discard it.");
+            throw new SessionException($"Committed session recovery state is invalid and was retained: {ex.Message}");
         }
 
         if (state?.Preset?.FocusCommitment == null ||
             state.Preset.FocusCommitment.Mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
         {
-            DeleteCommittedSessionState();
-            return;
+            throw new SessionException("Committed session recovery state is invalid and was retained.");
+        }
+
+        var strictStateVerified = false;
+        if (state.Preset.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+        {
+            if (_commitmentProtection == null)
+            {
+                throw new SessionException("Strict Windows protection is unavailable for recovery.");
+            }
+
+            await _commitmentProtection.CheckRecoveryStateAsync(cancellationToken).ConfigureAwait(false);
+            strictStateVerified = true;
         }
 
         if (state.EndDeadline <= DateTimeOffset.UtcNow)
@@ -124,6 +133,19 @@ public class SessionManager(
         }
         catch
         {
+            var strictStatePath = Path.Combine(Path.GetDirectoryName(_committedSessionPath)!, "strict-protection.json");
+            if (strictStateVerified && !File.Exists(strictStatePath))
+            {
+                DeleteCommittedSessionState();
+                if (_commitmentProtection != null)
+                {
+                    await _commitmentProtection.SetRecoveryStartupAsync(false, CancellationToken.None)
+                        .ConfigureAwait(false);
+                }
+
+                throw;
+            }
+
             _breaksUsed = state.BreaksUsed;
             BreakEndsAt = state.BreakEndsAt;
             SaveCommittedSessionState(state.Preset, state.StartedAt, state.EndDeadline);
@@ -278,6 +300,11 @@ public class SessionManager(
         var snapshot = CreateSnapshot(preset);
         ValidateFocusCommitment(snapshot.FocusCommitment);
         var sessionEndsAt = endAtOverride ?? GetSessionEnd(snapshot.FocusCommitment, DateTimeOffset.Now);
+
+        if (snapshot.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+        {
+            await PreflightSessionAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        }
 
         try
         {
@@ -941,6 +968,26 @@ public class SessionManager(
 
             logger.LogInformation("Stopping current session...");
 
+            var wasCommittedSession = ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
+                FocusCommitmentMode.Strict;
+            if (ActiveSession?.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+            {
+                if (_commitmentProtection == null)
+                {
+                    throw new SessionException("Session remains committed because Windows protection is unavailable.");
+                }
+
+                try
+                {
+                    await _commitmentProtection.RestoreAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    throw new SessionException(
+                        $"Session remains committed because Windows protection could not be restored: {ex.Message}");
+                }
+            }
+
             // Signal cancellation to any running startup tasks immediately
             _sessionCts?.Cancel();
 
@@ -990,22 +1037,7 @@ public class SessionManager(
             var stoppedPresetName = ActiveSession?.Name;
             var stoppedModules = _activeModules.ToList();
             var startedAt = SessionStartedAt;
-            Exception? protectionRestoreError = null;
-            var wasCommittedSession = ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
-                FocusCommitmentMode.Strict;
-            if (ActiveSession?.FocusCommitment.Mode == FocusCommitmentMode.Strict && _commitmentProtection != null)
-            {
-                try
-                {
-                    await _commitmentProtection.RestoreAsync(cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    protectionRestoreError = ex;
-                }
-            }
-
-            if (wasCommittedSession && _commitmentProtection != null && protectionRestoreError == null)
+            if (wasCommittedSession && _commitmentProtection != null)
             {
                 try
                 {
@@ -1014,7 +1046,8 @@ public class SessionManager(
                 }
                 catch (Exception ex)
                 {
-                    protectionRestoreError ??= ex;
+                    logger.LogWarning(ex,
+                        "Could not remove the recovery startup entry after the committed session ended.");
                 }
             }
 
@@ -1026,11 +1059,6 @@ public class SessionManager(
             {
                 SessionStopped?.Invoke(stoppedPresetId);
                 TrackSessionStopped(stoppedPresetId, stoppedPresetName, stoppedModules, startedAt);
-            }
-
-            if (protectionRestoreError != null)
-            {
-                throw new SessionException($"Session ended, but Windows protection could not be restored: {protectionRestoreError.Message}");
             }
 
             return true;
@@ -1078,16 +1106,12 @@ public class SessionManager(
 
         try
         {
-            Directory.CreateDirectory(directory);
-            var tempPath = _committedSessionPath + ".tmp";
-            File.WriteAllText(tempPath, JsonSerializer.Serialize(
+            CommittedSessionStateFile.WritePayload(_committedSessionPath, JsonSerializer.Serialize(
                 new PersistedCommittedSession(preset, startedAt, endDeadline, _breaksUsed, BreakEndsAt),
                 CommittedSessionJsonOptions));
-            File.Move(tempPath, _committedSessionPath, overwrite: true);
         }
         catch (Exception ex)
         {
-            DeleteCommittedSessionState();
             throw new SessionException($"Committed session recovery state could not be saved: {ex.Message}");
         }
     }
@@ -1243,6 +1267,10 @@ public class SessionManager(
 
     private static DateTimeOffset ResolveEndAt(TimeOnly endTime, IReadOnlyCollection<DayOfWeek> daysOfWeek,
         DateTimeOffset localNow)
+        => ResolveEndAt(endTime, daysOfWeek, localNow, TimeZoneInfo.Local);
+
+    private static DateTimeOffset ResolveEndAt(TimeOnly endTime, IReadOnlyCollection<DayOfWeek> daysOfWeek,
+        DateTimeOffset localNow, TimeZoneInfo localTimeZone)
     {
         for (var daysAhead = 0; daysAhead <= 7; daysAhead++)
         {
@@ -1252,7 +1280,16 @@ public class SessionManager(
                 continue;
             }
 
-            var end = new DateTimeOffset(date.Add(endTime.ToTimeSpan()), localNow.Offset);
+            var localEnd = DateTime.SpecifyKind(date.Add(endTime.ToTimeSpan()), DateTimeKind.Unspecified);
+            while (localTimeZone.IsInvalidTime(localEnd))
+            {
+                localEnd = localEnd.AddMinutes(1);
+            }
+
+            var offset = localTimeZone.IsAmbiguousTime(localEnd)
+                ? localTimeZone.GetAmbiguousTimeOffsets(localEnd).Max()
+                : localTimeZone.GetUtcOffset(localEnd);
+            var end = new DateTimeOffset(localEnd, offset);
             if (end > localNow)
             {
                 return end.ToUniversalTime();

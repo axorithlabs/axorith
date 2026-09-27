@@ -36,10 +36,17 @@ if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase)
         var checkConfiguration = new Configuration();
         checkBuilder.Configuration.Bind(checkConfiguration);
         var configPath = checkConfiguration.Persistence.ResolveConfigPath();
-        var committedSessionPath = Path.Combine(configPath, "committed-session.json");
+        var secureState = !checkBuilder.Environment.IsDevelopment();
+        var commitmentStateDirectory = CommitmentStatePaths.Resolve(configPath, secureState, migrateLegacy: false);
+        var committedSessionPath = Path.Combine(commitmentStateDirectory, "committed-session.json");
+        if (!File.Exists(committedSessionPath) && secureState)
+        {
+            committedSessionPath = Path.Combine(configPath, "committed-session.json");
+        }
+
         if (File.Exists(committedSessionPath))
         {
-            using var document = JsonDocument.Parse(File.ReadAllText(committedSessionPath));
+            using var document = JsonDocument.Parse(CommittedSessionStateFile.ReadPayloadOrLegacy(committedSessionPath));
             var root = document.RootElement;
             var mode = root.GetProperty("Preset").GetProperty("FocusCommitment").GetProperty("Mode").GetInt32();
             if (mode is 1 or 2)
@@ -67,8 +74,9 @@ if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase)
 
             if (mode == 2)
             {
-                var protection = new WindowsCommitmentProtectionService(configPath,
-                    NullLogger<WindowsCommitmentProtectionService>.Instance);
+                var protection = new WindowsCommitmentProtectionService(Path.GetDirectoryName(committedSessionPath)!,
+                    NullLogger<WindowsCommitmentProtectionService>.Instance, allowLegacyState: true);
+                await protection.CheckRecoveryStateAsync().ConfigureAwait(false);
                 await protection.RestoreAsync().ConfigureAwait(false);
             }
 
@@ -77,14 +85,17 @@ if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase)
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
 
-        if (File.Exists(Path.Combine(configPath, "strict-protection.json")))
+        var strictStateDirectory = File.Exists(Path.Combine(commitmentStateDirectory, "strict-protection.json"))
+            ? commitmentStateDirectory
+            : configPath;
+        if (File.Exists(Path.Combine(strictStateDirectory, "strict-protection.json")))
         {
-            var protection = new WindowsCommitmentProtectionService(configPath,
-                NullLogger<WindowsCommitmentProtectionService>.Instance);
+            var protection = new WindowsCommitmentProtectionService(strictStateDirectory,
+                NullLogger<WindowsCommitmentProtectionService>.Instance, allowLegacyState: true);
             await protection.RestoreAsync().ConfigureAwait(false);
         }
 
-        await new WindowsCommitmentProtectionService(configPath,
+        await new WindowsCommitmentProtectionService(commitmentStateDirectory,
                 NullLogger<WindowsCommitmentProtectionService>.Instance)
             .SetRecoveryStartupAsync(active: false).ConfigureAwait(false);
 
@@ -259,7 +270,7 @@ try
 
     builder.Host.ConfigureContainer<ContainerBuilder>((_, containerBuilder) =>
     {
-        RegisterCoreServices(containerBuilder);
+        RegisterCoreServices(containerBuilder, !builder.Environment.IsDevelopment());
         RegisterBroadcasters(containerBuilder);
     });
 
@@ -370,18 +381,7 @@ try
     catch (Exception ex)
     {
         Log.Fatal(ex, "Failed to recover the committed session. Host cannot continue safely.");
-        try
-        {
-            await app.Services.GetRequiredService<ICommitmentProtectionService>()
-                .ReconcileAsync(strictSessionActive: false,
-                    cancellationToken: app.Lifetime.ApplicationStopping).ConfigureAwait(false);
-        }
-        catch (Exception restoreEx)
-        {
-            Log.Fatal(restoreEx, "Failed to restore temporary Windows protection after session recovery failed. " +
-                                  "Any existing temporary sign-in entry will be preserved for a later retry.");
-        }
-
+        Log.Fatal("Existing committed recovery and Windows protection state were preserved for a later retry.");
         return 1;
     }
 
@@ -573,7 +573,7 @@ static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
     };
 }
 
-static void RegisterCoreServices(ContainerBuilder builder)
+static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitmentState)
 {
     builder.Register(ctx =>
         {
@@ -673,7 +673,9 @@ static void RegisterCoreServices(ContainerBuilder builder)
             var shutdownTimeout = TimeSpan.FromSeconds(config.Session.ShutdownTimeoutSeconds);
 
             var telemetryService = ctx.Resolve<ITelemetryService>();
-            var committedSessionPath = Path.Combine(config.Persistence.ResolveConfigPath(), "committed-session.json");
+            var commitmentStateDirectory = CommitmentStatePaths.Resolve(config.Persistence.ResolveConfigPath(),
+                secureCommitmentState);
+            var committedSessionPath = Path.Combine(commitmentStateDirectory, "committed-session.json");
             var commitmentProtection = ctx.Resolve<ICommitmentProtectionService>();
 
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout,
@@ -687,7 +689,8 @@ static void RegisterCoreServices(ContainerBuilder builder)
         {
             var config = ctx.Resolve<IOptions<Configuration>>().Value;
             var logger = ctx.Resolve<ILogger<WindowsCommitmentProtectionService>>();
-            return new WindowsCommitmentProtectionService(config.Persistence.ResolveConfigPath(), logger);
+            return new WindowsCommitmentProtectionService(
+                CommitmentStatePaths.Resolve(config.Persistence.ResolveConfigPath(), secureCommitmentState), logger);
         })
         .As<ICommitmentProtectionService>()
         .SingleInstance()

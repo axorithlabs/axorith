@@ -576,7 +576,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         StartReviewEndTime = options.EndCondition switch
         {
             FocusEndCondition.Duration => $"Duration: {options.Duration?.TotalMinutes:0} minutes · ends at {DateTimeOffset.Now.Add(options.Duration ?? TimeSpan.FromHours(1)).AddSeconds(10):HH:mm}",
-            FocusEndCondition.EndAt => $"Ends at {options.EndAtLocalTime:HH:mm} local time",
+            FocusEndCondition.EndAt => FormatEndAtReview(options, DateTime.Now),
             _ => "No fixed end time"
         };
 
@@ -635,6 +635,31 @@ public class MainViewModel : ReactiveObject, IDisposable
             _ => "Do nothing"
         };
         IsDestructiveStartReviewAfterEnd = options.AfterEnd is AfterEndBehavior.SignOut or AfterEndBehavior.ShutDownPc;
+    }
+
+    private static string FormatEndAtReview(FocusCommitmentOptions options, DateTime localNow)
+    {
+        if (options.EndAtLocalTime is not { } endTime)
+        {
+            return "End time is not set.";
+        }
+
+        for (var daysAhead = 0; daysAhead <= 7; daysAhead++)
+        {
+            var date = localNow.Date.AddDays(daysAhead);
+            if (options.EndAtDaysOfWeek is { Count: > 0 } days && !days.Contains(date.DayOfWeek))
+            {
+                continue;
+            }
+
+            var end = date.Add(endTime.ToTimeSpan());
+            if (end > localNow)
+            {
+                return $"Ends {end:ddd, MMM d} at {end:HH:mm} local time";
+            }
+        }
+
+        return "No valid end day is selected.";
     }
 
     private async Task ConfirmStartAsync()

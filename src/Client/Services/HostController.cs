@@ -134,8 +134,19 @@ public class HostController(
                     }
 
                     logger.LogWarning(
-                        "⚠️ Axorith.Host process detected but not reachable after {TimeoutMs}ms grace period. Will restart.",
+                        "Axorith.Host process detected but not reachable after {TimeoutMs}ms grace period.",
                         graceSw.ElapsedMilliseconds);
+
+                    if (!forceRestart)
+                    {
+                        foreach (var proc in existingProcesses)
+                        {
+                            proc.Dispose();
+                        }
+
+                        throw new InvalidOperationException(
+                            "Axorith Host is running but unavailable. It was left running to protect any committed session; retry after it recovers or request an explicit restart.");
+                    }
                 }
                 else
                 {
@@ -178,6 +189,9 @@ public class HostController(
                             proc.Id, proc.StartTime);
                         proc.Dispose();
                     }
+
+                    throw new InvalidOperationException(
+                        "The existing Axorith Host could not be stopped; refusing to start a second Host process.");
                 }
             }
             else
@@ -233,6 +247,7 @@ public class HostController(
             {
                 FileName = exe,
                 UseShellExecute = true,
+                Verb = OperatingSystem.IsWindows() ? "runas" : string.Empty,
                 WorkingDirectory = Path.GetDirectoryName(exe) ?? AppContext.BaseDirectory
             });
 
