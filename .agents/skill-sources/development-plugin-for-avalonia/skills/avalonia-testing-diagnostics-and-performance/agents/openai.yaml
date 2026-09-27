@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Testing, Diagnostics, and Performance"
+  short_description: "Headless tests, diagnostics, troubleshooting, and performance reviews"
+  default_prompt: "Use $avalonia-testing-diagnostics-and-performance to validate or optimize an Avalonia app"

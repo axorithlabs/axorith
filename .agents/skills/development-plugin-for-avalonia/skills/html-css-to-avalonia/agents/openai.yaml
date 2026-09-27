@@ -1,0 +1,4 @@
+interface:
+  display_name: "HTML/CSS to Avalonia"
+  short_description: "Translate web layout, styling, and UI patterns into Avalonia"
+  default_prompt: "Use $html-css-to-avalonia to port HTML or CSS layouts and UI patterns to Avalonia"

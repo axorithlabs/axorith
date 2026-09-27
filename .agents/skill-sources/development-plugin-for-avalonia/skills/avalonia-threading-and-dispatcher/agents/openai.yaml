@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Threading and Dispatcher"
+  short_description: "Reactive flows, dispatcher usage, timers, and UI-thread correctness"
+  default_prompt: "Use $avalonia-threading-and-dispatcher to review dispatcher, timers, and async UI-thread boundaries in Avalonia"

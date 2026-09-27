@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "skills": {
+    "brandkit": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "b63012f3c3d21197e0185d3e9cc7ec40c589fb10e0b5a32a561739de31aa3f20"
+    },
+    "design-taste-frontend": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "9d1e82c5c409d2b0247245a005bc0f7e4447c0999b78dcea60f568c1ba4a6694"
+    },
+    "development-plugin-for-avalonia": {
+      "source": "./.agents/skill-sources/development-plugin-for-avalonia",
+      "sourceType": "local",
+      "computedHash": "dd80d0589c8b4e83b7ef0711152a40e71bf25291030bc5918270f8d9230d4d5b"
+    },
+    "full-output-enforcement": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "26bd29ce4c5e02c7666b2d503609bf466bd32290822e91f0e984147048dbb924"
+    },
+    "gpt-taste": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "cc8f0c601d8240a124e1d11634351a2be7b8a72fd807c75e5b6bf7afcd5ddee0"
+    },
+    "high-end-visual-design": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "7db385e4c5370e5a7fca9704a1361b056e4504ea6a03924bb86f33a4f00b5c73"
+    },
+    "image-to-code": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "58517b03b2a01f4c9ba65861559d03df931400871bbc200978c975b24bb92c73"
+    },
+    "imagegen-frontend-mobile": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "9ab7f4f6ce66a3cff02bbf5894e5bd5af50bf5d6ef0adffdc88e8fab772fe44f"
+    },
+    "imagegen-frontend-web": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "65f5ae59fa317567809438310b1c54f78cd133426deb43e4d3d4ca4c8f541628"
+    },
+    "impeccable": {
+      "source": "./.agents/skill-sources/impeccable",
+      "sourceType": "local",
+      "computedHash": "f7c4e03bef91154273d2dc3b62aff829cf4ab1b1f16e6b98c8c6a31be4405318"
+    },
+    "industrial-brutalist-ui": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "8fc355c4aadb7d29c53ca28bc41be3cd6eea765d121e3737c4dc2d0f90a8effa"
+    },
+    "minimalist-ui": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "08873a3131d3be27bef9bf3304b310b16b44ca6e3561aebe532797be3443f6bd"
+    },
+    "redesign-existing-projects": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "b405eee0e0e80fc243f731d9aa368bca307e356db7e6157d27101d369dac6726"
+    },
+    "stitch-design-taste": {
+      "source": "./.agents/skill-sources/taste-skill-pack",
+      "sourceType": "local",
+      "computedHash": "3aa58992f0fd9673b975cd48cd4f8ae4b4976fd5cdd9f20e26d3d447aee317fb"
+    }
+  }
+}

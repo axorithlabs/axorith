@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Controls and Windowing"
+  short_description: "Controls, windows, popups, menus, tray, and notification surfaces"
+  default_prompt: "Use $avalonia-controls-and-windowing to build or debug Avalonia controls, windows, and popup surfaces"

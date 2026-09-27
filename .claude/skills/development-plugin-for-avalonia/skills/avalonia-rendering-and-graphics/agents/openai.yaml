@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Rendering and Graphics"
+  short_description: "Animation, compositor, drawing, Skia, and rendering boundaries"
+  default_prompt: "Use $avalonia-rendering-and-graphics to work on Avalonia animation, custom drawing, or rendering interop"

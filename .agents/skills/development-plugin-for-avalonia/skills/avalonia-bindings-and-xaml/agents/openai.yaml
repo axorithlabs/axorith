@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Bindings and XAML"
+  short_description: "Compiled bindings, runtime XAML, converters, and markup behavior"
+  default_prompt: "Use $avalonia-bindings-and-xaml to fix or design compiled bindings, runtime XAML loading, and converter wiring"
