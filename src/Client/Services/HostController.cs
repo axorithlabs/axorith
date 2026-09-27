@@ -360,9 +360,7 @@ public class HostController(
             var token = await tokenProvider.GetTokenAsync(ct);
             if (string.IsNullOrEmpty(token))
             {
-                logger.LogWarning("Cannot stop host gracefully: Auth token not found. Will try to kill process.");
-                KillHostProcess();
-                return;
+                throw new InvalidOperationException("Cannot stop Host gracefully because its authentication token is unavailable.");
             }
 
             var port = GetDiscoveredPort();
@@ -370,9 +368,14 @@ public class HostController(
             using (channel)
             {
                 var management = new HostManagement.HostManagementClient(channel);
-                await management.RequestShutdownAsync(
+                var response = await management.RequestShutdownAsync(
                     new ShutdownRequest { Reason = "Client tray stop", TimeoutSeconds = 10 },
                     deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: ct);
+                if (!response.Accepted)
+                {
+                    throw new InvalidOperationException(response.Message);
+                }
+
                 logger.LogInformation("Shutdown requested to Host");
             }
 
@@ -390,13 +393,12 @@ public class HostController(
                 await Task.Delay(500, ct);
             }
 
-            logger.LogWarning("Host did not exit within timeout. Forcing kill.");
-            KillHostProcess();
+            throw new TimeoutException("Host did not exit after accepting the shutdown request.");
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Graceful host shutdown failed or timed out, will try to kill processes");
-            KillHostProcess();
+            logger.LogWarning(ex, "Graceful Host shutdown failed; leaving the process running.");
+            throw;
         }
     }
 
@@ -463,38 +465,6 @@ public class HostController(
             _cachedPort = fallbackPort;
             logger.LogDebug("Using configured port {Port}", fallbackPort);
             return fallbackPort;
-        }
-    }
-
-    private void KillHostProcess()
-    {
-        var procs = Array.Empty<Process>();
-        try
-        {
-            procs = Process.GetProcessesByName("Axorith.Host");
-        }
-        catch (Exception e)
-        {
-            logger.LogWarning(e, "Failed to enumerate Axorith.Host processes");
-        }
-
-        foreach (var p in procs)
-        {
-            try
-            {
-                var pid = p.Id;
-                p.Kill(entireProcessTree: true);
-                _ = p.WaitForExit(3000);
-                logger.LogInformation("Killed Host process PID {Pid}", pid);
-            }
-            catch (Exception killEx)
-            {
-                logger.LogWarning(killEx, "Failed to kill Host process");
-            }
-            finally
-            {
-                p.Dispose();
-            }
         }
     }
 

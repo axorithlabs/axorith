@@ -1,3 +1,5 @@
+using Axorith.Core.Models;
+
 namespace Axorith.Client.CoreSdk.Abstractions;
 
 /// <summary>
@@ -11,6 +13,8 @@ public interface ISessionsApi
     /// </summary>
     Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default);
 
+    Task<OperationResult> PreflightSessionAsync(Guid presetId, CancellationToken ct = default);
+
     /// <summary>
     ///     Starts a session from a preset.
     ///     Validates all modules before starting.
@@ -21,6 +25,11 @@ public interface ISessionsApi
     ///     Stops the currently active session.
     /// </summary>
     Task<OperationResult> StopSessionAsync(CancellationToken ct = default);
+
+    Task<OperationResult> StartBreakAsync(CancellationToken ct = default);
+
+    IAsyncEnumerable<EmergencyUnlockProgress> HoldEmergencyUnlockAsync(IAsyncEnumerable<bool> heldSignals,
+        CancellationToken ct = default);
 
     /// <summary>
     ///     Observable stream of session events (started, stopped, module events).
@@ -36,8 +45,22 @@ public record SessionState(
     bool IsActive,
     Guid? PresetId,
     string? PresetName,
-    DateTimeOffset? StartedAt
+    DateTimeOffset? StartedAt,
+    FocusCommitmentMode FocusCommitment = FocusCommitmentMode.Normal,
+    DateTimeOffset? EndsAt = null,
+    int BreaksRemaining = 0,
+    AfterEndBehavior AfterEnd = AfterEndBehavior.DoNothing,
+    string ProtectionStatus = "inactive",
+    bool EmergencyUnlockAvailable = false,
+    DateTimeOffset? BreakEndsAt = null,
+    bool AppBlocking = false,
+    bool WebsiteBlocking = false,
+    int BreaksTotal = 0,
+    TimeSpan? Remaining = null,
+    TimeSpan? BreakRemaining = null
 );
+
+public record EmergencyUnlockProgress(double Progress, bool Completed, string Message);
 
 /// <summary>
 ///     Session event notification.

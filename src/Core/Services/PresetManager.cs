@@ -11,7 +11,7 @@ namespace Axorith.Core.Services;
 /// </summary>
 public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
-    private const int CurrentPresetVersion = 2;
+    private const int CurrentPresetVersion = 3;
     private static readonly Guid ApplicationLauncherId = Guid.Parse("9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd");
     private static readonly IReadOnlyDictionary<Guid, string> LegacyLauncherPathKeys = new Dictionary<Guid, string>
     {

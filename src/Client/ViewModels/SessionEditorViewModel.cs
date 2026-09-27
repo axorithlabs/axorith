@@ -691,21 +691,38 @@ public class StopAfterDurationTriggerViewModel : TriggerViewModel
     }
 }
 
-public class ThenStartAnotherTriggerViewModel(SessionEditorViewModel? parent = null) : TriggerViewModel
+public class ThenActionTriggerViewModel(SessionEditorViewModel? parent, AfterEndBehavior behavior) : TriggerViewModel
 {
-    public override string Title => "Start Another Session";
+    public AfterEndBehavior Behavior { get; } = behavior;
+
+    public override string Title => Behavior switch
+    {
+        AfterEndBehavior.StartNextWorkspace => "Start next Workspace",
+        AfterEndBehavior.LockPc => "Lock PC",
+        AfterEndBehavior.Sleep => "Sleep",
+        AfterEndBehavior.SignOut => "Sign out",
+        AfterEndBehavior.ShutDownPc => "Shut down PC",
+        _ => string.Empty
+    };
+
     public override string IconKey => "PlayIcon";
 
     public override string Description
     {
         get
         {
-            if (NextPresetId.HasValue && !string.IsNullOrWhiteSpace(NextPresetName))
-            {
-                return $"Start '{NextPresetName}'";
-            }
-
-            return "Select a session to start";
+            return Behavior == AfterEndBehavior.StartNextWorkspace
+                ? NextPresetId.HasValue && !string.IsNullOrWhiteSpace(NextPresetName)
+                    ? $"Start '{NextPresetName}'"
+                    : "Choose a Workspace"
+                : Behavior switch
+                {
+                    AfterEndBehavior.LockPc => "Lock the Windows user",
+                    AfterEndBehavior.Sleep => "Put the PC to sleep",
+                    AfterEndBehavior.SignOut => "Sign out of Windows",
+                    AfterEndBehavior.ShutDownPc => "Turn off the PC",
+                    _ => string.Empty
+                };
         }
     }
 
@@ -716,6 +733,7 @@ public class ThenStartAnotherTriggerViewModel(SessionEditorViewModel? parent = n
         {
             this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(Description));
+            this.RaisePropertyChanged(nameof(HasError));
         }
     }
 
@@ -729,9 +747,11 @@ public class ThenStartAnotherTriggerViewModel(SessionEditorViewModel? parent = n
         }
     }
 
-    public bool IsNextPresetSelectionVisible => (parent?.AvailablePresetsForNext.Count ?? 0) > 0;
+    public bool IsNextPresetSelectionVisible => Behavior == AfterEndBehavior.StartNextWorkspace &&
+                                                (parent?.AvailablePresetsForNext.Count ?? 0) > 0;
 
-    public bool IsNoOtherPresetsAvailable => (parent?.AvailablePresetsForNext.Count ?? 0) == 0;
+    public bool IsNoOtherPresetsAvailable => Behavior == AfterEndBehavior.StartNextWorkspace &&
+                                             (parent?.AvailablePresetsForNext.Count ?? 0) == 0;
 
     public NextPresetOption? SelectedNextPreset
     {
@@ -745,7 +765,7 @@ public class ThenStartAnotherTriggerViewModel(SessionEditorViewModel? parent = n
         }
     }
 
-    public override bool HasError => !NextPresetId.HasValue;
+    public override bool HasError => Behavior == AfterEndBehavior.StartNextWorkspace && !NextPresetId.HasValue;
 
     public void RefreshPresetVisibility()
     {
@@ -767,6 +787,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
+    private FocusCommitmentOptions _focusCommitment = new();
     private bool _disposed;
 
     private readonly ObservableAsPropertyHelper<bool> _isFooterVisible;
@@ -809,7 +830,82 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
+    public IReadOnlyList<string> FocusCommitmentModes { get; } = ["Normal", "Locked", "Strict"];
+    public IReadOnlyList<string> BreakOptions { get; } = ["No breaks", "One 5-minute break", "Custom break budget"];
+    public IReadOnlyList<string> ScheduleLockOptions { get; } = ["Off", "5 minutes", "15 minutes", "1 hour"];
+
+    public int FocusCommitmentModeIndex
+    {
+        get => (int)_focusCommitment.Mode;
+        set
+        {
+            if (value is < 0 or > 2) return;
+            _focusCommitment.Mode = (FocusCommitmentMode)value;
+            RaiseFocusCommitmentChanged();
+        }
+    }
+
+    public bool IsCommittedMode => _focusCommitment.Mode != FocusCommitmentMode.Normal;
+    public bool IsStrictMode => _focusCommitment.Mode == FocusCommitmentMode.Strict;
+    public bool IsCustomBreakBudget => BreakPresetIndex == 2;
+    private bool _customBreakBudgetSelected;
+
+    public int BreakPresetIndex
+    {
+        get
+        {
+            var options = _focusCommitment;
+            return _customBreakBudgetSelected ? 2 : options.BreakCount == 0 ? 0 :
+                options.BreakCount == 1 && options.BreakDuration == TimeSpan.FromMinutes(5) ? 1 : 2;
+        }
+        set
+        {
+            _customBreakBudgetSelected = value == 2;
+            if (value == 0)
+            {
+                _focusCommitment.BreakCount = 0;
+            }
+            else if (value == 1)
+            {
+                _focusCommitment.BreakCount = 1;
+                _focusCommitment.BreakDuration = TimeSpan.FromMinutes(5);
+            }
+            else if (_focusCommitment.BreakCount == 0 || BreakPresetIndex != 2)
+            {
+                _focusCommitment.BreakCount = 1;
+                _focusCommitment.BreakDuration = TimeSpan.FromMinutes(5);
+            }
+            RaiseFocusCommitmentChanged();
+        }
+    }
+
+    public int BreakCount
+    {
+        get => _focusCommitment.BreakCount;
+        set => _focusCommitment.BreakCount = Math.Clamp(value, 1, 5);
+    }
+
+    public int BreakDurationMinutes
+    {
+        get => (int)Math.Clamp(Math.Round(_focusCommitment.BreakDuration.TotalMinutes), 1, 60);
+        set => _focusCommitment.BreakDuration = TimeSpan.FromMinutes(Math.Clamp(value, 1, 60));
+    }
+
+    public int ScheduleLockIndex
+    {
+        get => _focusCommitment.ScheduleLockMinutes switch { 5 => 1, 15 => 2, 60 => 3, _ => 0 };
+        set => _focusCommitment.ScheduleLockMinutes = value switch { 1 => 5, 2 => 15, 3 => 60, _ => 0 };
+    }
+
+    private string _scheduledConfigurationLockStatus = "Configuration unlocked";
+    public string ScheduledConfigurationLockStatus
+    {
+        get => _scheduledConfigurationLockStatus;
+        private set => this.RaiseAndSetIfChanged(ref _scheduledConfigurationLockStatus, value);
+    }
+
     public ObservableCollection<TriggerViewModel> Triggers { get; } = [];
+    public bool HasScheduledStart => Triggers.Any(trigger => trigger is ScheduleTriggerViewModel);
     public ObservableCollection<TriggerViewModel> StopTriggers { get; } = [];
     public ObservableCollection<TriggerViewModel> ThenTriggers { get; } = [];
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
@@ -827,12 +923,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     }
 
     public TriggerViewModel? SelectedStopTrigger
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
-
-    public TriggerViewModel? SelectedThenTrigger
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
@@ -870,13 +960,11 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     private readonly ObservableAsPropertyHelper<bool> _canAddStopAfterDurationTrigger;
     public bool CanAddStopAfterDurationTrigger => _canAddStopAfterDurationTrigger.Value;
 
-    public ReactiveCommand<Unit, Unit> AddThenStartAnotherTriggerCommand { get; }
+    public ReactiveCommand<AfterEndBehavior, Unit> AddThenActionTriggerCommand { get; }
     public ICommand RemoveThenTriggerCommand { get; }
-    public ICommand EditThenTriggerCommand { get; }
-    public ICommand CloseThenTriggerSettingsCommand { get; }
 
-    private readonly ObservableAsPropertyHelper<bool> _canAddThenStartAnotherTrigger;
-    public bool CanAddThenStartAnotherTrigger => _canAddThenStartAnotherTrigger.Value;
+    private readonly ObservableAsPropertyHelper<bool> _canAddThenActionTrigger;
+    public bool CanAddThenActionTrigger => _canAddThenActionTrigger.Value;
 
     public Task InitializationTask { get; private set; }
 
@@ -890,6 +978,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         IToastNotificationService toastService,
         IServiceProvider serviceProvider)
     {
+        Triggers.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasScheduledStart));
         _shell = shell;
         _modulesApi = modulesApi;
         _presetsApi = presetsApi;
@@ -899,8 +988,8 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         _telemetry = serviceProvider.GetService<ITelemetryService>();
 
         _isFooterVisible = this.WhenAnyValue(x => x.SelectedModule, x => x.ModuleSelector, x => x.SelectedTrigger,
-                x => x.SelectedStopTrigger, x => x.SelectedThenTrigger)
-            .Select(t => t.Item1 == null && t.Item2 == null && t.Item3 == null && t.Item4 == null && t.Item5 == null)
+                x => x.SelectedStopTrigger)
+            .Select(t => t.Item1 == null && t.Item2 == null && t.Item3 == null && t.Item4 == null)
             .ToProperty(this, x => x.IsFooterVisible);
 
         _hasValidationErrors = ConfiguredModules
@@ -1039,32 +1128,28 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         EditStopTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedStopTrigger = t);
         CloseStopTriggerSettingsCommand = ReactiveCommand.Create(() => SelectedStopTrigger = null);
 
-        var canAddThenStartAnother = ThenTriggers
+        var canAddThenAction = ThenTriggers
             .ToObservableChangeSet()
-            .Select(_ => !ThenTriggers.Any(t => t is ThenStartAnotherTriggerViewModel))
+            .Select(_ => ThenTriggers.Count == 0)
             .ObserveOn(RxApp.MainThreadScheduler);
 
-        _canAddThenStartAnotherTrigger = canAddThenStartAnother.ToProperty(this, x => x.CanAddThenStartAnotherTrigger);
+        _canAddThenActionTrigger = canAddThenAction.ToProperty(this, x => x.CanAddThenActionTrigger);
 
-        AddThenStartAnotherTriggerCommand = ReactiveCommand.Create(() =>
+        AddThenActionTriggerCommand = ReactiveCommand.Create<AfterEndBehavior>(behavior =>
         {
-            ThenTriggers.Clear();
-            var trigger = new ThenStartAnotherTriggerViewModel(this);
+            if (behavior is AfterEndBehavior.DoNothing || !Enum.IsDefined(behavior))
+            {
+                return;
+            }
+
+            var trigger = new ThenActionTriggerViewModel(this, behavior);
             ThenTriggers.Add(trigger);
-            SelectedThenTrigger = trigger;
-        }, canAddThenStartAnother);
+        }, canAddThenAction);
 
         RemoveThenTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
         {
             ThenTriggers.Remove(t);
-            if (SelectedThenTrigger == t)
-            {
-                SelectedThenTrigger = null;
-            }
         });
-
-        EditThenTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedThenTrigger = t);
-        CloseThenTriggerSettingsCommand = ReactiveCommand.Create(() => SelectedThenTrigger = null);
 
         InitializationTask = InitializeAsync();
     }
@@ -1126,15 +1211,21 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             }
         }
 
-        foreach (var trigger in ThenTriggers.OfType<ThenStartAnotherTriggerViewModel>())
+        foreach (var trigger in ThenTriggers.OfType<ThenActionTriggerViewModel>())
         {
             trigger.RefreshPresetVisibility();
         }
+
     }
 
     private void LoadFromPreset()
     {
+        _focusCommitment = CopyFocusCommitment(_preset.FocusCommitment ?? new FocusCommitmentOptions());
+        _customBreakBudgetSelected = _focusCommitment.BreakCount > 0 &&
+                                     (_focusCommitment.BreakCount != 1 ||
+                                      _focusCommitment.BreakDuration != TimeSpan.FromMinutes(5));
         Name = _preset.Name;
+        RaiseFocusCommitmentChanged();
         foreach (var vm in ConfiguredModules)
         {
             vm.Dispose();
@@ -1166,9 +1257,42 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             var schedules = await _schedulerApi.ListSchedulesAsync();
             var presetSchedules = schedules.Where(s => s.PresetId == _preset.Id).ToList();
+            var lockStatus = await _schedulerApi.GetConfigurationLockStatusAsync(_preset.Id);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                ScheduledConfigurationLockStatus = lockStatus.IsLocked
+                    ? lockStatus.StartsIn is { } startsIn && startsIn > TimeSpan.Zero
+                        ? $"Configuration locked · Session starts in {(int)Math.Ceiling(startsIn.TotalMinutes)} min"
+                        : "Configuration locked · Session starts now"
+                    : "Configuration unlocked";
+                if (Enum.IsDefined(_focusCommitment.AfterEnd) &&
+                    _focusCommitment.AfterEnd != AfterEndBehavior.DoNothing &&
+                    (_focusCommitment.AfterEnd != AfterEndBehavior.StartNextWorkspace ||
+                     _focusCommitment.NextWorkspaceId.HasValue))
+                {
+                    var thenTrigger = new ThenActionTriggerViewModel(this, _focusCommitment.AfterEnd)
+                    {
+                        NextPresetId = _focusCommitment.AfterEnd == AfterEndBehavior.StartNextWorkspace
+                            ? _focusCommitment.NextWorkspaceId
+                            : null
+                    };
+                    ThenTriggers.Add(thenTrigger);
+                    if (thenTrigger.NextPresetId is { } nextPresetId)
+                    {
+                        var nextPreset = AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == nextPresetId);
+                        if (nextPreset != null)
+                        {
+                            thenTrigger.SelectedNextPreset = nextPreset;
+                            thenTrigger.NextPresetName = nextPreset.Name;
+                        }
+                        else
+                        {
+                            _ = LoadThenPresetNameAsync(thenTrigger, nextPresetId);
+                        }
+                    }
+                }
+
                 var toRemove = Triggers.Where(t => t is ScheduleTriggerViewModel).ToList();
                 foreach (var t in toRemove)
                 {
@@ -1218,7 +1342,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
                     if (ThenTriggers.Count == 0 && s.NextPresetId.HasValue)
                     {
-                        var thenTrigger = new ThenStartAnotherTriggerViewModel(this)
+                        var thenTrigger = new ThenActionTriggerViewModel(this, AfterEndBehavior.StartNextWorkspace)
                         {
                             NextPresetId = s.NextPresetId
                         };
@@ -1252,7 +1376,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
                     if (ThenTriggers.Count == 0 && s.NextPresetId.HasValue)
                     {
-                        var thenTrigger = new ThenStartAnotherTriggerViewModel(this)
+                        var thenTrigger = new ThenActionTriggerViewModel(this, AfterEndBehavior.StartNextWorkspace)
                         {
                             NextPresetId = s.NextPresetId
                         };
@@ -1281,7 +1405,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private async Task LoadThenPresetNameAsync(ThenStartAnotherTriggerViewModel trigger, Guid presetId)
+    private async Task LoadThenPresetNameAsync(ThenActionTriggerViewModel trigger, Guid presetId)
     {
         try
         {
@@ -1334,10 +1458,16 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        var thenTrigger = ThenTriggers.OfType<ThenStartAnotherTriggerViewModel>().FirstOrDefault();
-        if (thenTrigger is { NextPresetId: null })
+        var thenTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
+        if (thenTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace, NextPresetId: null })
         {
-            ErrorMessage = "Please select a session for 'Start Another Session' trigger.";
+            ErrorMessage = "Please select a Workspace for the Start next Workspace action.";
+            return;
+        }
+
+        if (thenTrigger is { Behavior: not AfterEndBehavior.DoNothing } && StopTriggers.Count == 0)
+        {
+            ErrorMessage = "Add a Stop Trigger before configuring an after-end action.";
             return;
         }
 
@@ -1345,6 +1475,11 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         if (stopDurationTrigger is { HasDurationError: true })
         {
             ErrorMessage = "Session Duration must be greater than 0.";
+            return;
+        }
+
+        if (!ValidateFocusCommitment())
+        {
             return;
         }
 
@@ -1358,6 +1493,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             })
         ];
         _preset.Name = Name;
+        _preset.FocusCommitment = CopyFocusCommitment(_focusCommitment);
 
         try
         {
@@ -1488,8 +1624,10 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                     days.Add(DayOfWeek.Sunday);
                 }
 
-                var thenStartTrigger = ThenTriggers.OfType<ThenStartAnotherTriggerViewModel>().FirstOrDefault();
-                var nextPresetId = thenStartTrigger?.NextPresetId;
+                var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
+                var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
+                    ? thenStartTrigger.NextPresetId
+                    : null;
 
                 var schedule = new SessionSchedule
                 {
@@ -1529,8 +1667,10 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
             foreach (var durationTrigger in StopTriggers.OfType<StopAfterDurationTriggerViewModel>())
             {
-                var thenStartTrigger = ThenTriggers.OfType<ThenStartAnotherTriggerViewModel>().FirstOrDefault();
-                var nextPresetId = thenStartTrigger?.NextPresetId;
+                var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
+                var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
+                    ? thenStartTrigger.NextPresetId
+                    : null;
 
                 var schedule = new SessionSchedule
                 {
@@ -1636,6 +1776,117 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         }
     }
 
+    private bool ValidateFocusCommitment()
+    {
+        var options = _focusCommitment;
+        if (options.BreakCount is < 0 or > 5 || options.BreakCount > 0 &&
+            (options.BreakDuration < TimeSpan.FromMinutes(1) || options.BreakDuration > TimeSpan.FromMinutes(60)))
+        {
+            ErrorMessage = "Break budget must be between 0 and 5 breaks of 1 to 60 minutes each.";
+            return false;
+        }
+
+        if (options.ScheduleLockMinutes is not (0 or 5 or 15 or 60))
+        {
+            ErrorMessage = "Choose Off, 5 minutes, 15 minutes, or 1 hour for the scheduled configuration lock.";
+            return false;
+        }
+
+        if (options.Mode != FocusCommitmentMode.Normal)
+        {
+            if (StopTriggers.Count == 0)
+            {
+                ErrorMessage = "Add one Stop Trigger to set when a Locked or Strict session ends.";
+                return false;
+            }
+
+            if (StopTriggers.Count > 1)
+            {
+                ErrorMessage = "Use only one Stop Trigger for a Locked or Strict session.";
+                return false;
+            }
+
+            switch (StopTriggers[0])
+            {
+                case StopAfterDurationTriggerViewModel duration:
+                    options.EndCondition = FocusEndCondition.Duration;
+                    options.Duration = duration.Duration;
+                    options.EndAtLocalTime = null;
+                    options.EndAtDaysOfWeek = [];
+                    break;
+                case StopAtTimeTriggerViewModel fixedTime:
+                    options.EndCondition = FocusEndCondition.EndAt;
+                    options.Duration = null;
+                    options.EndAtLocalTime = TimeOnly.FromTimeSpan(fixedTime.Time);
+                    options.EndAtDaysOfWeek = GetSelectedDays(fixedTime);
+                    break;
+                default:
+                    ErrorMessage = "Choose a Fixed Time or Session Duration Stop Trigger.";
+                    return false;
+            }
+
+        }
+        else
+        {
+            options.EndCondition = FocusEndCondition.None;
+            options.Duration = null;
+            options.EndAtLocalTime = null;
+            options.EndAtDaysOfWeek = [];
+        }
+
+        var thenTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
+        options.AfterEnd = thenTrigger?.Behavior ?? AfterEndBehavior.DoNothing;
+        options.NextWorkspaceId = options.AfterEnd == AfterEndBehavior.StartNextWorkspace
+            ? thenTrigger?.NextPresetId
+            : null;
+        if (options.AfterEnd == AfterEndBehavior.StartNextWorkspace && !options.NextWorkspaceId.HasValue)
+        {
+            ErrorMessage = "Select the Workspace for the Start next Workspace action.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static List<DayOfWeek> GetSelectedDays(StopAtTimeTriggerViewModel trigger)
+    {
+        var days = new List<DayOfWeek>();
+        if (trigger.RunOnMonday) days.Add(DayOfWeek.Monday);
+        if (trigger.RunOnTuesday) days.Add(DayOfWeek.Tuesday);
+        if (trigger.RunOnWednesday) days.Add(DayOfWeek.Wednesday);
+        if (trigger.RunOnThursday) days.Add(DayOfWeek.Thursday);
+        if (trigger.RunOnFriday) days.Add(DayOfWeek.Friday);
+        if (trigger.RunOnSaturday) days.Add(DayOfWeek.Saturday);
+        if (trigger.RunOnSunday) days.Add(DayOfWeek.Sunday);
+        return days;
+    }
+
+    private static FocusCommitmentOptions CopyFocusCommitment(FocusCommitmentOptions options) => new()
+    {
+        Mode = options.Mode,
+        EndCondition = options.EndCondition,
+        Duration = options.Duration,
+        EndAtLocalTime = options.EndAtLocalTime,
+        EndAtDaysOfWeek = [.. options.EndAtDaysOfWeek ?? []],
+        BreakCount = options.BreakCount,
+        BreakDuration = options.BreakDuration,
+        AfterEnd = options.AfterEnd,
+        NextWorkspaceId = options.NextWorkspaceId,
+        ScheduleLockMinutes = options.ScheduleLockMinutes
+    };
+
+    private void RaiseFocusCommitmentChanged()
+    {
+        this.RaisePropertyChanged(nameof(FocusCommitmentModeIndex));
+        this.RaisePropertyChanged(nameof(IsCommittedMode));
+        this.RaisePropertyChanged(nameof(IsStrictMode));
+        this.RaisePropertyChanged(nameof(BreakPresetIndex));
+        this.RaisePropertyChanged(nameof(IsCustomBreakBudget));
+        this.RaisePropertyChanged(nameof(BreakCount));
+        this.RaisePropertyChanged(nameof(BreakDurationMinutes));
+        this.RaisePropertyChanged(nameof(ScheduleLockIndex));
+    }
+
     private void Cancel()
     {
         foreach (var vm in ConfiguredModules)
@@ -1682,12 +1933,12 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         _canAddAnyTrigger.Dispose();
         _canAddStopAtTimeTrigger.Dispose();
         _canAddStopAfterDurationTrigger.Dispose();
-        _canAddThenStartAnotherTrigger.Dispose();
+        _canAddThenActionTrigger.Dispose();
         _hasValidationErrors.Dispose();
         AddScheduleTriggerCommand.Dispose();
         AddStopAtTimeTriggerCommand.Dispose();
         AddStopAfterDurationTriggerCommand.Dispose();
-        AddThenStartAnotherTriggerCommand.Dispose();
+        AddThenActionTriggerCommand.Dispose();
 
         foreach (var vm in ConfiguredModules)
         {

@@ -178,6 +178,12 @@ public class ModulesServiceImpl(
                     [$"Module instance {instanceId} is not running"]);
             }
 
+            if (module is ICommittedSessionValidator && IsCommittedSessionActive())
+            {
+                return SessionMapper.CreateResult(false,
+                    "Blocker actions are unavailable during a committed session.");
+            }
+
             var action = module.GetActions().FirstOrDefault(a => a.Key == request.ActionKey);
             if (action == null)
             {
@@ -355,6 +361,12 @@ public class ModulesServiceImpl(
             var activeModule = sessionManager.GetActiveModuleInstanceByInstanceId(instanceId);
             if (activeModule != null)
             {
+                if (IsCommittedSessionActive())
+                {
+                    return Task.FromResult(SessionMapper.CreateResult(false,
+                        "Module settings cannot be changed during a committed session."));
+                }
+
                 var setting = activeModule.GetSettings().FirstOrDefault(s => s.Key == request.SettingKey);
                 if (setting != null)
                 {
@@ -405,6 +417,10 @@ public class ModulesServiceImpl(
             throw new RpcException(new Status(StatusCode.Internal, "Failed to update setting"));
         }
     }
+
+    private bool IsCommittedSessionActive() =>
+        sessionManager.ActiveSession?.FocusCommitment.Mode is Axorith.Core.Models.FocusCommitmentMode.Locked or
+            Axorith.Core.Models.FocusCommitmentMode.Strict;
 
     public override async Task<BeginEditResponse> BeginEdit(BeginEditRequest request, ServerCallContext context)
     {

@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using Axorith.Core.Models;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
@@ -9,6 +10,8 @@ using OperationResult = Axorith.Client.CoreSdk.Abstractions.OperationResult;
 using SessionEvent = Axorith.Client.CoreSdk.Abstractions.SessionEvent;
 using SessionEventType = Axorith.Client.CoreSdk.Abstractions.SessionEventType;
 using SessionState = Axorith.Client.CoreSdk.Abstractions.SessionState;
+using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
+using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
 
 namespace Axorith.Client.CoreSdk;
 
@@ -66,11 +69,35 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 startedAt = response.StartedAt.ToDateTimeOffset();
             }
 
+            DateTimeOffset? endsAt = null;
+            if (response.EndsAt != null)
+            {
+                endsAt = response.EndsAt.ToDateTimeOffset();
+            }
+
+            DateTimeOffset? breakEndsAt = null;
+            if (response.BreakEndsAt != null)
+            {
+                breakEndsAt = response.BreakEndsAt.ToDateTimeOffset();
+            }
+
             return new SessionState(
                 response.IsActive,
                 presetId,
                 response.PresetName,
-                startedAt);
+                startedAt,
+                (FocusCommitmentMode)response.FocusCommitment,
+                endsAt,
+                response.BreaksRemaining,
+                (AfterEndBehavior)response.AfterEnd,
+                response.ProtectionStatus,
+                response.EmergencyUnlockAvailable,
+                breakEndsAt,
+                response.AppBlocking,
+                response.WebsiteBlocking,
+                response.BreaksTotal,
+                TimeSpan.FromSeconds(response.RemainingSeconds),
+                response.BreakEndsAt == null ? null : TimeSpan.FromSeconds(response.BreakRemainingSeconds));
         }).ConfigureAwait(false);
     }
 
@@ -106,6 +133,78 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 response.Errors?.Count > 0 ? response.Errors.ToList() : null,
                 response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
         }).ConfigureAwait(false);
+    }
+
+    public async Task<OperationResult> StartBreakAsync(CancellationToken ct = default)
+    {
+        var response = await _client.StartBreakAsync(new StartBreakRequest(), cancellationToken: ct)
+            .ConfigureAwait(false);
+        return new OperationResult(response.Success, response.Message,
+            response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+            response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+    }
+
+    public async Task<OperationResult> PreflightSessionAsync(Guid presetId, CancellationToken ct = default)
+    {
+        return await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await _client.PreflightSessionAsync(
+                    new PreflightSessionRequest { PresetId = presetId.ToString() },
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            return new OperationResult(
+                response.Success,
+                response.Message,
+                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
+                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        }).ConfigureAwait(false);
+    }
+
+    public async IAsyncEnumerable<EmergencyUnlockProgress> HoldEmergencyUnlockAsync(
+        IAsyncEnumerable<bool> heldSignals,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var call = _client.HoldEmergencyUnlock(cancellationToken: ct);
+        using var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var sendTask = Task.Run(async () =>
+        {
+            await foreach (var isHeld in heldSignals.WithCancellation(sendCts.Token).ConfigureAwait(false))
+            {
+                await call.RequestStream.WriteAsync(new EmergencyUnlockHoldSignal { IsHeld = isHeld })
+                    .ConfigureAwait(false);
+            }
+
+            await call.RequestStream.CompleteAsync().ConfigureAwait(false);
+        }, sendCts.Token);
+
+        try
+        {
+            while (await call.ResponseStream.MoveNext(ct).ConfigureAwait(false))
+            {
+                var progress = call.ResponseStream.Current;
+                yield return new EmergencyUnlockProgress(progress.Progress, progress.Completed, progress.Message);
+                if (progress.Completed)
+                {
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            sendCts.Cancel();
+            try
+            {
+                await sendTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (sendCts.IsCancellationRequested)
+            {
+            }
+            catch (RpcException ex) when (sendCts.IsCancellationRequested &&
+                                          ex.StatusCode is StatusCode.OK or StatusCode.Cancelled)
+            {
+            }
+        }
     }
 
     private async Task StartStreamingEventsAsync(CancellationToken ct)

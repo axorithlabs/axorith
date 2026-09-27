@@ -84,3 +84,5 @@ public class SessionSchedule
         return null;
     }
 }
+
+public sealed record ConfigurationLockStatus(bool IsLocked, TimeSpan? StartsIn);

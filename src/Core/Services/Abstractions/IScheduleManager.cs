@@ -12,6 +12,9 @@ public interface IScheduleManager : IAsyncDisposable
     /// </summary>
     Task StartAsync(CancellationToken cancellationToken);
 
+    /// <summary>Starts schedule processing after startup recovery has completed.</summary>
+    Task StartProcessingAsync(CancellationToken cancellationToken);
+
     /// <summary>
     ///     Lists all configured schedules.
     /// </summary>
@@ -36,4 +39,7 @@ public interface IScheduleManager : IAsyncDisposable
     ///     Enables or disables a schedule.
     /// </summary>
     Task<SessionSchedule?> SetEnabledAsync(Guid scheduleId, bool enabled, CancellationToken cancellationToken);
+
+    Task<ConfigurationLockStatus> GetConfigurationLockStatusAsync(Guid presetId,
+        CancellationToken cancellationToken);
 }

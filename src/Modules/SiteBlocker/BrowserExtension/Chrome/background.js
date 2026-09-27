@@ -9,6 +9,7 @@
 // --- Constants ---
 const STORAGE_KEY_BLOCKED_DOMAINS = "axorith_blocked_domains";
 const STORAGE_KEY_MODE = "axorith_blocking_mode";
+const PROTOCOL_VERSION = 1;
 
 // Host names to try. Priority: Dev -> Prod
 const HOSTS = ["axorith.dev", "axorith"];
@@ -62,14 +63,44 @@ function handleConnectionFailure() {
     }
 }
 
-function handleNativeMessage(message) {
+async function handleNativeMessage(message) {
     console.log("Axorith: Received message from native host:", message);
 
-    if (message.command === "block" && Array.isArray(message.sites)) {
-        const mode = message.mode || "BlockList";
-        blockSites(message.sites, mode);
-    } else if (message.command === "unblock") {
-        unblockSites();
+    try {
+        let blocking = false;
+        if (message.command === "block" && Array.isArray(message.sites)) {
+            blocking = await blockSites(message.sites, message.mode || "BlockList");
+        } else if (message.command === "unblock") {
+            await unblockSites();
+        } else if (message.command === "health") {
+            const state = await chrome.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+            blocking = sameSites(state[STORAGE_KEY_BLOCKED_DOMAINS], message.sites) &&
+                state[STORAGE_KEY_MODE] === message.mode;
+        }
+
+        if (message.requestId && nativePort) {
+            nativePort.postMessage({
+                requestId: message.requestId,
+                protocolVersion: PROTOCOL_VERSION,
+                browser: "chromium",
+                version: chrome.runtime.getManifest().version,
+                ok: message.command !== "block" || blocking,
+                blocking
+            });
+        }
+    } catch (error) {
+        if (message.requestId && nativePort) {
+            nativePort.postMessage({
+                requestId: message.requestId,
+                protocolVersion: PROTOCOL_VERSION,
+                browser: "chromium",
+                version: chrome.runtime.getManifest().version,
+                ok: false,
+                status: "Error",
+                message: error.message
+            });
+        }
+        console.error("Axorith: Native request failed:", error);
     }
 }
 
@@ -80,7 +111,7 @@ async function blockSites(domains, mode) {
     if (domains.length === 0 && mode === "BlockList") {
         console.log("Axorith: Empty blocklist. Clearing blocks.");
         await unblockSites();
-        return;
+        return true;
     }
 
     console.log(`Axorith: Activating ${mode} for ${domains.length} domains.`);
@@ -91,11 +122,10 @@ async function blockSites(domains, mode) {
     });
 
     const tabs = await chrome.tabs.query({});
-    for (const tab of tabs) {
-        if (shouldBlockUrl(tab.url, domains, mode)) {
-            injectBlocker(tab.id);
-        }
-    }
+    const results = await Promise.all(tabs
+        .filter(tab => shouldBlockUrl(tab.url, domains, mode))
+        .map(tab => injectBlocker(tab.id)));
+    return results.every(Boolean);
 }
 
 async function unblockSites() {
@@ -122,10 +152,21 @@ async function unblockSites() {
 
 function injectBlocker(tabId) {
     console.log(`Axorith: Injecting blocker into tab ${tabId}`);
-    chrome.scripting.executeScript({
+    return chrome.scripting.executeScript({
         target: { tabId: tabId },
         files: ["content.js"]
-    }).catch(err => console.warn(`Axorith: Failed to inject script into tab ${tabId}: ${err.message}. It might be a privileged page.`));
+    }).then(() => true).catch(err => {
+        console.warn(`Axorith: Failed to inject script into tab ${tabId}: ${err.message}. It might be a privileged page.`);
+        return false;
+    });
+}
+
+function sameSites(left, right) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+        return false;
+    }
+    const expected = new Set(right);
+    return left.every(site => expected.has(site));
 }
 
 

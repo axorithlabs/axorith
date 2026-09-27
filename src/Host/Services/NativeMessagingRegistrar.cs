@@ -9,10 +9,10 @@ namespace Axorith.Host.Services;
 /// </summary>
 public class NativeMessagingRegistrar(
     INativeMessagingManager manager,
-    ILogger<NativeMessagingRegistrar> logger) : IHostedService
+    ILogger<NativeMessagingRegistrar> logger,
+    IConfiguration configuration) : IHostedService
 {
     private const string FirefoxExtensionId = "site-blocker-firefox@axorithlabs.com";
-    private const string ChromeExtensionId = "CHROME_EXTENSION_ID_PLACEHOLDER";
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -59,25 +59,35 @@ public class NativeMessagingRegistrar(
 
         manager.RegisterFirefoxHost(hostName, shimPath, [FirefoxExtensionId]);
 
-        #if DEBUG
-        logger.LogWarning(
-            "DEBUG MODE: Allowing wildcard chrome-extension origins for development. " +
-            "This is insecure and must be replaced with actual extension ID in production.");
-        manager.RegisterChromeHost(hostName, shimPath, ["chrome-extension://*/*"]);
-        #else
-        if (string.Equals(ChromeExtensionId, "CHROME_EXTENSION_ID_PLACEHOLDER", StringComparison.Ordinal))
+        var allowedOriginsByBrowser = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            logger.LogError(
-                "Chrome extension ID not configured. Native Messaging for Chrome will not work. " +
-                "Update ChromeExtensionId constant in NativeMessagingRegistrar.cs with your published extension ID.");
+            ["chrome"] = ReadExtensionIds("ChromeExtensionIds"),
+            ["edge"] = ReadExtensionIds("EdgeExtensionIds"),
+            ["chromium"] = ReadExtensionIds("ChromiumExtensionIds")
+        };
+        var configuredCount = allowedOriginsByBrowser.Values.Sum(origins => origins.Length);
+        manager.RegisterChromeHost(hostName, shimPath, allowedOriginsByBrowser);
+        if (configuredCount == 0)
+        {
+            logger.LogWarning(
+                "No Chromium extension IDs are configured. Chrome, Edge, and Chromium native messaging is disabled. " +
+                "Set SiteBlocker:NativeMessaging:<Browser>ExtensionIds to the published extension IDs.");
         }
         else
         {
-            var chromeOrigin = $"chrome-extension://{ChromeExtensionId}/";
-            manager.RegisterChromeHost(hostName, shimPath, [chromeOrigin]);
-            logger.LogInformation("Registered Chrome Native Messaging Host with extension ID: {ExtensionId}",
-                ChromeExtensionId);
+            logger.LogInformation("Registered Chromium Native Messaging Host for {Count} extension IDs.",
+                configuredCount);
         }
-        #endif
     }
+
+    private string[] ReadExtensionIds(string settingName) =>
+        (configuration[$"SiteBlocker:NativeMessaging:{settingName}"] ?? string.Empty)
+            .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(IsValidChromiumExtensionId)
+            .Select(id => $"chrome-extension://{id}/")
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+    private static bool IsValidChromiumExtensionId(string id) =>
+        id.Length == 32 && id.All(character => character is >= 'a' and <= 'p');
 }

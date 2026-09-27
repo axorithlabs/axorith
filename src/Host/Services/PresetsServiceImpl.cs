@@ -5,6 +5,7 @@ using Axorith.Host.Mappers;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 
 namespace Axorith.Host.Services;
 
@@ -14,8 +15,10 @@ namespace Axorith.Host.Services;
 /// </summary>
 public class PresetsServiceImpl(
     IPresetManager presetManager,
+    IScheduleManager scheduleManager,
     IDesignTimeSandboxManager sandboxManager,
     IModuleRegistry moduleRegistry,
+    ISessionManager sessionManager,
     ILogger<PresetsServiceImpl> logger,
     ITelemetryService? telemetry = null)
     : PresetsService.PresetsServiceBase
@@ -165,6 +168,8 @@ public class PresetsServiceImpl(
 
             logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
 
+            await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
+
             var preset = PresetMapper.ToModel(request.Preset);
 
             var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
@@ -211,6 +216,8 @@ public class PresetsServiceImpl(
 
             logger.LogDebug("DeletePreset called for {PresetId}", presetId);
 
+            await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
+
             await presetManager.DeletePresetAsync(presetId, context.CancellationToken)
                 .ConfigureAwait(false);
 
@@ -230,6 +237,29 @@ public class PresetsServiceImpl(
             logger.LogError(ex, "Error deleting preset {PresetId}", request.PresetId);
             throw new RpcException(new Status(StatusCode.Internal, "Failed to delete preset", ex));
         }
+    }
+
+    private async Task EnsurePresetMutableAsync(Guid presetId, CancellationToken cancellationToken)
+    {
+        var activeSession = sessionManager.ActiveSession;
+        if (activeSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict &&
+            activeSession.FocusCommitment.NextWorkspaceId == presetId)
+        {
+            throw new RpcException(new Status(StatusCode.FailedPrecondition,
+                "Configuration locked · This Workspace is selected as the next Workspace in the active committed Session."));
+        }
+
+        var status = await scheduleManager.GetConfigurationLockStatusAsync(presetId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!status.IsLocked)
+        {
+            return;
+        }
+
+        var time = status.StartsIn is { } remaining && remaining > TimeSpan.Zero
+            ? $"Session starts in {(int)Math.Ceiling(remaining.TotalMinutes)} min"
+            : "Session starts now";
+        throw new RpcException(new Status(StatusCode.FailedPrecondition, $"Configuration locked · {time}."));
     }
 
     private void TrackPresetTelemetry(string eventName, SessionPreset preset)

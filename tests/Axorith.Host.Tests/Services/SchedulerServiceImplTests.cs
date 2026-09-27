@@ -19,6 +19,10 @@ public class SchedulerServiceImplTests
     public SchedulerServiceImplTests()
     {
         _mockScheduleManager = new Mock<IScheduleManager>();
+        _mockScheduleManager.Setup(m => m.ListSchedulesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SessionSchedule>());
+        _mockScheduleManager.Setup(m => m.GetConfigurationLockStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Axorith.Core.Models.ConfigurationLockStatus(false, null));
         _service = new SchedulerServiceImpl(
             _mockScheduleManager.Object,
             NullLogger<SchedulerServiceImpl>.Instance
@@ -149,9 +153,9 @@ public class SchedulerServiceImplTests
         // Act
         Func<Task> act = async () => await _service.CreateSchedule(request, context);
 
-        // Assert - implementation wraps all exceptions as Internal
+        // Assert - missing required data is invalid input.
         await act.Should().ThrowAsync<RpcException>()
-            .Where(ex => ex.StatusCode == StatusCode.Internal);
+            .Where(ex => ex.StatusCode == StatusCode.InvalidArgument);
     }
 
     #endregion
@@ -203,9 +207,9 @@ public class SchedulerServiceImplTests
         // Act
         Func<Task> act = async () => await _service.UpdateSchedule(request, context);
 
-        // Assert - implementation wraps all exceptions as Internal
+        // Assert - missing required data is invalid input.
         await act.Should().ThrowAsync<RpcException>()
-            .Where(ex => ex.StatusCode == StatusCode.Internal);
+            .Where(ex => ex.StatusCode == StatusCode.InvalidArgument);
     }
 
     #endregion
@@ -240,9 +244,9 @@ public class SchedulerServiceImplTests
         // Act
         Func<Task> act = async () => await _service.DeleteSchedule(request, context);
 
-        // Assert - implementation wraps all exceptions as Internal
+        // Assert - malformed IDs are invalid input.
         await act.Should().ThrowAsync<RpcException>()
-            .Where(ex => ex.StatusCode == StatusCode.Internal);
+            .Where(ex => ex.StatusCode == StatusCode.InvalidArgument);
     }
 
     #endregion

@@ -7,6 +7,7 @@ using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Models;
 using Axorith.Host;
 using Axorith.Host.Grpc;
 using Axorith.Host.Interceptors;
@@ -21,8 +22,80 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
 using Serilog.Events;
+
+if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase))
+{
+    try
+    {
+        var checkArgs = args.Where(arg => !string.Equals(arg, "--check-committed-session",
+            StringComparison.OrdinalIgnoreCase)).ToArray();
+        var checkBuilder = WebApplication.CreateBuilder(checkArgs);
+        var checkConfiguration = new Configuration();
+        checkBuilder.Configuration.Bind(checkConfiguration);
+        var configPath = checkConfiguration.Persistence.ResolveConfigPath();
+        var committedSessionPath = Path.Combine(configPath, "committed-session.json");
+        if (File.Exists(committedSessionPath))
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(committedSessionPath));
+            var root = document.RootElement;
+            var mode = root.GetProperty("Preset").GetProperty("FocusCommitment").GetProperty("Mode").GetInt32();
+            if (mode is 1 or 2)
+            {
+                if (!DateTimeOffset.TryParse(root.GetProperty("EndDeadline").GetString(), out var deadline) ||
+                    deadline > DateTimeOffset.UtcNow)
+                {
+                    if (deadline != default)
+                    {
+                        Console.WriteLine($"A committed session is active until {deadline.ToLocalTime():yyyy-MM-dd HH:mm}.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("A committed session is active, but its end time could not be verified.");
+                    }
+
+                    return 2;
+                }
+            }
+
+            if (mode is not (0 or 1 or 2))
+            {
+                return 2;
+            }
+
+            if (mode == 2)
+            {
+                var protection = new WindowsCommitmentProtectionService(configPath,
+                    NullLogger<WindowsCommitmentProtectionService>.Instance);
+                await protection.RestoreAsync().ConfigureAwait(false);
+            }
+
+            File.Delete(committedSessionPath);
+            var tempPath = committedSessionPath + ".tmp";
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+
+        if (File.Exists(Path.Combine(configPath, "strict-protection.json")))
+        {
+            var protection = new WindowsCommitmentProtectionService(configPath,
+                NullLogger<WindowsCommitmentProtectionService>.Instance);
+            await protection.RestoreAsync().ConfigureAwait(false);
+        }
+
+        await new WindowsCommitmentProtectionService(configPath,
+                NullLogger<WindowsCommitmentProtectionService>.Instance)
+            .SetRecoveryStartupAsync(active: false).ConfigureAwait(false);
+
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Axorith could not verify the committed session: {ex.Message}");
+        return 2;
+    }
+}
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -228,7 +301,7 @@ try
         }
     }, app.Lifetime.ApplicationStopping);
 
-    _ = Task.Run(async () =>
+    var moduleRegistryInitTask = Task.Run(async () =>
     {
         try
         {
@@ -249,7 +322,7 @@ try
         }
     }, app.Lifetime.ApplicationStopping);
 
-    _ = Task.Run(async () =>
+    var schedulerStartTask = Task.Run(async () =>
     {
         try
         {
@@ -262,7 +335,7 @@ try
         }
     }, app.Lifetime.ApplicationStopping);
 
-    _ = Task.Run(async () =>
+    var autoStopStartTask = Task.Run(async () =>
     {
         try
         {
@@ -278,6 +351,42 @@ try
             Log.Error(ex, "Failed to start SessionAutoStopService");
         }
     }, app.Lifetime.ApplicationStopping);
+
+    await Task.WhenAll(moduleRegistryInitTask, schedulerStartTask, autoStopStartTask).ConfigureAwait(false);
+    try
+    {
+        var sessionManager = app.Services.GetRequiredService<ISessionManager>();
+        await sessionManager.RecoverCommittedSessionAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+        var recoveredSession = app.Services.GetRequiredService<ISessionManager>();
+        var commitmentProtection = app.Services.GetRequiredService<ICommitmentProtectionService>();
+        var strictSessionActive = recoveredSession.ActiveSession?.FocusCommitment.Mode == FocusCommitmentMode.Strict;
+        await commitmentProtection.ReconcileAsync(strictSessionActive,
+            app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+        await commitmentProtection.SetRecoveryStartupAsync(
+            recoveredSession.ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
+                FocusCommitmentMode.Strict,
+            app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "Failed to recover the committed session. Host cannot continue safely.");
+        try
+        {
+            await app.Services.GetRequiredService<ICommitmentProtectionService>()
+                .ReconcileAsync(strictSessionActive: false,
+                    cancellationToken: app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+        }
+        catch (Exception restoreEx)
+        {
+            Log.Fatal(restoreEx, "Failed to restore temporary Windows protection after session recovery failed. " +
+                                  "Any existing temporary sign-in entry will be preserved for a later retry.");
+        }
+
+        return 1;
+    }
+
+    await app.Services.GetRequiredService<IScheduleManager>()
+        .StartProcessingAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
 
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
@@ -564,11 +673,23 @@ static void RegisterCoreServices(ContainerBuilder builder)
             var shutdownTimeout = TimeSpan.FromSeconds(config.Session.ShutdownTimeoutSeconds);
 
             var telemetryService = ctx.Resolve<ITelemetryService>();
+            var committedSessionPath = Path.Combine(config.Persistence.ResolveConfigPath(), "committed-session.json");
+            var commitmentProtection = ctx.Resolve<ICommitmentProtectionService>();
 
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout,
-                telemetryService);
+                telemetryService, committedSessionPath, commitmentProtection);
         })
         .As<ISessionManager>()
+        .SingleInstance()
+        .PreserveExistingDefaults();
+
+    builder.Register(ctx =>
+        {
+            var config = ctx.Resolve<IOptions<Configuration>>().Value;
+            var logger = ctx.Resolve<ILogger<WindowsCommitmentProtectionService>>();
+            return new WindowsCommitmentProtectionService(config.Persistence.ResolveConfigPath(), logger);
+        })
+        .As<ICommitmentProtectionService>()
         .SingleInstance()
         .PreserveExistingDefaults();
 

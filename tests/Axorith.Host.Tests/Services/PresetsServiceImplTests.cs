@@ -18,20 +18,28 @@ namespace Axorith.Host.Tests.Services;
 public class PresetsServiceImplTests
 {
     private readonly Mock<IPresetManager> _mockPresetManager;
+    private readonly Mock<IScheduleManager> _mockScheduleManager;
     private readonly Mock<IDesignTimeSandboxManager> _sandboxManager;
     private readonly Mock<IModuleRegistry> _mockModuleRegistry;
+    private readonly Mock<ISessionManager> _mockSessionManager;
     private readonly PresetsServiceImpl _service;
 
     public PresetsServiceImplTests()
     {
         _mockPresetManager = new Mock<IPresetManager>();
+        _mockScheduleManager = new Mock<IScheduleManager>();
         _sandboxManager = new Mock<IDesignTimeSandboxManager>();
         _mockModuleRegistry = new Mock<IModuleRegistry>();
+        _mockSessionManager = new Mock<ISessionManager>();
         _mockModuleRegistry.Setup(x => x.GetAllDefinitions()).Returns(new List<ModuleDefinition>());
+        _mockScheduleManager.Setup(x => x.GetConfigurationLockStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Axorith.Core.Models.ConfigurationLockStatus(false, null));
         _service = new PresetsServiceImpl(
             _mockPresetManager.Object,
+            _mockScheduleManager.Object,
             _sandboxManager.Object,
             _mockModuleRegistry.Object,
+            _mockSessionManager.Object,
             NullLogger<PresetsServiceImpl>.Instance
         );
     }

@@ -29,6 +29,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Integrations.Tests" />
         <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
         <ProjectReference Include="..\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\Contracts\Axorith.Contracts.csproj" />

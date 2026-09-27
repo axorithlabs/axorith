@@ -2,10 +2,13 @@
 
 /// <summary>
 ///     Defines a service for blocking applications from running.
-///     Operates in BlockList mode only: explicitly listed processes are terminated.
+///     Terminates explicitly listed processes or all non-allowed user-session processes.
 /// </summary>
 public interface IProcessBlocker : IDisposable
 {
+    /// <summary>Whether a process monitoring loop is currently active.</summary>
+    bool IsMonitoring { get; }
+
     /// <summary>
     ///     Applies blocking rules for the specified list of processes.
     ///     This starts the monitoring if not already running, or updates the existing rules.
@@ -19,6 +22,12 @@ public interface IProcessBlocker : IDisposable
     ///     Useful for notifying the user about what was closed.
     /// </returns>
     List<string> Block(IEnumerable<string> processNames);
+
+    /// <summary>
+    ///     Allows the specified applications and their child processes while terminating other
+    ///     applications in the current interactive Windows session.
+    /// </summary>
+    List<string> AllowOnly(IEnumerable<string> processNames);
 
     /// <summary>
     ///     Dynamically removes a restriction for a specific process without stopping the whole blocker.

@@ -3,6 +3,7 @@ using Axorith.Contracts;
 using Axorith.Core.Models;
 using Google.Protobuf.WellKnownTypes;
 using Polly.Retry;
+using ConfigurationLockStatusModel = Axorith.Core.Models.ConfigurationLockStatus;
 
 namespace Axorith.Client.CoreSdk;
 
@@ -17,6 +18,19 @@ internal class GrpcSchedulerApi(SchedulerService.SchedulerServiceClient client, 
                 .ConfigureAwait(false);
 
             return response.Schedules.Select(ToModel).ToList();
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<ConfigurationLockStatusModel> GetConfigurationLockStatusAsync(Guid presetId,
+        CancellationToken ct = default)
+    {
+        return await retryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await client.GetConfigurationLockStatusAsync(
+                new ConfigurationLockStatusRequest { PresetId = presetId.ToString() }, cancellationToken: ct)
+                .ConfigureAwait(false);
+            return new ConfigurationLockStatusModel(response.IsLocked,
+                response.IsLocked ? TimeSpan.FromSeconds(response.SecondsUntilStart) : null);
         }).ConfigureAwait(false);
     }
 
