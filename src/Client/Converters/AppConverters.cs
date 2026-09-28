@@ -8,6 +8,9 @@ namespace Axorith.Client.Converters;
 /// </summary>
 public static class AppConverters
 {
+    private const double PresetCardMinimumWidth = 400;
+    private const double PresetCardGap = 14;
+
     /// <summary>
     ///     Returns true if the value is a StopAtTimeTriggerViewModel.
     /// </summary>
@@ -50,6 +53,11 @@ public static class AppConverters
 
     public static readonly IValueConverter BoolToDoubleConverter =
         new FuncValueConverter<bool, double>(v => v ? 1.0 : 0.0);
+
+    public static readonly IValueConverter PresetCardWidth =
+        new FuncValueConverter<double, double>(width => width >= 2 * PresetCardMinimumWidth + 2 * PresetCardGap
+            ? (width - 2 * PresetCardGap) / 2
+            : Math.Max(0, width - PresetCardGap));
 
     /// <summary>
     ///     Converts bool (is24HourFormat) to minimum hour value: 0 for 24-hour, 1 for 12-hour.

@@ -26,21 +26,32 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
     {
         get
         {
-            var moduleNames = string.Join(", ", Modules.Select(module => module.DisplayName));
             var options = Model.FocusCommitment;
-            var duration = options.EndCondition switch
+            return options.EndCondition switch
             {
                 FocusEndCondition.Duration when options.Duration is { } value => $"{value.TotalMinutes:0} min",
                 FocusEndCondition.EndAt when options.EndAtLocalTime is { } endAt => $"Until {endAt:HH:mm}",
                 _ => "Until stopped"
             };
-
-            return string.Join(" · ", new[] { moduleNames, duration }.Where(value => !string.IsNullOrWhiteSpace(value)));
         }
     }
 
-    public string ScheduleSummary => _schedules.Count == 0
-        ? "None"
+    public string ModulesSummary
+    {
+        get
+        {
+            var names = Modules.Take(3).Select(module => module.DisplayName).ToArray();
+            var remaining = Modules.Count - names.Length;
+            return remaining > 0
+                ? $"{string.Join(", ", names)} +{remaining}"
+                : string.Join(", ", names);
+        }
+    }
+
+    public bool HasSchedule => _schedules.Count > 0;
+
+    public string ScheduleSummary => !HasSchedule
+        ? string.Empty
         : string.Join(" · ", _schedules.Select(schedule =>
             string.IsNullOrWhiteSpace(schedule.Name) ? schedule.Type.ToString() : schedule.Name));
 

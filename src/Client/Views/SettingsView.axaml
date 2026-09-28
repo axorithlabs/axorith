@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
+             xmlns:converters="using:Axorith.Client.Converters"
              x:Class="Axorith.Client.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -54,89 +55,46 @@
 
     <Grid ColumnDefinitions="220,*" Background="#050505">
         <Border Grid.Column="0" Background="#0A0A0A" BorderBrush="#333333" BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="14,20,14,16">
-                <TextBlock Grid.Row="0" Text="AXORITH" FontSize="17" FontWeight="Bold"
-                           Foreground="#E0E0E0" Margin="10,8,10,22" />
-
-                <StackPanel Grid.Row="1" Spacing="6">
-                    <Button Classes="NavItem" Command="{Binding BackCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <PathIcon Data="{StaticResource HomeIcon}" Width="17" Height="17" />
-                            <TextBlock Text="Home" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="NavItem" Command="{Binding OpenPresetsCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <PathIcon Data="{StaticResource PresetsIcon}" Width="17" Height="17" />
-                            <TextBlock Text="Presets" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+            <Grid RowDefinitions="Auto,*,Auto" Margin="10,18,10,14">
+                <TextBlock Grid.Row="0" Text="SETTINGS" FontSize="10" FontWeight="SemiBold"
+                           Foreground="#888888" Margin="10,8,10,16" />
+                <StackPanel Grid.Row="1" Spacing="4">
+                    <Button Classes="SectionNav" Classes.Active="{Binding IsGeneralSection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="General" Content="General" />
+                    <Button Classes="SectionNav" Classes.Active="{Binding IsAppearanceSection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="Appearance" Content="Appearance" />
+                    <Button Classes="SectionNav" Classes.Active="{Binding IsPrivacySection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="Privacy" Content="Privacy" />
+                    <Button Classes="SectionNav" Classes.Active="{Binding IsAboutSection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="About" Content="About" />
                 </StackPanel>
-
-                <Border Grid.Row="3" Classes="Card" Padding="11" Margin="0,0,0,14"
-                        IsVisible="{Binding MainViewModel.IsSessionActive}">
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="ACTIVE SESSION" FontSize="10" Foreground="#888888" />
-                        <TextBlock Text="{Binding MainViewModel.ActiveWorkspaceName}" FontSize="14"
-                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="7">
-                            <TextBlock Text="{Binding MainViewModel.ActiveSessionRemaining}" FontSize="13"
-                                       FontWeight="SemiBold" />
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
-                                <PathIcon Data="{StaticResource PrivacyIcon}" Width="13" Height="13"
-                                          Foreground="{Binding MainViewModel.ActiveProtectionBrush}" />
-                                <TextBlock Text="{Binding MainViewModel.ActiveProtectionStatus}" FontSize="10"
-                                           Foreground="{Binding MainViewModel.ActiveProtectionBrush}"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Row="3" Classes="Card" Padding="11" Margin="0,0,0,14"
-                        IsVisible="{Binding MainViewModel.IsSessionActive, Converter={x:Static BoolConverters.Not}}">
-                    <StackPanel Spacing="7">
-                        <TextBlock Text="SESSION" FontSize="10" Foreground="#888888" />
-                        <TextBlock Text="No active session" FontSize="13" Foreground="#B0B0B0" />
-                        <Button Content="Open presets" Command="{Binding OpenPresetsCommand}" Padding="7,5" />
-                    </StackPanel>
-                </Border>
-
-                <Button Grid.Row="4" Classes="NavItem Active">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <PathIcon Data="{StaticResource SettingsIcon}" Width="17" Height="17" />
-                        <TextBlock Text="Settings" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
+                <Button Grid.Row="2" Classes="NavItem" Content="← Back" Command="{Binding BackCommand}" />
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" Margin="36,28,36,24" RowDefinitions="Auto,*">
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
+        <Grid Grid.Column="1" Margin="28,22,28,22" RowDefinitions="Auto,*">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Settings" FontSize="30" FontWeight="Bold" Foreground="#E0E0E0" />
-                    <TextBlock Text="Axorith preferences" Foreground="#B0B0B0" />
+                    <TextBlock Text="Settings" FontSize="26" FontWeight="Bold" Foreground="#E0E0E0" />
                 </StackPanel>
-                <Button Grid.Column="1" Content="Save changes" Command="{Binding SaveCommand}"
-                        Classes="accent" VerticalAlignment="Center" IsEnabled="{Binding HasUnsavedChanges}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Classes="NavItem" IsVisible="{Binding MainViewModel.HasActiveSessionName}"
+                            Command="{Binding BackCommand}" AutomationProperties.Name="Open active session">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <TextBlock Text="{Binding MainViewModel.ActiveWorkspaceName}" MaxWidth="120"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock Text="·" Foreground="#777777" VerticalAlignment="Center"
+                                       IsVisible="{Binding MainViewModel.ActiveSessionRemaining, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}" />
+                            <TextBlock Text="{Binding MainViewModel.ActiveSessionRemaining}" FontSize="12"
+                                       FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Content="Save changes" Command="{Binding SaveCommand}"
+                            Classes="accent" IsEnabled="{Binding HasUnsavedChanges}" />
+                </StackPanel>
             </Grid>
 
-            <Grid Grid.Row="1" ColumnDefinitions="190,*" ColumnSpacing="28">
-                <Border Grid.Column="0" Classes="Card" Padding="10" VerticalAlignment="Stretch">
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="SECTIONS" FontSize="10" Foreground="#888888" Margin="8,8,8,4" />
-                        <Button Classes="SectionNav" Classes.Active="{Binding IsGeneralSection}"
-                                Command="{Binding SelectSectionCommand}" CommandParameter="General" Content="General" />
-                        <Button Classes="SectionNav" Classes.Active="{Binding IsAppearanceSection}"
-                                Command="{Binding SelectSectionCommand}" CommandParameter="Appearance" Content="Appearance" />
-                        <Button Classes="SectionNav" Classes.Active="{Binding IsPrivacySection}"
-                                Command="{Binding SelectSectionCommand}" CommandParameter="Privacy" Content="Privacy" />
-                        <Button Classes="SectionNav" Classes.Active="{Binding IsAboutSection}"
-                                Command="{Binding SelectSectionCommand}" CommandParameter="About" Content="About" />
-                    </StackPanel>
-                </Border>
-
-                <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
                     <Grid>
                         <StackPanel Spacing="0" IsVisible="{Binding IsGeneralSection}">
@@ -148,13 +106,13 @@
                             <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,17">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="Start Axorith with Windows" FontSize="15" />
-                                        <TextBlock Text="Launch Axorith automatically after sign in"
+                                        <TextBlock Text="Start with Windows" FontSize="15" />
+                                        <TextBlock Text="Launch automatically after sign in"
                                                    FontSize="12" Foreground="#888888" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoStartEnabled}"
                                                   VerticalAlignment="Center"
-                                                  AutomationProperties.Name="Start Axorith with Windows" />
+                                                  AutomationProperties.Name="Start with Windows" />
                                 </Grid>
                             </Border>
 
@@ -181,7 +139,7 @@
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Minimize to tray on close" FontSize="15" />
-                                        <TextBlock Text="Closing the window keeps Axorith running"
+                                        <TextBlock Text="Closing the window keeps the app running"
                                                    FontSize="12" Foreground="#888888" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding MinimizeToTrayOnClose}"
@@ -215,13 +173,13 @@
                         <StackPanel Spacing="18" IsVisible="{Binding IsAppearanceSection}">
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Appearance" FontSize="22" FontWeight="Bold" />
-                                <TextBlock Text="Axorith interface colors" Foreground="#B0B0B0" />
+                                <TextBlock Text="Current interface colors" Foreground="#B0B0B0" />
                             </StackPanel>
                             <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,18">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4">
                                         <TextBlock Text="Theme" FontSize="15" />
-                                        <TextBlock Text="Axorith keeps the current dark appearance."
+                                        <TextBlock Text="The interface uses the current dark palette."
                                                    FontSize="12" Foreground="#888888" />
                                     </StackPanel>
                                     <TextBlock Grid.Column="1" Text="Dark" Foreground="#B0B0B0"
@@ -230,29 +188,25 @@
                             </Border>
                             <StackPanel Spacing="12">
                                 <TextBlock Text="Color palette" FontSize="15" FontWeight="SemiBold" />
-                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-                                    <Border Classes="Card" Padding="12">
-                                        <StackPanel Spacing="8">
-                                            <Border Height="34" Background="{DynamicResource SystemRegionBrush}"
+                                <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,14">
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                        <StackPanel Spacing="7">
+                                            <Border Height="28" Background="{DynamicResource SystemRegionBrush}"
                                                     BorderBrush="#333333" BorderThickness="1" CornerRadius="4" />
                                             <TextBlock Text="Canvas" FontSize="12" Foreground="#B0B0B0" />
                                         </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="1" Classes="Card" Padding="12">
-                                        <StackPanel Spacing="8">
-                                            <Border Height="34" Background="{DynamicResource CardBackgroundBrush}"
+                                        <StackPanel Grid.Column="1" Spacing="7">
+                                            <Border Height="28" Background="{DynamicResource CardBackgroundBrush}"
                                                     BorderBrush="#333333" BorderThickness="1" CornerRadius="4" />
                                             <TextBlock Text="Panel" FontSize="12" Foreground="#B0B0B0" />
                                         </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="2" Classes="Card" Padding="12">
-                                        <StackPanel Spacing="8">
-                                            <Border Height="34" Background="{DynamicResource SystemAccentBrush}"
+                                        <StackPanel Grid.Column="2" Spacing="7">
+                                            <Border Height="28" Background="{DynamicResource SystemAccentBrush}"
                                                     CornerRadius="4" />
                                             <TextBlock Text="Action accent" FontSize="12" Foreground="#B0B0B0" />
                                         </StackPanel>
-                                    </Border>
-                                </Grid>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
                         </StackPanel>
 
@@ -265,7 +219,7 @@
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Anonymous telemetry" FontSize="15" />
-                                        <TextBlock Text="Sends anonymous usage data to help improve Axorith"
+                                        <TextBlock Text="Sends anonymous usage data to help improve the app"
                                                    FontSize="12" Foreground="#888888" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding TelemetryEnabled}"
@@ -273,7 +227,7 @@
                                                   AutomationProperties.Name="Anonymous telemetry" />
                                 </Grid>
                             </Border>
-                            <Border Classes="Card" Padding="16">
+                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,12">
                                 <StackPanel Spacing="7">
                                     <TextBlock Text="Data collected" FontWeight="SemiBold" />
                                     <TextBlock Text="App version and operating system&#x0a;Feature usage&#x0a;Error reports&#x0a;No personal data or IP addresses"
@@ -287,13 +241,13 @@
                         <StackPanel Spacing="18" IsVisible="{Binding IsAboutSection}">
                             <StackPanel Spacing="4">
                                 <TextBlock Text="About" FontSize="22" FontWeight="Bold" />
-                                <TextBlock Text="Axorith application information" Foreground="#B0B0B0" />
+                                <TextBlock Text="Application information" Foreground="#B0B0B0" />
                             </StackPanel>
                             <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,18">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4">
                                         <TextBlock Text="Version" FontSize="15" />
-                                        <TextBlock Text="Axorith desktop client" FontSize="12" Foreground="#888888" />
+                                        <TextBlock Text="Desktop client" FontSize="12" Foreground="#888888" />
                                     </StackPanel>
                                     <TextBlock Grid.Column="1" Text="{Binding AppVersion}" Foreground="#B0B0B0"
                                                VerticalAlignment="Center" />
@@ -312,6 +266,5 @@
                     </Grid>
                 </ScrollViewer>
             </Grid>
-        </Grid>
     </Grid>
 </UserControl>

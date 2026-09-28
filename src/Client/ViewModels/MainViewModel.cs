@@ -65,6 +65,7 @@ public class MainViewModel : ReactiveObject, IDisposable
             this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(IsCommittedSession));
             this.RaisePropertyChanged(nameof(CanStopSession));
+            this.RaisePropertyChanged(nameof(HasActiveSessionName));
             this.RaisePropertyChanged(nameof(IsSessionStatusNoticeVisible));
         }
     }
@@ -91,7 +92,16 @@ public class MainViewModel : ReactiveObject, IDisposable
     };
 
     private string _activeWorkspaceName = string.Empty;
-    public string ActiveWorkspaceName { get => _activeWorkspaceName; private set => this.RaiseAndSetIfChanged(ref _activeWorkspaceName, value); }
+    public string ActiveWorkspaceName
+    {
+        get => _activeWorkspaceName;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _activeWorkspaceName, value);
+            this.RaisePropertyChanged(nameof(HasActiveSessionName));
+        }
+    }
+    public bool HasActiveSessionName => IsSessionActive && !string.IsNullOrWhiteSpace(ActiveWorkspaceName);
     private string _activeSessionRemaining = string.Empty;
     public string ActiveSessionRemaining
     {
@@ -126,8 +136,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
     }
     public bool IsProtectionAttentionVisible =>
-        !ActiveProtectionStatus.StartsWith("Protection active", StringComparison.Ordinal) &&
-        !ActiveProtectionStatus.StartsWith("Protection inactive", StringComparison.Ordinal);
+        ActiveProtectionStatus.StartsWith("Protection failed", StringComparison.Ordinal) ||
+        ActiveProtectionStatus.StartsWith("Protection degraded", StringComparison.Ordinal);
     public IBrush ActiveProtectionBrush => ActiveProtectionStatus switch
     {
         var status when status.StartsWith("Protection failed", StringComparison.Ordinal) => Brushes.IndianRed,
@@ -438,7 +448,10 @@ public class MainViewModel : ReactiveObject, IDisposable
                     case SessionEventType.Started:
                         SessionStatus = "Session is active.";
                         SetActiveSessionPreset(evt.PresetId);
-                        ActiveFocusCommitmentMode = FocusCommitmentMode.Locked;
+                        if (Presets.FirstOrDefault(preset => preset.Id == evt.PresetId) is { } activePreset)
+                        {
+                            ActiveFocusCommitmentMode = activePreset.Model.FocusCommitment.Mode;
+                        }
                         IsSessionActive = true;
                         BeginTrackingSession(evt.PresetId, evt.Timestamp);
                         _ = RefreshSessionStateAsync();
@@ -578,6 +591,9 @@ public class MainViewModel : ReactiveObject, IDisposable
     private void SetActiveSessionPreset(Guid? presetId)
     {
         ActiveSessionPresetId = presetId;
+        ActiveWorkspaceName = presetId is { } id
+            ? Presets.FirstOrDefault(preset => preset.Id == id)?.Name ?? string.Empty
+            : string.Empty;
         foreach (var preset in Presets)
         {
             preset.IsActive = preset.Id == presetId;
@@ -1220,7 +1236,10 @@ public class MainViewModel : ReactiveObject, IDisposable
                     SetActiveSessionPreset(state.PresetId);
                     ActiveFocusCommitmentMode = state.FocusCommitment;
                     IsSessionActive = true;
-                    ActiveWorkspaceName = state.PresetName ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(state.PresetName))
+                    {
+                        ActiveWorkspaceName = state.PresetName;
+                    }
                     BeginTrackingSession(state.PresetId, state.StartedAt, state.PresetName);
                     _activeSessionEndsAt = state.EndsAt;
                     _activeBreakEndsAt = state.BreakEndsAt;
