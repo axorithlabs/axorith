@@ -8,9 +8,12 @@ option csharp_namespace = "Axorith.Contracts";
 
 service SessionsService {
   rpc GetSessionState(GetSessionStateRequest) returns (SessionState);
+  rpc PreflightSession(PreflightSessionRequest) returns (OperationResult);
   rpc StartSession(StartSessionRequest) returns (OperationResult);
   rpc StopSession(StopSessionRequest) returns (OperationResult);
+  rpc StartBreak(StartBreakRequest) returns (OperationResult);
   rpc StreamSessionEvents(StreamSessionEventsRequest) returns (stream SessionEvent);
+  rpc HoldEmergencyUnlock(stream EmergencyUnlockHoldSignal) returns (stream EmergencyUnlockHoldProgress);
 }
 
 message GetSessionStateRequest {
@@ -21,10 +24,26 @@ message StartSessionRequest {
   string preset_id = 1;
 }
 
+message PreflightSessionRequest {
+  string preset_id = 1;
+}
+
 message StopSessionRequest {
   // Empty on purpose: reserved for future options (for example, force flags).
 }
 
 message StreamSessionEventsRequest {
   // Future extension point: add filters (for example, by session id or event type).
+}
+
+message StartBreakRequest {}
+
+message EmergencyUnlockHoldSignal {
+  bool is_held = 1;
+}
+
+message EmergencyUnlockHoldProgress {
+  double progress = 1;
+  bool completed = 2;
+  string message = 3;
 }

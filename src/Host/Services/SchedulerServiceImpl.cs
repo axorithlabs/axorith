@@ -39,10 +39,15 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
                 request.Schedule.PresetId);
 
             var model = ScheduleMapper.ToModel(request.Schedule);
+            await EnsurePresetMutableAsync(model.PresetId, context.CancellationToken);
             model.Id = Guid.NewGuid();
 
             var saved = await scheduleManager.SaveScheduleAsync(model, context.CancellationToken);
             return ScheduleMapper.ToMessage(saved);
+        }
+        catch (RpcException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -63,8 +68,20 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
             logger.LogInformation("Updating schedule '{Name}' ({Id})", request.Schedule.Name, request.Schedule.Id);
 
             var model = ScheduleMapper.ToModel(request.Schedule);
+            var existing = (await scheduleManager.ListSchedulesAsync(context.CancellationToken))
+                .FirstOrDefault(s => s.Id == model.Id);
+            if (existing != null)
+            {
+                await EnsurePresetMutableAsync(existing.PresetId, context.CancellationToken);
+            }
+
+            await EnsurePresetMutableAsync(model.PresetId, context.CancellationToken);
             var saved = await scheduleManager.SaveScheduleAsync(model, context.CancellationToken);
             return ScheduleMapper.ToMessage(saved);
+        }
+        catch (RpcException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -84,8 +101,19 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
 
             logger.LogInformation("Deleting schedule {Id}", id);
 
+            var existing = (await scheduleManager.ListSchedulesAsync(context.CancellationToken))
+                .FirstOrDefault(s => s.Id == id);
+            if (existing != null)
+            {
+                await EnsurePresetMutableAsync(existing.PresetId, context.CancellationToken);
+            }
+
             await scheduleManager.DeleteScheduleAsync(id, context.CancellationToken);
             return new Empty();
+        }
+        catch (RpcException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -101,6 +129,13 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
             if (!Guid.TryParse(request.ScheduleId, out var id))
             {
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid Schedule ID"));
+            }
+
+            var existing = (await scheduleManager.ListSchedulesAsync(context.CancellationToken))
+                .FirstOrDefault(s => s.Id == id);
+            if (existing != null)
+            {
+                await EnsurePresetMutableAsync(existing.PresetId, context.CancellationToken);
             }
 
             logger.LogInformation("Setting schedule {Id} enabled: {Enabled}", id, request.Enabled);
@@ -122,6 +157,34 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         {
             logger.LogError(ex, "Error toggling schedule");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to toggle schedule"));
+        }
+    }
+
+    public override async Task<ConfigurationLockStatus> GetConfigurationLockStatus(
+        ConfigurationLockStatusRequest request, ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.PresetId, out var presetId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid preset ID."));
+        }
+
+        var status = await scheduleManager.GetConfigurationLockStatusAsync(presetId, context.CancellationToken);
+        return new ConfigurationLockStatus
+        {
+            IsLocked = status.IsLocked,
+            SecondsUntilStart = (long)(status.StartsIn?.TotalSeconds ?? 0)
+        };
+    }
+
+    private async Task EnsurePresetMutableAsync(Guid presetId, CancellationToken cancellationToken)
+    {
+        var status = await scheduleManager.GetConfigurationLockStatusAsync(presetId, cancellationToken);
+        if (status.IsLocked)
+        {
+            var time = status.StartsIn is { } remaining && remaining > TimeSpan.Zero
+                ? $"Session starts in {(int)Math.Ceiling(remaining.TotalMinutes)} min"
+                : "Session starts now";
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, $"Configuration locked · {time}."));
         }
     }
 }

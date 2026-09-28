@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Accessibility and Validation"
+  short_description: "Validation pipelines, accessibility semantics, and automation metadata"
+  default_prompt: "Use $avalonia-accessibility-and-validation to review validation, accessibility, and automation in an Avalonia UI"

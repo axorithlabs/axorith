@@ -12,6 +12,8 @@ public interface ISchedulerApi
     /// </summary>
     Task<IReadOnlyList<SessionSchedule>> ListSchedulesAsync(CancellationToken ct = default);
 
+    Task<ConfigurationLockStatus> GetConfigurationLockStatusAsync(Guid presetId, CancellationToken ct = default);
+
     /// <summary>
     ///     Creates a new schedule.
     /// </summary>

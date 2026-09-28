@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Views and Templating"
+  short_description: "View composition, templates, view location, and tree patterns"
+  default_prompt: "Use $avalonia-views-and-templating to design or debug Avalonia view location and templating flows"

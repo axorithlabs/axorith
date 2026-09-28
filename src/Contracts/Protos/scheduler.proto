@@ -13,6 +13,7 @@ service SchedulerService {
   rpc UpdateSchedule (UpdateScheduleRequest) returns (Schedule);
   rpc DeleteSchedule (DeleteScheduleRequest) returns (google.protobuf.Empty);
   rpc SetEnabled (SetScheduleEnabledRequest) returns (Schedule);
+  rpc GetConfigurationLockStatus (ConfigurationLockStatusRequest) returns (ConfigurationLockStatus);
 }
 
 message Schedule {
@@ -52,4 +53,10 @@ message DeleteScheduleRequest {
 message SetScheduleEnabledRequest {
   string schedule_id = 1;
   bool enabled = 2;
+}
+
+message ConfigurationLockStatusRequest { string preset_id = 1; }
+message ConfigurationLockStatus {
+  bool is_locked = 1;
+  int64 seconds_until_start = 2;
 }

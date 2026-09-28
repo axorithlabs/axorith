@@ -27,6 +27,18 @@ public interface ISessionManager : IAsyncDisposable
     /// </summary>
     DateTimeOffset? SessionStartedAt { get; }
 
+    DateTimeOffset? SessionEndsAt { get; }
+
+    TimeSpan? SessionTimeRemaining { get; }
+
+    DateTimeOffset? BreakEndsAt { get; }
+
+    int BreaksRemaining { get; }
+
+    TimeSpan? BreakTimeRemaining { get; }
+
+    string ProtectionStatus { get; }
+
     /// <summary>
     ///     Returns an immutable snapshot of the currently running session, including active modules,
     ///     their settings and actions. Returns null if no session is running.
@@ -57,11 +69,26 @@ public interface ISessionManager : IAsyncDisposable
     /// <param name="cancellationToken">Cancellation token to observe.</param>
     Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);
 
+    /// <summary>Validates whether the Host can start a preset without starting its modules.</summary>
+    Task PreflightSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);
+
+    /// <summary>Restores an unexpired committed session saved by an earlier Host process.</summary>
+    Task RecoverCommittedSessionAsync(CancellationToken cancellationToken = default);
+
     /// <summary>
     ///     Stops the currently active session, performing cleanup for all modules.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to observe.</param>
     Task StopCurrentSessionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Ends a session after its configured deadline or a completed emergency unlock.</summary>
+    Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default);
+
+    Task StartBreakAsync(CancellationToken cancellationToken = default);
+
+    Task EndBreakAsync(CancellationToken cancellationToken = default);
+
+    Task RefreshProtectionHealthAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Gets the active instance of a module by its module ID.

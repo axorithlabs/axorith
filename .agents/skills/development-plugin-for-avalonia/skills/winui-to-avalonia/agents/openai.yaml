@@ -1,0 +1,4 @@
+interface:
+  display_name: "WinUI to Avalonia"
+  short_description: "Port WinUI shells, state models, composition, and platform integration"
+  default_prompt: "Use $winui-to-avalonia to migrate a WinUI or Windows App SDK UI to Avalonia"

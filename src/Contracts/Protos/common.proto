@@ -135,6 +135,43 @@ message Preset {
   string name = 2;
   int32 version = 3;
   repeated ConfiguredModule modules = 4;
+  FocusCommitmentOptions focus_commitment = 5;
+}
+
+message FocusCommitmentOptions {
+  FocusCommitmentMode mode = 1;
+  FocusEndCondition end_condition = 2;
+  int64 duration_seconds = 3;
+  bool has_end_at_local_time = 4;
+  int32 end_at_hour = 5;
+  int32 end_at_minute = 6;
+  int32 break_count = 7;
+  int32 break_duration_seconds = 8;
+  AfterEndBehavior after_end = 9;
+  string next_workspace_id = 10;
+  int32 schedule_lock_minutes = 11;
+  repeated int32 end_at_days_of_week = 12;
+}
+
+enum FocusCommitmentMode {
+  FOCUS_COMMITMENT_NORMAL = 0;
+  FOCUS_COMMITMENT_LOCKED = 1;
+  FOCUS_COMMITMENT_STRICT = 2;
+}
+
+enum FocusEndCondition {
+  FOCUS_END_NONE = 0;
+  FOCUS_END_DURATION = 1;
+  FOCUS_END_AT = 2;
+}
+
+enum AfterEndBehavior {
+  AFTER_END_DO_NOTHING = 0;
+  AFTER_END_START_NEXT_WORKSPACE = 1;
+  AFTER_END_LOCK_PC = 2;
+  AFTER_END_SLEEP = 3;
+  AFTER_END_SIGN_OUT = 4;
+  AFTER_END_SHUT_DOWN_PC = 5;
 }
 
 message SessionState {
@@ -143,6 +180,18 @@ message SessionState {
   string preset_name = 3;
   google.protobuf.Timestamp started_at = 4;
   repeated ModuleInstanceState module_states = 5;
+  FocusCommitmentMode focus_commitment = 6;
+  google.protobuf.Timestamp ends_at = 7;
+  int32 breaks_remaining = 8;
+  AfterEndBehavior after_end = 9;
+  string protection_status = 10;
+  bool emergency_unlock_available = 11;
+  google.protobuf.Timestamp break_ends_at = 12;
+  bool app_blocking = 13;
+  bool website_blocking = 14;
+  int32 breaks_total = 15;
+  int64 remaining_seconds = 16;
+  int64 break_remaining_seconds = 17;
 }
 
 message ModuleInstanceState {

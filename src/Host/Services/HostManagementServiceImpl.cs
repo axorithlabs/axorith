@@ -1,4 +1,5 @@
 using Axorith.Contracts;
+using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
@@ -23,6 +24,16 @@ public class HostManagementServiceImpl(
         {
             if (sessionManager.IsSessionRunning)
             {
+                if (sessionManager.ActiveSession?.FocusCommitment.Mode is Axorith.Core.Models.FocusCommitmentMode.Locked or
+                    Axorith.Core.Models.FocusCommitmentMode.Strict)
+                {
+                    return Task.FromResult(new ShutdownResponse
+                    {
+                        Accepted = false,
+                        Message = "Host shutdown is unavailable during a committed session."
+                    });
+                }
+
                 logger.LogInformation("Stopping active session before shutdown...");
                 _ = Task.Run(async () =>
                 {

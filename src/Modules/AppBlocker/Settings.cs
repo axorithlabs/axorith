@@ -12,16 +12,29 @@ internal sealed class Settings : IDisposable
     private static Dictionary<string, string[]>? _categoryProcesses;
     private static readonly Lock _loadLock = new();
 
+    private readonly Setting<string> _mode;
     private readonly Setting<List<string>> _categories;
     private readonly Setting<string> _customProcessList;
     private readonly Setting<string> _appToAdd;
     private readonly Action _addAppAction;
     private readonly IReadOnlyList<ISetting> _allSettings;
     private readonly IReadOnlyList<IAction> _allActions;
+    private readonly IDisposable _modeSubscription;
 
     public Settings(IAppDiscoveryService appDiscovery)
     {
         EnsureCategoriesLoaded();
+
+        _mode = Setting.AsChoice(
+            key: "Mode",
+            label: "Blocking Mode",
+            defaultValue: "BlockList",
+            initialChoices:
+            [
+                new KeyValuePair<string, string>("BlockList", "Block selected apps"),
+                new KeyValuePair<string, string>("AllowList", "Only allow Workspace apps")
+            ],
+            description: "Block selected apps, or allow only applications configured in this Workspace.");
 
         _categories = Setting.AsMultiChoice(
             key: "Categories",
@@ -58,9 +71,13 @@ internal sealed class Settings : IDisposable
             return Task.CompletedTask;
         });
 
-        _allSettings = [_categories, _appToAdd, _customProcessList];
+        _modeSubscription = _mode.Value.Subscribe(_ => UpdateVisibility());
+        _allSettings = [_mode, _categories, _appToAdd, _customProcessList];
         _allActions = [_addAppAction];
+        UpdateVisibility();
     }
+
+    public bool IsAllowList => _mode.GetCurrentValue() == "AllowList";
 
     public IReadOnlyList<ISetting> GetSettings()
     {
@@ -84,6 +101,13 @@ internal sealed class Settings : IDisposable
         }
 
         return Task.FromResult(ValidationResult.Success);
+    }
+
+    private void UpdateVisibility()
+    {
+        var blockList = !IsAllowList;
+        _categories.SetVisibility(blockList);
+        _customProcessList.SetVisibility(blockList);
     }
 
     public IEnumerable<string> GetProcesses()
@@ -186,6 +210,8 @@ internal sealed class Settings : IDisposable
 
     public void Dispose()
     {
+        _modeSubscription.Dispose();
+        _mode.Dispose();
         _categories.Dispose();
         _appToAdd.Dispose();
         _customProcessList.Dispose();

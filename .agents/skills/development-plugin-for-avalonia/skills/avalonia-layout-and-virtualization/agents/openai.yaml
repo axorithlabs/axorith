@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Layout and Virtualization"
+  short_description: "Panels, measure-arrange behavior, invalidation, and virtualization"
+  default_prompt: "Use $avalonia-layout-and-virtualization to optimize Avalonia layout, custom panels, or large item surfaces"

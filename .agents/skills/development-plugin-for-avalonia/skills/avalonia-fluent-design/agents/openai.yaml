@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Fluent Design"
+  short_description: "FluentTheme, palette tuning, Fluent shells, motion, and icon guidance"
+  default_prompt: "Use $avalonia-fluent-design to apply Microsoft Fluent design patterns to an Avalonia app"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia Platform Services"
+  short_description: "Storage, clipboard, launcher, screens, and platform integration flows"
+  default_prompt: "Use $avalonia-platform-services to wire or debug Avalonia file pickers, clipboard, launcher, and screen services"

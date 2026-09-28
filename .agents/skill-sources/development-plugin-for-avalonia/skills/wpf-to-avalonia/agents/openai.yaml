@@ -1,0 +1,4 @@
+interface:
+  display_name: "WPF to Avalonia"
+  short_description: "Port WPF bindings, resources, controls, layout, and rendering patterns"
+  default_prompt: "Use $wpf-to-avalonia to migrate a WPF application or subsystem to Avalonia"

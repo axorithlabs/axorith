@@ -31,4 +31,9 @@ public interface ISessionAutoStopService : IAsyncDisposable
     ///     Gets the remaining time until auto-stop, or null if not tracking or no auto-stop configured.
     /// </summary>
     TimeSpan? GetTimeRemaining();
+
+    Task ExecuteAfterEndActionAsync(Axorith.Core.Models.AfterEndBehavior behavior);
+
+    Task<bool> CompleteNaturallyAsync(Axorith.Core.Models.SessionPreset expectedSession,
+        Guid? fallbackNextPresetId, CancellationToken cancellationToken = default);
 }

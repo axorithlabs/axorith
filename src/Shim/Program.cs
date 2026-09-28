@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
+using System.Buffers.Binary;
+using System.IO.Pipes;
 using System.Text;
+using System.Text.Json;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,27 +11,29 @@ namespace Axorith.Shim;
 
 internal static class Program
 {
-    private const string PipeName = "axorith-nm-pipe";
     private const int MaxLogSizeBytes = 10 * 1024 * 1024;
     private const int LogFlushIntervalMs = 5000;
+    private const int MaxNativeMessageBytes = 1024 * 1024;
 
     private static readonly ConcurrentQueue<string> LogQueue = new();
+    private static readonly ConcurrentDictionary<string, TaskCompletionSource<string>> PendingResponses = new();
     private static readonly SemaphoreSlim LogSemaphore = new(1, 1);
     private static CancellationTokenSource? _logFlushCts;
     private static Task? _logFlushTask;
 
-    public static async Task Main()
+    public static async Task Main(string[] args)
     {
         StartLogFlusher();
 
         var loggerFactory = NullLoggerFactory.Instance;
         var pipeFactory = PlatformServices.CreateNamedPipeFactory(loggerFactory);
+        var pipeName = GetPipeName(args);
         using var shutdown = new CancellationTokenSource();
         var inputMonitor = MonitorStandardInputAsync(shutdown);
 
         try
         {
-            await ListenForExtensionAsync(pipeFactory, shutdown.Token).ConfigureAwait(false);
+            await ListenForExtensionAsync(pipeFactory, pipeName, shutdown.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -38,21 +43,59 @@ internal static class Program
         }
     }
 
-    private static async Task ListenForExtensionAsync(INamedPipeFactory pipeFactory, CancellationToken ct)
+    private static async Task ListenForExtensionAsync(INamedPipeFactory pipeFactory, string pipeName,
+        CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                using var pipeServer = pipeFactory.CreateSecureServerPipe(PipeName);
+                using var pipeServer = pipeFactory.CreateSecureServerPipe(pipeName, PipeDirection.InOut, 16);
                 await pipeServer.WaitForConnectionAsync(ct).ConfigureAwait(false);
 
-                using var reader = new StreamReader(pipeServer);
-                var message = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+                using var reader = new StreamReader(pipeServer, new UTF8Encoding(false), false, 1024, leaveOpen: true);
+                using var writer = new StreamWriter(pipeServer, new UTF8Encoding(false), 1024, leaveOpen: true)
+                {
+                    AutoFlush = true
+                };
+                var message = await reader.ReadLineAsync(ct).ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(message))
                 {
-                    SendMessageToExtension(message);
+                    var requestId = GetRequestId(message);
+                    if (string.IsNullOrEmpty(requestId))
+                    {
+                        SendMessageToExtension(message);
+                        continue;
+                    }
+
+                    var pending = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    if (!PendingResponses.TryAdd(requestId, pending))
+                    {
+                        await writer.WriteLineAsync(CreateErrorResponse(requestId, "Error", "Duplicate request id."));
+                        continue;
+                    }
+
+                    try
+                    {
+                        SendMessageToExtension(message);
+                        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                        try
+                        {
+                            var response = await pending.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+                            await writer.WriteLineAsync(response.AsMemory(), ct).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                        {
+                            await writer.WriteLineAsync(CreateErrorResponse(requestId, "Outdated",
+                                "The extension did not respond to the health protocol.").AsMemory(), ct)
+                                .ConfigureAwait(false);
+                        }
+                    }
+                    finally
+                    {
+                        PendingResponses.TryRemove(requestId, out _);
+                    }
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -70,7 +113,38 @@ internal static class Program
     {
         try
         {
-            await Console.OpenStandardInput().CopyToAsync(Stream.Null, shutdown.Token).ConfigureAwait(false);
+            var input = Console.OpenStandardInput();
+            var header = new byte[sizeof(int)];
+            while (!shutdown.IsCancellationRequested)
+            {
+                var firstRead = await input.ReadAsync(header.AsMemory(0, header.Length), shutdown.Token)
+                    .ConfigureAwait(false);
+                if (firstRead == 0)
+                {
+                    break;
+                }
+
+                if (firstRead < header.Length)
+                {
+                    await input.ReadExactlyAsync(header.AsMemory(firstRead), shutdown.Token).ConfigureAwait(false);
+                }
+
+                var messageLength = BinaryPrimitives.ReadInt32LittleEndian(header);
+                if (messageLength <= 0 || messageLength > MaxNativeMessageBytes)
+                {
+                    throw new InvalidDataException($"Invalid native message length: {messageLength}.");
+                }
+
+                var messageBytes = new byte[messageLength];
+                await input.ReadExactlyAsync(messageBytes, shutdown.Token).ConfigureAwait(false);
+                using var document = JsonDocument.Parse(messageBytes);
+                if (document.RootElement.TryGetProperty("requestId", out var requestIdElement) &&
+                    requestIdElement.ValueKind == JsonValueKind.String &&
+                    PendingResponses.TryGetValue(requestIdElement.GetString()!, out var pending))
+                {
+                    pending.TrySetResult(Encoding.UTF8.GetString(messageBytes));
+                }
+            }
         }
         catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
         {
@@ -85,6 +159,27 @@ internal static class Program
             shutdown.Cancel();
         }
     }
+
+    private static string GetPipeName(string[] args)
+    {
+        var browser = args.FirstOrDefault(arg => arg.StartsWith("--browser=", StringComparison.OrdinalIgnoreCase))?
+            .Split('=', 2)[1].ToLowerInvariant();
+        return browser is "chrome" or "edge" or "chromium" or "firefox"
+            ? $"axorith-nm-pipe-{browser}"
+            : "axorith-nm-pipe";
+    }
+
+    private static string? GetRequestId(string message)
+    {
+        using var document = JsonDocument.Parse(message);
+        return document.RootElement.TryGetProperty("requestId", out var requestId) &&
+               requestId.ValueKind == JsonValueKind.String
+            ? requestId.GetString()
+            : null;
+    }
+
+    private static string CreateErrorResponse(string requestId, string status, string message) =>
+        JsonSerializer.Serialize(new { requestId, protocolVersion = 1, ok = false, status, message });
 
     private static void SendMessageToExtension(string jsonMessage)
     {

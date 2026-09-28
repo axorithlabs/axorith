@@ -35,9 +35,9 @@ public interface INativeMessagingManager
     /// <param name="executablePath">
     ///     The absolute path to the Native Messaging Host executable (Axorith.Shim.exe).
     /// </param>
-    /// <param name="allowedOrigins">
-    ///     A list of Chrome extension origins that are permitted to communicate with this host.
-    ///     Format: "chrome-extension://[extension-id]/"
+    /// <param name="allowedOriginsByBrowser">
+    ///     The permitted extension origins for each Chromium browser key: chrome, edge, and chromium.
     /// </param>
-    void RegisterChromeHost(string hostName, string executablePath, string[] allowedOrigins);
+    void RegisterChromeHost(string hostName, string executablePath,
+        IReadOnlyDictionary<string, string[]> allowedOriginsByBrowser);
 }

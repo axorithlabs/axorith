@@ -82,6 +82,28 @@ VIAddVersionKey "OriginalFilename" "${PRODUCT_NAME}-Setup-${PRODUCT_VERSION}.exe
 !define MUI_ABORTWARNING
 !insertmacro MUI_LANGUAGE "English"
 
+!macro CheckCommittedSession Action AllowedLabel
+    IfFileExists "$INSTDIR\Axorith.Host\Axorith.Host.exe" 0 ${AllowedLabel}
+    nsExec::ExecToStack '"$INSTDIR\Axorith.Host\Axorith.Host.exe" --check-committed-session'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" ${AllowedLabel}
+    ${If} $1 == ""
+        StrCpy $1 "Axorith could not verify whether a committed session is active."
+    ${EndIf}
+    MessageBox MB_OK|MB_ICONSTOP "$1 ${Action} is blocked."
+    Abort
+${AllowedLabel}:
+!macroend
+
+Function .onInit
+    !insertmacro CheckCommittedSession "Installation or update" on_init_allowed
+FunctionEnd
+
+Function un.onInit
+    !insertmacro CheckCommittedSession "Uninstall" un_on_init_allowed
+FunctionEnd
+
 Var DesktopRuntimeInstalled
 Var AspNetRuntimeInstalled
 
@@ -198,6 +220,7 @@ SectionEnd
 
 Section "MainSection" SEC_INSTALL
     SetShellVarContext current
+    !insertmacro CheckCommittedSession "Installation or update" install_section_allowed
 
     ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString"
     ${If} $0 != ""
@@ -244,6 +267,7 @@ Section "MainSection" SEC_INSTALL
 SectionEnd
 
 Section "Uninstall"
+    !insertmacro CheckCommittedSession "Uninstall" uninstall_section_allowed
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     Delete "$smprograms\${PRODUCT_NAME}.lnk"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"

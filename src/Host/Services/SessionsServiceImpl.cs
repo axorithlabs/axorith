@@ -1,4 +1,5 @@
 using Axorith.Contracts;
+using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
 using Axorith.Host.Streaming;
@@ -6,6 +7,8 @@ using Axorith.Shared.Exceptions;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Action = Axorith.Contracts.Action;
+using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
+using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
 
 namespace Axorith.Host.Services;
 
@@ -38,6 +41,27 @@ public class SessionsServiceImpl(
                 state.PresetId = snapshot.PresetId.ToString();
                 state.PresetName = snapshot.PresetName;
 
+                var activePreset = sessionManager.ActiveSession;
+                var commitment = activePreset?.FocusCommitment;
+                state.FocusCommitment = (Axorith.Contracts.FocusCommitmentMode)(commitment?.Mode ?? FocusCommitmentMode.Normal);
+                state.BreaksRemaining = sessionManager.BreaksRemaining;
+                state.BreaksTotal = commitment?.BreakCount ?? 0;
+                state.RemainingSeconds = (long)Math.Ceiling(sessionManager.SessionTimeRemaining?.TotalSeconds ?? 0);
+                state.BreakRemainingSeconds = (long)Math.Ceiling(sessionManager.BreakTimeRemaining?.TotalSeconds ?? 0);
+                state.AfterEnd = (Axorith.Contracts.AfterEndBehavior)(commitment?.AfterEnd ?? AfterEndBehavior.DoNothing);
+                state.ProtectionStatus = sessionManager.ProtectionStatus ?? "Protection active";
+                state.EmergencyUnlockAvailable = commitment?.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict;
+
+                if (sessionManager.BreakEndsAt is { } breakEndsAt)
+                {
+                    state.BreakEndsAt = Timestamp.FromDateTimeOffset(breakEndsAt);
+                }
+
+                if (sessionManager.SessionEndsAt is { } sessionEndsAt)
+                {
+                    state.EndsAt = Timestamp.FromDateTimeOffset(sessionEndsAt);
+                }
+
                 if (sessionManager.SessionStartedAt is { } startedAt)
                 {
                     state.StartedAt = Timestamp.FromDateTimeOffset(startedAt);
@@ -45,6 +69,8 @@ public class SessionsServiceImpl(
 
                 foreach (var module in snapshot.Modules)
                 {
+                    state.AppBlocking |= module.ModuleName.Contains("App Blocker", StringComparison.OrdinalIgnoreCase);
+                    state.WebsiteBlocking |= module.ModuleName.Contains("Site Blocker", StringComparison.OrdinalIgnoreCase);
                     var moduleState = new ModuleInstanceState
                     {
                         InstanceId = module.InstanceId.ToString(),
@@ -150,6 +176,36 @@ public class SessionsServiceImpl(
         }
     }
 
+    public override async Task<OperationResult> PreflightSession(PreflightSessionRequest request, ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.PresetId, out var presetId))
+        {
+            return SessionMapper.CreateResult(false, "Invalid Workspace ID", [$"Could not parse ID: {request.PresetId}"]);
+        }
+
+        var preset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken).ConfigureAwait(false);
+        if (preset == null)
+        {
+            return SessionMapper.CreateResult(false, "Workspace not found", [$"No Workspace found with ID: {presetId}"]);
+        }
+
+        try
+        {
+            await sessionManager.PreflightSessionAsync(preset, context.CancellationToken).ConfigureAwait(false);
+            return SessionMapper.CreateResult(true, "Preflight passed. The Host can start this Workspace.");
+        }
+        catch (SessionException ex)
+        {
+            logger.LogWarning(ex, "Session preflight failed: {Message}", ex.Message);
+            return SessionMapper.CreateResult(false, ex.Message, [ex.Message]);
+        }
+        catch (InvalidSettingsException ex)
+        {
+            return SessionMapper.CreateResult(false, ex.Message,
+                ex.InvalidKeys.Select(key => $"Invalid setting: {key}").ToList());
+        }
+    }
+
     public override async Task<OperationResult> StopSession(StopSessionRequest request, ServerCallContext context)
     {
         try
@@ -200,6 +256,85 @@ public class SessionsServiceImpl(
         {
             logger.LogError(ex, "Error streaming session events for {SubscriberId}", subscriberId);
             throw;
+        }
+    }
+
+    public override async Task<OperationResult> StartBreak(StartBreakRequest request, ServerCallContext context)
+    {
+        try
+        {
+            await sessionManager.StartBreakAsync(context.CancellationToken).ConfigureAwait(false);
+            return SessionMapper.CreateResult(true, "Break started.");
+        }
+        catch (SessionException ex)
+        {
+            return SessionMapper.CreateResult(false, ex.Message, [ex.Message]);
+        }
+    }
+
+    public override async Task HoldEmergencyUnlock(
+        IAsyncStreamReader<EmergencyUnlockHoldSignal> requestStream,
+        IServerStreamWriter<EmergencyUnlockHoldProgress> responseStream,
+        ServerCallContext context)
+    {
+        long? holdStartedAt = null;
+        long? lastSignalAt = null;
+
+        await foreach (var signal in requestStream.ReadAllAsync(context.CancellationToken).ConfigureAwait(false))
+        {
+            var mode = sessionManager.ActiveSession?.FocusCommitment.Mode;
+            if (mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
+            {
+                await responseStream.WriteAsync(new EmergencyUnlockHoldProgress
+                {
+                    Message = "There is no committed session to unlock."
+                }).ConfigureAwait(false);
+                return;
+            }
+
+            var now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (!signal.IsHeld)
+            {
+                holdStartedAt = null;
+                lastSignalAt = null;
+                continue;
+            }
+
+            if (!holdStartedAt.HasValue || lastSignalAt.HasValue &&
+                System.Diagnostics.Stopwatch.GetElapsedTime(lastSignalAt.Value, now) > TimeSpan.FromSeconds(1))
+            {
+                holdStartedAt = now;
+            }
+
+            lastSignalAt = now;
+            var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(holdStartedAt.Value, now);
+            if (elapsed >= TimeSpan.FromSeconds(60))
+            {
+                var ended = await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock,
+                    context.CancellationToken).ConfigureAwait(false);
+                if (!ended)
+                {
+                    await responseStream.WriteAsync(new EmergencyUnlockHoldProgress
+                    {
+                        Message = "There is no committed session to unlock."
+                    }).ConfigureAwait(false);
+                    return;
+                }
+
+                await responseStream.WriteAsync(new EmergencyUnlockHoldProgress
+                {
+                    Progress = 1,
+                    Completed = true,
+                    Message = "Session ended by Emergency Unlock."
+                }).ConfigureAwait(false);
+                return;
+            }
+
+            await responseStream.WriteAsync(new EmergencyUnlockHoldProgress
+            {
+                Progress = Math.Clamp(elapsed.TotalSeconds / 60, 0, 1),
+                Message = "Keep holding to unlock."
+            }).ConfigureAwait(false);
         }
     }
 }

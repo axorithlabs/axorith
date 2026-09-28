@@ -12,19 +12,49 @@
     </UserControl.Resources>
     
     <Grid RowDefinitions="Auto, *, Auto" Margin="0">
-        <Border Grid.Row="0" 
+        <Border Grid.Row="0" IsEnabled="{Binding !IsOverlayOpen}"
                 BorderThickness="0,0,0,1" 
                 BorderBrush="#333" 
                 Padding="12" 
                 Background="#050505">
-            <TextBlock Text="{Binding SessionStatus}" 
-                       HorizontalAlignment="Center" 
-                       VerticalAlignment="Center"
-                       Foreground="#999" 
-                       FontSize="13"/>
+            <StackPanel Spacing="8" HorizontalAlignment="Stretch">
+                <Border Classes="Card" Padding="16,12" Margin="12,0"
+                        IsVisible="{Binding IsSessionStatusNoticeVisible}">
+                    <TextBlock Text="{Binding SessionStatus}" Foreground="#DDD"
+                               TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                </Border>
+                <Border x:Name="ActiveSessionCard" Classes="Card" Padding="16,12" Margin="12,0"
+                        IsVisible="{Binding IsSessionActive}">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+                            <TextBlock Text="{Binding ActiveWorkspaceName}" FontSize="20" FontWeight="Bold"
+                                       Foreground="#FFF"/>
+                            <TextBlock Text="{Binding ActiveSessionMode}" Foreground="#AAA"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" Spacing="2">
+                            <TextBlock Text="{Binding ActiveSessionRemaining}" FontSize="24" FontWeight="Bold"
+                                       Foreground="#FFF" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding ActiveSessionEndTime}" Foreground="#AAA"
+                                       HorizontalAlignment="Right"/>
+                        </StackPanel>
+                        <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                            <TextBlock Text="{Binding ActiveBreakStatus}" Foreground="#CCC" Margin="0,0,18,4"
+                                       IsVisible="{Binding HasActiveBreakStatus}"/>
+                            <TextBlock x:Name="ProtectionStatusText" Text="{Binding ActiveProtectionStatus}"
+                                       Foreground="{Binding ActiveProtectionBrush}"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       IsVisible="{Binding IsProtectionAttentionVisible}"/>
+                        </WrapPanel>
+                        <Button Grid.Row="2" Grid.Column="1" Content="Start Break"
+                                Command="{Binding StartBreakCommand}" Classes="accent"
+                                HorizontalAlignment="Right" Margin="0,10,0,0"
+                                IsVisible="{Binding CanStartBreak}"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
         </Border>
 
-        <Grid Grid.Row="1">
+        <Grid x:Name="WorkspaceListArea" Grid.Row="1" IsEnabled="{Binding !IsOverlayOpen}">
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         IsVisible="{Binding !Presets.Count}"
@@ -132,8 +162,7 @@
                                     </ItemsControl>
 
                                     <Panel DockPanel.Dock="Bottom" Margin="0,25,0,0">
-                                         <StackPanel Orientation="Horizontal" Spacing="8" 
-                                                     Opacity="{Binding $parent[ListBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}"
+                                         <StackPanel x:Name="PresetActionButtons" Orientation="Horizontal" Spacing="8"
                                                      HorizontalAlignment="Center">
                                             <Button Content="Start" 
                                                     Classes="accent"
@@ -199,7 +228,7 @@
             </ScrollViewer>
         </Grid>
 
-        <Border Grid.Row="2" 
+        <Border Grid.Row="2" IsEnabled="{Binding !IsOverlayOpen}"
                 Background="#0A0A0A" 
                 BorderBrush="#333" 
                 BorderThickness="0,1,0,0" 
@@ -219,18 +248,27 @@
                             Orientation="Horizontal" 
                             Spacing="20" 
                             HorizontalAlignment="Center">
-                    <Button Content="Create New Session" 
+                    <Button x:Name="CreateSessionButton" Content="Create New Session"
                             Command="{Binding CreateSessionCommand}" 
                             IsVisible="{Binding !IsSessionActive}"
                             MinWidth="200"
                             HorizontalContentAlignment="Center"/>
 
-                    <Button Content="Stop Current Session" 
+                    <Button x:Name="StopSessionButton" Content="Stop Current Session"
                             Command="{Binding StopSessionCommand}" 
                             Classes="danger"
                             Padding="30,8"
                             FontWeight="Bold"
-                            IsVisible="{Binding IsSessionActive}"
+                            IsVisible="{Binding CanStopSession}"
+                            MinWidth="200"
+                            HorizontalContentAlignment="Center"/>
+
+                    <Button x:Name="OpenEmergencyUnlockButton" Content="Emergency Unlock"
+                            Command="{Binding OpenEmergencyUnlockCommand}"
+                            Classes="danger"
+                            Padding="30,8"
+                            FontWeight="Bold"
+                            IsVisible="{Binding IsCommittedSession}"
                             MinWidth="200"
                             HorizontalContentAlignment="Center"/>
 
@@ -255,6 +293,92 @@
                 </StackPanel>
 
             </Grid>
+        </Border>
+
+        <Border Grid.Row="0" Grid.RowSpan="3" ZIndex="999"
+                Background="#D9000000" IsVisible="{Binding IsStartConfirmationOpen}">
+            <ScrollViewer x:Name="StartDialogScrollViewer" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="16">
+            <Border x:Name="StartDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
+                    MaxWidth="720" Padding="28" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center" Background="#111" BorderBrush="#555">
+                <StackPanel x:Name="StartDialogContent" Spacing="18" KeyboardNavigation.TabNavigation="Cycle">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="{Binding StartReviewTitle}" FontSize="22" FontWeight="Bold"
+                                   Foreground="#FFF"/>
+                        <TextBlock Text="{Binding StartReviewWorkspaceName}" FontSize="17"
+                                   FontWeight="SemiBold" Foreground="#DDD"/>
+                        <TextBlock Text="{Binding StartReviewEndTime}" Foreground="#AAA" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Border BorderBrush="#333" BorderThickness="0,1,0,0"/>
+                    <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                          ColumnSpacing="12" RowSpacing="14">
+                        <TextBlock Grid.Row="0" Text="Applications" FontWeight="SemiBold" Foreground="#CCC"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StartReviewApps}"
+                                   Foreground="#AAA" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="1" Text="Blockers" FontWeight="SemiBold" Foreground="#CCC"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StartReviewBlockers}"
+                                   Foreground="#AAA" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="2" Text="Breaks" FontWeight="SemiBold" Foreground="#CCC"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding StartReviewBreakPolicy}"
+                                   Foreground="#AAA" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="3" Text="After it ends" FontWeight="SemiBold" Foreground="#CCC"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
+                                   Foreground="#AAA" TextWrapping="Wrap"
+                                   IsVisible="{Binding !IsDestructiveStartReviewAfterEnd}"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
+                                   Foreground="#E6C878" FontWeight="Bold" TextWrapping="Wrap"
+                                   IsVisible="{Binding IsDestructiveStartReviewAfterEnd}"/>
+                    </Grid>
+                    <TextBlock Text="Strict also limits common Windows bypass tools for the session."
+                               Foreground="#E6C878" TextWrapping="Wrap" IsVisible="{Binding IsStrictStartReview}"/>
+                    <TextBlock Text="{Binding StartCountdownSeconds, StringFormat='Starting in {0} seconds…'}"
+                               Foreground="#E6C878" HorizontalAlignment="Center"
+                               IsVisible="{Binding IsStartCountdownRunning}"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"
+                                Margin="0,8,0,0">
+                        <Button x:Name="StartConfirmationCancelButton" Content="Cancel" Width="80"
+                                Command="{Binding CancelStartCommand}" Height="42"/>
+                        <Button Content="Start Session" Command="{Binding ConfirmStartCommand}"
+                                Classes="accent" Width="120" Height="42"
+                                IsEnabled="{Binding !IsStartCountdownRunning}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Row="0" Grid.RowSpan="3" ZIndex="1000"
+                Background="#D9000000" IsVisible="{Binding IsEmergencyUnlockOpen}">
+            <ScrollViewer x:Name="EmergencyDialogScrollViewer" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="16">
+            <Border x:Name="EmergencyDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
+                    MaxWidth="520" Padding="28" HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Background="#111" BorderBrush="#555">
+                <StackPanel x:Name="EmergencyDialogContent" Spacing="16" KeyboardNavigation.TabNavigation="Cycle">
+                    <TextBlock Text="Emergency Unlock" FontSize="22" FontWeight="Bold"
+                               Foreground="#FFF" HorizontalAlignment="Center"/>
+                    <TextBlock Text="This immediately ends the committed session and restores its temporary protections. Any after-end action is skipped."
+                               Foreground="#AAA" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <ProgressBar Value="{Binding EmergencyUnlockProgress}" Minimum="0" Maximum="1" Height="8"
+                                 AutomationProperties.Name="Emergency Unlock hold progress"/>
+                    <TextBlock Text="Hold continuously for 60 seconds. Releasing or losing focus cancels the hold."
+                               Foreground="#AAA" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="{Binding EmergencyUnlockError}" Foreground="#E88"
+                               TextWrapping="Wrap" TextAlignment="Center"
+                               IsVisible="{Binding HasEmergencyUnlockError}"/>
+                    <Button x:Name="EmergencyUnlockHoldButton" Content="Hold to unlock for 60 seconds"
+                            Classes="danger"
+                            AutomationProperties.HelpText="Keep holding continuously. Releasing or losing focus resets progress."
+                            HorizontalAlignment="Stretch"
+                            Height="54"
+                            PointerCaptureLost="OnEmergencyUnlockPointerCaptureLost"
+                            LostFocus="OnEmergencyUnlockLostFocus"/>
+                    <Button Content="Cancel" Command="{Binding CloseEmergencyUnlockCommand}"
+                            HorizontalAlignment="Stretch"/>
+                </StackPanel>
+            </Border>
+            </ScrollViewer>
         </Border>
     </Grid>
 </UserControl>

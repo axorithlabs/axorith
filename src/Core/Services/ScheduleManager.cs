@@ -35,23 +35,46 @@ public class ScheduleManager(
 
     private Task? _loopTask;
     private CancellationTokenSource? _loopCts;
+    private CancellationToken _applicationStoppingToken;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await LoadAsync(cancellationToken);
 
         sessionManager.SessionStarted += OnSessionStarted;
-
-        _loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _loopTask = RunSchedulerLoopAsync(_loopCts.Token);
+        _applicationStoppingToken = cancellationToken;
 
         logger.LogInformation("Scheduler started with {Count} schedules", _schedules.Count);
+    }
+
+    public Task StartProcessingAsync(CancellationToken cancellationToken)
+    {
+        if (_loopTask != null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _loopCts = CancellationTokenSource.CreateLinkedTokenSource(_applicationStoppingToken, cancellationToken);
+        _loopTask = RunSchedulerLoopAsync(_loopCts.Token);
+        return Task.CompletedTask;
     }
 
     private async void OnSessionStarted(Guid presetId)
     {
         try
         {
+            var activePreset = sessionManager.ActiveSession;
+            if (activePreset?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+            {
+                var remaining = sessionManager.SessionEndsAt - DateTimeOffset.UtcNow;
+                await autoStopService.StartTrackingAsync(
+                    presetId,
+                    remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero,
+                    activePreset.FocusCommitment.NextWorkspaceId,
+                    CancellationToken.None).ConfigureAwait(false);
+                return;
+            }
+
             var schedules = await GetSchedulesForPresetAsync(presetId, CancellationToken.None);
 
             var durationSchedule = schedules.FirstOrDefault(s =>
@@ -104,6 +127,39 @@ public class ScheduleManager(
         {
             _lock.Release();
         }
+    }
+
+    public async Task<ConfigurationLockStatus> GetConfigurationLockStatusAsync(Guid presetId,
+        CancellationToken cancellationToken)
+    {
+        var preset = await presetManager.GetPresetByIdAsync(presetId, cancellationToken).ConfigureAwait(false);
+        var lockMinutes = preset?.FocusCommitment.ScheduleLockMinutes ?? 0;
+        if (lockMinutes <= 0)
+        {
+            return new ConfigurationLockStatus(false, null);
+        }
+
+        if (lockMinutes is not (5 or 15 or 60))
+        {
+            throw new InvalidOperationException("Schedule lock must be Off, 5 minutes, 15 minutes, or 1 hour.");
+        }
+
+        var now = DateTimeOffset.Now;
+        var schedules = await ListSchedulesAsync(cancellationToken).ConfigureAwait(false);
+        var nextStart = schedules
+            .Where(s => s.PresetId == presetId && s.IsEnabled &&
+                        (s.Type is ScheduleType.OneTime or ScheduleType.Recurring))
+            .Select(s => s.GetNextRun(now))
+            .Where(run => run.HasValue)
+            .Select(run => run.GetValueOrDefault() - now)
+            .Where(remaining => remaining >= TimeSpan.FromSeconds(-30) && remaining <= TimeSpan.FromMinutes(lockMinutes))
+            .OrderBy(remaining => remaining)
+            .Select(remaining => (TimeSpan?)remaining)
+            .FirstOrDefault();
+
+        return nextStart.HasValue
+            ? new ConfigurationLockStatus(true, nextStart.Value > TimeSpan.Zero ? nextStart : TimeSpan.Zero)
+            : new ConfigurationLockStatus(false, null);
     }
 
     public async Task<SessionSchedule> SaveScheduleAsync(SessionSchedule schedule, CancellationToken cancellationToken)
@@ -218,6 +274,12 @@ public class ScheduleManager(
 
                 if (schedule.Type == ScheduleType.StopRecurring)
                 {
+                    if (sessionManager.ActiveSession?.FocusCommitment.Mode is
+                        FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+                    {
+                        continue;
+                    }
+
                     if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
                     {
                         await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromSeconds(15), "15 seconds", ct);
@@ -306,28 +368,13 @@ public class ScheduleManager(
 
                 await notifier.ShowSystemAsync("Session Scheduler", "Stopping session now...");
 
-                await sessionManager.StopCurrentSessionAsync(ct);
-
-                logger.LogInformation("Session stopped successfully by schedule '{Name}'", schedule.Name);
-
-                if (schedule.NextPresetId.HasValue)
+                var expectedSession = sessionManager.ActiveSession;
+                if (expectedSession == null ||
+                    !await autoStopService.CompleteNaturallyAsync(expectedSession, schedule.NextPresetId, ct)
+                        .ConfigureAwait(false))
                 {
-                    var nextPreset = await presetManager.GetPresetByIdAsync(schedule.NextPresetId.Value, ct);
-                    if (nextPreset != null)
-                    {
-                        logger.LogInformation("Starting next preset '{NextPresetName}' as configured in schedule",
-                            nextPreset.Name);
-                        await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{nextPreset.Name}' now...");
-
-                        await sessionManager.StartSessionAsync(nextPreset, ct);
-
-                        logger.LogInformation("Next preset '{NextPresetName}' started successfully", nextPreset.Name);
-                    }
-                    else
-                    {
-                        logger.LogWarning("Next preset {NextPresetId} not found for schedule '{Name}'",
-                            schedule.NextPresetId.Value, schedule.Name);
-                    }
+                    logger.LogInformation("Session ended before stop schedule '{Name}' could acquire the natural-end gate.",
+                        schedule.Name);
                 }
 
                 await UpdateLastRunAsync(schedule, now, ct);

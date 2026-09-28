@@ -31,6 +31,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
                 description = "Native messaging host for Axorith",
                 path = executablePath,
                 type = "stdio",
+                args = new[] { "--browser=firefox" },
                 allowed_extensions = allowedExtensions
             };
 
@@ -62,7 +63,8 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         }
     }
 
-    public void RegisterChromeHost(string hostName, string executablePath, string[] allowedOrigins)
+    public void RegisterChromeHost(string hostName, string executablePath,
+        IReadOnlyDictionary<string, string[]> allowedOriginsByBrowser)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostName);
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
@@ -77,33 +79,16 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         {
             var manifestDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.NativeMessagingChrome);
 
-            var manifest = new
-            {
-                name = hostName,
-                description = "Native messaging host for Axorith",
-                path = executablePath,
-                type = "stdio",
-                allowed_origins = allowedOrigins
-            };
+            var chromeManifest = WriteChromeManifest(manifestDir, hostName, executablePath,
+                allowedOriginsByBrowser.GetValueOrDefault("chrome", []), "chrome");
+            var edgeManifest = WriteChromeManifest(manifestDir, hostName, executablePath,
+                allowedOriginsByBrowser.GetValueOrDefault("edge", []), "edge");
+            var chromiumManifest = WriteChromeManifest(manifestDir, hostName, executablePath,
+                allowedOriginsByBrowser.GetValueOrDefault("chromium", []), "chromium");
 
-            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-            var jsonContent = JsonSerializer.Serialize(manifest, jsonOptions);
-
-            var manifestFileName = $"{hostName}.json";
-            var manifestPath = Path.Combine(manifestDir, manifestFileName);
-
-            File.WriteAllText(manifestPath, jsonContent);
-            logger.LogDebug("Generated Chrome Native Messaging manifest at: {Path}",
-                TelemetryGuard.SafePath(manifestPath));
-
-            var chromeRegistryPath = $@"Software\Google\Chrome\NativeMessagingHosts\{hostName}";
-            RegisterInRegistry(chromeRegistryPath, manifestPath);
-
-            var chromiumRegistryPath = $@"Software\Chromium\NativeMessagingHosts\{hostName}";
-            RegisterInRegistry(chromiumRegistryPath, manifestPath);
-
-            var edgeRegistryPath = $@"Software\Microsoft\Edge\NativeMessagingHosts\{hostName}";
-            RegisterInRegistry(edgeRegistryPath, manifestPath);
+            RegisterInRegistry($@"Software\Google\Chrome\NativeMessagingHosts\{hostName}", chromeManifest);
+            RegisterInRegistry($@"Software\Microsoft\Edge\NativeMessagingHosts\{hostName}", edgeManifest);
+            RegisterInRegistry($@"Software\Chromium\NativeMessagingHosts\{hostName}", chromiumManifest);
 
             logger.LogInformation("Successfully registered Chrome/Chromium Native Messaging Host '{HostName}'",
                 hostName);
@@ -113,6 +98,26 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             logger.LogError(ex, "Failed to register Chrome Native Messaging Host '{HostName}'", hostName);
             throw;
         }
+    }
+
+    private string WriteChromeManifest(string manifestDir, string hostName, string executablePath,
+        string[] allowedOrigins, string browser)
+    {
+        var manifest = new
+        {
+            name = hostName,
+            description = "Native messaging host for Axorith",
+            path = executablePath,
+            type = "stdio",
+            args = new[] { $"--browser={browser}" },
+            allowed_origins = allowedOrigins
+        };
+
+        var manifestPath = Path.Combine(manifestDir, $"{hostName}.{browser}.json");
+        File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+        logger.LogDebug("Generated {Browser} Native Messaging Host manifest at: {Path}", browser,
+            TelemetryGuard.SafePath(manifestPath));
+        return manifestPath;
     }
 
     private void RegisterInRegistry(string registryPath, string manifestPath)

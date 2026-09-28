@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia 12 Migration"
+  short_description: "Upgrade from Avalonia 11.3.12 using the dedicated migration lane"
+  default_prompt: "Use $avalonia-12-migration to plan or execute an upgrade from Avalonia 11 to Avalonia 12"

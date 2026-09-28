@@ -17,9 +17,9 @@ public class SessionPreset
 
     /// <summary>
     ///     Schema version for preset format. Used for migration when structure changes.
-    ///     Current version: 1
+    ///     Current version: 3
     /// </summary>
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 3;
 
     /// <summary>
     ///     A unique identifier for this preset. Crucial for updating and deleting.
@@ -30,6 +30,8 @@ public class SessionPreset
     ///     The user-friendly name of the preset, e.g., "Morning Coding Focus".
     /// </summary>
     public string Name { get; set; } = string.Empty;
+
+    public FocusCommitmentOptions FocusCommitment { get; set; } = new();
 
     /// <summary>
     ///     The list of modules that are part of this session, along with their specific configurations.

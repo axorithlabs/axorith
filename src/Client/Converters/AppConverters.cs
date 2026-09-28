@@ -20,12 +20,6 @@ public static class AppConverters
     public static readonly IValueConverter IsStopAfterDurationTrigger =
         new FuncValueConverter<object?, bool>(value => value is StopAfterDurationTriggerViewModel);
 
-    /// <summary>
-    ///     Returns true if the value is a ThenStartAnotherTriggerViewModel.
-    /// </summary>
-    public static readonly IValueConverter IsThenStartAnotherTrigger =
-        new FuncValueConverter<object?, bool>(value => value is ThenStartAnotherTriggerViewModel);
-
     public static readonly IValueConverter IsNotNullOrEmpty =
         new FuncValueConverter<string?, bool>(value => !string.IsNullOrEmpty(value));
 

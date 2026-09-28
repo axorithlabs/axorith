@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
+             xmlns:core="using:Axorith.Core.Models"
              xmlns:converters="using:Axorith.Client.Converters"
              xmlns:selectors="using:Axorith.Client.Selectors"
              xmlns:sdk="clr-namespace:Axorith.Sdk;assembly=Axorith.Sdk"
@@ -11,6 +12,17 @@
             <Setter Property="BorderBrush" Value="#FF4444"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="#1F0505"/>
+        </Style>
+        <Style Selector="Border.ItemCard">
+            <Setter Property="Background" Value="#111"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+        <Style Selector="Border.ItemCard.error">
+            <Setter Property="Background" Value="#111"/>
+            <Setter Property="BorderBrush" Value="#FF6B6B"/>
         </Style>
         
         <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ RepeatButton">
@@ -91,6 +103,10 @@
         <StreamGeometry x:Key="DeleteIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z</StreamGeometry>
         <StreamGeometry x:Key="CloseIcon">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
         <StreamGeometry x:Key="PlayIcon">M8,5.14V19.14L19,12.14L8,5.14Z</StreamGeometry>
+        <StreamGeometry x:Key="LockPcIcon">M18,8H17V6A5,5 0 0,0 7,6V8H6A2,2 0 0,0 4,10V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V10A2,2 0 0,0 18,8M9,6A3,3 0 0,1 15,6V8H9V6M18,20H6V10H18V20M12,12A2,2 0 0,0 10,14C10,14.74 10.4,15.38 11,15.73V18H13V15.73C13.6,15.38 14,14.74 14,14A2,2 0 0,0 12,12Z</StreamGeometry>
+        <StreamGeometry x:Key="SleepPcIcon">M12,2A10,10 0 1,0 22,12C22,11.53 21.97,11.07 21.9,10.62A8,8 0 0,1 11.38,2.1C11.58,2.04 11.79,2 12,2M12,20A8,8 0 0,1 8.42,4.84A10,10 0 0,0 19.16,15.58A8,8 0 0,1 12,20Z</StreamGeometry>
+        <StreamGeometry x:Key="SignOutIcon">M17,7L15.59,8.41L18.17,11H8V13H18.17L15.59,15.59L17,17L22,12L17,7M4,5H12V3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H12V19H4V5Z</StreamGeometry>
+        <StreamGeometry x:Key="PowerIcon">M13,3H11V13H13V3M17.83,6.17L16.41,7.59A8,8 0 1,1 7.59,7.59L6.17,6.17A10,10 0 1,0 17.83,6.17Z</StreamGeometry>
 
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
             <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
@@ -275,8 +291,6 @@
                                         Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}" 
                                         CommandParameter="{Binding}"
                                         Width="24" Height="24" Padding="4" Margin="8,0,0,0" 
-                                        Opacity="{Binding $parent[ComboBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}"
-                                        IsHitTestVisible="{Binding $parent[ComboBoxItem].IsPointerOver}"
                                         ToolTip.Tip="Remove from history">
                                     <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
                                               Width="12" Height="12"
@@ -328,8 +342,6 @@
                                         Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}" 
                                         CommandParameter="{Binding}"
                                         Width="24" Height="24" Padding="4" Margin="8,0,0,0" 
-                                        Opacity="{Binding $parent[ComboBoxItem].IsPointerOver, Converter={x:Static converters:AppConverters.BoolToDoubleConverter}}"
-                                        IsHitTestVisible="{Binding $parent[ComboBoxItem].IsPointerOver}"
                                         ToolTip.Tip="Remove from history">
                                     <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
                                               Width="12" Height="12"
@@ -415,6 +427,49 @@
                         </StackPanel>
                     </Border>
 
+                    <Border x:Name="FocusCommitmentCard" Classes="Card" Padding="24" Margin="0,40,0,0" Width="500">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Focus commitment" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            <TextBlock Text="Choose whether this Workspace can be stopped once it starts."
+                                       Foreground="#888" FontSize="13" TextWrapping="Wrap"/>
+                            <ComboBox ItemsSource="{Binding FocusCommitmentModes}"
+                                      SelectedIndex="{Binding FocusCommitmentModeIndex, Mode=TwoWay}"/>
+
+                            <StackPanel IsVisible="{Binding IsCommittedMode}" Spacing="10">
+                                <Border Background="#1A1710" BorderBrush="#665522" BorderThickness="1"
+                                        CornerRadius="6" Padding="10" IsVisible="{Binding IsStrictMode}">
+                                    <TextBlock Text="Strict requires Windows protection. The Host will refuse to start if it cannot enable that protection."
+                                               Foreground="#E6C878" FontSize="12" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <TextBlock Text="Breaks" FontWeight="SemiBold" Foreground="#CCC" Margin="0,4,0,0"/>
+                                <ComboBox ItemsSource="{Binding BreakOptions}"
+                                          SelectedIndex="{Binding BreakPresetIndex, Mode=TwoWay}"/>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsCustomBreakBudget}">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Number of breaks" Foreground="#AAA" FontSize="12"/>
+                                        <NumericUpDown Value="{Binding BreakCount, Mode=TwoWay}" Minimum="1" Maximum="5"
+                                                       Increment="1" FormatString="0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="5">
+                                        <TextBlock Text="Minutes per break" Foreground="#AAA" FontSize="12"/>
+                                        <NumericUpDown Value="{Binding BreakDurationMinutes, Mode=TwoWay}" Minimum="1" Maximum="60"
+                                                       Increment="1" FormatString="0"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel x:Name="ScheduleLockPanel" Spacing="8" IsVisible="{Binding HasScheduledStart}">
+                                    <TextBlock Text="Lock configuration before scheduled start" FontWeight="SemiBold"
+                                               Foreground="#CCC" Margin="0,4,0,0"/>
+                                    <ComboBox ItemsSource="{Binding ScheduleLockOptions}"
+                                              SelectedIndex="{Binding ScheduleLockIndex, Mode=TwoWay}"/>
+                                    <TextBlock Text="{Binding ScheduledConfigurationLockStatus}"
+                                               Foreground="#E6C878" FontSize="12" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
                     <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
@@ -454,7 +509,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <Button HorizontalAlignment="Stretch" 
+                            <Button HorizontalAlignment="Stretch"
                                     Background="Transparent" 
                                     BorderBrush="#333" 
                                     BorderThickness="1" 
@@ -616,10 +671,10 @@
 
                     <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
-                    <Border Classes="Card" Padding="24" MinWidth="500">
+                    <Border x:Name="StopOnCard" Classes="Card" Padding="24" MinWidth="500">
                         <StackPanel Spacing="15">
-                            <TextBlock Text="Stop On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
-                            
+                            <TextBlock x:Name="StopOnHeading" Text="Stop On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+
                             <ItemsControl ItemsSource="{Binding StopTriggers}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:TriggerViewModel">
@@ -654,7 +709,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <Button HorizontalAlignment="Stretch" 
+                            <Button x:Name="AddStopTriggerButton" HorizontalAlignment="Stretch"
                                     Background="Transparent" 
                                     BorderBrush="#333" 
                                     BorderThickness="1" 
@@ -685,7 +740,7 @@
                                 </StackPanel>
                             </Button>
                             
-                            <TextBlock Text="If empty, stop manually via button." 
+                            <TextBlock Text="If empty, stop manually via button."
                                        HorizontalAlignment="Center" 
                                        Foreground="#666" 
                                        FontSize="12" 
@@ -696,45 +751,55 @@
 
                     <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
-                    <Border Classes="Card" Padding="24" MinWidth="500" Margin="0,0,0,120">
+                    <Border x:Name="ThenCard" Classes="Card" Padding="24" MinWidth="500" Margin="0,0,0,120">
                         <StackPanel Spacing="15">
-                            <TextBlock Text="Then..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
-                            
+                            <TextBlock x:Name="ThenHeading" Text="Then..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+
                             <ItemsControl ItemsSource="{Binding ThenTriggers}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:ThenStartAnotherTriggerViewModel">
-                                        <Button Classes="ItemCard" 
-                                                Command="{Binding $parent[ItemsControl].DataContext.EditThenTriggerCommand}" 
-                                                CommandParameter="{Binding}"
-                                                Margin="0,0,0,10"
+                                    <DataTemplate x:DataType="vm:ThenActionTriggerViewModel">
+                                        <Border Classes="ItemCard" Margin="0,0,0,10"
                                                 Classes.error="{Binding HasError}">
-                                            <Border>
-                                                <Grid ColumnDefinitions="Auto, *, Auto">
-                                                    <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
-                                                        <PathIcon Data="{StaticResource PlayIcon}" Width="20" Height="20" Foreground="#4CAF50"/>
-                                                    </Border>
-                                                    
-                                                    <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
-                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
-                                                        <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
-                                                    </StackPanel>
-                                                    
-                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                        <Button Classes="delete-btn" 
-                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveThenTriggerCommand}" 
-                                                                CommandParameter="{Binding}" 
-                                                                ToolTip.Tip="Remove">
-                                                            <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </Button>
+                                            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                                <Border Background="#222" CornerRadius="6" Width="40" Height="40"
+                                                        VerticalAlignment="Center">
+                                                    <PathIcon Data="{StaticResource PlayIcon}" Width="20" Height="20"
+                                                              Foreground="#4CAF50"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
+                                                    <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.7"
+                                                               IsVisible="{Binding !IsNoOtherPresetsAvailable}"/>
+                                                    <TextBlock Text="No other Workspaces are available."
+                                                               FontSize="13" Opacity="0.7"
+                                                               IsVisible="{Binding IsNoOtherPresetsAvailable}"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="2" Classes="delete-btn"
+                                                        Command="{Binding $parent[ItemsControl].DataContext.RemoveThenTriggerCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Remove">
+                                                    <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
+                                                </Button>
+                                                <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                                          Margin="15,10,0,0"
+                                                          ItemsSource="{Binding $parent[UserControl].DataContext.AvailablePresetsForNext}"
+                                                          SelectedItem="{Binding SelectedNextPreset}"
+                                                          IsVisible="{Binding IsNextPresetSelectionVisible}"
+                                                          HorizontalAlignment="Stretch"
+                                                          PlaceholderText="Select Workspace"
+                                                          Height="36">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Name}"/>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                </ComboBox>
+                                            </Grid>
+                                        </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <Button HorizontalAlignment="Stretch" 
+                            <Button x:Name="AddThenTriggerButton" HorizontalAlignment="Stretch"
                                     Background="Transparent" 
                                     BorderBrush="#333" 
                                     BorderThickness="1" 
@@ -743,11 +808,40 @@
                                     Cursor="Hand">
                                 <Button.Flyout>
                                     <MenuFlyout Placement="Bottom">
-                                        <MenuItem Header="Start Another Session" 
-                                                  Command="{Binding AddThenStartAnotherTriggerCommand}"
-                                                  IsEnabled="{Binding CanAddThenStartAnotherTrigger}">
+                                        <MenuItem Header="Start next Workspace"
+                                                  Command="{Binding AddThenActionTriggerCommand}"
+                                                  CommandParameter="{x:Static core:AfterEndBehavior.StartNextWorkspace}"
+                                                  IsEnabled="{Binding CanAddThenActionTrigger}">
                                             <MenuItem.Icon>
                                                 <PathIcon Data="{StaticResource PlayIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Lock PC" Command="{Binding AddThenActionTriggerCommand}"
+                                                  CommandParameter="{x:Static core:AfterEndBehavior.LockPc}"
+                                                  IsEnabled="{Binding CanAddThenActionTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource LockPcIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Sleep" Command="{Binding AddThenActionTriggerCommand}"
+                                                  CommandParameter="{x:Static core:AfterEndBehavior.Sleep}"
+                                                  IsEnabled="{Binding CanAddThenActionTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource SleepPcIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Sign out" Command="{Binding AddThenActionTriggerCommand}"
+                                                  CommandParameter="{x:Static core:AfterEndBehavior.SignOut}"
+                                                  IsEnabled="{Binding CanAddThenActionTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource SignOutIcon}" Width="14" Height="14"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Shut down PC" Command="{Binding AddThenActionTriggerCommand}"
+                                                  CommandParameter="{x:Static core:AfterEndBehavior.ShutDownPc}"
+                                                  IsEnabled="{Binding CanAddThenActionTrigger}">
+                                            <MenuItem.Icon>
+                                                <PathIcon Data="{StaticResource PowerIcon}" Width="14" Height="14"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
                                     </MenuFlyout>
@@ -758,7 +852,7 @@
                                 </StackPanel>
                             </Button>
                             
-                            <TextBlock Text="Triggers next session after stop. Does not apply when stopped manually." 
+                            <TextBlock Text="Triggers next session after stop. Does not apply when stopped manually."
                                        HorizontalAlignment="Center" 
                                        Foreground="#666" 
                                        FontSize="12"
@@ -1124,63 +1218,6 @@
                                         <TextBlock Text="Session will automatically stop after this duration from start." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
                                     </StackPanel>
                                     <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </ScrollViewer>
-                    </Grid>
-                </Border>
-            </Panel>
-        </DataTemplate>
-            </TransitioningContentControl.ContentTemplate>
-        </TransitioningContentControl>
-
-        <TransitioningContentControl Content="{Binding SelectedThenTrigger}" IsVisible="{Binding SelectedThenTrigger, Converter={x:Static converters:AppConverters.IsThenStartAnotherTrigger}}">
-            <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.15"/>
-            </TransitioningContentControl.PageTransition>
-            <TransitioningContentControl.ContentTemplate>
-                <DataTemplate x:DataType="vm:ThenStartAnotherTriggerViewModel">
-            <Panel>
-                <Border Background="#000000" Opacity="0.85"/>
-                <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
-                    <Grid RowDefinitions="Auto, *">
-                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseThenTriggerSettingsCommand}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <PathIcon Data="{StaticResource PlayIcon}" Width="18" Height="18" Foreground="#4CAF50" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Start Another Session" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                            <Border Padding="24">
-                                <StackPanel Spacing="24">
-                                    <StackPanel Spacing="20">
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Next Session" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
-                                            <Grid Grid.Column="1">
-                                                <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.AvailablePresetsForNext}" 
-                                                          SelectedItem="{Binding SelectedNextPreset}"
-                                                          IsVisible="{Binding IsNextPresetSelectionVisible}"
-                                                          HorizontalAlignment="Stretch" 
-                                                          PlaceholderText="Select session to start..."
-                                                          Height="36">
-                                                    <ComboBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <TextBlock Text="{Binding Name}"/>
-                                                        </DataTemplate>
-                                                    </ComboBox.ItemTemplate>
-                                                </ComboBox>
-                                                <Border IsVisible="{Binding IsNoOtherPresetsAvailable}" 
-                                                        Background="#2A1100" BorderBrush="#552200" BorderThickness="1" CornerRadius="4" Padding="8">
-                                                    <TextBlock Text="No other presets available to start." Foreground="#FFAA00" FontSize="12"/>
-                                                </Border>
-                                            </Grid>
-                                        </Grid>
-                                        <TextBlock Text="This session will start automatically after the current session stops." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
-                                    </StackPanel>
-                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseThenTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </Border>
                         </ScrollViewer>

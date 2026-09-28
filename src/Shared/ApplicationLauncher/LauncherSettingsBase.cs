@@ -217,7 +217,7 @@ public abstract class LauncherSettingsBase : IDisposable
         else
         {
             var mode = ProcessMode.GetCurrentValue();
-            if (mode == "LaunchNew" && Path.IsPathRooted(appPath) && !File.Exists(appPath))
+            if (mode != "AttachExisting" && Path.IsPathRooted(appPath) && !File.Exists(appPath))
             {
                 errors[ApplicationPath.Key] = $"File not found at '{appPath}'.";
             }
