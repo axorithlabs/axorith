@@ -14,32 +14,6 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <Style Selector="Button.NavItem, Button.SectionNav">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="Padding" Value="12,9" />
-        </Style>
-        <Style Selector="Button.NavItem /template/ ContentPresenter, Button.SectionNav /template/ ContentPresenter">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.12" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Button.NavItem:pointerover /template/ ContentPresenter, Button.SectionNav:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#222222" />
-            <Setter Property="BorderBrush" Value="#4A4A4A" />
-        </Style>
-        <Style Selector="Button.NavItem.Active /template/ ContentPresenter, Button.SectionNav.Active /template/ ContentPresenter">
-            <Setter Property="Background" Value="#1A1A1A" />
-            <Setter Property="BorderBrush" Value="#333333" />
-        </Style>
-        <Style Selector="Button.NavItem.Active:pointerover /template/ ContentPresenter, Button.SectionNav.Active:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#222222" />
-            <Setter Property="BorderBrush" Value="#4A4A4A" />
-        </Style>
         <Style Selector="ToggleSwitch">
             <Setter Property="OnContent" Value="ON" />
             <Setter Property="OffContent" Value="OFF" />
@@ -48,18 +22,33 @@
 
     <Grid ColumnDefinitions="220,*" Background="#050505">
         <Border Grid.Column="0" Background="#0A0A0A" BorderBrush="#333333" BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="Auto,*,Auto" Margin="10,18,10,14">
+            <Grid RowDefinitions="Auto,*,Auto" Margin="13,18,6,14">
                 <TextBlock Grid.Row="0" Text="SETTINGS" FontSize="10" FontWeight="SemiBold"
                            Foreground="#888888" Margin="10,8,10,16" />
                 <StackPanel Grid.Row="1" Spacing="4">
-                    <Button Classes="SectionNav" Classes.Active="{Binding IsGeneralSection}"
-                            Command="{Binding SelectSectionCommand}" CommandParameter="General" Content="General" />
-                    <Button Classes="SectionNav" Classes.Active="{Binding IsPrivacySection}"
-                            Command="{Binding SelectSectionCommand}" CommandParameter="Privacy" Content="Privacy" />
-                    <Button Classes="SectionNav" Classes.Active="{Binding IsAboutSection}"
-                            Command="{Binding SelectSectionCommand}" CommandParameter="About" Content="About" />
+                    <Button Classes="SidebarButton" Classes.Active="{Binding IsGeneralSection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="General">
+                        <StackPanel Orientation="Horizontal" Spacing="13">
+                            <PathIcon Data="{StaticResource SettingsIcon}" Width="16" Height="16" />
+                            <TextBlock Text="General" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="SidebarButton" Classes.Active="{Binding IsPrivacySection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="Privacy">
+                        <StackPanel Orientation="Horizontal" Spacing="13">
+                            <PathIcon Data="{StaticResource PrivacyIcon}" Width="16" Height="16" />
+                            <TextBlock Text="Privacy" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="SidebarButton" Classes.Active="{Binding IsAboutSection}"
+                            Command="{Binding SelectSectionCommand}" CommandParameter="About">
+                        <StackPanel Orientation="Horizontal" Spacing="13">
+                            <PathIcon Data="{StaticResource AboutIcon}" Width="16" Height="16" />
+                            <TextBlock Text="About" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
-                <Button Grid.Row="2" Classes="NavItem" Content="← Back" Command="{Binding BackCommand}" />
+                <Button Grid.Row="2" Classes="SidebarButton" Content="← Back" Command="{Binding BackCommand}" />
             </Grid>
         </Border>
 
