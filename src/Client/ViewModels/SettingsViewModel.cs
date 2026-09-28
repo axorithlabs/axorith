@@ -43,14 +43,12 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
 
             this.RaiseAndSetIfChanged(ref _selectedSection, value);
             this.RaisePropertyChanged(nameof(IsGeneralSection));
-            this.RaisePropertyChanged(nameof(IsAppearanceSection));
             this.RaisePropertyChanged(nameof(IsPrivacySection));
             this.RaisePropertyChanged(nameof(IsAboutSection));
         }
     }
 
     public bool IsGeneralSection => SelectedSection == "General";
-    public bool IsAppearanceSection => SelectedSection == "Appearance";
     public bool IsPrivacySection => SelectedSection == "Privacy";
     public bool IsAboutSection => SelectedSection == "About";
 

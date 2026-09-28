@@ -61,15 +61,6 @@ public partial class MainView : UserControl
 
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
-    private void OnActiveSessionClick(object? sender, RoutedEventArgs e)
-    {
-        ViewModel?.ShowHome();
-        if (this.FindControl<ScrollViewer>("HomeScrollViewer") is { } scrollViewer)
-        {
-            scrollViewer.Offset = Vector.Zero;
-        }
-    }
-
     private void ObserveViewModel()
     {
         if (ReferenceEquals(_observedViewModel, ViewModel))
@@ -125,19 +116,21 @@ public partial class MainView : UserControl
                     ? "OpenEmergencyUnlockButton"
                     : "StopSessionButton");
             else if (ViewModel?.IsSessionActive == true)
-                target = this.FindControl<Button>("ActiveSessionButton");
+                target = this.FindControl<Button>(ViewModel.IsCommittedSession
+                    ? "SidebarEmergencyUnlockButton"
+                    : "SidebarStopSessionButton");
             else if (ViewModel?.IsPresetsPage == true && ViewModel.Presets.Count > 0)
                 target = this.FindControl<ListBox>("PresetsListBox");
             else if (ViewModel?.IsPresetsPage == true)
                 target = this.FindControl<Button>("CreateSessionButton");
             else
-                target = this.FindControl<TextBlock>("HomePageHeading");
+                target = this.FindControl<TextBlock>("TodaySectionHeading");
 
             if (target?.IsVisible != true)
             {
                 target = ViewModel?.IsPresetsPage == true
                     ? this.FindControl<Button>("CreateSessionButton")
-                    : this.FindControl<TextBlock>("HomePageHeading");
+                    : this.FindControl<TextBlock>("TodaySectionHeading");
             }
 
             target?.Focus();

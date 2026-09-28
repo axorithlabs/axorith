@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
-             xmlns:converters="using:Axorith.Client.Converters"
              x:Class="Axorith.Client.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -20,24 +19,18 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Padding" Value="12,9" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.15" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
-                </Transitions>
-            </Setter>
         </Style>
         <Style Selector="Button.NavItem /template/ ContentPresenter, Button.SectionNav /template/ ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.15" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                    <BrushTransition Property="Background" Duration="0:0:0.12" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="Button.NavItem:pointerover /template/ ContentPresenter, Button.SectionNav:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#161616" />
-            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="Background" Value="#222222" />
+            <Setter Property="BorderBrush" Value="#4A4A4A" />
         </Style>
         <Style Selector="Button.NavItem.Active /template/ ContentPresenter, Button.SectionNav.Active /template/ ContentPresenter">
             <Setter Property="Background" Value="#1A1A1A" />
@@ -45,7 +38,7 @@
         </Style>
         <Style Selector="Button.NavItem.Active:pointerover /template/ ContentPresenter, Button.SectionNav.Active:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#222222" />
-            <Setter Property="BorderBrush" Value="#555555" />
+            <Setter Property="BorderBrush" Value="#4A4A4A" />
         </Style>
         <Style Selector="ToggleSwitch">
             <Setter Property="OnContent" Value="ON" />
@@ -61,8 +54,6 @@
                 <StackPanel Grid.Row="1" Spacing="4">
                     <Button Classes="SectionNav" Classes.Active="{Binding IsGeneralSection}"
                             Command="{Binding SelectSectionCommand}" CommandParameter="General" Content="General" />
-                    <Button Classes="SectionNav" Classes.Active="{Binding IsAppearanceSection}"
-                            Command="{Binding SelectSectionCommand}" CommandParameter="Appearance" Content="Appearance" />
                     <Button Classes="SectionNav" Classes.Active="{Binding IsPrivacySection}"
                             Command="{Binding SelectSectionCommand}" CommandParameter="Privacy" Content="Privacy" />
                     <Button Classes="SectionNav" Classes.Active="{Binding IsAboutSection}"
@@ -74,21 +65,7 @@
 
         <Grid Grid.Column="1" Margin="28,22,28,22" RowDefinitions="Auto,*">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-                <StackPanel Spacing="2">
-                    <TextBlock Text="Settings" FontSize="26" FontWeight="Bold" Foreground="#E0E0E0" />
-                </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Classes="NavItem" IsVisible="{Binding MainViewModel.HasActiveSessionName}"
-                            Command="{Binding BackCommand}" AutomationProperties.Name="Open active session">
-                        <StackPanel Orientation="Horizontal" Spacing="7">
-                            <TextBlock Text="{Binding MainViewModel.ActiveWorkspaceName}" MaxWidth="120"
-                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <TextBlock Text="·" Foreground="#777777" VerticalAlignment="Center"
-                                       IsVisible="{Binding MainViewModel.ActiveSessionRemaining, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}" />
-                            <TextBlock Text="{Binding MainViewModel.ActiveSessionRemaining}" FontSize="12"
-                                       FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
                     <Button Content="Save changes" Command="{Binding SaveCommand}"
                             Classes="accent" IsEnabled="{Binding HasUnsavedChanges}" />
                 </StackPanel>
@@ -168,46 +145,6 @@
                                     </StackPanel>
                                 </Grid>
                             </Border>
-                        </StackPanel>
-
-                        <StackPanel Spacing="18" IsVisible="{Binding IsAppearanceSection}">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Appearance" FontSize="22" FontWeight="Bold" />
-                                <TextBlock Text="Current interface colors" Foreground="#B0B0B0" />
-                            </StackPanel>
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,18">
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
-                                    <StackPanel Spacing="4">
-                                        <TextBlock Text="Theme" FontSize="15" />
-                                        <TextBlock Text="The interface uses the current dark palette."
-                                                   FontSize="12" Foreground="#888888" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="Dark" Foreground="#B0B0B0"
-                                               VerticalAlignment="Center" />
-                                </Grid>
-                            </Border>
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="Color palette" FontSize="15" FontWeight="SemiBold" />
-                                <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,14">
-                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-                                        <StackPanel Spacing="7">
-                                            <Border Height="28" Background="{DynamicResource SystemRegionBrush}"
-                                                    BorderBrush="#333333" BorderThickness="1" CornerRadius="4" />
-                                            <TextBlock Text="Canvas" FontSize="12" Foreground="#B0B0B0" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="7">
-                                            <Border Height="28" Background="{DynamicResource CardBackgroundBrush}"
-                                                    BorderBrush="#333333" BorderThickness="1" CornerRadius="4" />
-                                            <TextBlock Text="Panel" FontSize="12" Foreground="#B0B0B0" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" Spacing="7">
-                                            <Border Height="28" Background="{DynamicResource SystemAccentBrush}"
-                                                    CornerRadius="4" />
-                                            <TextBlock Text="Action accent" FontSize="12" Foreground="#B0B0B0" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Spacing="18" IsVisible="{Binding IsPrivacySection}">
