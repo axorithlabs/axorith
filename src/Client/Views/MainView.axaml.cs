@@ -114,10 +114,12 @@ public partial class MainView : UserControl
                 target = this.FindControl<Button>("OpenEmergencyUnlockButton");
             else if (ViewModel?.IsSessionActive == true)
                 target = this.FindControl<Button>("StopSessionButton");
-            else if (ViewModel?.Presets.Count > 0)
+            else if (ViewModel?.IsPresetsPage == true && ViewModel.Presets.Count > 0)
                 target = this.FindControl<ListBox>("PresetsListBox");
-            else
+            else if (ViewModel?.IsPresetsPage == true)
                 target = this.FindControl<Button>("CreateSessionButton");
+            else
+                target = this.FindControl<Button>("OpenPresetsButton");
             target?.Focus();
         });
     }

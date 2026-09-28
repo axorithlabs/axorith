@@ -10,10 +10,45 @@ namespace Axorith.Client.ViewModels;
 public class SessionPresetViewModel : ReactiveObject, IDisposable
 {
     private readonly IDisposable? _validationSubscription;
+    private readonly IReadOnlyList<SessionSchedule> _schedules;
 
     public Guid Id => Model.Id;
     public string Name => Model.Name;
     public SessionPreset Model { get; }
+    public string CommitmentLabel => Model.FocusCommitment.Mode switch
+    {
+        FocusCommitmentMode.Strict => "Strict",
+        FocusCommitmentMode.Locked => "Locked",
+        _ => "Normal"
+    };
+
+    public string SessionSummary
+    {
+        get
+        {
+            var moduleNames = string.Join(", ", Modules.Select(module => module.DisplayName));
+            var options = Model.FocusCommitment;
+            var duration = options.EndCondition switch
+            {
+                FocusEndCondition.Duration when options.Duration is { } value => $"{value.TotalMinutes:0} min",
+                FocusEndCondition.EndAt when options.EndAtLocalTime is { } endAt => $"Until {endAt:HH:mm}",
+                _ => "Until stopped"
+            };
+
+            return string.Join(" · ", new[] { moduleNames, duration }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        }
+    }
+
+    public string ScheduleSummary => _schedules.Count == 0
+        ? "None"
+        : string.Join(" · ", _schedules.Select(schedule =>
+            string.IsNullOrWhiteSpace(schedule.Name) ? schedule.Type.ToString() : schedule.Name));
+
+    public bool IsActive
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public bool HasValidationErrors
     {
@@ -38,9 +73,10 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
     public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
 
     public SessionPresetViewModel(SessionPreset model, IReadOnlyList<ModuleDefinition> availableModules,
-        IModulesApi modulesApi, IServiceProvider serviceProvider)
+        IModulesApi modulesApi, IServiceProvider serviceProvider, IReadOnlyList<SessionSchedule>? schedules = null)
     {
         Model = model;
+        _schedules = schedules ?? [];
 
         var moduleVms = model.Modules
             .Select(m =>

@@ -1,383 +1,442 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
-             xmlns:converters="using:Axorith.Client.Converters"
+             xmlns:controls="using:Axorith.Client.Controls"
              x:Class="Axorith.Client.Views.MainView"
              x:DataType="vm:MainViewModel">
-    
+
     <UserControl.Resources>
-        <StreamGeometry x:Key="SettingsIcon">M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z</StreamGeometry>
-        <StreamGeometry x:Key="DiscordIcon">M22,24L16.75,19L17.38,21H4.5A2.5,2.5 0 0,1 2,18.5V3.5A2.5,2.5 0 0,1 4.5,1H19.5A2.5,2.5 0 0,1 22,3.5V24M12,6.8C9.32,6.8 7.44,7.95 7.44,7.95C8.47,7.03 10.27,6.5 10.27,6.5L10.1,6.33C8.41,6.36 6.88,7.53 6.88,7.53C5.16,11.12 5.27,14.22 5.27,14.22C6.67,16.03 8.75,15.9 8.75,15.9L9.46,15C8.21,14.73 7.42,13.62 7.42,13.62C7.42,13.62 9.3,14.9 12,14.9C14.7,14.9 16.58,13.62 16.58,13.62C16.58,13.62 15.79,14.73 14.54,15L15.25,15.9C15.25,15.9 17.33,16.03 18.73,14.22C18.73,14.22 18.84,11.12 17.12,7.53C17.12,7.53 15.59,6.36 13.9,6.33L13.73,6.5C13.73,6.5 15.53,7.03 16.56,7.95C16.56,7.95 14.68,6.8 12,6.8M9.93,10.59C10.58,10.59 11.11,11.16 11.1,11.86C11.1,12.55 10.58,13.13 9.93,13.13C9.29,13.13 8.77,12.55 8.77,11.86C8.77,11.16 9.28,10.59 9.93,10.59M14.1,10.59C14.75,10.59 15.27,11.16 15.27,11.86C15.27,12.55 14.75,13.13 14.1,13.13C13.46,13.13 12.94,12.55 12.94,11.86C12.94,11.16 13.45,10.59 14.1,10.59Z</StreamGeometry>
-        <StreamGeometry x:Key="WarningIcon">M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z</StreamGeometry>
+        <StreamGeometry x:Key="HomeIcon">M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z</StreamGeometry>
+        <StreamGeometry x:Key="PresetsIcon">M3,4H21V6H3V4M3,11H21V13H3V11M3,18H21V20H3V18M1,4H2V6H1V4M1,11H2V13H1V11M1,18H2V20H1V18Z</StreamGeometry>
+        <StreamGeometry x:Key="SettingsIcon">M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z</StreamGeometry>
+        <StreamGeometry x:Key="ShieldIcon">M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z</StreamGeometry>
     </UserControl.Resources>
-    
-    <Grid RowDefinitions="Auto, *, Auto" Margin="0">
-        <Border Grid.Row="0" IsEnabled="{Binding !IsOverlayOpen}"
-                BorderThickness="0,0,0,1" 
-                BorderBrush="#333" 
-                Padding="12" 
-                Background="#050505">
-            <StackPanel Spacing="8" HorizontalAlignment="Stretch">
-                <Border Classes="Card" Padding="16,12" Margin="12,0"
-                        IsVisible="{Binding IsSessionStatusNoticeVisible}">
-                    <TextBlock Text="{Binding SessionStatus}" Foreground="#DDD"
-                               TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-                </Border>
-                <Border x:Name="ActiveSessionCard" Classes="Card" Padding="16,12" Margin="12,0"
-                        IsVisible="{Binding IsSessionActive}">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
-                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
-                            <TextBlock Text="{Binding ActiveWorkspaceName}" FontSize="20" FontWeight="Bold"
-                                       Foreground="#FFF"/>
-                            <TextBlock Text="{Binding ActiveSessionMode}" Foreground="#AAA"/>
+
+    <UserControl.Styles>
+        <Style Selector="Button.NavItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.NavItem /template/ ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.NavItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#161616" />
+            <Setter Property="BorderBrush" Value="#333333" />
+        </Style>
+        <Style Selector="Button.NavItem.Active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1A1A1A" />
+            <Setter Property="BorderBrush" Value="#333333" />
+        </Style>
+        <Style Selector="Button.NavItem.Active:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#222222" />
+            <Setter Property="BorderBrush" Value="#555555" />
+        </Style>
+        <Style Selector="Border.PresetCard">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Border.PresetCard">
+            <Setter Property="Background" Value="#161616" />
+            <Setter Property="BorderBrush" Value="#555555" />
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*" ColumnDefinitions="220,*" Background="#050505">
+        <Border Grid.Column="0" Background="#0A0A0A" BorderBrush="#333333" BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="14,20,14,16">
+                <TextBlock Grid.Row="0" Text="AXORITH" FontSize="17" FontWeight="Bold"
+                           Foreground="#E0E0E0" Margin="10,8,10,22" />
+
+                <StackPanel Grid.Row="1" Spacing="6">
+                    <Button Classes="NavItem" Classes.Active="{Binding IsHomePage}" Command="{Binding ShowHomeCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource HomeIcon}" Width="17" Height="17" />
+                            <TextBlock Text="Home" VerticalAlignment="Center" />
                         </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" Spacing="2">
-                            <TextBlock Text="{Binding ActiveSessionRemaining}" FontSize="24" FontWeight="Bold"
-                                       Foreground="#FFF" HorizontalAlignment="Right"/>
-                            <TextBlock Text="{Binding ActiveSessionEndTime}" Foreground="#AAA"
-                                       HorizontalAlignment="Right"/>
-                        </StackPanel>
-                        <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
-                            <TextBlock Text="{Binding ActiveBreakStatus}" Foreground="#CCC" Margin="0,0,18,4"
-                                       IsVisible="{Binding HasActiveBreakStatus}"/>
-                            <TextBlock x:Name="ProtectionStatusText" Text="{Binding ActiveProtectionStatus}"
-                                       Foreground="{Binding ActiveProtectionBrush}"
-                                       AutomationProperties.LiveSetting="Polite"
-                                       IsVisible="{Binding IsProtectionAttentionVisible}"/>
-                        </WrapPanel>
-                        <Button Grid.Row="2" Grid.Column="1" Content="Start Break"
-                                Command="{Binding StartBreakCommand}" Classes="accent"
-                                HorizontalAlignment="Right" Margin="0,10,0,0"
-                                IsVisible="{Binding CanStartBreak}"/>
-                    </Grid>
-                </Border>
-            </StackPanel>
-        </Border>
-
-        <Grid x:Name="WorkspaceListArea" Grid.Row="1" IsEnabled="{Binding !IsOverlayOpen}">
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        IsVisible="{Binding !Presets.Count}"
-                        Spacing="20">
-                <TextBlock Text="You have no presets yet."
-                           HorizontalAlignment="Center"
-                           Foreground="#666"
-                           FontSize="18"
-                           FontWeight="SemiBold"/>
-                <TextBlock Text="Create a new session to automate your workflow."
-                           HorizontalAlignment="Center"
-                           Foreground="#555"
-                           FontSize="14"/>
-            </StackPanel>
-
-            <ScrollViewer IsVisible="{Binding Presets.Count}">
-                <ListBox Name="PresetsListBox" 
-                         ItemsSource="{Binding Presets}" 
-                         SelectedItem="{Binding SelectedPreset}" 
-                         Background="Transparent"
-                         Margin="0,20">
-                    
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel HorizontalAlignment="Center"/>
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:SessionPresetViewModel">
-                            <Border Classes="Card"
-                                    Classes.HasErrors="{Binding HasValidationErrors}"
-                                    x:Name="RootBorder"
-                                    Padding="24"
-                                    Width="320"
-                                    MinHeight="200">
-                                
-                                <Border.Transitions>
-                                    <Transitions>
-                                        <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
-                                    </Transitions>
-                                </Border.Transitions>
-
-                                <DockPanel LastChildFill="False">
-                                    <TextBlock DockPanel.Dock="Top"
-                                               Text="{Binding Name}" 
-                                               FontWeight="SemiBold" 
-                                               FontSize="18" 
-                                               Foreground="#E0E0E0"
-                                               TextAlignment="Center"
-                                               HorizontalAlignment="Center"/>
-                                    
-                                    <TextBlock Text="{Binding Modules.Count, StringFormat='{}{0} modules'}" 
-                                               Foreground="#888"
-                                               FontSize="13"
-                                               DockPanel.Dock="Top" 
-                                               Margin="0,4,0,0" 
-                                               TextAlignment="Center"/>
-                                    
-                                    <TextBlock Text="{Binding ValidationMessage}"
-                                               Foreground="#FF5555"
-                                               FontSize="12"
-                                               DockPanel.Dock="Top"
-                                               Margin="0,8,0,0"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               MaxWidth="300"
-                                               IsVisible="{Binding HasValidationErrors}"/>
-                                    
-                                    <ItemsControl ItemsSource="{Binding Modules}" 
-                                                  DockPanel.Dock="Top" 
-                                                  Margin="0,20,0,0" 
-                                                  HorizontalAlignment="Center"
-                                                  MaxWidth="350">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel HorizontalAlignment="Center"/>
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-            
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
-                                                <Border CornerRadius="4" 
-                                                        Background="#111" 
-                                                        BorderThickness="1"
-                                                        Padding="8,4" 
-                                                        Margin="3"
-                                                        Classes.ModuleError="{Binding HasErrors}">
-                                                    <Border.Styles>
-                                                        <Style Selector="Border">
-                                                            <Setter Property="BorderBrush" Value="#333"/>
-                                                        </Style>
-                                                        <Style Selector="Border.ModuleError">
-                                                            <Setter Property="BorderBrush" Value="#DD5555"/>
-                                                            <Setter Property="BorderThickness" Value="2"/>
-                                                        </Style>
-                                                    </Border.Styles>
-                                                    <TextBlock FontSize="11" 
-                                                               Foreground="#BBB"
-                                                               Text="{Binding DisplayName}" 
-                                                               TextAlignment="Center"/>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <Panel DockPanel.Dock="Bottom" Margin="0,25,0,0">
-                                         <StackPanel x:Name="PresetActionButtons" Orientation="Horizontal" Spacing="8"
-                                                     HorizontalAlignment="Center">
-                                            <Button Content="Start" 
-                                                    Classes="accent"
-                                                    Command="{Binding #PresetsListBox.DataContext.StartSelectedCommand}"
-                                                    CommandParameter="{Binding}"
-                                                    IsEnabled="{Binding IsValid}"
-                                                    ToolTip.Tip="{Binding ValidationMessage}"/>
-                                            <Button Content="Edit" 
-                                                    Command="{Binding #PresetsListBox.DataContext.EditSelectedCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                            <Button Content="Delete" 
-                                                    Classes="danger"
-                                                    Command="{Binding #PresetsListBox.DataContext.DeleteSelectedCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                        </StackPanel>
-                                    </Panel>
-                                </DockPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-
-                    <ListBox.Styles>
-                        <Style Selector="ListBoxItem">
-                            <Setter Property="Padding" Value="0"/>
-                            <Setter Property="Margin" Value="12"/>
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="IsEnabled" Value="{Binding #PresetsListBox.DataContext.IsSessionActive, Converter={x:Static BoolConverters.Not}}"/>
-                        </Style>
-                        <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="Transparent"/>
-                        </Style>
-                        
-                        <Style Selector="ListBoxItem" x:DataType="vm:SessionPresetViewModel">
-                            <Setter Property="Classes.Active">
-                                <MultiBinding Converter="{x:Static converters:AppConverters.MultiEqualsConverter}">
-                                    <Binding Path="Id"/>
-                                    <Binding Path="#PresetsListBox.DataContext.ActiveSessionPresetId"/>
-                                </MultiBinding>
-                            </Setter>
-                        </Style>
-
-                        <Style Selector="ListBoxItem.Active Border.Card">
-                            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
-                            <Setter Property="BorderThickness" Value="1"/>
-                            <Setter Property="Background" Value="#080808"/> 
-                        </Style>
-                        <Style Selector="ListBoxItem.Active">
-                             <Setter Property="IsEnabled" Value="True"/>
-                        </Style>
-                        <Style Selector="ListBoxItem:not(.Active):pointerover Border.Card">
-                            <Setter Property="BorderBrush" Value="#444"/>
-                        </Style>
-                        
-                        <Style Selector="Border.Card.HasErrors">
-                            <Setter Property="BorderBrush" Value="#CC4444"/>
-                            <Setter Property="BorderThickness" Value="2"/>
-                        </Style>
-                        <Style Selector="ListBoxItem:pointerover Border.Card.HasErrors">
-                            <Setter Property="BorderBrush" Value="#DD5555"/>
-                        </Style>
-                    </ListBox.Styles>
-                </ListBox>
-            </ScrollViewer>
-        </Grid>
-
-        <Border Grid.Row="2" IsEnabled="{Binding !IsOverlayOpen}"
-                Background="#0A0A0A" 
-                BorderBrush="#333" 
-                BorderThickness="0,1,0,0" 
-                Padding="20">
-            <Grid ColumnDefinitions="Auto, *, Auto">
-                <Button Grid.Column="0"
-                        Command="{Binding OpenSettingsCommand}"
-                        ToolTip.Tip="Settings"
-                        Padding="12,8">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <PathIcon Data="{StaticResource SettingsIcon}" Width="16" Height="16"/>
-                        <TextBlock Text="Settings" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-                        
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal" 
-                            Spacing="20" 
-                            HorizontalAlignment="Center">
-                    <Button x:Name="CreateSessionButton" Content="Create New Session"
-                            Command="{Binding CreateSessionCommand}" 
-                            IsVisible="{Binding !IsSessionActive}"
-                            MinWidth="200"
-                            HorizontalContentAlignment="Center"/>
-
-                    <Button x:Name="StopSessionButton" Content="Stop Current Session"
-                            Command="{Binding StopSessionCommand}" 
-                            Classes="danger"
-                            Padding="30,8"
-                            FontWeight="Bold"
-                            IsVisible="{Binding CanStopSession}"
-                            MinWidth="200"
-                            HorizontalContentAlignment="Center"/>
-
-                    <Button x:Name="OpenEmergencyUnlockButton" Content="Emergency Unlock"
-                            Command="{Binding OpenEmergencyUnlockCommand}"
-                            Classes="danger"
-                            Padding="30,8"
-                            FontWeight="Bold"
-                            IsVisible="{Binding IsCommittedSession}"
-                            MinWidth="200"
-                            HorizontalContentAlignment="Center"/>
-
-                    <Button Command="{Binding InstallUpdateCommand}"
-                            IsVisible="{Binding UpdateAvailable}"
-                            Classes="success"
-                            MinWidth="200"
-                            HorizontalContentAlignment="Center"
-                            IsEnabled="{Binding !IsDownloadingUpdate}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" 
-                                      Width="16" Height="16"/>
-                            <TextBlock VerticalAlignment="Center">
-                                <TextBlock.Text>
-                                    <MultiBinding StringFormat="Update to {0}">
-                                        <Binding Path="UpdateVersion"/>
-                                    </MultiBinding>
-                                </TextBlock.Text>
-                            </TextBlock>
+                    </Button>
+                    <Button Classes="NavItem" Classes.Active="{Binding IsPresetsPage}" Command="{Binding ShowPresetsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{StaticResource PresetsIcon}" Width="17" Height="17" />
+                            <TextBlock Text="Presets" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
 
+                <Border Grid.Row="3" Classes="Card" Padding="11" Margin="0,0,0,14"
+                        IsVisible="{Binding IsSessionActive}">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="ACTIVE SESSION" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{Binding ActiveWorkspaceName}" FontSize="14" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="7">
+                            <TextBlock Text="{Binding ActiveSessionRemaining}" FontSize="13" FontWeight="SemiBold" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
+                                <PathIcon Data="{StaticResource ShieldIcon}" Width="13" Height="13"
+                                          Foreground="{Binding ActiveProtectionBrush}" />
+                                <TextBlock Text="{Binding ActiveProtectionStatus}" FontSize="10"
+                                           Foreground="{Binding ActiveProtectionBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Button x:Name="StopSessionButton" Content="Stop session"
+                                Command="{Binding StopSessionCommand}" Classes="danger"
+                                Padding="7,5" IsVisible="{Binding CanStopSession}" />
+                        <Button x:Name="OpenEmergencyUnlockButton" Content="Emergency unlock"
+                                Command="{Binding OpenEmergencyUnlockCommand}" Classes="danger"
+                                Padding="7,5" IsVisible="{Binding IsCommittedSession}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="3" Classes="Card" Padding="11" Margin="0,0,0,14"
+                        IsVisible="{Binding !IsSessionActive}">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="SESSION" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="No active session" FontSize="13" Foreground="#B0B0B0" />
+                        <Button x:Name="OpenPresetsButton" Content="Open presets"
+                                Command="{Binding ShowPresetsCommand}" Padding="7,5" />
+                    </StackPanel>
+                </Border>
+
+                <Button Grid.Row="4" Classes="NavItem" Command="{Binding OpenSettingsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <PathIcon Data="{StaticResource SettingsIcon}" Width="17" Height="17" />
+                        <TextBlock Text="Settings" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
 
-        <Border Grid.Row="0" Grid.RowSpan="3" ZIndex="999"
-                Background="#D9000000" IsVisible="{Binding IsStartConfirmationOpen}">
+        <Grid Grid.Column="1" Margin="36,28,36,24" RowDefinitions="Auto,Auto,*"
+              IsEnabled="{Binding !IsOverlayOpen}">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+                <StackPanel IsVisible="{Binding IsHomePage}" Spacing="2">
+                    <TextBlock Text="Home" FontSize="30" FontWeight="Bold" Foreground="#E0E0E0" />
+                    <TextBlock Text="Your focus activity at a glance" Foreground="#B0B0B0" />
+                </StackPanel>
+                <StackPanel IsVisible="{Binding IsPresetsPage}" Spacing="2">
+                    <TextBlock Text="Presets" FontSize="30" FontWeight="Bold" Foreground="#E0E0E0" />
+                    <TextBlock Text="Reusable focus setups" Foreground="#B0B0B0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button x:Name="CreateSessionButton" Content="New preset"
+                            Command="{Binding CreateSessionCommand}" Classes="accent"
+                            IsVisible="{Binding IsPresetsPage}" />
+                    <Button Command="{Binding InstallUpdateCommand}" Classes="accent"
+                            IsVisible="{Binding UpdateAvailable}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" Width="16" Height="16" />
+                            <TextBlock Text="{Binding UpdateVersion}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1" Classes="Card" Padding="12" Margin="0,0,0,16"
+                    IsVisible="{Binding IsSessionStatusNoticeVisible}">
+                <TextBlock Text="{Binding SessionStatus}" Foreground="#D0D0D0" TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite" />
+            </Border>
+
+            <ScrollViewer Grid.Row="2" IsVisible="{Binding IsHomePage}"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="20" MaxWidth="1400" HorizontalAlignment="Stretch">
+                    <Border Classes="Card" Padding="22" IsVisible="{Binding IsSessionActive}">
+                        <Grid ColumnDefinitions="*,360" ColumnSpacing="28" RowDefinitions="Auto,Auto">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="6">
+                                <TextBlock Text="ACTIVE SESSION" FontSize="11" Foreground="#888888" />
+                                <TextBlock Text="{Binding ActiveWorkspaceName}" FontSize="22" FontWeight="Bold"
+                                           Foreground="#E0E0E0" />
+                                <TextBlock Text="{Binding ActiveSessionMode}" Foreground="#B0B0B0" />
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="10"
+                                        Margin="0,14,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ActiveSessionRemaining}" FontSize="42" FontWeight="Bold"
+                                           Foreground="#E0E0E0" />
+                                <StackPanel VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Text="remaining" Foreground="#B0B0B0" />
+                                    <TextBlock Text="{Binding ActiveSessionEndTime}" Foreground="#888888" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.RowSpan="2" Grid.Column="1" Spacing="10" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <PathIcon Data="{StaticResource ShieldIcon}" Width="16" Height="16"
+                                              Foreground="{Binding ActiveProtectionBrush}" />
+                                    <TextBlock Text="{Binding ActiveSessionMode}" Foreground="#B0B0B0" />
+                                    <TextBlock Text="·" Foreground="#666666" />
+                                    <TextBlock Text="{Binding ActiveProtectionStatus}"
+                                               Foreground="{Binding ActiveProtectionBrush}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding ActiveBreakPolicy, StringFormat='Break: {0}'}"
+                                           Foreground="#B0B0B0" />
+                                <TextBlock Text="{Binding ActiveBreakStatus}" Foreground="#B0B0B0"
+                                           IsVisible="{Binding HasActiveBreakStatus}" />
+                                <TextBlock Text="{Binding ActiveAfterEndBehavior, StringFormat='After end: {0}'}"
+                                           Foreground="#B0B0B0" />
+                                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,2,0,0">
+                                    <Button Content="Take break" Command="{Binding StartBreakCommand}"
+                                            Classes="accent" IsVisible="{Binding CanStartBreak}" />
+                                    <Button Content="Stop session"
+                                            Command="{Binding StopSessionCommand}" Classes="danger"
+                                            IsVisible="{Binding CanStopSession}" />
+                                    <Button Content="Emergency unlock" Command="{Binding OpenEmergencyUnlockCommand}"
+                                            Classes="danger" IsVisible="{Binding IsCommittedSession}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Today" FontSize="18" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+                            <Border Classes="Card" Padding="17">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Focus today" FontSize="12" Foreground="#B0B0B0" />
+                                    <TextBlock Text="{Binding FocusTodayLabel}" FontSize="22" FontWeight="Bold" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Classes="Card" Padding="17">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Sessions this week" FontSize="12" Foreground="#B0B0B0" />
+                                    <TextBlock Text="{Binding SessionsThisWeek}" FontSize="22" FontWeight="Bold" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="Card" Padding="17">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Focused this week" FontSize="12" Foreground="#B0B0B0" />
+                                    <TextBlock Text="{Binding FocusThisWeekLabel}" FontSize="22" FontWeight="Bold" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Classes="Card" Padding="18">
+                        <Grid RowDefinitions="Auto,170,Auto" RowSpacing="10">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="Focus activity" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="Last 7 days" FontSize="12" Foreground="#888888"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Grid.Row="1">
+                                <controls:FocusActivityChart Values="{Binding FocusActivityValues}"
+                                                             Stroke="{DynamicResource SystemAccentBrush}"
+                                                             AxisStroke="{DynamicResource BorderBrush}"
+                                                             AutomationProperties.Name="Focus activity for the last seven days" />
+                                <TextBlock Text="Completed focus sessions will appear here."
+                                           Foreground="#888888" HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" IsVisible="{Binding !HasSessionActivity}" />
+                            </Grid>
+                            <TextBlock Grid.Row="2" Text="Activity includes sessions observed while Axorith is open."
+                                       FontSize="11" Foreground="#777777" />
+                        </Grid>
+                    </Border>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="18">
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Recent sessions" FontSize="18" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{Binding RecentSessions}" IsVisible="{Binding HasRecentSessions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="8" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <TextBlock Text="{Binding}" Foreground="#B0B0B0" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Completed sessions will appear here."
+                                           Foreground="#888888" IsVisible="{Binding !HasRecentSessions}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Classes="Card" Padding="18">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Next scheduled" FontSize="18" FontWeight="SemiBold" />
+                                <StackPanel Spacing="5" IsVisible="{Binding HasUpcomingSchedule}">
+                                    <TextBlock Text="{Binding NextScheduledPresetName}" Foreground="#D0D0D0" />
+                                    <TextBlock Text="{Binding NextScheduledTime}" Foreground="#888888" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding UpcomingScheduleStatus}" Foreground="#888888"
+                                           IsVisible="{Binding !HasUpcomingSchedule}" />
+                                <Button Content="Open presets" Command="{Binding ShowPresetsCommand}"
+                                        HorizontalAlignment="Left" Classes="secondary" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer Grid.Row="2" IsVisible="{Binding IsPresetsPage}"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14" MaxWidth="1400" HorizontalAlignment="Stretch">
+                    <TextBlock Text="Choose a setup to start a focus session."
+                               Foreground="#888888" IsVisible="{Binding Presets.Count}" />
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10"
+                                IsVisible="{Binding !Presets.Count}" Margin="0,80">
+                        <TextBlock Text="No presets yet" FontSize="20" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Create a preset to configure your first focus session."
+                                   Foreground="#888888" HorizontalAlignment="Center" />
+                        <Button Content="Create preset" Command="{Binding CreateSessionCommand}"
+                                Classes="accent" HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <ListBox x:Name="PresetsListBox" x:DataType="vm:MainViewModel"
+                             ItemsSource="{Binding Presets}"
+                             SelectedItem="{Binding SelectedPreset}" Background="Transparent">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SessionPresetViewModel">
+                                <Border Classes="Card PresetCard" Padding="20">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto"
+                                          ColumnSpacing="20" RowSpacing="9">
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal"
+                                                    Spacing="10">
+                                            <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="Bold" />
+                                            <Border BorderBrush="#444444" BorderThickness="1" CornerRadius="12"
+                                                    Padding="8,2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding CommitmentLabel}" FontSize="11"
+                                                           Foreground="#B0B0B0" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding SessionSummary}"
+                                                   Foreground="#B0B0B0" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                                   Text="{Binding ScheduleSummary, StringFormat='Schedule: {0}'}"
+                                                   FontSize="12" Foreground="#888888" />
+                                        <StackPanel Grid.RowSpan="3" Grid.Column="1" Orientation="Horizontal"
+                                                    VerticalAlignment="Center" Spacing="8">
+                                            <Button Content="Running" IsEnabled="False" IsVisible="{Binding IsActive}" />
+                                            <Button Content="Start" Classes="accent" IsVisible="{Binding !IsActive}"
+                                                    Command="{Binding #PresetsListBox.DataContext.StartSelectedCommand}"
+                                                    CommandParameter="{Binding}" IsEnabled="{Binding IsValid}" />
+                                            <Button Content="Edit"
+                                                    Command="{Binding #PresetsListBox.DataContext.EditSelectedCommand}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Content="Delete" Classes="danger"
+                                                    Command="{Binding #PresetsListBox.DataContext.DeleteSelectedCommand}"
+                                                    CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                                                   Text="{Binding ValidationMessage}" Foreground="#FF7777"
+                                                   TextWrapping="Wrap" IsVisible="{Binding HasValidationErrors}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <Border Grid.Row="0" Grid.RowSpan="1" ZIndex="999" Background="#D9000000"
+                IsVisible="{Binding IsStartConfirmationOpen}">
             <ScrollViewer x:Name="StartDialogScrollViewer" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="16">
-            <Border x:Name="StartDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
-                    MaxWidth="720" Padding="28" HorizontalAlignment="Stretch"
-                    VerticalAlignment="Center" Background="#111" BorderBrush="#555">
-                <StackPanel x:Name="StartDialogContent" Spacing="18" KeyboardNavigation.TabNavigation="Cycle">
-                    <StackPanel Spacing="5">
-                        <TextBlock Text="{Binding StartReviewTitle}" FontSize="22" FontWeight="Bold"
-                                   Foreground="#FFF"/>
-                        <TextBlock Text="{Binding StartReviewWorkspaceName}" FontSize="17"
-                                   FontWeight="SemiBold" Foreground="#DDD"/>
-                        <TextBlock Text="{Binding StartReviewEndTime}" Foreground="#AAA" TextWrapping="Wrap"/>
+                <Border x:Name="StartDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
+                        MaxWidth="720" Padding="28" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                        Background="#111111" BorderBrush="#555555">
+                    <StackPanel x:Name="StartDialogContent" Spacing="18" KeyboardNavigation.TabNavigation="Cycle">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding StartReviewTitle}" FontSize="22" FontWeight="Bold" />
+                            <TextBlock Text="{Binding StartReviewWorkspaceName}" FontSize="17" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding StartReviewEndTime}" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0" />
+                        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                              ColumnSpacing="12" RowSpacing="14">
+                            <TextBlock Grid.Row="0" Text="Applications" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StartReviewApps}"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="1" Text="Blockers" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StartReviewBlockers}"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="2" Text="Breaks" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding StartReviewBreakPolicy}"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="3" Text="After it ends" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap"
+                                       IsVisible="{Binding !IsDestructiveStartReviewAfterEnd}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
+                                       Foreground="#E6C878" FontWeight="Bold" TextWrapping="Wrap"
+                                       IsVisible="{Binding IsDestructiveStartReviewAfterEnd}" />
+                        </Grid>
+                        <TextBlock Text="Strict also limits common Windows bypass tools for the session."
+                                   Foreground="#E6C878" TextWrapping="Wrap" IsVisible="{Binding IsStrictStartReview}" />
+                        <TextBlock Text="{Binding StartCountdownSeconds, StringFormat='Starting in {0} seconds…'}"
+                                   Foreground="#E6C878" HorizontalAlignment="Center"
+                                   IsVisible="{Binding IsStartCountdownRunning}" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+                            <Button x:Name="StartConfirmationCancelButton" Content="Cancel" Width="80"
+                                    Command="{Binding CancelStartCommand}" Height="42" />
+                            <Button Content="Start session" Command="{Binding ConfirmStartCommand}"
+                                    Classes="accent" Width="120" Height="42"
+                                    IsEnabled="{Binding !IsStartCountdownRunning}" />
+                        </StackPanel>
                     </StackPanel>
-                    <Border BorderBrush="#333" BorderThickness="0,1,0,0"/>
-                    <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto"
-                          ColumnSpacing="12" RowSpacing="14">
-                        <TextBlock Grid.Row="0" Text="Applications" FontWeight="SemiBold" Foreground="#CCC"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StartReviewApps}"
-                                   Foreground="#AAA" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="1" Text="Blockers" FontWeight="SemiBold" Foreground="#CCC"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StartReviewBlockers}"
-                                   Foreground="#AAA" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="2" Text="Breaks" FontWeight="SemiBold" Foreground="#CCC"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding StartReviewBreakPolicy}"
-                                   Foreground="#AAA" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="3" Text="After it ends" FontWeight="SemiBold" Foreground="#CCC"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
-                                   Foreground="#AAA" TextWrapping="Wrap"
-                                   IsVisible="{Binding !IsDestructiveStartReviewAfterEnd}"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
-                                   Foreground="#E6C878" FontWeight="Bold" TextWrapping="Wrap"
-                                   IsVisible="{Binding IsDestructiveStartReviewAfterEnd}"/>
-                    </Grid>
-                    <TextBlock Text="Strict also limits common Windows bypass tools for the session."
-                               Foreground="#E6C878" TextWrapping="Wrap" IsVisible="{Binding IsStrictStartReview}"/>
-                    <TextBlock Text="{Binding StartCountdownSeconds, StringFormat='Starting in {0} seconds…'}"
-                               Foreground="#E6C878" HorizontalAlignment="Center"
-                               IsVisible="{Binding IsStartCountdownRunning}"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"
-                                Margin="0,8,0,0">
-                        <Button x:Name="StartConfirmationCancelButton" Content="Cancel" Width="80"
-                                Command="{Binding CancelStartCommand}" Height="42"/>
-                        <Button Content="Start Session" Command="{Binding ConfirmStartCommand}"
-                                Classes="accent" Width="120" Height="42"
-                                IsEnabled="{Binding !IsStartCountdownRunning}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
             </ScrollViewer>
         </Border>
 
-        <Border Grid.Row="0" Grid.RowSpan="3" ZIndex="1000"
-                Background="#D9000000" IsVisible="{Binding IsEmergencyUnlockOpen}">
+        <Border Grid.Row="0" Grid.RowSpan="1" ZIndex="1000" Background="#D9000000"
+                IsVisible="{Binding IsEmergencyUnlockOpen}">
             <ScrollViewer x:Name="EmergencyDialogScrollViewer" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="16">
-            <Border x:Name="EmergencyDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
-                    MaxWidth="520" Padding="28" HorizontalAlignment="Center"
-                    VerticalAlignment="Center" Background="#111" BorderBrush="#555">
-                <StackPanel x:Name="EmergencyDialogContent" Spacing="16" KeyboardNavigation.TabNavigation="Cycle">
-                    <TextBlock Text="Emergency Unlock" FontSize="22" FontWeight="Bold"
-                               Foreground="#FFF" HorizontalAlignment="Center"/>
-                    <TextBlock Text="This immediately ends the committed session and restores its temporary protections. Any after-end action is skipped."
-                               Foreground="#AAA" TextWrapping="Wrap" TextAlignment="Center"/>
-                    <ProgressBar Value="{Binding EmergencyUnlockProgress}" Minimum="0" Maximum="1" Height="8"
-                                 AutomationProperties.Name="Emergency Unlock hold progress"/>
-                    <TextBlock Text="Hold continuously for 60 seconds. Releasing or losing focus cancels the hold."
-                               Foreground="#AAA" TextWrapping="Wrap" TextAlignment="Center"/>
-                    <TextBlock Text="{Binding EmergencyUnlockError}" Foreground="#E88"
-                               TextWrapping="Wrap" TextAlignment="Center"
-                               IsVisible="{Binding HasEmergencyUnlockError}"/>
-                    <Button x:Name="EmergencyUnlockHoldButton" Content="Hold to unlock for 60 seconds"
-                            Classes="danger"
-                            AutomationProperties.HelpText="Keep holding continuously. Releasing or losing focus resets progress."
-                            HorizontalAlignment="Stretch"
-                            Height="54"
-                            PointerCaptureLost="OnEmergencyUnlockPointerCaptureLost"
-                            LostFocus="OnEmergencyUnlockLostFocus"/>
-                    <Button Content="Cancel" Command="{Binding CloseEmergencyUnlockCommand}"
-                            HorizontalAlignment="Stretch"/>
-                </StackPanel>
-            </Border>
+                <Border x:Name="EmergencyDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
+                        MaxWidth="520" Padding="28" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="#111111" BorderBrush="#555555">
+                    <StackPanel x:Name="EmergencyDialogContent" Spacing="16" KeyboardNavigation.TabNavigation="Cycle">
+                        <TextBlock Text="Emergency unlock" FontSize="22" FontWeight="Bold"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="This immediately ends the committed session and restores its temporary protections. Any after-end action is skipped."
+                                   Foreground="#AAAAAA" TextWrapping="Wrap" TextAlignment="Center" />
+                        <ProgressBar Value="{Binding EmergencyUnlockProgress}" Minimum="0" Maximum="1" Height="8"
+                                     AutomationProperties.Name="Emergency unlock hold progress" />
+                        <TextBlock Text="Hold continuously for 60 seconds. Releasing or losing focus cancels the hold."
+                                   Foreground="#AAAAAA" TextWrapping="Wrap" TextAlignment="Center" />
+                        <TextBlock Text="{Binding EmergencyUnlockError}" Foreground="#EE8888"
+                                   TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding HasEmergencyUnlockError}" />
+                        <Button x:Name="EmergencyUnlockHoldButton" Content="Hold to unlock for 60 seconds"
+                                Classes="danger" AutomationProperties.HelpText="Keep holding continuously. Releasing or losing focus resets progress."
+                                HorizontalAlignment="Stretch" Height="54"
+                                PointerCaptureLost="OnEmergencyUnlockPointerCaptureLost"
+                                LostFocus="OnEmergencyUnlockLostFocus" />
+                        <Button Content="Cancel" Command="{Binding CloseEmergencyUnlockCommand}"
+                                HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
             </ScrollViewer>
         </Border>
     </Grid>

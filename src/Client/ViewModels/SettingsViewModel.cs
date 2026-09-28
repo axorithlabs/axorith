@@ -26,6 +26,33 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     private readonly ClientUiConfiguration _config;
     private readonly IClientOnboardingService? _onboardingService;
     private readonly IToastNotificationService? _toastService;
+    private string _selectedSection = "General";
+
+    public MainViewModel? MainViewModel { get; }
+    public bool CanCheckForUpdates => MainViewModel is not null;
+
+    public string SelectedSection
+    {
+        get => _selectedSection;
+        set
+        {
+            if (_selectedSection == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _selectedSection, value);
+            this.RaisePropertyChanged(nameof(IsGeneralSection));
+            this.RaisePropertyChanged(nameof(IsAppearanceSection));
+            this.RaisePropertyChanged(nameof(IsPrivacySection));
+            this.RaisePropertyChanged(nameof(IsAboutSection));
+        }
+    }
+
+    public bool IsGeneralSection => SelectedSection == "General";
+    public bool IsAppearanceSection => SelectedSection == "Appearance";
+    public bool IsPrivacySection => SelectedSection == "Privacy";
+    public bool IsAboutSection => SelectedSection == "About";
 
     private bool _telemetryEnabled;
     private bool _autoStartEnabled;
@@ -82,6 +109,8 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
 
     public ICommand SaveCommand { get; }
     public ICommand BackCommand { get; }
+    public ICommand OpenPresetsCommand { get; }
+    public ICommand SelectSectionCommand { get; }
     public ICommand OpenPrivacyPolicyCommand { get; }
     public ICommand OpenGitHubCommand { get; }
     public ICommand RunSetupWizardCommand { get; }
@@ -102,6 +131,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         ILogger<SettingsViewModel> logger)
     {
         _shell = shell;
+        MainViewModel = shell.Content as MainViewModel;
         _settingsStore = settingsStore;
         _autoStartManager = autoStartManager;
         _telemetry = telemetry;
@@ -116,7 +146,9 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         LoadSettings();
 
         SaveCommand = ReactiveCommand.Create(SaveSettings);
-        BackCommand = ReactiveCommand.Create(NavigateBack);
+        BackCommand = ReactiveCommand.CreateFromTask(() => NavigateToMainAsync(showPresets: false));
+        OpenPresetsCommand = ReactiveCommand.CreateFromTask(() => NavigateToMainAsync(showPresets: true));
+        SelectSectionCommand = ReactiveCommand.Create<string>(section => SelectedSection = section);
         OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
 
@@ -177,14 +209,23 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private async void NavigateBack()
+    private async Task NavigateToMainAsync(bool showPresets)
     {
         if (HasUnsavedChanges)
         {
             SaveSettings();
         }
 
-        var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
+        var mainViewModel = MainViewModel ?? _serviceProvider.GetRequiredService<MainViewModel>();
+        if (showPresets)
+        {
+            mainViewModel.ShowPresets();
+        }
+        else
+        {
+            mainViewModel.ShowHome();
+        }
+
         await mainViewModel.InitializeAsync();
         _shell.NavigateTo(mainViewModel);
     }
