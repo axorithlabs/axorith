@@ -1,6 +1,15 @@
 const assert = require("node:assert/strict");
+const { readFileSync } = require("node:fs");
 const test = require("node:test");
 const { isWindowsInstallerDownloadUrl, normalizeWebsitePath, sanitizeWebsiteEvent } = require("../js/posthog.js");
+
+test("homepage Download for Windows button links straight to the installer", () => {
+    const homepage = readFileSync(require.resolve("../index.html"), "utf8");
+    const button = homepage.match(/<a href="([^"]+)" class="btn btn-primary">\s*<svg[\s\S]*?<\/svg>\s*Download for Windows/);
+
+    assert.ok(button, "homepage must contain its Download for Windows button");
+    assert.equal(button[1], "https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe");
+});
 
 test("website paths are normalized and limited to approved routes", () => {
     const event = {
