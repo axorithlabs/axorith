@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -112,6 +113,46 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
 
 public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<HostTestFactory>
 {
+    [Fact]
+    public async Task MainViewKeepsIdleAndSidebarActionsClearAndReadable()
+    {
+        var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
+        using var channelLifetime = channel;
+        using var api = new GrpcSessionsApi(sessions, Policy.Handle<Exception>().RetryAsync(0), NullLogger.Instance);
+        EnsureAvaloniaApp();
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var viewModel = new MainViewModel(null!, null!, api, null!, services);
+        var view = new MainView { DataContext = viewModel };
+
+        Assert.False(viewModel.IsSessionActive);
+        Assert.Null(view.FindControl<Border>("SessionStatusNotice"));
+        Assert.DoesNotContain(view.GetLogicalDescendants().OfType<TextBlock>(),
+            text => text.Text == "No active session");
+
+        foreach (var name in new[] { "HomeSidebarButton", "PresetsSidebarButton", "SettingsSidebarButton" })
+        {
+            Assert.Equal(HorizontalAlignment.Stretch, view.FindControl<Button>(name)!.HorizontalAlignment);
+        }
+        Assert.Equal(12, view.FindControl<Button>("HomeSidebarButton")!.FontSize);
+
+        Assert.Contains(view.FindControl<Button>("CreateSessionButton"),
+            view.FindControl<Grid>("PresetsHeader")!.Children);
+        Assert.Equal(16, new SettingsView().FindControl<TextBlock>("SettingsSidebarHeading")!.FontSize);
+
+        using var preset = new SessionPresetViewModel(new SessionPreset { Name = "Deep Work" },
+            [], null!, services);
+        var card = view.FindControl<ListBox>("PresetsListBox")!.ItemTemplate!.Build(preset)!;
+        var moreButton = card.GetVisualDescendants().OfType<Button>()
+            .Single(button => button.Name == "PresetActionsButton");
+        Assert.Equal(40, moreButton.Width);
+        Assert.Equal(3, Assert.IsType<StackPanel>(moreButton.Content).Children.Count);
+
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsSessionActive))!
+            .SetValue(viewModel, true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(view.FindControl<Button>("SidebarStopSessionButton")!.IsVisible);
+    }
+
     static HostGrpcEndToEndTests()
     {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
@@ -360,7 +401,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         using (var services = new ServiceCollection().BuildServiceProvider())
         using (var viewModel = new MainViewModel(null!, null!, api, null!, services))
         {
-            AppBuilder.Configure<TestApplication>().UsePlatformDetect().SetupWithoutStarting();
+            EnsureAvaloniaApp();
             using var editorViewModel = new SessionEditorViewModel(null!, null!, null!, null!, null!, services);
             Dispatcher.UIThread.RunJobs();
             await editorViewModel.InitializationTask;
@@ -493,7 +534,6 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
 
             var view = new MainView { DataContext = viewModel };
             Assert.True(viewModel.CreateSessionCommand.CanExecute(null));
-
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
                 .SetValue(viewModel, true);
 
@@ -625,6 +665,14 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             {
                 confirmationWindow.Close();
             }
+        }
+    }
+
+    private static void EnsureAvaloniaApp()
+    {
+        if (Application.Current is null)
+        {
+            AppBuilder.Configure<TestApplication>().UsePlatformDetect().SetupWithoutStarting();
         }
     }
 

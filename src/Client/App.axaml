@@ -141,8 +141,15 @@
             <Setter Property="FontSize" Value="14" />
             <Setter Property="MinHeight" Value="30" />
             <Setter Property="Padding" Value="12,4" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.SidebarButton.danger">
+            <Setter Property="Background" Value="#32191C" />
+            <Setter Property="BorderBrush" Value="#71343B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#FF929B" />
         </Style>
         <Style Selector="Button.SidebarButton /template/ ContentPresenter">
             <Setter Property="Transitions">
@@ -172,14 +179,14 @@
             <Setter Property="BorderBrush" Value="Transparent" />
         </Style>
         <Style Selector="Button.SidebarButton.danger:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#302224" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Foreground" Value="#FF7777" />
+            <Setter Property="Background" Value="#482328" />
+            <Setter Property="BorderBrush" Value="#A84B55" />
+            <Setter Property="Foreground" Value="#FFD5D8" />
         </Style>
         <Style Selector="Button.SidebarButton.danger:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="#402529" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Foreground" Value="#FF7777" />
+            <Setter Property="Background" Value="#57282F" />
+            <Setter Property="BorderBrush" Value="#B95560" />
+            <Setter Property="Foreground" Value="White" />
         </Style>
 
         <Style Selector="Button.icon">

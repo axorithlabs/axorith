@@ -9,6 +9,7 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Core.Models;
+using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
@@ -42,20 +43,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    public string SessionStatus
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(IsSessionStatusNoticeVisible));
-        }
-    } = "No session is active.";
-
-    public bool IsSessionStatusNoticeVisible => !IsOverlayOpen &&
-        (!IsSessionActive || SessionStatus.StartsWith("Failed", StringComparison.Ordinal) ||
-         SessionStatus.StartsWith("Unable", StringComparison.Ordinal)) &&
-        !string.IsNullOrWhiteSpace(SessionStatus) && SessionStatus != "No session is active.";
+    private bool _sessionStateFailureNotified;
 
     public bool IsSessionActive
     {
@@ -66,7 +54,6 @@ public class MainViewModel : ReactiveObject, IDisposable
             this.RaisePropertyChanged(nameof(IsCommittedSession));
             this.RaisePropertyChanged(nameof(CanStopSession));
             this.RaisePropertyChanged(nameof(HasActiveSessionName));
-            this.RaisePropertyChanged(nameof(IsSessionStatusNoticeVisible));
         }
     }
 
@@ -157,7 +144,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         {
             this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(IsOverlayOpen));
-            this.RaisePropertyChanged(nameof(IsSessionStatusNoticeVisible));
         }
     }
 
@@ -185,7 +171,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         {
             this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(IsOverlayOpen));
-            this.RaisePropertyChanged(nameof(IsSessionStatusNoticeVisible));
         }
     }
 
@@ -446,7 +431,6 @@ public class MainViewModel : ReactiveObject, IDisposable
                 switch (evt.Type)
                 {
                     case SessionEventType.Started:
-                        SessionStatus = "Session is active.";
                         SetActiveSessionPreset(evt.PresetId);
                         if (Presets.FirstOrDefault(preset => preset.Id == evt.PresetId) is { } activePreset)
                         {
@@ -457,7 +441,6 @@ public class MainViewModel : ReactiveObject, IDisposable
                         _ = RefreshSessionStateAsync();
                         break;
                     case SessionEventType.Stopped:
-                        SessionStatus = "No session is active.";
                         EndTrackingSession(evt.Timestamp);
                         SetActiveSessionPreset(null);
                         ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
@@ -475,6 +458,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                         });
                         if (evt.Type == SessionEventType.ModuleError)
                         {
+                            _toastService?.Show(evt.Message ?? "A module failed.", NotificationType.Error);
                             _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
                             {
                                 ["message"] = evt.Message,
@@ -484,7 +468,7 @@ public class MainViewModel : ReactiveObject, IDisposable
 
                         break;
                     case SessionEventType.ValidationWarning:
-                        SessionStatus = evt.Message ?? "Session validation warning.";
+                        _toastService?.Show(evt.Message ?? "Session validation warning.", NotificationType.Warning);
                         _telemetry?.TrackEvent("SessionValidationWarning", new Dictionary<string, object?>
                         {
                             ["message"] = evt.Message,
@@ -670,13 +654,11 @@ public class MainViewModel : ReactiveObject, IDisposable
                 return;
             }
 
-            SessionStatus = $"Checking '{presetVm.Name}' before the committed start...";
             var result = await _sessionsApi.PreflightSessionAsync(presetVm.Id);
             if (!result.Success)
             {
                 var error = $"{presetVm.Model.FocusCommitment.Mode} Session cannot start: {result.Message}";
-                SessionStatus = error;
-                ShowTransientSessionError(error, TimeSpan.FromSeconds(8));
+                _toastService?.Show(error, NotificationType.Error);
                 return;
             }
 
@@ -685,13 +667,11 @@ public class MainViewModel : ReactiveObject, IDisposable
             StartCountdownSeconds = 0;
             IsStartCountdownRunning = false;
             IsStartConfirmationOpen = true;
-            SessionStatus = $"Review '{presetVm.Name}' before starting.";
         }
         catch (Exception ex)
         {
             var error = $"Session preflight failed: {ex.Message}";
-            SessionStatus = error;
-            ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
+            _toastService?.Show(error, NotificationType.Error);
         }
     }
 
@@ -811,7 +791,6 @@ public class MainViewModel : ReactiveObject, IDisposable
             }
 
             StartCountdownSeconds = 0;
-            SessionStatus = "Checking protection again before the committed start...";
             var preflight = await _sessionsApi.PreflightSessionAsync(preset.Id, cts.Token);
             cts.Token.ThrowIfCancellationRequested();
             if (!preflight.Success)
@@ -819,8 +798,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                 var error = $"{preset.Model.FocusCommitment.Mode} Session cannot start: {preflight.Message}";
                 _pendingStartPreset = null;
                 IsStartConfirmationOpen = false;
-                SessionStatus = error;
-                ShowTransientSessionError(error, TimeSpan.FromSeconds(8));
+                _toastService?.Show(error, NotificationType.Error);
                 return;
             }
 
@@ -853,14 +831,12 @@ public class MainViewModel : ReactiveObject, IDisposable
         IsStartCountdownRunning = false;
         StartCountdownSeconds = 0;
         IsStartConfirmationOpen = false;
-        SessionStatus = "Committed session start cancelled.";
     }
 
     private async Task LaunchPresetAsync(SessionPresetViewModel presetVm)
     {
         try
         {
-            SessionStatus = $"Starting '{presetVm.Name}'...";
             SetActiveSessionPreset(presetVm.Id);
             ActiveFocusCommitmentMode = presetVm.Model.FocusCommitment.Mode;
             IsSessionActive = true;
@@ -869,65 +845,45 @@ public class MainViewModel : ReactiveObject, IDisposable
             if (!result.Success)
             {
                 var error = $"Failed to start session: {result.Message}";
-                SessionStatus = error;
+                _toastService?.Show(error, NotificationType.Error);
                 SetActiveSessionPreset(null);
                 ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
                 IsSessionActive = false;
-                ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
             }
             else
             {
-                SessionStatus = $"Session '{presetVm.Name}' is now active.";
+                _toastService?.Show($"Session '{presetVm.Name}' started.", NotificationType.Success);
                 await RefreshSessionStateAsync();
             }
         }
         catch (Exception ex)
         {
             var error = $"Failed to start session: {ex.Message}";
-            SessionStatus = error;
+            _toastService?.Show(error, NotificationType.Error);
             SetActiveSessionPreset(null);
             ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
             IsSessionActive = false;
-            ShowTransientSessionError(error, TimeSpan.FromSeconds(5));
         }
-    }
-
-    private void ShowTransientSessionError(string message, TimeSpan duration)
-    {
-        var subscription = Observable
-            .Timer(duration)
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ =>
-            {
-                if (!IsSessionActive && SessionStatus == message)
-                {
-                    SessionStatus = "No session is active.";
-                }
-            });
-
-        _disposables.Add(subscription);
     }
 
     private async Task StopCurrentSessionAsync()
     {
         try
         {
-            SessionStatus = "Stopping session...";
-
             var result = await _sessionsApi.StopSessionAsync();
             if (!result.Success)
             {
-                SessionStatus = $"Failed to stop session: {result.Message}";
+                _toastService?.Show($"Failed to stop session: {result.Message}", NotificationType.Error);
             }
             else
             {
-                SessionStatus = "Session stopped.";
+                _toastService?.Show("Session stopped.", NotificationType.Success);
                 await RefreshSessionStateAsync();
             }
         }
         catch (Exception ex)
         {
-            SessionStatus = $"Failed to stop session: {ex.Message}";
+            _toastService?.Show($"Failed to stop session: {ex.Message}", NotificationType.Error);
         }
     }
 
@@ -1051,7 +1007,8 @@ public class MainViewModel : ReactiveObject, IDisposable
             if (completed)
             {
                 await RefreshSessionStateAsync();
-                await Dispatcher.UIThread.InvokeAsync(() => SessionStatus = "Emergency Unlock completed.");
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    _toastService?.Show("Emergency unlock completed.", NotificationType.Success));
             }
         }
     }
@@ -1087,11 +1044,11 @@ public class MainViewModel : ReactiveObject, IDisposable
             await _presetsApi.DeletePresetAsync(presetVm.Id);
             Presets.Remove(presetVm);
             presetVm.Dispose();
-            SessionStatus = $"Preset '{presetVm.Name}' deleted.";
+            _toastService?.Show($"Preset '{presetVm.Name}' deleted.", NotificationType.Success);
         }
         catch (Exception ex)
         {
-            SessionStatus = $"Failed to delete preset: {ex.Message}";
+            _toastService?.Show($"Failed to delete preset: {ex.Message}", NotificationType.Error);
         }
     }
 
@@ -1176,15 +1133,11 @@ public class MainViewModel : ReactiveObject, IDisposable
                 UpdateNextScheduledPreset(schedules, fullPresets, schedulesAvailable);
                 UpdateDashboardActivity();
 
-                if (Presets.Count == 0)
-                {
-                    SessionStatus = "No presets found. Click 'Create New Session' to get started.";
-                }
             });
         }
         catch (Exception ex)
         {
-            SessionStatus = $"Failed to load presets: {ex.Message}";
+            _toastService?.Show($"Failed to load presets: {ex.Message}", NotificationType.Error);
         }
     }
 
@@ -1228,11 +1181,9 @@ public class MainViewModel : ReactiveObject, IDisposable
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                _sessionStateFailureNotified = false;
                 if (state?.IsActive == true)
                 {
-                    SessionStatus = state.PresetName != null
-                        ? $"Session '{state.PresetName}' is active."
-                        : "Session is active.";
                     SetActiveSessionPreset(state.PresetId);
                     ActiveFocusCommitmentMode = state.FocusCommitment;
                     IsSessionActive = true;
@@ -1259,7 +1210,6 @@ public class MainViewModel : ReactiveObject, IDisposable
                 }
                 else
                 {
-                    SessionStatus = "No session is active.";
                     EndTrackingSession(DateTimeOffset.Now);
                     SetActiveSessionPreset(null);
                     ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
@@ -1271,9 +1221,15 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
+            var message = $"Unable to fetch session state: {ex.Message}";
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                SessionStatus = $"Unable to fetch session state: {ex.Message}";
+                if (!_sessionStateFailureNotified)
+                {
+                    _toastService?.Show(message, NotificationType.Error);
+                    _sessionStateFailureNotified = true;
+                }
+
                 SetActiveSessionPreset(null);
                 ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
                 IsSessionActive = false;
@@ -1295,14 +1251,22 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private async Task StartBreakAsync()
     {
-        var result = await _sessionsApi.StartBreakAsync();
-        if (!result.Success)
+        try
         {
-            SessionStatus = result.Message;
-            return;
-        }
+            var result = await _sessionsApi.StartBreakAsync();
+            if (!result.Success)
+            {
+                _toastService?.Show($"Failed to start break: {result.Message}", NotificationType.Error);
+                return;
+            }
 
-        await RefreshSessionStateAsync();
+            _toastService?.Show("Break started.", NotificationType.Success);
+            await RefreshSessionStateAsync();
+        }
+        catch (Exception ex)
+        {
+            _toastService?.Show($"Failed to start break: {ex.Message}", NotificationType.Error);
+        }
     }
 
     private async Task RefreshSessionStateForClockAsync()

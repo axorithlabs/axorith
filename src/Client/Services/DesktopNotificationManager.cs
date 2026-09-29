@@ -1,6 +1,5 @@
 ﻿using System.Reactive.Linq;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
@@ -12,7 +11,7 @@ namespace Axorith.Client.Services;
 /// <summary>
 ///     Manages the display and stacking of desktop toast notifications (floating windows).
 ///     Listens to the shared ToastNotificationService and shows a desktop window
-///     when the main application window is not visible or active.
+///     through the dedicated desktop toast window.
 /// </summary>
 public class DesktopNotificationManager(
     IToastNotificationService toastService,
@@ -35,16 +34,6 @@ public class DesktopNotificationManager(
 
     private void OnNotificationReceived(ToastNotification notification)
     {
-        var mainWindow = desktop.MainWindow;
-        var isWindowVisibleAndActive = mainWindow is { IsVisible: true } &&
-                                       mainWindow.WindowState != WindowState.Minimized &&
-                                       mainWindow.IsActive;
-
-        if (isWindowVisibleAndActive)
-        {
-            return;
-        }
-
         ShowDesktopToast(notification);
     }
 
