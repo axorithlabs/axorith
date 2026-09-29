@@ -8,7 +8,6 @@ using Axorith.Client.Services.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using Axorith.Sdk.Services;
-using Axorith.Telemetry;
 using DynamicData;
 using DynamicData.Binding;
 using Grpc.Core;
@@ -783,7 +782,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     private readonly ISchedulerApi _schedulerApi;
     private readonly IToastNotificationService _toastService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly ITelemetryService? _telemetry;
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
@@ -985,7 +983,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         _schedulerApi = schedulerApi;
         _toastService = toastService;
         _serviceProvider = serviceProvider;
-        _telemetry = serviceProvider.GetService<ITelemetryService>();
 
         _isFooterVisible = this.WhenAnyValue(x => x.SelectedModule, x => x.ModuleSelector, x => x.SelectedTrigger,
                 x => x.SelectedStopTrigger)
@@ -1712,57 +1709,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             }
 
             _toastService.Show("Preset saved successfully", NotificationType.Success);
-
-            if (isNew)
-            {
-                _telemetry?.TrackEvent("PresetCreated", new Dictionary<string, object?>
-                {
-                    ["presetId"] = _preset.Id,
-                    ["name"] = _preset.Name
-                });
-            }
-
-            var presetSummaries = await _presetsApi.ListPresetsAsync();
-            var fullPresets = new List<SessionPreset>();
-            foreach (var summary in presetSummaries)
-            {
-                var fullPreset = await _presetsApi.GetPresetAsync(summary.Id);
-                if (fullPreset != null)
-                {
-                    fullPresets.Add(fullPreset);
-                }
-            }
-
-            var modules = await _modulesApi.ListModulesAsync();
-            var moduleDefLookup = modules.ToDictionary(m => m.Id, m => m.Name);
-
-            var presetData = fullPresets.Select(p => new Dictionary<string, object?>
-            {
-                ["id"] = p.Id.ToString(),
-                ["name"] = TelemetryGuard.SafeString(p.Name),
-                ["version"] = p.Version,
-                ["moduleCount"] = p.Modules.Count,
-                ["modules"] = p.Modules.Select(m =>
-                {
-                    var moduleName = moduleDefLookup.TryGetValue(m.ModuleId, out var name) ? name : "Unknown";
-                    return new Dictionary<string, object?>
-                    {
-                        ["instanceId"] = m.InstanceId.ToString(),
-                        ["moduleId"] = m.ModuleId.ToString(),
-                        ["moduleName"] = TelemetryGuard.SafeString(moduleName),
-                        ["customName"] = TelemetryGuard.SafeString(m.CustomName),
-                        ["startDelayMs"] = (long)m.StartDelay.TotalMilliseconds,
-                        ["settingsCount"] = m.Settings.Count,
-                        ["settingKeys"] = m.Settings.Keys.Take(32).ToArray()
-                    };
-                }).ToArray()
-            }).ToArray();
-
-            _telemetry?.TrackEvent("PresetCount", new Dictionary<string, object?>
-            {
-                ["total"] = presetSummaries.Count,
-                ["presets"] = presetData
-            });
 
             Cancel();
         }

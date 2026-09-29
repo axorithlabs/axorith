@@ -418,7 +418,7 @@ public class ScheduleManager(
 
                 await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...");
 
-                await sessionManager.StartSessionAsync(preset, ct);
+                await sessionManager.StartSessionAsync(preset, ct, startSource: "schedule");
 
                 logger.LogInformation("Session '{PresetName}' started successfully by schedule '{ScheduleName}'",
                     preset.Name, schedule.Name);

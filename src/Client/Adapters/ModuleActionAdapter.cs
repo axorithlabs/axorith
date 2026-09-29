@@ -62,17 +62,15 @@ internal class ModuleActionAdapter(
                 if (result.Success)
                 {
                     _invokedSubject.OnNext(Unit.Default);
-                    telemetry?.TrackEvent("ModuleUsed", new Dictionary<string, object?>
-                    {
-                        ["name"] = moduleName,
-                        ["action"] = Key
-                    });
                 }
+                TrackActionInvocation(result.Success ? "success" : "failed");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // Adapter has no logger - silently ignore action invocation errors
                 // Errors are logged on the Host side
+                TrackActionInvocation("failed");
+                TrackActionError(ex);
             }
         });
     }
@@ -81,18 +79,42 @@ internal class ModuleActionAdapter(
     {
         // Invoke action via gRPC and wait for completion
         // Used for actions that require async completion (e.g., OAuth login)
-        var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
-
-        if (result.Success)
+        try
         {
-            _invokedSubject.OnNext(Unit.Default);
-            telemetry?.TrackEvent("ModuleUsed", new Dictionary<string, object?>
+            var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
+
+            if (result.Success)
             {
-                ["name"] = moduleName,
-                ["action"] = Key
-            });
+                _invokedSubject.OnNext(Unit.Default);
+            }
+            TrackActionInvocation(result.Success ? "success" : "failed");
+        }
+        catch (Exception ex)
+        {
+            TrackActionInvocation("failed");
+            TrackActionError(ex);
+            throw;
         }
     }
+
+    private void TrackActionInvocation(string result) => telemetry?.TrackEvent("ModuleActionInvoked",
+        new Dictionary<string, object?>
+        {
+            ["moduleId"] = moduleId,
+            ["moduleName"] = moduleName,
+            ["instanceId"] = designTimeId,
+            ["actionKey"] = Key,
+            ["result"] = result
+        });
+
+    private void TrackActionError(Exception exception) => telemetry?.TrackError(exception, "module",
+        "design_time_action", "error", handled: true, fatal: false, properties: new Dictionary<string, object?>
+        {
+            ["moduleId"] = moduleId,
+            ["moduleName"] = moduleName,
+            ["instanceId"] = designTimeId,
+            ["actionKey"] = Key
+        });
 
     public void Dispose()
     {

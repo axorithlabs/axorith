@@ -55,6 +55,7 @@ public class SessionManager(
         public required ILifetimeScope Scope { get; init; }
         public required ConfiguredModule Configuration { get; init; }
         public required ModuleDefinition Definition { get; init; }
+        public bool IsStarted { get; set; }
 
         public string DisplayName => Configuration.CustomName ?? Definition.Name;
 
@@ -84,7 +85,25 @@ public class SessionManager(
         ? TimeSpan.FromSeconds(Math.Max(0, (double)(deadline - System.Diagnostics.Stopwatch.GetTimestamp()) /
                                          System.Diagnostics.Stopwatch.Frequency))
         : null;
-    public string ProtectionStatus { get; private set; } = "Protection active";
+    public string ProtectionStatus
+    {
+        get => _protectionStatus;
+        private set
+        {
+            var previousState = GetProtectionState(_protectionStatus);
+            _protectionStatus = value;
+            var state = GetProtectionState(value);
+            if (previousState != state && ActiveSession is { } session && _sessionTelemetryStarted)
+            {
+                telemetry.TrackEvent("ProtectionStateChanged", new Dictionary<string, object?>
+                {
+                    ["sessionInstanceId"] = _sessionInstanceId,
+                    ["presetId"] = session.Id,
+                    ["protectionState"] = state
+                });
+            }
+        }
+    }
 
     public event Action<Guid>? SessionStarted;
     public event Action<Guid>? SessionStopped;
@@ -654,6 +673,7 @@ public class SessionManager(
     private async Task StartSingleModuleAsync(ActiveModule module, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
 
         using var scope = logger.BeginScope(new Dictionary<string, object>
         {
@@ -672,18 +692,24 @@ public class SessionManager(
             await module.Instance.OnSessionStartAsync(startCts.Token).ConfigureAwait(false);
 
             logger.LogInformation("Module '{InstanceName}' started successfully.", module.DisplayName);
-            TrackModuleStarted(module);
+            module.IsStarted = true;
+            TrackModuleStarted(module,
+                (long)System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Timed out specifically
             logger.LogError("Module '{InstanceName}' startup timed out after {Timeout}s.",
                 module.DisplayName, startupTimeout.TotalSeconds);
+            TrackModuleFailed(module, "timeout",
+                (long)System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             throw new SessionException($"Module '{module.DisplayName}' startup timed out.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Module '{InstanceName}' failed to start.", module.DisplayName);
+            TrackModuleFailed(module, "unknown",
+                (long)System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             throw new SessionException($"Module '{module.DisplayName}' failed to start: {ex.Message}");
         }
     }
@@ -767,6 +793,15 @@ public class SessionManager(
                     ProtectionStatus = BuildProtectionStatus("Protection degraded", _activeModules);
                     _protectionWasUnavailable = true;
                 }
+
+                telemetry.TrackEvent("SessionBreakStarted", new Dictionary<string, object?>
+                {
+                    ["sessionInstanceId"] = _sessionInstanceId,
+                    ["presetId"] = ActiveSession?.Id,
+                    ["breakCount"] = commitment.BreakCount,
+                    ["breaksUsed"] = _breaksUsed,
+                    ["breakDurationMs"] = (long)commitment.BreakDuration.TotalMilliseconds
+                });
             }
             catch
             {
@@ -882,6 +917,14 @@ public class SessionManager(
             {
                 SaveCommittedSessionState(ActiveSession, SessionStartedAt!.Value, SessionEndsAt!.Value);
             }
+
+            telemetry.TrackEvent("SessionBreakEnded", new Dictionary<string, object?>
+            {
+                ["sessionInstanceId"] = _sessionInstanceId,
+                ["presetId"] = ActiveSession?.Id,
+                ["breaksUsed"] = _breaksUsed,
+                ["result"] = resumeError is null ? "completed" : "failed"
+            });
 
             if (resumeError != null)
             {
@@ -1072,12 +1115,22 @@ public class SessionManager(
                     shutdownCts.CancelAfter(shutdownTimeout);
 
                     await activeModule.Instance.OnSessionEndAsync(shutdownCts.Token).ConfigureAwait(false);
+                    if (activeModule.IsStarted)
+                    {
+                        TrackModuleStopped(activeModule, "success");
+                    }
                 }
                 catch (Exception ex)
                 {
                     // We swallow exceptions during stop to ensure we try to stop EVERYTHING.
                     logger.LogError(ex, "Module '{InstanceName}' threw an exception during stop.",
                         activeModule.DisplayName);
+                    if (activeModule.IsStarted)
+                    {
+                        TrackModuleStopped(activeModule, "failed");
+                        telemetry.TrackError(ex, "module", "module_execution", "error", handled: true,
+                            fatal: false, properties: ModuleTelemetryProperties(activeModule));
+                    }
                 }
             }
 
@@ -1095,9 +1148,16 @@ public class SessionManager(
             }
 
             var stoppedPresetId = ActiveSession?.Id ?? Guid.Empty;
-            var stoppedPresetName = ActiveSession?.Name;
             var stoppedModules = _activeModules.ToList();
             var startedAt = SessionStartedAt;
+            var stoppedSessionInstanceId = _sessionInstanceId;
+            var startSource = _sessionStartSource;
+            var breaksUsed = _breaksUsed;
+            var reportSessionStop = _sessionTelemetryStarted;
+            var commitmentMode = CommitmentMode(ActiveSession?.FocusCommitment.Mode ?? FocusCommitmentMode.Normal);
+            var breakCount = ActiveSession?.FocusCommitment.BreakCount ?? 0;
+            var emergencyUnlockUsed = reason == SessionEndReason.EmergencyUnlock;
+            var protectionDegraded = _protectionWasUnavailable || GetProtectionState(ProtectionStatus) == "degraded";
             if (wasCommittedSession && _commitmentProtection != null)
             {
                 try
@@ -1119,7 +1179,21 @@ public class SessionManager(
             if (stoppedPresetId != Guid.Empty)
             {
                 SessionStopped?.Invoke(stoppedPresetId);
-                TrackSessionStopped(stoppedPresetId, stoppedPresetName, stoppedModules, startedAt);
+                if (reportSessionStop)
+                {
+                    TrackSessionStopped(stoppedPresetId, stoppedModules, startedAt, stoppedSessionInstanceId,
+                        startSource, reason, breaksUsed, commitmentMode, breakCount, emergencyUnlockUsed,
+                        protectionDegraded);
+                    if (emergencyUnlockUsed)
+                    {
+                        telemetry.TrackEvent("EmergencyUnlockUsed", new Dictionary<string, object?>
+                        {
+                            ["sessionInstanceId"] = stoppedSessionInstanceId,
+                            ["presetId"] = stoppedPresetId,
+                            ["result"] = "completed"
+                        });
+                    }
+                }
             }
 
             return true;

@@ -454,18 +454,14 @@ public class MainViewModel : ReactiveObject, IDisposable
                     case SessionEventType.ModuleStarted:
                     case SessionEventType.ModuleStopped:
                     case SessionEventType.ModuleError:
-                        _telemetry?.TrackEvent("ModuleUsed", new Dictionary<string, object?>
-                        {
-                            ["event"] = evt.Type.ToString(),
-                            ["module"] = evt.Message
-                        });
                         if (evt.Type == SessionEventType.ModuleError)
                         {
                             _toastService?.Show(evt.Message ?? "A module failed.", NotificationType.Error);
-                            _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+                            _telemetry?.TrackEvent("ModuleExecutionFailed", new Dictionary<string, object?>
                             {
-                                ["message"] = evt.Message,
-                                ["fatal"] = false
+                                ["presetId"] = evt.PresetId,
+                                ["stage"] = "module_startup",
+                                ["result"] = "failed"
                             });
                         }
 
@@ -474,16 +470,9 @@ public class MainViewModel : ReactiveObject, IDisposable
                         _toastService?.Show(evt.Message ?? "Session validation warning.", NotificationType.Warning);
                         _telemetry?.TrackEvent("SessionValidationWarning", new Dictionary<string, object?>
                         {
-                            ["message"] = evt.Message,
-                            ["presetId"] = evt.PresetId?.ToString()
-                        });
-                        break;
-                    default:
-                        _telemetry?.TrackEvent("SessionEventUnhandled", new Dictionary<string, object?>
-                        {
-                            ["event"] = evt.Type.ToString(),
-                            ["message"] = evt.Message,
-                            ["presetId"] = evt.PresetId?.ToString()
+                            ["presetId"] = evt.PresetId,
+                            ["stage"] = "preflight",
+                            ["failureReason"] = "validation_failed"
                         });
                         break;
                 }
@@ -604,13 +593,9 @@ public class MainViewModel : ReactiveObject, IDisposable
                 });
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
-            {
-                ["message"] = "Failed to check for updates",
-                ["fatal"] = false
-            });
+            _telemetry?.TrackError(ex, "update", "update_check", "warning", handled: true, fatal: false);
         }
     }
 
@@ -624,30 +609,43 @@ public class MainViewModel : ReactiveObject, IDisposable
             return;
         }
 
+        var stage = "update_download";
         try
         {
             IsDownloadingUpdate = true;
             DownloadProgress = 0;
+            _telemetry?.TrackEvent("UpdateDownloadStarted", new Dictionary<string, object?>
+            {
+                ["releaseVersion"] = _availableUpdate.Version
+            });
 
             var progress = new Progress<double>(value => { DownloadProgress = value; });
 
             var installerPath = await _updatesApi.DownloadUpdateAsync(_availableUpdate, progress);
-
-            _telemetry?.TrackEvent("UpdateInstalled", new Dictionary<string, object?>
+            _telemetry?.TrackEvent("UpdateDownloadCompleted", new Dictionary<string, object?>
             {
-                ["version"] = _availableUpdate.Version
+                ["releaseVersion"] = _availableUpdate.Version
             });
 
+            stage = "update_install";
+            _telemetry?.TrackEvent("UpdateInstallStarted", new Dictionary<string, object?>
+            {
+                ["releaseVersion"] = _availableUpdate.Version
+            });
             await _updatesApi.InstallUpdateAsync(installerPath);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             IsDownloadingUpdate = false;
-            _telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            var eventName = stage == "update_download" ? "UpdateDownloadFailed" : "UpdateInstallFailed";
+            _telemetry?.TrackEvent(eventName, new Dictionary<string, object?>
             {
-                ["message"] = "Failed to install update",
-                ["fatal"] = false
+                ["releaseVersion"] = _availableUpdate.Version,
+                ["stage"] = stage,
+                ["result"] = "failed"
             });
+            _telemetry?.TrackError(ex, "update", stage, "error", handled: true, fatal: false,
+                new Dictionary<string, object?> { ["releaseVersion"] = _availableUpdate.Version });
         }
     }
 
@@ -1140,6 +1138,7 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private void CreateNewSession()
     {
+        _telemetry?.TrackEvent("PresetCreationStarted");
         var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
         editor.PresetToEdit = null;
         _shell.NavigateTo(editor);
@@ -1205,33 +1204,6 @@ public class MainViewModel : ReactiveObject, IDisposable
                         schedules.Where(schedule => schedule.PresetId == fullPreset.Id).ToArray()));
                 }
             }
-
-            var moduleDefLookup = modules.ToDictionary(m => m.Id, m => m.Name);
-
-            var presetData = fullPresets.Select(p => new Dictionary<string, object?>
-            {
-                ["id"] = p.Id.ToString(),
-                ["version"] = p.Version,
-                ["moduleCount"] = p.Modules.Count,
-                ["modules"] = p.Modules.Select(m =>
-                {
-                    var moduleName = moduleDefLookup.TryGetValue(m.ModuleId, out var name) ? name : "Unknown";
-                    return new Dictionary<string, object?>
-                    {
-                        ["instanceId"] = m.InstanceId.ToString(),
-                        ["moduleId"] = m.ModuleId.ToString(),
-                        ["moduleName"] = TelemetryGuard.SafeString(moduleName),
-                        ["startDelayMs"] = (long)m.StartDelay.TotalMilliseconds,
-                        ["settingsCount"] = m.Settings.Count
-                    };
-                }).ToArray()
-            }).ToArray();
-
-            _telemetry?.TrackEvent("PresetCount", new Dictionary<string, object?>
-            {
-                ["total"] = presets.Count,
-                ["presets"] = presetData
-            });
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {

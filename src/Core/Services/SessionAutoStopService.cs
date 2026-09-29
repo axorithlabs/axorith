@@ -384,7 +384,7 @@ public class SessionAutoStopService(
                     await notifier.ShowSystemAsync("Session Transition",
                         $"Starting '{nextPreset.Name}'...").ConfigureAwait(false);
 
-                    await sessionManager.StartSessionAsync(nextPreset, CancellationToken.None).ConfigureAwait(false);
+                    await sessionManager.StartSessionAsync(nextPreset, CancellationToken.None, startSource: "chained").ConfigureAwait(false);
 
                     logger.LogInformation("Next preset '{NextPresetName}' started successfully", nextPreset.Name);
                 }

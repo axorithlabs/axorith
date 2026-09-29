@@ -264,55 +264,28 @@ public class PresetsServiceImpl(
 
     private void TrackPresetTelemetry(string eventName, SessionPreset preset)
     {
-        if (!_telemetry.IsEnabled)
-        {
-            return;
-        }
-
         var allModuleDefs = moduleRegistry.GetAllDefinitions();
         var moduleDefLookup = allModuleDefs.ToDictionary(m => m.Id, m => m.Name);
-
-        var moduleIds = preset.Modules.Select(m => m.ModuleId.ToString()).ToArray();
-        var settingsKeys = preset.Modules
-            .SelectMany(m => m.Settings.Keys)
-            .Distinct()
-            .Take(64) // cap to avoid oversize
-            .ToArray();
-
-        var modulesDetailed = preset.Modules.Select(m =>
+        var modules = preset.Modules.Select(module => new Dictionary<string, object?>
         {
-            var moduleName = moduleDefLookup.TryGetValue(m.ModuleId, out var name) ? name : "Unknown";
-            return new
-            {
-                moduleId = m.ModuleId.ToString(),
-                moduleName = TelemetryGuard.SafeString(moduleName),
-                instanceId = m.InstanceId.ToString(),
-                customName = !string.IsNullOrWhiteSpace(m.CustomName),
-                startDelaySec = (int)m.StartDelay.TotalSeconds,
-                settingsKeys = m.Settings.Keys.Take(32).ToArray(),
-                settingsCount = m.Settings.Count,
-                settings = m.Settings
-                    .Take(32)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => new
-                        {
-                            len = kvp.Value?.Length ?? 0,
-                            val = TelemetryGuard.SafeString(kvp.Value, 128)
-                        })
-            };
+            ["moduleId"] = module.ModuleId,
+            ["moduleName"] = moduleDefLookup.GetValueOrDefault(module.ModuleId, "custom"),
+            ["instanceId"] = module.InstanceId
         }).ToArray();
 
         _telemetry.TrackEvent(eventName, new Dictionary<string, object?>
         {
-            ["presetId"] = preset.Id.ToString(),
-            ["presetName"] = TelemetryGuard.SafeString(preset.Name, 128),
-            ["presetNameLength"] = preset.Name?.Length ?? 0,
+            ["presetId"] = preset.Id,
+            ["commitmentMode"] = preset.FocusCommitment.Mode switch
+            {
+                FocusCommitmentMode.Locked => "locked",
+                FocusCommitmentMode.Strict => "strict",
+                _ => "normal"
+            },
             ["moduleCount"] = preset.Modules.Count,
-            ["moduleIds"] = moduleIds,
-            ["settingsKeyCount"] = settingsKeys.Length,
-            ["settingsKeys"] = settingsKeys,
-            ["modules"] = modulesDetailed
+            ["moduleIds"] = modules.Select(module => ((Guid)module["moduleId"]!).ToString()).ToArray(),
+            ["moduleTypes"] = modules.Select(module => (string)module["moduleName"]!).Distinct().ToArray(),
+            ["modules"] = modules
         });
     }
 }
