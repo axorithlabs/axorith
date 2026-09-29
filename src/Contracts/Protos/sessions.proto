@@ -22,6 +22,8 @@ message GetSessionStateRequest {
 
 message StartSessionRequest {
   string preset_id = 1;
+  string session_instance_id = 2;
+  string start_source = 3;
 }
 
 message PreflightSessionRequest {

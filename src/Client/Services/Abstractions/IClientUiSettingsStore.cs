@@ -3,5 +3,5 @@
 public interface IClientUiSettingsStore
 {
     ClientUiConfiguration LoadOrDefault();
-    void Save(ClientUiConfiguration configuration);
+    bool Save(ClientUiConfiguration configuration);
 }

@@ -1,7 +1,8 @@
 param (
     [string]$Version = "",
     [string]$SigningCertificate = "",
-    [string]$SigningPassword = ""
+    [string]$SigningPassword = "",
+    [string]$NsisPluginDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,8 +18,8 @@ catch {
 
 $patchScript = Join-Path $SolutionDir "scripts\patch-telemetry-defaults.ps1"
 if (-not [string]::IsNullOrWhiteSpace($env:POSTHOG_API_KEY) -and (Test-Path $patchScript)) {
-    Write-Host "--- Patching TelemetrySettings.cs with POSTHOG_API_KEY for this build ---" -ForegroundColor Cyan
-    & $patchScript -Key $env:POSTHOG_API_KEY -Host $env:POSTHOG_API_HOST
+    Write-Host "--- Patching desktop and website PostHog defaults for this build ---" -ForegroundColor Cyan
+    & $patchScript -Key $env:POSTHOG_API_KEY -ApiHost $env:POSTHOG_API_HOST
 }
 elseif (-not (Test-Path $patchScript)) {
     Write-Warning "patch-telemetry-defaults.ps1 not found at $patchScript"
@@ -141,17 +142,22 @@ if (-not $NsisPath) {
     }
 }
 
-Write-Host "--- Publishing the entire solution in Release mode ---" -ForegroundColor Cyan
+Write-Host "--- Publishing product projects in Release mode ---" -ForegroundColor Cyan
 if (Test-Path $DistDir) { Remove-Item -Recurse -Force $DistDir }
+if (Test-Path $StagingDir) { Remove-Item -Recurse -Force $StagingDir }
 New-Item -ItemType Directory -Force $StagingDir | Out-Null
 New-Item -ItemType Directory -Force $DistDir | Out-Null
 
-dotnet publish $SolutionDir --configuration Release -p:Version=$Version
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Solution publish failed."
-    exit 1
+$publishProjects = Get-ChildItem -Path (Join-Path $SolutionDir "src") -Filter "*.csproj" -File -Recurse
+foreach ($project in $publishProjects) {
+    Write-Host "Publishing $($project.FullName)..." -ForegroundColor Cyan
+    & dotnet publish $project.FullName --configuration Release "-p:Version=$Version"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Publish failed for $($project.FullName)."
+        exit 1
+    }
 }
-Write-Host "Solution published successfully."
+Write-Host "Product projects published successfully."
 
 Write-Host "--- Aggregating published artifacts into staging directory ---" -ForegroundColor Cyan
 
@@ -220,6 +226,22 @@ $nsisArgs = @(
     "/DPRODUCT_VERSION=$Version",
     "/DBUILD_ROOT=$StagingDir"
 )
+if (-not [string]::IsNullOrWhiteSpace($env:POSTHOG_API_KEY)) {
+    $posthogApiHost = $env:POSTHOG_API_HOST
+    if ([string]::IsNullOrWhiteSpace($posthogApiHost)) {
+        $posthogApiHost = "https://us.i.posthog.com"
+    }
+    $posthogApiHost = $posthogApiHost.TrimEnd('/')
+    $nsisArgs += "/DPOSTHOG_API_KEY=$($env:POSTHOG_API_KEY)"
+    $nsisArgs += "/DPOSTHOG_API_HOST=$posthogApiHost"
+}
+if (-not [string]::IsNullOrWhiteSpace($NsisPluginDir)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $NsisPluginDir "INetC.dll"))) {
+        Write-Error "INetC.dll not found in NSIS plugin directory: $NsisPluginDir"
+        exit 1
+    }
+    $nsisArgs += "/X!addplugindir `"$NsisPluginDir`""
+}
 $nsisArgs += $NsiScriptPath
 
 $executablePath = if ($NsisPath.Source) { $NsisPath.Source } else { $NsisPath }
@@ -231,7 +253,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if (-not [string]::IsNullOrWhiteSpace($SigningCertificate) -and (Test-Path $SigningCertificate)) {
-    $installerName = "Axorith-Setup-${Version}.exe"
+    $installerName = "axorith-setup.exe"
     $installerPath = Join-Path $DistDir $installerName
     if (Test-Path $installerPath) {
         Write-Host "--- Signing installer ---" -ForegroundColor Cyan
@@ -240,6 +262,10 @@ if (-not [string]::IsNullOrWhiteSpace($SigningCertificate) -and (Test-Path $Sign
 }
 
 Write-Host "--- Build successful! ---" -ForegroundColor Green
-$installerName = "Axorith-Setup-${Version}.exe"
+$installerName = "axorith-setup.exe"
 $installerPath = Join-Path $DistDir $installerName
+if (-not (Test-Path $installerPath)) {
+    Write-Error "Installer output not found at $installerPath"
+    exit 1
+}
 Write-Host "Installer created at: $installerPath"

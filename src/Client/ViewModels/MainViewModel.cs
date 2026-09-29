@@ -30,6 +30,8 @@ public class MainViewModel : ReactiveObject, IDisposable
     private readonly ITelemetryService? _telemetry;
     private readonly IClientOnboardingService? _onboardingService;
     private readonly IToastNotificationService? _toastService;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> TrackedUpdateVersions =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public SessionPresetViewModel? SelectedPreset
     {
@@ -241,6 +243,7 @@ public class MainViewModel : ReactiveObject, IDisposable
     private CancellationTokenSource? _emergencyUnlockCts;
     private CancellationTokenSource? _startCountdownCts;
     private SessionPresetViewModel? _pendingStartPreset;
+    private Guid? _pendingStartSessionInstanceId;
     private readonly DispatcherTimer _activeSessionClock = new() { Interval = TimeSpan.FromSeconds(1) };
     private DateTimeOffset? _activeSessionEndsAt;
     private DateTimeOffset? _activeBreakEndsAt;
@@ -592,11 +595,12 @@ public class MainViewModel : ReactiveObject, IDisposable
             _availableUpdate = updateInfo;
             UpdateAvailable = updateInfo != null;
             UpdateVersion = updateInfo?.Version;
-            if (updateInfo != null)
+            if (updateInfo is not null && _telemetry is { IsEnabled: true } &&
+                TryTrackUpdateAvailable(updateInfo.Version))
             {
                 _telemetry?.TrackEvent("UpdateAvailable", new Dictionary<string, object?>
                 {
-                    ["version"] = updateInfo.Version
+                    ["releaseVersion"] = updateInfo.Version
                 });
             }
         }
@@ -609,6 +613,9 @@ public class MainViewModel : ReactiveObject, IDisposable
             });
         }
     }
+
+    internal static bool TryTrackUpdateAvailable(string releaseVersion) =>
+        TrackedUpdateVersions.TryAdd(releaseVersion, 0);
 
     private async Task InstallUpdateAsync()
     {
@@ -646,23 +653,27 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private async Task StartPresetAsync(SessionPresetViewModel presetVm)
     {
+        var sessionInstanceId = Guid.NewGuid();
+        TrackSessionStartRequested(presetVm, sessionInstanceId);
         try
         {
             if (presetVm.Model.FocusCommitment.Mode == FocusCommitmentMode.Normal)
             {
-                await LaunchPresetAsync(presetVm);
+                await LaunchPresetAsync(presetVm, sessionInstanceId);
                 return;
             }
 
             var result = await _sessionsApi.PreflightSessionAsync(presetVm.Id);
             if (!result.Success)
             {
+                TrackSessionStartFailed(presetVm, sessionInstanceId, "preflight", "validation_failed");
                 var error = $"{presetVm.Model.FocusCommitment.Mode} Session cannot start: {result.Message}";
                 _toastService?.Show(error, NotificationType.Error);
                 return;
             }
 
             _pendingStartPreset = presetVm;
+            _pendingStartSessionInstanceId = sessionInstanceId;
             PopulateStartReview(presetVm);
             StartCountdownSeconds = 0;
             IsStartCountdownRunning = false;
@@ -670,10 +681,81 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
+            TrackSessionStartFailed(presetVm, sessionInstanceId, "preflight", "unknown");
+            _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
+                properties: new Dictionary<string, object?>
+                {
+                    ["sessionInstanceId"] = sessionInstanceId,
+                    ["presetId"] = presetVm.Id,
+                    ["stage"] = "preflight"
+                });
             var error = $"Session preflight failed: {ex.Message}";
             _toastService?.Show(error, NotificationType.Error);
         }
     }
+
+    private void TrackSessionStartRequested(SessionPresetViewModel preset, Guid sessionInstanceId)
+    {
+        var options = preset.Model.FocusCommitment;
+        var modules = preset.Modules.Select(module => new Dictionary<string, object?>
+        {
+            ["moduleId"] = module.Model.ModuleId,
+            ["moduleName"] = module.Definition.Name,
+            ["instanceId"] = module.Model.InstanceId
+        }).ToArray();
+
+        _telemetry?.TrackEvent("SessionStartRequested", new Dictionary<string, object?>
+        {
+            ["sessionInstanceId"] = sessionInstanceId,
+            ["presetId"] = preset.Id,
+            ["startSource"] = "manual",
+            ["commitmentMode"] = CommitmentMode(options.Mode),
+            ["endConditionType"] = EndCondition(options.EndCondition),
+            ["plannedDurationMs"] = options.Duration is { } duration ? (long)duration.TotalMilliseconds : null,
+            ["breakCount"] = options.BreakCount,
+            ["breakDurationMs"] = (long)options.BreakDuration.TotalMilliseconds,
+            ["afterEndAction"] = AfterEndAction(options.AfterEnd),
+            ["moduleCount"] = modules.Length,
+            ["modules"] = modules,
+            ["moduleIds"] = modules.Select(module => ((Guid)module["moduleId"]!).ToString()).ToArray(),
+            ["moduleTypes"] = modules.Select(module => (string)module["moduleName"]!).Distinct().ToArray()
+        });
+    }
+
+    private void TrackSessionStartFailed(SessionPresetViewModel preset, Guid sessionInstanceId, string stage,
+        string failureReason) => _telemetry?.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
+        {
+            ["sessionInstanceId"] = sessionInstanceId,
+            ["presetId"] = preset.Id,
+            ["startSource"] = "manual",
+            ["stage"] = stage,
+            ["failureReason"] = failureReason,
+            ["result"] = "failed"
+        });
+
+    private static string CommitmentMode(FocusCommitmentMode mode) => mode switch
+    {
+        FocusCommitmentMode.Locked => "locked",
+        FocusCommitmentMode.Strict => "strict",
+        _ => "normal"
+    };
+
+    private static string EndCondition(FocusEndCondition condition) => condition switch
+    {
+        FocusEndCondition.Duration => "duration",
+        FocusEndCondition.EndAt => "end_at",
+        _ => "none"
+    };
+
+    private static string AfterEndAction(AfterEndBehavior behavior) => behavior switch
+    {
+        AfterEndBehavior.StartNextWorkspace => "start_next_workspace",
+        AfterEndBehavior.LockPc => "lock_pc",
+        AfterEndBehavior.Sleep => "sleep",
+        AfterEndBehavior.SignOut => "sign_out",
+        AfterEndBehavior.ShutDownPc => "shut_down_pc",
+        _ => "do_nothing"
+    };
 
     private void PopulateStartReview(SessionPresetViewModel presetVm)
     {
@@ -778,6 +860,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
 
         var preset = _pendingStartPreset;
+        var sessionInstanceId = _pendingStartSessionInstanceId ?? Guid.NewGuid();
         var cts = new CancellationTokenSource();
         _startCountdownCts = cts;
         IsStartCountdownRunning = true;
@@ -795,21 +878,36 @@ public class MainViewModel : ReactiveObject, IDisposable
             cts.Token.ThrowIfCancellationRequested();
             if (!preflight.Success)
             {
+                TrackSessionStartFailed(preset, sessionInstanceId, "preflight", "validation_failed");
                 var error = $"{preset.Model.FocusCommitment.Mode} Session cannot start: {preflight.Message}";
                 _pendingStartPreset = null;
+                _pendingStartSessionInstanceId = null;
                 IsStartConfirmationOpen = false;
                 _toastService?.Show(error, NotificationType.Error);
                 return;
             }
 
             _pendingStartPreset = null;
+            _pendingStartSessionInstanceId = null;
             IsStartConfirmationOpen = false;
             IsStartCountdownRunning = false;
-            await LaunchPresetAsync(preset);
+            await LaunchPresetAsync(preset, sessionInstanceId);
         }
         catch (OperationCanceledException)
         {
             // The user cancelled during the ten-second countdown.
+        }
+        catch (Exception ex)
+        {
+            TrackSessionStartFailed(preset, sessionInstanceId, "preflight", "network_error");
+            _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
+                properties: new Dictionary<string, object?>
+                {
+                    ["sessionInstanceId"] = sessionInstanceId,
+                    ["presetId"] = preset.Id,
+                    ["stage"] = "preflight"
+                });
+            throw;
         }
         finally
         {
@@ -825,15 +923,27 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private void CancelStart()
     {
+        if (_pendingStartPreset is { } preset && _pendingStartSessionInstanceId is { } sessionInstanceId)
+        {
+            _telemetry?.TrackEvent("SessionStartCancelled", new Dictionary<string, object?>
+            {
+                ["sessionInstanceId"] = sessionInstanceId,
+                ["presetId"] = preset.Id,
+                ["startSource"] = "manual",
+                ["result"] = "cancelled"
+            });
+        }
+
         _startCountdownCts?.Cancel();
         _startCountdownCts = null;
         _pendingStartPreset = null;
+        _pendingStartSessionInstanceId = null;
         IsStartCountdownRunning = false;
         StartCountdownSeconds = 0;
         IsStartConfirmationOpen = false;
     }
 
-    private async Task LaunchPresetAsync(SessionPresetViewModel presetVm)
+    private async Task LaunchPresetAsync(SessionPresetViewModel presetVm, Guid sessionInstanceId)
     {
         try
         {
@@ -841,7 +951,7 @@ public class MainViewModel : ReactiveObject, IDisposable
             ActiveFocusCommitmentMode = presetVm.Model.FocusCommitment.Mode;
             IsSessionActive = true;
 
-            var result = await _sessionsApi.StartSessionAsync(presetVm.Id);
+            var result = await _sessionsApi.StartSessionAsync(presetVm.Id, sessionInstanceId);
             if (!result.Success)
             {
                 var error = $"Failed to start session: {result.Message}";
@@ -858,6 +968,14 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
+            TrackSessionStartFailed(presetVm, sessionInstanceId, "rpc_request", "network_error");
+            _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
+                properties: new Dictionary<string, object?>
+                {
+                    ["sessionInstanceId"] = sessionInstanceId,
+                    ["presetId"] = presetVm.Id,
+                    ["stage"] = "rpc_request"
+                });
             var error = $"Failed to start session: {ex.Message}";
             _toastService?.Show(error, NotificationType.Error);
             SetActiveSessionPreset(null);

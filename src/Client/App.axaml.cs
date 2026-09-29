@@ -170,12 +170,6 @@ public class App : Application
             };
         }
 
-        telemetry.TrackEvent("AppReady", new Dictionary<string, object?>
-        {
-            ["scope"] = "app",
-            ["trayMode"] = _isTrayMode
-        });
-
         // Apply auto-start settings on first run
         ApplyAutoStartSettings(uiSettingsStore, Services, logger);
 

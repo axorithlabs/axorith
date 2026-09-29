@@ -1,6 +1,4 @@
-using System.Collections.Frozen;
 using System.Diagnostics;
-using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -8,13 +6,6 @@ using Serilog.Events;
 using Serilog.Sinks.PeriodicBatching;
 
 namespace Axorith.Telemetry;
-
-/// <summary>
-///     Interface for PostHog sink to enable testability.
-/// </summary>
-internal interface IPostHogSink : IBatchedLogEventSink
-{
-}
 
 /// <summary>
 ///     Batching sink that sends Serilog events to PostHog /batch endpoint.
@@ -25,52 +16,46 @@ internal sealed class PostHogSink(
     string apiKey,
     string host,
     string distinctId,
-    RetryPolicyOptions? retryOptions = null)
-    : IPostHogSink
+    RetryPolicyOptions? retryOptions = null,
+    Func<bool>? isEnabled = null,
+    Func<int>? getPreferenceGeneration = null)
+    : IBatchedLogEventSink
 {
-    private static readonly FrozenSet<string> NumericKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "moduleCount",
-        "settingsKeyCount",
-        "settingsCount",
-        "presetNameLength",
-        "startDelaySec",
-        "uptimeMs",
-        "durationMs",
-        "sessionDurationMs",
-        "activeSessionModuleCount",
-        "presetCount",
-        "total",
-        "count"
-    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
-
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly string _apiKey = apiKey ?? throw new ArgumentNullException(nameof(apiKey));
     private readonly string _host = host ?? throw new ArgumentNullException(nameof(host));
     private readonly string _distinctId = distinctId ?? throw new ArgumentNullException(nameof(distinctId));
     private readonly RetryPolicyOptions _retryOptions = retryOptions ?? new RetryPolicyOptions();
+    private readonly Func<bool> _isEnabled = isEnabled ?? (() => true);
+    private readonly Func<int> _getPreferenceGeneration = getPreferenceGeneration ?? (() => 0);
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task EmitBatchAsync(IEnumerable<LogEvent> batch)
     {
+        if (!_isEnabled()) return;
+
+        var generation = _getPreferenceGeneration();
         var events = new List<object>();
 
         foreach (var logEvent in batch)
         {
+            if (!logEvent.Properties.TryGetValue(TelemetryConstants.Properties.PreferenceGeneration, out var generationProperty) ||
+                generationProperty is not ScalarValue { Value: int eventGeneration } || eventGeneration != generation)
+            {
+                continue;
+            }
+
             var props = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
-                [TelemetryConstants.Properties.DistinctId] = _distinctId,
-                [TelemetryConstants.Properties.Level] = logEvent.Level.ToString(),
-                [TelemetryConstants.Properties.Ip] = "0.0.0.0",
-                [TelemetryConstants.Properties.IpAlt] = "0.0.0.0",
-                [TelemetryConstants.Properties.GeoIpDisable] = true
+                [TelemetryConstants.Properties.DistinctId] = _distinctId
             };
 
             foreach (var property in logEvent.Properties)
             {
-                if (SensitiveDataMasker.IsSensitiveKey(property.Key))
+                if (property.Key == TelemetryConstants.Properties.EventName ||
+                    property.Key == TelemetryConstants.Properties.PreferenceGeneration ||
+                    SensitiveDataMasker.IsSensitiveKey(property.Key))
                 {
-                    props[property.Key] = SensitiveDataMasker.MaskValue;
                     continue;
                 }
 
@@ -88,11 +73,6 @@ internal sealed class PostHogSink(
                 props[property.Key] = simplified;
             }
 
-            if (logEvent.Exception is not null)
-            {
-                props[TelemetryConstants.Properties.Exception] = TelemetryGuard.SafeStackTrace(logEvent.Exception);
-            }
-
             var name = ResolveEventName(logEvent);
 
             if (string.Equals(name, TelemetryConstants.IdentifyEvent, StringComparison.OrdinalIgnoreCase))
@@ -100,10 +80,7 @@ internal sealed class PostHogSink(
                 var setPayload = ExtractSet(props);
                 var identifyProps = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                 {
-                    [TelemetryConstants.Properties.Set] = setPayload,
-                    [TelemetryConstants.Properties.Ip] = "0.0.0.0",
-                    [TelemetryConstants.Properties.IpAlt] = "0.0.0.0",
-                    [TelemetryConstants.Properties.GeoIpDisable] = true
+                    [TelemetryConstants.Properties.Set] = setPayload
                 };
 
                 events.Add(new
@@ -137,7 +114,7 @@ internal sealed class PostHogSink(
             batch = events
         };
 
-        await SendWithRetryAsync(payload, events.Count).ConfigureAwait(false);
+        await SendWithRetryAsync(payload, events.Count, generation).ConfigureAwait(false);
     }
 
     public Task OnEmptyBatchAsync()
@@ -145,18 +122,16 @@ internal sealed class PostHogSink(
         return Task.CompletedTask;
     }
 
-    private async Task SendWithRetryAsync(object payload, int eventCount)
+    private async Task SendWithRetryAsync(object payload, int eventCount, int generation)
     {
         Exception? lastException = null;
 
         for (var attempt = 0; attempt <= _retryOptions.MaxRetryAttempts; attempt++)
         {
+            if (!_isEnabled() || _getPreferenceGeneration() != generation) return;
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, BuildUri());
-                request.Headers.TryAddWithoutValidation("X-Forwarded-For", "0.0.0.0");
-                request.Headers.TryAddWithoutValidation("CF-Connecting-IP", "0.0.0.0");
-                request.Headers.TryAddWithoutValidation("True-Client-IP", "0.0.0.0");
                 request.Content = JsonContent.Create(payload, options: _jsonOptions);
 
                 Debug.WriteLine($"PostHog: Sending {eventCount} events to {BuildUri()} (attempt {attempt + 1})");
@@ -273,7 +248,7 @@ internal sealed class PostHogSink(
     {
         return value switch
         {
-            ScalarValue scalar => ScrubScalar(key, scalar.Value),
+            ScalarValue scalar => scalar.Value,
             SequenceValue sequence => sequence.Elements.Select(v => Simplify(null, v)).ToArray(),
             StructureValue structure => structure.Properties.ToDictionary(p => p.Name, p => Simplify(p.Name, p.Value)),
             DictionaryValue dictionary => dictionary.Elements.ToDictionary(
@@ -281,60 +256,6 @@ internal sealed class PostHogSink(
                 kvp => Simplify(kvp.Key.Value?.ToString(), kvp.Value)),
             _ => value.ToString()
         };
-    }
-
-    private static object? ScrubScalar(string? key, object? value)
-    {
-        return value switch
-        {
-            null => null,
-            string s => NormalizeString(key, s),
-            bool b => b,
-            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => value,
-            Guid g => g.ToString(),
-            DateTime dt => dt,
-            DateTimeOffset dto => dto,
-            _ => value.ToString()
-        };
-    }
-
-    private static object NormalizeString(string? key, string value)
-    {
-        var keyNonNull = key ?? string.Empty;
-
-        if (SensitiveDataMasker.IsIpMaskExempt(keyNonNull))
-        {
-            return value;
-        }
-
-        if (!NumericKeys.Contains(keyNonNull) ||
-            !TryParseNumeric(value, out var numeric))
-        {
-            return SensitiveDataMasker.MaskIfIpAddress(value);
-        }
-
-        return numeric ?? SensitiveDataMasker.MaskIfIpAddress(value);
-    }
-
-    private static bool TryParseNumeric(string input, out object? parsed)
-    {
-        var trimmed = input.Trim();
-
-        if (long.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l))
-        {
-            parsed = l;
-            return true;
-        }
-
-        if (double.TryParse(trimmed, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture,
-                out var d))
-        {
-            parsed = d;
-            return true;
-        }
-
-        parsed = null;
-        return false;
     }
 
     private static IReadOnlyDictionary<string, object?> ExtractSet(IReadOnlyDictionary<string, object?> props)

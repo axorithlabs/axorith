@@ -19,7 +19,7 @@ public interface ISessionsApi
     ///     Starts a session from a preset.
     ///     Validates all modules before starting.
     /// </summary>
-    Task<OperationResult> StartSessionAsync(Guid presetId, CancellationToken ct = default);
+    Task<OperationResult> StartSessionAsync(Guid presetId, Guid sessionInstanceId, CancellationToken ct = default);
 
     /// <summary>
     ///     Stops the currently active session.

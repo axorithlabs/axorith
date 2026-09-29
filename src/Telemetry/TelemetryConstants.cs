@@ -9,9 +9,6 @@ public static class TelemetryConstants
     /// <summary>PostHog identify event for user/device identification.</summary>
     public const string IdentifyEvent = "$identify";
 
-    /// <summary>Event name for log entries forwarded to telemetry.</summary>
-    public const string LogEvent = "LogEvent";
-
     /// <summary>Default event name when none is specified.</summary>
     public const string DefaultEvent = "event";
 
@@ -26,32 +23,13 @@ public static class TelemetryConstants
         /// <summary>PostHog $set property for user properties.</summary>
         public const string Set = "$set";
 
-        /// <summary>PostHog property to disable geo IP lookup.</summary>
-        public const string GeoIpDisable = "$geoip_disable";
-
-        /// <summary>IP address property (masked for privacy).</summary>
-        public const string Ip = "$ip";
-
-        /// <summary>Alternative IP property key.</summary>
-        public const string IpAlt = "ip";
-
         /// <summary>Event name property.</summary>
         public const string EventName = "EventName";
 
-        /// <summary>Log level property.</summary>
-        public const string Level = "level";
-
-        /// <summary>Message template property for log events.</summary>
-        public const string MessageTemplate = "MessageTemplate";
-
-        /// <summary>Exception details property.</summary>
-        public const string Exception = "exception";
+        internal const string PreferenceGeneration = "__telemetry_preference_generation";
 
         /// <summary>Application name property.</summary>
         public const string Application = "application";
-
-        /// <summary>Application version property.</summary>
-        public const string AppVersion = "app_version";
 
         /// <summary>Axorith version property.</summary>
         public const string AxorithVersion = "axorith_version";

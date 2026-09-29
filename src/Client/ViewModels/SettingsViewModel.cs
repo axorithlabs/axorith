@@ -147,7 +147,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         BackCommand = ReactiveCommand.CreateFromTask(() => NavigateToMainAsync(showPresets: false));
         OpenPresetsCommand = ReactiveCommand.CreateFromTask(() => NavigateToMainAsync(showPresets: true));
         SelectSectionCommand = ReactiveCommand.Create<string>(section => SelectedSection = section);
-        OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy"));
+        OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy/"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
 
         var canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
@@ -173,12 +173,23 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     {
         try
         {
+            var changedCategories = new List<string>();
+            if (_config.TelemetryEnabled != _telemetryEnabled) changedCategories.Add("telemetry");
+            if (_config.AutoStartEnabled != _autoStartEnabled || _config.AutoStartMinimized != _autoStartMinimized)
+                changedCategories.Add("startup");
+            if (_config.MinimizeToTrayOnClose != _minimizeToTrayOnClose) changedCategories.Add("tray_behavior");
+
             _config.TelemetryEnabled = _telemetryEnabled;
             _config.AutoStartEnabled = _autoStartEnabled;
             _config.AutoStartMinimized = _autoStartMinimized;
             _config.MinimizeToTrayOnClose = _minimizeToTrayOnClose;
 
-            _settingsStore.Save(_config);
+            var saved = _settingsStore.Save(_config);
+            _telemetry.SetEnabled(_telemetryEnabled);
+            if (saved && _telemetryEnabled)
+            {
+                Program.ConfirmPendingInstallation();
+            }
 
             if (_autoStartEnabled)
             {
@@ -191,13 +202,13 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
 
             HasUnsavedChanges = false;
 
-            _telemetry.TrackEvent("SettingsSaved", new Dictionary<string, object?>
+            if (saved && changedCategories.Count > 0)
             {
-                ["telemetryEnabled"] = _telemetryEnabled,
-                ["autoStartEnabled"] = _autoStartEnabled,
-                ["autoStartMinimized"] = _autoStartMinimized,
-                ["minimizeToTray"] = _minimizeToTrayOnClose
-            });
+                _telemetry.TrackEvent("SettingsChanged", new Dictionary<string, object?>
+                {
+                    ["changedCategories"] = changedCategories
+                });
+            }
 
             _logger.LogInformation("Settings saved successfully");
         }
@@ -257,35 +268,45 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
 
         try
         {
+            _telemetry.TrackEvent("OnboardingStarted");
             var result = await _onboardingService.RunSetupAsync();
 
-            if (result.CreatedCount > 0)
+            if (result.Errors.Count == 0 && result.ErrorMessage is null)
             {
-                _toastService?.Show(
-                    $"Setup complete: Created {result.CreatedCount} preset(s): {string.Join(", ", result.CreatedPresetNames)}",
-                    NotificationType.Success);
-
-                _telemetry.TrackEvent("SetupWizardCompleted", new Dictionary<string, object?>
+                _telemetry.TrackEvent("OnboardingCompleted", new Dictionary<string, object?>
                 {
-                    ["createdCount"] = result.CreatedCount,
-                    ["presetNames"] = result.CreatedPresetNames.ToArray()
+                    ["createdCount"] = result.CreatedCount
                 });
-            }
-            else if (result.Errors.Count > 0)
-            {
-                _toastService?.Show(
-                    $"Setup completed with errors: {result.Errors.First()}",
-                    NotificationType.Warning);
+                if (result.CreatedCount > 0)
+                {
+                    _toastService?.Show(
+                        $"Setup complete: Created {result.CreatedCount} preset(s): {string.Join(", ", result.CreatedPresetNames)}",
+                        NotificationType.Success);
+                }
+                else
+                {
+                    _toastService?.Show("No new presets created. Required modules may not be installed.");
+                }
             }
             else
             {
+                _telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
+                {
+                    ["stage"] = "onboarding"
+                });
                 _toastService?.Show(
-                    "No new presets created. Required modules may not be installed.");
+                    $"Setup completed with errors: {result.Errors.FirstOrDefault() ?? result.ErrorMessage}",
+                    NotificationType.Warning);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Setup wizard failed");
+            _telemetry.TrackError(ex, "onboarding", "onboarding_create", "error", handled: true, fatal: false);
+            _telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
+            {
+                ["stage"] = "onboarding"
+            });
             _toastService?.Show($"Setup failed: {ex.Message}", NotificationType.Error);
         }
         finally

@@ -1,9 +1,9 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Axorith.Client.Services;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -16,8 +16,10 @@ namespace Axorith.Client;
 internal static class Program
 {
     internal static ITelemetryService? Telemetry { get; private set; }
-    private static readonly Stopwatch AppUptime = Stopwatch.StartNew();
+    private static readonly string PendingInstallationPath = Path.Combine(ApplicationPaths.Config, "pending-install.json");
+    private static PendingInstallation? _pendingInstallation;
     private static SingleInstanceManager? _singleInstanceManager;
+    private static int _applicationReadySent;
 
     [STAThread]
     public static int Main(string[] args)
@@ -64,7 +66,8 @@ internal static class Program
             .AddCommandLine(args)
             .Build();
 
-        var telemetryEnabled = LoadTelemetryEnabledSetting();
+        var telemetryEnabled = TelemetryPreference.ReadOrDefault(LoadLegacyTelemetryEnabledSetting());
+        TelemetryPreference.Save(telemetryEnabled);
 
         var telemetrySettings = new TelemetrySettings()
                 .WithEnvironmentOverrides() with
@@ -74,7 +77,14 @@ internal static class Program
             };
 
         Telemetry = new TelemetryService(telemetrySettings);
-        var telemetryLogLevel = TelemetrySettings.ResolveLogLevel(telemetrySettings.LogLevel);
+        _pendingInstallation = LoadPendingInstallation();
+        if ((_pendingInstallation is null && File.Exists(PendingInstallationPath)) ||
+            (_pendingInstallation is { } pending &&
+             !IsPendingInstallationEligible(Telemetry.IsEnabled, pending.InstallationId,
+                 DeviceIdProvider.GetDeviceId())))
+        {
+            DiscardPendingInstallation();
+        }
 
         Log.Information(
             "Telemetry (Client): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={FlushSec}",
@@ -102,9 +112,6 @@ internal static class Program
             }
         }
 
-        using var heartbeatCts = new CancellationTokenSource();
-        Task? heartbeatTask = null;
-
         var logsPath = configuration.GetValue<string>("Serilog:WriteTo:1:Args:path")
                        ?? "%AppData%/Axorith/logs/client-.log";
         var resolvedLogsPath = Environment.ExpandEnvironmentVariables(logsPath);
@@ -118,8 +125,6 @@ internal static class Program
             .ReadFrom.Configuration(configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", "Axorith.Client")
-            .WriteTo.Sink(new TelemetrySerilogSink(Telemetry),
-                restrictedToMinimumLevel: telemetryLogLevel)
             .CreateLogger();
 
         try
@@ -129,8 +134,16 @@ internal static class Program
                 typeof(Program).Assembly.GetName().Version,
                 Environment.OSVersion);
 
-            Telemetry?.TrackEvent("AppStarted");
-            heartbeatTask = RunHeartbeatAsync(heartbeatCts.Token);
+            var launchProperties = new Dictionary<string, object?>();
+            if (_pendingInstallation is not null)
+            {
+                launchProperties["launchSource"] = "installer";
+            }
+            else if (args.Contains("--autostart", StringComparer.OrdinalIgnoreCase))
+            {
+                launchProperties["launchSource"] = "autostart";
+            }
+            Telemetry?.TrackEvent("ApplicationLaunched", launchProperties);
 
             var app = BuildAvaloniaApp();
 
@@ -144,6 +157,7 @@ internal static class Program
         catch (Exception ex)
         {
             Log.Fatal(ex, "Axorith Client terminated unexpectedly");
+            Telemetry?.TrackError(ex, "client", "startup", "fatal", handled: true, fatal: true);
 
             return 1;
         }
@@ -151,17 +165,8 @@ internal static class Program
         {
             Log.CloseAndFlush();
 
-            Telemetry?.TrackEvent("AppUptime", new Dictionary<string, object?>
-            {
-                ["durationMs"] = (long)AppUptime.Elapsed.TotalMilliseconds
-            });
-
-            heartbeatCts.Cancel();
-            heartbeatTask?.GetAwaiter().GetResult();
-
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             Telemetry?.FlushAsync(flushCts.Token).GetAwaiter().GetResult();
-            Telemetry?.DisposeAsync().GetAwaiter().GetResult();
 
             _singleInstanceManager?.Dispose();
         }
@@ -183,6 +188,8 @@ internal static class Program
                 Dispatcher.UIThread.UnhandledException += (_, e) =>
                 {
                     Log.Error(e.Exception, "Unhandled exception in UI thread");
+                    Telemetry?.TrackError(e.Exception, "client", "startup", "error", handled: e.Handled,
+                        fatal: false);
                     // Don't mark as handled - let Avalonia decide whether to crash or not
                 };
             });
@@ -196,23 +203,20 @@ internal static class Program
             if (e.IsTerminating)
             {
                 Log.Fatal(exception, "Unhandled exception in AppDomain (terminating)");
-                Telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+                if (exception is not null)
                 {
-                    ["fatal"] = true,
-                    ["message"] = TelemetryGuard.SafeString(exception?.Message),
-                    ["stack"] = TelemetryGuard.SafeStackTrace(exception)
-                });
-                Telemetry?.FlushAsync().GetAwaiter().GetResult();
+                    Telemetry?.TrackError(exception, "client", "startup", "fatal", handled: false, fatal: true);
+                }
+                using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                Telemetry?.FlushAsync(flushCts.Token).GetAwaiter().GetResult();
             }
             else
             {
                 Log.Error(exception, "Unhandled exception in AppDomain (non-terminating)");
-                Telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+                if (exception is not null)
                 {
-                    ["fatal"] = false,
-                    ["message"] = TelemetryGuard.SafeString(exception?.Message),
-                    ["stack"] = TelemetryGuard.SafeStackTrace(exception)
-                });
+                    Telemetry?.TrackError(exception, "client", "unknown", "error", handled: false, fatal: false);
+                }
             }
         };
 
@@ -220,50 +224,78 @@ internal static class Program
         {
             Log.Error(e.Exception, "Unobserved task exception");
             e.SetObserved();
-            Telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
-            {
-                ["fatal"] = false,
-                ["message"] = TelemetryGuard.SafeString(e.Exception?.Message),
-                ["stack"] = TelemetryGuard.SafeStackTrace(e.Exception)
-            });
+            Telemetry?.TrackError(e.Exception, "client", "unknown", "warning", handled: true, fatal: false);
         };
 
         Log.Debug("Global exception handlers registered");
     }
 
-    private static async Task RunHeartbeatAsync(CancellationToken ct)
+    internal static void ConfirmPendingInstallation()
     {
-        if (Telemetry is not { IsEnabled: true })
+        if (_pendingInstallation is not { } pending)
         {
             return;
         }
 
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
+        if (!IsPendingInstallationEligible(Telemetry is { IsEnabled: true }, pending.InstallationId,
+                DeviceIdProvider.GetDeviceId()))
+        {
+            DiscardPendingInstallation();
+            return;
+        }
+
         try
         {
-            while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            Telemetry?.TrackEvent("InstallationConfirmed", new Dictionary<string, object?>
             {
-                Telemetry.TrackEvent("ClientHeartbeat", new Dictionary<string, object?>
-                {
-                    ["uptimeMs"] = (long)AppUptime.Elapsed.TotalMilliseconds
-                });
-            }
+                ["installAttemptId"] = pending.InstallAttemptId,
+                ["installMode"] = pending.InstallMode,
+                ["currentVersion"] = pending.CurrentVersion,
+                ["previousVersion"] = pending.PreviousVersion
+            });
+            File.Delete(PendingInstallationPath);
+            _pendingInstallation = null;
         }
-        catch (OperationCanceledException)
+        catch (Exception ex)
         {
-            // ignore
+            Log.Warning(ex, "Could not clear pending installation telemetry state");
         }
-        finally
+    }
+
+    private static void DiscardPendingInstallation()
+    {
+        _pendingInstallation = null;
+        try
         {
-            timer.Dispose();
+            File.Delete(PendingInstallationPath);
         }
+        catch
+        {
+            // A stale pending attempt must never be retried after telemetry is disabled.
+        }
+    }
+
+    internal static bool IsPendingInstallationEligible(bool telemetryEnabled, Guid pendingInstallationId,
+        string? currentInstallationId) =>
+        telemetryEnabled && Guid.TryParse(currentInstallationId, out var parsedInstallationId) &&
+        pendingInstallationId == parsedInstallationId;
+
+    internal static void MarkApplicationReady()
+    {
+        if (Interlocked.Exchange(ref _applicationReadySent, 1) != 0)
+        {
+            return;
+        }
+
+        Telemetry?.TrackEvent("ApplicationReady");
+        ConfirmPendingInstallation();
     }
 
     /// <summary>
     ///     Loads the telemetry enabled setting from clientsettings.json.
     ///     Returns true (default) if file doesn't exist or can't be read.
     /// </summary>
-    private static bool LoadTelemetryEnabledSetting()
+    private static bool LoadLegacyTelemetryEnabledSetting()
     {
         try
         {
@@ -287,4 +319,33 @@ internal static class Program
             return true;
         }
     }
+
+    private static PendingInstallation? LoadPendingInstallation()
+    {
+        try
+        {
+            if (!File.Exists(PendingInstallationPath)) return null;
+            using var document = JsonDocument.Parse(File.ReadAllText(PendingInstallationPath));
+            var root = document.RootElement;
+            if (!Guid.TryParse(root.GetProperty("installationId").GetString(), out var installationId))
+                return null;
+            if (!Guid.TryParse(root.GetProperty("installAttemptId").GetString(), out var installAttemptId))
+                return null;
+            return new PendingInstallation(
+                installationId,
+                installAttemptId,
+                root.GetProperty("installMode").GetString() ?? string.Empty,
+                root.GetProperty("currentVersion").GetString() ?? string.Empty,
+                root.TryGetProperty("previousVersion", out var previousVersion) && previousVersion.ValueKind == JsonValueKind.String
+                    ? previousVersion.GetString()
+                    : null);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed record PendingInstallation(Guid InstallationId, Guid InstallAttemptId, string InstallMode,
+        string CurrentVersion, string? PreviousVersion);
 }

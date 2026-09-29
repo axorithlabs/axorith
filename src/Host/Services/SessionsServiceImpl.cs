@@ -4,6 +4,7 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
 using Axorith.Host.Streaming;
 using Axorith.Shared.Exceptions;
+using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Action = Axorith.Contracts.Action;
@@ -20,9 +21,11 @@ public class SessionsServiceImpl(
     ISessionManager sessionManager,
     IPresetManager presetManager,
     SessionEventBroadcaster eventBroadcaster,
-    ILogger<SessionsServiceImpl> logger)
+    ILogger<SessionsServiceImpl> logger,
+    ITelemetryService? telemetry = null)
     : SessionsService.SessionsServiceBase
 {
+    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
     public override Task<SessionState> GetSessionState(GetSessionStateRequest request, ServerCallContext context)
     {
         try
@@ -125,10 +128,14 @@ public class SessionsServiceImpl(
 
     public override async Task<OperationResult> StartSession(StartSessionRequest request, ServerCallContext context)
     {
+        Guid? sessionInstanceId = Guid.TryParse(request.SessionInstanceId, out var parsedSessionInstanceId)
+            ? parsedSessionInstanceId
+            : null;
         try
         {
             if (!Guid.TryParse(request.PresetId, out var presetId))
             {
+                TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), null, "validation_failed");
                 var result = SessionMapper.CreateResult(false, "Invalid preset ID",
                     [$"Could not parse preset ID: {request.PresetId}"]);
                 return result;
@@ -141,13 +148,14 @@ public class SessionsServiceImpl(
 
             if (preset == null)
             {
+                TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), presetId, "unknown");
                 return SessionMapper.CreateResult(false, "Preset not found",
                     [$"No preset found with ID: {presetId}"]);
             }
 
             try
             {
-                await sessionManager.StartSessionAsync(preset, context.CancellationToken)
+                await sessionManager.StartSessionAsync(preset, context.CancellationToken, "manual", sessionInstanceId)
                     .ConfigureAwait(false);
 
                 logger.LogInformation("Session started successfully: {PresetId}", presetId);
@@ -174,6 +182,19 @@ public class SessionsServiceImpl(
             logger.LogError(ex, "Error starting session");
             throw new RpcException(new Status(StatusCode.Internal, "Failed to start session", ex));
         }
+    }
+
+    private void TrackSessionStartFailure(Guid sessionInstanceId, Guid? presetId, string failureReason)
+    {
+        _telemetry.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
+        {
+            ["sessionInstanceId"] = sessionInstanceId,
+            ["presetId"] = presetId,
+            ["startSource"] = "manual",
+            ["stage"] = "rpc_request",
+            ["failureReason"] = failureReason,
+            ["result"] = "failed"
+        });
     }
 
     public override async Task<OperationResult> PreflightSession(PreflightSessionRequest request, ServerCallContext context)

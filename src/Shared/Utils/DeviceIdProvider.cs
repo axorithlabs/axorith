@@ -1,28 +1,45 @@
-using System.Security.Cryptography;
 using System.Text;
 
 namespace Axorith.Shared.Utils;
 
-/// <summary>
-///     Provides a deterministic device ID based on machine-specific identifiers.
-///     The device ID is stable across application restarts and does not require file caching.
-/// </summary>
+/// <summary>Provides the anonymous ID shared by Axorith processes for one installation.</summary>
 public static class DeviceIdProvider
 {
-    /// <summary>
-    ///     Gets a deterministic device ID for the current machine.
-    ///     The ID is generated from Environment.MachineName,
-    ///     ensuring the same ID is always returned for the same machine combination.
-    /// </summary>
-    /// <returns>A GUID string representing the device ID.</returns>
-    public static string GetDeviceId()
+    private const string MutexName = "Axorith.DeviceInstallationIdentity";
+
+    /// <summary>Gets the stable, randomly generated ID for this Axorith installation.</summary>
+    public static string GetDeviceId() => GetDeviceId(Path.Combine(ApplicationPaths.Config, "installation-id.txt"));
+
+    internal static string GetDeviceId(string idFilePath)
     {
-        var machineIdentifier = $"{Environment.MachineName}";
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(machineIdentifier));
+        ArgumentException.ThrowIfNullOrWhiteSpace(idFilePath);
+        var path = Path.GetFullPath(idFilePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        var guidBytes = new byte[16];
-        Array.Copy(hash, guidBytes, 16);
+        using var mutex = new Mutex(false, MutexName);
+        try
+        {
+            try
+            {
+                mutex.WaitOne();
+            }
+            catch (AbandonedMutexException)
+            {
+                // The previous process exited while holding the identity lock.
+            }
 
-        return new Guid(guidBytes).ToString();
+            if (Guid.TryParse(File.Exists(path) ? File.ReadAllText(path) : null, out var existingId))
+            {
+                return existingId.ToString("D");
+            }
+
+            var installationId = Guid.NewGuid().ToString("D");
+            File.WriteAllText(path, installationId, new UTF8Encoding(false));
+            return installationId;
+        }
+        finally
+        {
+            mutex.ReleaseMutex();
+        }
     }
 }

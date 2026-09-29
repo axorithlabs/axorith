@@ -67,7 +67,8 @@ public interface ISessionManager : IAsyncDisposable
     /// </summary>
     /// <param name="preset">The session preset to execute.</param>
     /// <param name="cancellationToken">Cancellation token to observe.</param>
-    Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);
+    Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default,
+        string startSource = "manual", Guid? sessionInstanceId = null);
 
     /// <summary>Validates whether the Host can start a preset without starting its modules.</summary>
     Task PreflightSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);

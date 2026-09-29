@@ -1,6 +1,7 @@
 using System.Collections;
-using System.Collections.Concurrent;
-using System.Reflection;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using Axorith.Shared.Utils;
 using Serilog;
 using Serilog.Core;
@@ -13,17 +14,27 @@ namespace Axorith.Telemetry;
 public interface ITelemetryService : IAsyncDisposable
 {
     bool IsEnabled { get; }
+    void SetEnabled(bool enabled);
     void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null);
-
-    void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null,
-        IReadOnlyDictionary<string, object?>? properties = null);
-
+    void TrackError(Exception exception, string subsystem, string operation, string severity,
+        bool handled, bool fatal, IReadOnlyDictionary<string, object?>? properties = null);
     Task FlushAsync(CancellationToken ct = default);
 }
 
-public sealed class TelemetryService : ITelemetryService
+public sealed partial class TelemetryService : ITelemetryService
 {
     public const string HttpClientName = "PostHog";
+    private static readonly TimeSpan ErrorRepeatInterval = TimeSpan.FromMinutes(1);
+    private static readonly HashSet<string> ProductAssemblies = [
+        "Axorith.Client", "Axorith.Host", "Axorith.Core", "Axorith.Shared.Platform", "Axorith.Sdk", "Axorith.Contracts"];
+
+    private sealed class ErrorAggregate(Dictionary<string, object?> properties)
+    {
+        public Dictionary<string, object?> Properties { get; } = properties;
+        public DateTimeOffset LastEmittedAt { get; set; } = DateTimeOffset.UtcNow;
+        public long PendingCount { get; set; }
+        public bool PendingFatal { get; set; }
+    }
 
     private readonly Logger? _logger;
     private readonly PeriodicBatchingSink? _batchingSink;
@@ -31,144 +42,205 @@ public sealed class TelemetryService : ITelemetryService
     private readonly IReadOnlyCollection<LogEventProperty> _baseProperties;
     private readonly HttpClient? _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly object _errorLock = new();
+    private readonly object _flushLock = new();
+    private readonly Dictionary<string, ErrorAggregate> _errors = new(StringComparer.Ordinal);
+    private Task? _flushTask;
+    private readonly string _distinctId = string.Empty;
+    private string? _application;
+    private string? _appVersion;
+    private string? _osVersion;
+    private int _enabled;
+    private int _identified;
+    private int _preferenceGeneration;
+    private int _acceptingEvents = 1;
     private volatile bool _disposed;
 
-    public bool IsEnabled => _logger is not null && !_disposed;
+    public bool IsEnabled => _logger is not null && Volatile.Read(ref _enabled) != 0 && !_disposed;
 
-    /// <summary>
-    ///     Creates a TelemetryService with IHttpClientFactory for proper HttpClient management.
-    /// </summary>
     public TelemetryService(TelemetrySettings settings, IHttpClientFactory? httpClientFactory = null)
     {
-        var settings1 = (settings ?? throw new ArgumentNullException(nameof(settings)))
-            .WithEnvironmentOverrides();
-
-        if (!settings1.IsActive)
+        var resolved = (settings ?? throw new ArgumentNullException(nameof(settings))).WithEnvironmentOverrides();
+        _baseProperties = [];
+        if (!resolved.IsConfigured)
         {
-            _baseProperties = [];
             return;
         }
 
-        var distinctId = string.IsNullOrWhiteSpace(settings1.DistinctId)
+        _distinctId = string.IsNullOrWhiteSpace(resolved.DistinctId)
             ? DeviceIdProvider.GetDeviceId()
-            : settings1.DistinctId;
+            : resolved.DistinctId;
 
-        var resolvedAppVersion = string.IsNullOrWhiteSpace(settings1.AppVersion)
+        var version = string.IsNullOrWhiteSpace(resolved.AppVersion)
             ? typeof(TelemetryService).Assembly.GetName().Version?.ToString() ?? "unknown"
-            : settings1.AppVersion;
-
-        var resolvedOsVersion = string.IsNullOrWhiteSpace(settings1.OsVersion)
+            : resolved.AppVersion;
+        var osVersion = string.IsNullOrWhiteSpace(resolved.OsVersion)
             ? Environment.OSVersion.VersionString
-            : settings1.OsVersion;
-
-        _baseProperties = BuildBaseProperties(settings1, resolvedAppVersion, resolvedOsVersion);
+            : resolved.OsVersion;
+        _baseProperties = BuildBaseProperties(resolved, version, osVersion);
+        _application = resolved.ApplicationName;
+        _appVersion = version;
+        _osVersion = osVersion;
 
         if (httpClientFactory is not null)
         {
             _httpClient = httpClientFactory.CreateClient(HttpClientName);
-            _ownsHttpClient = false;
         }
         else
         {
-            _httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(10)
-            };
+            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             _ownsHttpClient = true;
         }
 
-        var retryOptions = RetryPolicyOptions.FromSettings(settings1);
         var postHogSink = new PostHogSink(
             _httpClient,
-            settings1.PostHogApiKey,
-            settings1.PostHogHost,
-            distinctId,
-            retryOptions);
-
-        var batchingOptions = new PeriodicBatchingSinkOptions
+            resolved.PostHogApiKey,
+            resolved.PostHogHost,
+            _distinctId,
+            RetryPolicyOptions.FromSettings(resolved),
+            () => IsEnabled,
+            () => Volatile.Read(ref _preferenceGeneration));
+        _batchingSink = new PeriodicBatchingSink(postHogSink, new PeriodicBatchingSinkOptions
         {
-            BatchSizeLimit = settings1.BatchSize,
-            QueueLimit = settings1.QueueLimit,
-            Period = settings1.FlushInterval
-        };
-
-        _batchingSink = new PeriodicBatchingSink(postHogSink, batchingOptions);
-
+            BatchSizeLimit = resolved.BatchSize,
+            QueueLimit = resolved.QueueLimit,
+            Period = resolved.FlushInterval
+        });
         _logger = new LoggerConfiguration()
             .MinimumLevel.Verbose()
             .WriteTo.Sink(_batchingSink)
             .CreateLogger();
 
-        TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
+        SetEnabled(resolved.Enabled);
+    }
+
+    public void SetEnabled(bool enabled)
+    {
+        if (_logger is null || _disposed || Volatile.Read(ref _acceptingEvents) == 0)
         {
-            [TelemetryConstants.Properties.DistinctId] = distinctId,
-            [TelemetryConstants.Properties.Set] = new Dictionary<string, object?>
+            return;
+        }
+
+        var wasEnabled = Interlocked.Exchange(ref _enabled, enabled ? 1 : 0) != 0;
+        if (wasEnabled != enabled)
+        {
+            Interlocked.Increment(ref _preferenceGeneration);
+        }
+        if (!enabled)
+        {
+            lock (_errorLock)
             {
-                [TelemetryConstants.Properties.Application] = settings1.ApplicationName,
-                [TelemetryConstants.Properties.AppVersion] = resolvedAppVersion,
-                [TelemetryConstants.Properties.OsVersion] = resolvedOsVersion
+                foreach (var error in _errors.Values)
+                {
+                    error.PendingCount = 0;
+                    error.PendingFatal = false;
+                }
             }
-        });
+
+            return;
+        }
+
+        if (!wasEnabled || Interlocked.Exchange(ref _identified, 1) == 0)
+        {
+            TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
+            {
+                [TelemetryConstants.Properties.Set] = new Dictionary<string, object?>
+                {
+                    [TelemetryConstants.Properties.Application] = _application,
+                    [TelemetryConstants.Properties.AxorithVersion] = _appVersion,
+                    [TelemetryConstants.Properties.OsVersion] = _osVersion
+                }
+            });
+        }
     }
 
     public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null)
     {
-        if (_logger is null || _disposed)
+        lock (_flushLock)
         {
-            return;
+            if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0)
+            {
+                return;
+            }
+
+            var name = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
+            if (!EventNameRegex().IsMatch(name))
+            {
+                return;
+            }
+
+            var safeProperties = properties is null
+                ? new Dictionary<string, object?>()
+                : TelemetryEventSanitizer.SanitizeProperties(properties);
+            var logProperties = new List<LogEventProperty>(_baseProperties)
+            {
+                new(TelemetryConstants.Properties.EventName, new ScalarValue(name)),
+                new(TelemetryConstants.Properties.PreferenceGeneration,
+                    new ScalarValue(Volatile.Read(ref _preferenceGeneration)))
+            };
+            logProperties.AddRange(ConvertProperties(safeProperties));
+            _logger!.Write(CreateLogEvent(name, logProperties));
         }
-
-        var props = new List<LogEventProperty>(_baseProperties)
-        {
-            new(TelemetryConstants.Properties.EventName,
-                new ScalarValue(string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName))
-        };
-
-        if (properties != null)
-        {
-            props.AddRange(ConvertProperties(properties));
-        }
-
-        var template = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
-        var logEvent = CreateLogEvent(LogEventLevel.Information, template, props, exception: null);
-        _logger.Write(logEvent);
     }
 
-    public void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null,
-        IReadOnlyDictionary<string, object?>? properties = null)
+    public void TrackError(Exception exception, string subsystem, string operation, string severity,
+        bool handled, bool fatal, IReadOnlyDictionary<string, object?>? properties = null)
     {
-        if (_logger is null || _disposed)
+        ArgumentNullException.ThrowIfNull(exception);
+        if (!IsEnabled)
         {
             return;
         }
 
-        var props = new List<LogEventProperty>(_baseProperties)
+        var (fingerprint, diagnostic) = Describe(exception);
+        var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            new(TelemetryConstants.Properties.EventName, new ScalarValue(TelemetryConstants.LogEvent))
+            ["exceptionType"] = exception.GetType().Name,
+            ["fingerprint"] = fingerprint,
+            ["diagnostic"] = diagnostic,
+            ["subsystem"] = subsystem,
+            ["operation"] = operation,
+            ["severity"] = severity,
+            ["handled"] = handled,
+            ["fatal"] = fatal
         };
-
-        if (!string.IsNullOrWhiteSpace(messageTemplate))
+        if (properties is not null)
         {
-            props.Add(new LogEventProperty(TelemetryConstants.Properties.MessageTemplate,
-                new ScalarValue(messageTemplate)));
+            foreach (var (key, value) in properties) details[key] = value;
         }
 
-        if (properties != null)
+        var safeDetails = TelemetryEventSanitizer.SanitizeProperties(details)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        safeDetails["occurrenceCount"] = 1;
+        var now = DateTimeOffset.UtcNow;
+        lock (_errorLock)
         {
-            props.AddRange(ConvertProperties(properties));
-        }
+            if (!_errors.TryGetValue(fingerprint, out var aggregate))
+            {
+                _errors[fingerprint] = new ErrorAggregate(safeDetails);
+                TrackEvent("ErrorOccurred", safeDetails);
+                return;
+            }
 
-        var template = string.IsNullOrWhiteSpace(messageTemplate) ? TelemetryConstants.LogEvent : messageTemplate;
-        var logEvent = CreateLogEvent(level, template, props, exception);
-        _logger.Write(logEvent);
+            aggregate.PendingCount++;
+            aggregate.PendingFatal |= fatal;
+            if (!fatal && now - aggregate.LastEmittedAt < ErrorRepeatInterval)
+            {
+                return;
+            }
+
+            var repeatProperties = new Dictionary<string, object?>(aggregate.Properties, StringComparer.Ordinal)
+            {
+                ["occurrenceCount"] = aggregate.PendingCount,
+                ["fatal"] = aggregate.PendingFatal
+            };
+            aggregate.PendingCount = 0;
+            aggregate.PendingFatal = false;
+            aggregate.LastEmittedAt = now;
+            TrackEvent("ErrorOccurred", repeatProperties);
+        }
     }
 
-    /// <summary>
-    ///     Flushes all buffered events to PostHog.
-    ///     Thread-safe: concurrent calls will wait for the same flush operation.
-    ///     Note: This waits for the periodic batching interval to ensure events are sent.
-    ///     For immediate flush on shutdown, call DisposeAsync which will flush synchronously.
-    /// </summary>
     public async Task FlushAsync(CancellationToken ct = default)
     {
         if (_batchingSink is null || _disposed)
@@ -176,187 +248,147 @@ public sealed class TelemetryService : ITelemetryService
             return;
         }
 
-        var flushInterval = TimeSpan.FromSeconds(1);
+        FlushPendingErrors();
+        Task flushTask;
+        lock (_flushLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
 
+            if (_flushTask is null)
+            {
+                Interlocked.Exchange(ref _acceptingEvents, 0);
+                _flushTask = DrainBatchingSinkAsync();
+            }
+
+            flushTask = _flushTask;
+        }
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var waitCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
         try
         {
-            await Task.Delay(flushInterval, ct).ConfigureAwait(false);
+            await flushTask.WaitAsync(waitCts.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (waitCts.IsCancellationRequested)
         {
-            // Cancellation is acceptable
         }
     }
 
-    /// <summary>
-    ///     Disposes the telemetry service, flushing any pending events first.
-    ///     Idempotent: safe to call multiple times.
-    /// </summary>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        await FlushAsync().ConfigureAwait(false);
+    }
+
+    private async Task DrainBatchingSinkAsync()
+    {
+        try
         {
-            return;
+            await _batchingSink!.DisposeAsync().ConfigureAwait(false);
         }
-
-        _disposed = true;
-
-        if (_batchingSink is not null)
+        catch
         {
-            try
+            // Telemetry is best-effort during shutdown.
+        }
+        finally
+        {
+            try { _logger?.Dispose(); }
+            catch { }
+            if (_ownsHttpClient) _httpClient?.Dispose();
+            _disposed = true;
+        }
+    }
+
+    private void FlushPendingErrors()
+    {
+        if (!IsEnabled) return;
+        lock (_errorLock)
+        {
+            foreach (var error in _errors.Values.Where(item => item.PendingCount > 0))
             {
-                await _batchingSink.DisposeAsync().ConfigureAwait(false);
-            }
-            catch
-            {
-                // Ignore disposal errors
+                var properties = new Dictionary<string, object?>(error.Properties, StringComparer.Ordinal)
+                {
+                    ["occurrenceCount"] = error.PendingCount,
+                    ["fatal"] = error.PendingFatal
+                };
+                error.PendingCount = 0;
+                error.PendingFatal = false;
+                error.LastEmittedAt = DateTimeOffset.UtcNow;
+                TrackEvent("ErrorOccurred", properties);
             }
         }
+    }
 
-        _logger?.Dispose();
-
-        if (_ownsHttpClient)
-        {
-            _httpClient?.Dispose();
-        }
+    private static (string Fingerprint, string Diagnostic) Describe(Exception exception)
+    {
+        var frames = new StackTrace(exception, false).GetFrames() ?? [];
+        var productFrames = frames
+            .Select(frame => frame.GetMethod())
+            .Where(method => ProductAssemblies.Contains(method?.DeclaringType?.Assembly.GetName().Name ?? string.Empty))
+            .Select(method => $"{method!.DeclaringType!.Name}.{method.Name}")
+            .Take(8)
+            .ToArray();
+        var material = exception.GetType().FullName + "|" + string.Join("|", productFrames);
+        var fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
+        return (fingerprint, productFrames.FirstOrDefault() ?? exception.GetType().Name);
     }
 
     private static IReadOnlyCollection<LogEventProperty> BuildBaseProperties(TelemetrySettings settings,
         string appVersion, string osVersion)
     {
-        var list = new List<LogEventProperty>
+        var baseValues = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            new(TelemetryConstants.Properties.OsVersion, new ScalarValue(osVersion)),
-            new(TelemetryConstants.Properties.AxorithVersion, new ScalarValue(appVersion)),
-            new(TelemetryConstants.Properties.Application, new ScalarValue(settings.ApplicationName))
+            [TelemetryConstants.Properties.OsVersion] = osVersion,
+            [TelemetryConstants.Properties.AxorithVersion] = appVersion,
+            [TelemetryConstants.Properties.Application] = settings.ApplicationName,
+            [TelemetryConstants.Properties.BuildChannel] = settings.BuildChannel,
+            [TelemetryConstants.Properties.Environment] = settings.EnvironmentOverride
         };
-
-        if (!string.IsNullOrWhiteSpace(settings.BuildChannel))
-        {
-            list.Add(new LogEventProperty(TelemetryConstants.Properties.BuildChannel,
-                new ScalarValue(settings.BuildChannel)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(settings.EnvironmentOverride))
-        {
-            list.Add(new LogEventProperty(TelemetryConstants.Properties.Environment,
-                new ScalarValue(settings.EnvironmentOverride)));
-        }
-
-        return list;
+        return TelemetryEventSanitizer.SanitizeProperties(baseValues)
+            .Select(pair => new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value)))
+            .ToArray();
     }
 
     private IEnumerable<LogEventProperty> ConvertProperties(IReadOnlyDictionary<string, object?> properties)
     {
-        foreach (var kvp in properties)
+        foreach (var (key, value) in properties)
         {
-            yield return new LogEventProperty(kvp.Key, ConvertToPropertyValue(kvp.Value));
+            yield return new LogEventProperty(key, ConvertToPropertyValue(value));
         }
     }
 
-    private LogEvent CreateLogEvent(LogEventLevel level, string template, IEnumerable<LogEventProperty> properties,
-        Exception? exception)
+    private LogEvent CreateLogEvent(string name, IEnumerable<LogEventProperty> properties) =>
+        new(DateTimeOffset.UtcNow, LogEventLevel.Information, null, _templateParser.Parse(name), properties);
+
+    private static LogEventPropertyValue ConvertToPropertyValue(object? value) => value switch
     {
-        var messageTemplate = _templateParser.Parse(template);
-        return new LogEvent(DateTimeOffset.UtcNow, level, exception, messageTemplate, properties);
-    }
+        null => new ScalarValue(null),
+        string text => new ScalarValue(text),
+        bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal =>
+            new ScalarValue(value),
+        Guid id => new ScalarValue(id.ToString()),
+        IReadOnlyDictionary<string, object?> dictionary => new StructureValue(
+            dictionary.Select(pair => new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value)))),
+        IDictionary<string, object?> dictionary => new StructureValue(
+            dictionary.Select(pair => new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value)))),
+        IEnumerable sequence when value is not string =>
+            new SequenceValue(sequence.Cast<object?>().Select(ConvertToPropertyValue)),
+        _ => new ScalarValue(null)
+    };
 
-    private static LogEventPropertyValue ConvertToPropertyValue(object? value)
-    {
-        switch (value)
-        {
-            case null:
-                return new ScalarValue(null);
-            case string s:
-                return new ScalarValue(TelemetryGuard.SafeString(s));
-            case bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal:
-                return new ScalarValue(value);
-            case Enum e:
-                return new ScalarValue(e.ToString());
-            case Guid g:
-                return new ScalarValue(g.ToString());
-            case DateTime dt:
-                return new ScalarValue(dt);
-            case DateTimeOffset dto:
-                return new ScalarValue(dto);
-            case IReadOnlyDictionary<string, object?> dict:
-                return new StructureValue(
-                    dict.Select(d => new LogEventProperty(d.Key, ConvertToPropertyValue(d.Value))));
-            case IDictionary<string, object?> dict:
-                return new StructureValue(dict.Select(kvp =>
-                    new LogEventProperty(kvp.Key, ConvertToPropertyValue(kvp.Value))));
-            case IEnumerable enumerable and not string:
-                return new SequenceValue(enumerable.Cast<object?>().Select(ConvertToPropertyValue));
-            default:
-                var structured = TryConvertObject(value);
-                if (structured is not null)
-                {
-                    return structured;
-                }
-
-                return new ScalarValue(value.ToString());
-        }
-    }
-
-    private static readonly ConcurrentDictionary<Type, List<PropertyInfo>> PropertyCache = new();
-
-    private static StructureValue? TryConvertObject(object value)
-    {
-        var type = value.GetType();
-        var properties = PropertyCache.GetOrAdd(type, t =>
-        [
-            .. t
-                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
-        ]);
-
-        if (properties.Count == 0)
-        {
-            return null;
-        }
-
-        var logProps = new List<LogEventProperty>(properties.Count);
-
-        foreach (var property in properties)
-        {
-            object? propValue;
-            try
-            {
-                propValue = property.GetValue(value);
-            }
-            catch
-            {
-                // Skip properties that throw during evaluation to avoid breaking telemetry.
-                continue;
-            }
-
-            logProps.Add(new LogEventProperty(property.Name, ConvertToPropertyValue(propValue)));
-        }
-
-        return logProps.Count == 0 ? null : new StructureValue(logProps);
-    }
+    [System.Text.RegularExpressions.GeneratedRegex("^\\$?[A-Za-z][A-Za-z0-9]{0,79}$")]
+    private static partial System.Text.RegularExpressions.Regex EventNameRegex();
 }
 
 public sealed class NoopTelemetryService : ITelemetryService
 {
     public bool IsEnabled => false;
-
-    public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null)
-    {
-    }
-
-    public void TrackLog(LogEventLevel level, string messageTemplate, Exception? exception = null,
-        IReadOnlyDictionary<string, object?>? properties = null)
-    {
-    }
-
-    public Task FlushAsync(CancellationToken ct = default)
-    {
-        return Task.CompletedTask;
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        return ValueTask.CompletedTask;
-    }
+    public void SetEnabled(bool enabled) { }
+    public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null) { }
+    public void TrackError(Exception exception, string subsystem, string operation, string severity,
+        bool handled, bool fatal, IReadOnlyDictionary<string, object?>? properties = null) { }
+    public Task FlushAsync(CancellationToken ct = default) => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

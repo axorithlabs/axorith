@@ -151,7 +151,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: ./build/Installer/*.exe
+          path: ./build/Installer/axorith-setup.exe
           if-no-files-found: error
 
   create-release:
@@ -187,7 +187,7 @@ jobs:
         with:
           body: ${{ steps.build_changelog.outputs.changelog }}
           files: |
-            ./release-assets/*.exe
+            ./release-assets/axorith-setup.exe
           draft: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:

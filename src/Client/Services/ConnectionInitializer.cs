@@ -101,6 +101,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             await Dispatcher.UIThread.InvokeAsync(() => { shellViewModel.Content = mainViewModel; });
 
             StartHealthMonitoring(app.Services, app, config, loggerFactory, logger);
+            Program.MarkApplicationReady();
 
             logger.LogInformation("Axorith Client initialization sequence complete.");
         }

@@ -153,8 +153,7 @@ public class UpdateService : IDisposable
             foreach (var asset in assets.EnumerateArray())
             {
                 var name = asset.GetProperty("name").GetString();
-                if (name != null && name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
-                    name.Contains("Setup", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(name, "axorith-setup.exe", StringComparison.OrdinalIgnoreCase))
                 {
                     downloadUrl = asset.GetProperty("browser_download_url").GetString();
                     break;

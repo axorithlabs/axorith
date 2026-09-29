@@ -21,7 +21,7 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
         {
             if (!File.Exists(_settingsPath))
             {
-                return new ClientUiConfiguration();
+                return LoadDefaults();
             }
 
             var fileInfo = new FileInfo(_settingsPath);
@@ -42,17 +42,33 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
             // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
             // File size and MaxDepth are validated to prevent DoS attacks
             var config = JsonSerializer.Deserialize<ClientUiConfiguration>(json, DeserializeOptions); //-V5611
-            return config ?? new ClientUiConfiguration();
+            config ??= new ClientUiConfiguration();
+            if (TelemetryPreference.TryRead(out var telemetryEnabled))
+            {
+                config.TelemetryEnabled = telemetryEnabled;
+            }
+            return config;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load client UI settings from {Path}",
                 TelemetryGuard.SafePath(_settingsPath));
-            return new ClientUiConfiguration();
+            return LoadDefaults();
         }
     }
 
-    public void Save(ClientUiConfiguration configuration)
+    private static ClientUiConfiguration LoadDefaults()
+    {
+        var configuration = new ClientUiConfiguration();
+        if (TelemetryPreference.TryRead(out var telemetryEnabled))
+        {
+            configuration.TelemetryEnabled = telemetryEnabled;
+        }
+
+        return configuration;
+    }
+
+    public bool Save(ClientUiConfiguration configuration)
     {
         try
         {
@@ -62,11 +78,13 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
             });
 
             File.WriteAllText(_settingsPath, json);
+            return TelemetryPreference.Save(configuration.TelemetryEnabled);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to save client UI settings to {Path}",
                 TelemetryGuard.SafePath(_settingsPath));
+            return false;
         }
     }
 }

@@ -101,12 +101,17 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
         }).ConfigureAwait(false);
     }
 
-    public async Task<OperationResult> StartSessionAsync(Guid presetId, CancellationToken ct = default)
+    public async Task<OperationResult> StartSessionAsync(Guid presetId, Guid sessionInstanceId, CancellationToken ct = default)
     {
         return await _retryPolicy.ExecuteAsync(async () =>
         {
             var response = await _client.StartSessionAsync(
-                    new StartSessionRequest { PresetId = presetId.ToString() },
+                    new StartSessionRequest
+                    {
+                        PresetId = presetId.ToString(),
+                        SessionInstanceId = sessionInstanceId.ToString(),
+                        StartSource = "manual"
+                    },
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 

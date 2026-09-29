@@ -1,5 +1,3 @@
-﻿using Serilog.Events;
-
 namespace Axorith.Telemetry;
 
 /// <summary>
@@ -25,7 +23,6 @@ public sealed record TelemetrySettings
     public string ApplicationName { get; init; } = string.Empty;
     public string? BuildChannel { get; init; }
     public string? EnvironmentOverride { get; init; }
-    public string? LogLevel { get; init; }
     public int MaxRetryAttempts { get; init; } = 3;
     public TimeSpan InitialRetryDelay { get; init; } = TimeSpan.FromSeconds(1);
 
@@ -33,11 +30,12 @@ public sealed record TelemetrySettings
     ///     Returns true if telemetry is enabled and properly configured.
     ///     Checks for placeholder API key pattern (##...##) to detect unconfigured state.
     /// </summary>
-    public bool IsActive =>
-        Enabled &&
+    public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(PostHogApiKey) &&
         !PostHogApiKey.StartsWith("##", StringComparison.Ordinal) &&
         !string.IsNullOrWhiteSpace(PostHogHost);
+
+    public bool IsActive => Enabled && IsConfigured;
 
     /// <summary>
     ///     Returns a new instance with environment variable overrides applied.
@@ -54,14 +52,6 @@ public sealed record TelemetrySettings
         return this with { PostHogApiKey = envApiKey };
     }
 
-    public static LogEventLevel ResolveLogLevel(string? configuredLevel = null)
-    {
-        var value = string.IsNullOrWhiteSpace(configuredLevel) ? "Warning" : configuredLevel;
-
-        return Enum.TryParse<LogEventLevel>(value, true, out var parsed)
-            ? parsed
-            : LogEventLevel.Warning;
-    }
 }
 
 public static class TelemetryGuard
@@ -79,16 +69,6 @@ public static class TelemetryGuard
         return value.Length <= maxLength ? value : value[..maxLength];
     }
 
-    public static string SafeStackTrace(Exception? ex, int maxLength = 2_048)
-    {
-        if (ex == null)
-        {
-            return string.Empty;
-        }
-
-        var stack = ex.ToString();
-        return SafeString(stack, maxLength);
-    }
 
     /// <summary>
     ///     Masks user-specific information in file paths for privacy.

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -24,7 +23,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
-using Serilog.Events;
 
 if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase))
 {
@@ -114,8 +112,7 @@ Log.Logger = new LoggerConfiguration()
 
 var hostInfoPath = ApplicationPaths.HostInfoFile;
 ITelemetryService? telemetry = null;
-var telemetryLogLevel = LogEventLevel.Warning;
-var hostUptime = Stopwatch.StartNew();
+FileSystemWatcher? telemetryPreferenceWatcher = null;
 
 // CRITICAL: Use global mutex to prevent multiple Host instances
 // This protects against race conditions when multiple Clients start simultaneously
@@ -153,14 +150,23 @@ try
     Log.Information("Starting Axorith.Host...");
 
     var builder = WebApplication.CreateBuilder(args);
+    var telemetryEnabled = TelemetryPreference.ReadOrDefault(true);
     var telemetrySettings = new TelemetrySettings()
             .WithEnvironmentOverrides() with
         {
-            ApplicationName = "Axorith.Host"
+            ApplicationName = "Axorith.Host",
+            Enabled = telemetryEnabled
         };
 
-    telemetryLogLevel = TelemetrySettings.ResolveLogLevel(telemetrySettings.LogLevel);
     telemetry = new TelemetryService(telemetrySettings);
+    try
+    {
+        telemetryPreferenceWatcher = TelemetryPreference.Watch(enabled => telemetry?.SetEnabled(enabled));
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Could not watch the shared telemetry preference file");
+    }
     RegisterGlobalExceptionHandlers(telemetry);
 
     Log.Information(
@@ -208,15 +214,12 @@ try
                 retainedFileCountLimit: 30,
                 shared: true,
                 outputTemplate:
-                "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}")
-            .WriteTo.Sink(new TelemetrySerilogSink(telemetry ?? new NoopTelemetryService()),
-                restrictedToMinimumLevel: telemetryLogLevel);
+                "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {ShortSourceContext}: {ModuleContext}{Message:lj}{NewLine}{Exception}");
     });
 
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
     builder.Services.AddSingleton(_ => telemetry ?? new NoopTelemetryService());
-    builder.Services.AddSingleton(hostUptime);
     builder.Services.AddSingleton<IUserRegistrationService, UserRegistrationService>();
     builder.Services.AddSingleton<UpdateService>();
     builder.Services.Configure<Configuration>(builder.Configuration);
@@ -261,7 +264,6 @@ try
 
     builder.Services.AddHttpClient("default");
 
-    builder.Services.AddHostedService<TelemetryHeartbeatService>();
 
     if (builder.Environment.IsDevelopment())
     {
@@ -300,11 +302,6 @@ try
                 registration.MachineId[..8] + "...",
                 registration.FirstSeenUtc);
 
-            telemetry?.TrackEvent("UserRegistrationLoaded", new Dictionary<string, object?>
-            {
-                ["firstSeenUtc"] = registration.FirstSeenUtc.ToString("O"),
-                ["appVersion"] = registration.AppVersion
-            });
         }
         catch (Exception ex)
         {
@@ -472,30 +469,18 @@ try
         telemetry.IsEnabled,
         telemetry.IsEnabled);
 
-    telemetry?.TrackEvent("HostReady", new Dictionary<string, object?>
-    {
-        ["address"] = config.Grpc.BindAddress,
-        ["port"] = boundPort > 0 ? boundPort : null
-    });
+    telemetry?.TrackEvent("HostReady");
 
     await app.WaitForShutdownAsync();
 
-    telemetry?.TrackEvent("HostStopped", new Dictionary<string, object?>
-    {
-        ["uptimeMs"] = (long)hostUptime.Elapsed.TotalMilliseconds
-    });
+    telemetry?.TrackEvent("HostStopped");
 
     return 0;
 }
 catch (Exception ex)
 {
     Log.Fatal(ex, "Axorith.Host terminated unexpectedly");
-    telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
-    {
-        ["fatal"] = true,
-        ["message"] = TelemetryGuard.SafeString(ex.Message),
-        ["stack"] = TelemetryGuard.SafeStackTrace(ex)
-    });
+    telemetry?.TrackError(ex, "host", "startup", "fatal", handled: true, fatal: true);
 
     return 1;
 }
@@ -515,10 +500,11 @@ finally
     }
 
     await Log.CloseAndFlushAsync();
+    telemetryPreferenceWatcher?.Dispose();
     if (telemetry != null)
     {
-        await telemetry.FlushAsync();
-        await telemetry.DisposeAsync();
+        using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await telemetry.FlushAsync(flushCts.Token);
     }
 
     Log.Information("Host instance mutex will be released on disposal");
@@ -532,12 +518,10 @@ static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
         if (e.IsTerminating)
         {
             Log.Fatal(exception, "Unhandled exception in AppDomain (terminating)");
-            telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            if (exception is not null)
             {
-                ["fatal"] = true,
-                ["message"] = TelemetryGuard.SafeString(exception?.Message),
-                ["stack"] = TelemetryGuard.SafeStackTrace(exception)
-            });
+                telemetry?.TrackError(exception, "host", "startup", "fatal", handled: false, fatal: true);
+            }
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
@@ -551,12 +535,10 @@ static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
         else
         {
             Log.Error(exception, "Unhandled exception in AppDomain (non-terminating)");
-            telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
+            if (exception is not null)
             {
-                ["fatal"] = false,
-                ["message"] = TelemetryGuard.SafeString(exception?.Message),
-                ["stack"] = TelemetryGuard.SafeStackTrace(exception)
-            });
+                telemetry?.TrackError(exception, "host", "unknown", "error", handled: false, fatal: false);
+            }
         }
     };
 
@@ -564,12 +546,7 @@ static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
     {
         Log.Error(e.Exception, "Unobserved task exception");
         e.SetObserved();
-        telemetry?.TrackEvent("ErrorOccurred", new Dictionary<string, object?>
-        {
-            ["fatal"] = false,
-            ["message"] = TelemetryGuard.SafeString(e.Exception?.Message),
-            ["stack"] = TelemetryGuard.SafeStackTrace(e.Exception)
-        });
+        telemetry?.TrackError(e.Exception, "host", "unknown", "warning", handled: true, fatal: false);
     };
 }
 
