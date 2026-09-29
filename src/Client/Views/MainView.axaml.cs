@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -110,14 +111,28 @@ public partial class MainView : UserControl
                 target = this.FindControl<Button>("EmergencyUnlockHoldButton");
             else if (ViewModel?.IsStartConfirmationOpen == true)
                 target = this.FindControl<Button>("StartConfirmationCancelButton");
-            else if (ViewModel?.IsCommittedSession == true)
-                target = this.FindControl<Button>("OpenEmergencyUnlockButton");
+            else if (ViewModel?.IsSessionActive == true && ViewModel.IsHomePage)
+                target = this.FindControl<Button>(ViewModel.IsCommittedSession
+                    ? "OpenEmergencyUnlockButton"
+                    : "StopSessionButton");
             else if (ViewModel?.IsSessionActive == true)
-                target = this.FindControl<Button>("StopSessionButton");
-            else if (ViewModel?.Presets.Count > 0)
+                target = this.FindControl<Button>(ViewModel.IsCommittedSession
+                    ? "SidebarEmergencyUnlockButton"
+                    : "SidebarStopSessionButton");
+            else if (ViewModel?.IsPresetsPage == true && ViewModel.Presets.Count > 0)
                 target = this.FindControl<ListBox>("PresetsListBox");
-            else
+            else if (ViewModel?.IsPresetsPage == true)
                 target = this.FindControl<Button>("CreateSessionButton");
+            else
+                target = this.FindControl<TextBlock>("TodaySectionHeading");
+
+            if (target?.IsVisible != true)
+            {
+                target = ViewModel?.IsPresetsPage == true
+                    ? this.FindControl<Button>("CreateSessionButton")
+                    : this.FindControl<TextBlock>("TodaySectionHeading");
+            }
+
             target?.Focus();
         });
     }
