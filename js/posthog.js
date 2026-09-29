@@ -1,5 +1,5 @@
-const posthogProjectToken = "##POSTHOG_API_KEY##";
-const posthogApiHost = "##POSTHOG_API_HOST##";
+const posthogProjectToken = "phc_5JRZwyXJmWlMk1dln5MK3PipGNnAZNmRObSWLqjpMOT";
+const posthogApiHost = "https://us.posthog.com";
 const windowsInstallerPath = "/axorithlabs/axorith/releases/latest/download/axorith-setup.exe";
 
 function normalizeWebsitePath(value) {
