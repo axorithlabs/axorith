@@ -135,6 +135,23 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         }
         Assert.Equal(12, view.FindControl<Button>("HomeSidebarButton")!.FontSize);
 
+        var updateButton = view.FindControl<Button>("SidebarUpdateButton")!;
+        var sidebar = view.FindControl<Grid>("SidebarNavigationGrid")!;
+        Assert.False(updateButton.IsVisible);
+        Assert.Contains(updateButton, sidebar.Children);
+        Assert.Equal(4, Grid.GetRow(updateButton));
+
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.UpdateAvailable))!
+            .SetValue(viewModel, true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(updateButton.IsVisible);
+        Assert.Same(viewModel.InstallUpdateCommand, updateButton.Command);
+
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.UpdateAvailable))!
+            .SetValue(viewModel, false);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(updateButton.IsVisible);
+
         Assert.Contains(view.FindControl<Button>("CreateSessionButton"),
             view.FindControl<Grid>("PresetsHeader")!.Children);
         Assert.Equal(16, new SettingsView().FindControl<TextBlock>("SettingsSidebarHeading")!.FontSize);

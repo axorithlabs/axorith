@@ -39,7 +39,7 @@
 
     <Grid RowDefinitions="*" ColumnDefinitions="220,*" Background="#050505">
         <Border Grid.Column="0" Background="#0A0A0A" BorderBrush="#333333" BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="13,18,6,14">
+            <Grid x:Name="SidebarNavigationGrid" RowDefinitions="Auto,*,Auto,Auto,Auto" Margin="13,18,6,14">
                 <StackPanel Grid.Row="0" Spacing="4">
                     <Button x:Name="HomeSidebarButton" Classes="SidebarButton" Classes.Active="{Binding IsHomePage}" Command="{Binding ShowHomeCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="13">
@@ -83,24 +83,23 @@
                         <TextBlock Text="Settings" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="SidebarUpdateButton" Grid.Row="4" Classes="SidebarButton accent"
+                        Command="{Binding InstallUpdateCommand}" IsVisible="{Binding UpdateAvailable}"
+                        MinHeight="44" Margin="0,8,0,0" ToolTip.Tip="Install the available update">
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" Width="16" Height="16" />
+                        <StackPanel Spacing="1" VerticalAlignment="Center">
+                            <TextBlock Text="Update" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding UpdateVersion}" FontSize="11" Opacity="0.8" />
+                        </StackPanel>
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" Margin="28,22,28,22" RowDefinitions="Auto,*"
+        <Grid Grid.Column="1" Margin="28,22,28,22" RowDefinitions="*"
               IsEnabled="{Binding !IsOverlayOpen}">
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Command="{Binding InstallUpdateCommand}" Classes="accent"
-                            IsVisible="{Binding UpdateAvailable}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" Width="16" Height="16" />
-                            <TextBlock Text="{Binding UpdateVersion}" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Grid>
-
-            <ScrollViewer x:Name="HomeScrollViewer" Grid.Row="1" IsVisible="{Binding IsHomePage}"
+            <ScrollViewer x:Name="HomeScrollViewer" Grid.Row="0" IsVisible="{Binding IsHomePage}"
                           HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="20" MaxWidth="1400" HorizontalAlignment="Stretch">
                     <Border Classes="Card" Padding="18" IsVisible="{Binding IsSessionActive}">
@@ -227,7 +226,7 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <ScrollViewer Grid.Row="1" IsVisible="{Binding IsPresetsPage}"
+            <ScrollViewer Grid.Row="0" IsVisible="{Binding IsPresetsPage}"
                           HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="14" MaxWidth="1400" HorizontalAlignment="Stretch">
                     <Grid x:Name="PresetsHeader" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,0,0,2">
