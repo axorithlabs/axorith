@@ -540,11 +540,15 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             }
 
             var resolveEndAt = typeof(Axorith.Core.Services.SessionManager)
-                .GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
-                .Single(method => method.Name == "ResolveEndAt" && method.GetParameters().Length == 3);
+                .GetMethod("ResolveEndAt",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic,
+                    [typeof(TimeOnly), typeof(IReadOnlyCollection<DayOfWeek>), typeof(DateTimeOffset),
+                        typeof(TimeZoneInfo)])!;
+            var testTimeZone = TimeZoneInfo.CreateCustomTimeZone("Test UTC+03", TimeSpan.FromHours(3),
+                "Test UTC+03", "Test UTC+03");
             var resolvedEnd = (DateTimeOffset)resolveEndAt.Invoke(null,
                 [options.EndAtLocalTime!.Value, options.EndAtDaysOfWeek,
-                    new DateTimeOffset(2024, 1, 1, 19, 0, 0, TimeSpan.FromHours(3))])!;
+                    new DateTimeOffset(2024, 1, 1, 19, 0, 0, TimeSpan.FromHours(3)), testTimeZone])!;
             Assert.Equal(new DateTimeOffset(2024, 1, 5, 15, 30, 0, TimeSpan.Zero), resolvedEnd);
 
             editorViewModel.Triggers.Add(new ScheduleTriggerViewModel());
