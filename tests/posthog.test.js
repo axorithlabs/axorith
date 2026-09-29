@@ -21,6 +21,29 @@ test("homepage Download for Windows button links straight to the installer", () 
     assert.equal(button[1], "https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe");
 });
 
+test("all download links across the site go straight to the installer", () => {
+    const installer = "https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe";
+    const pages = ["../index.html", "../modules.html", "../privacy/index.html", "../download/index.html", "../download/windows/index.html"];
+
+    for (const page of pages) {
+        const html = readFileSync(require.resolve(page), "utf8");
+        const links = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)];
+
+        for (const [, attributes, content] of links) {
+            const href = attributes.match(/\bhref="([^"]+)"/i)?.[1];
+            const label = content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+            if (/download/i.test(label) || /\/download(?:\/|$)/i.test(href || "")) {
+                assert.equal(href, installer, `${page}: ${label}`);
+            }
+        }
+    }
+});
+
+test("download page no longer asks visitors to choose a platform", () => {
+    const page = readFileSync(require.resolve("../download/index.html"), "utf8");
+    assert.doesNotMatch(page, /choose a platform/i);
+});
+
 test("website paths are normalized and limited to approved routes", () => {
     const event = {
         properties: {
