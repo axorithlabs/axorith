@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function (event) {
+        const anchor = event.target instanceof Element ? event.target.closest('a') : null;
+        if (!anchor || !window.posthog || typeof window.posthog.capture !== 'function') return;
+
+        if (isWindowsInstallerDownloadUrl(anchor.href)) {
+            window.posthog.capture('WebsiteDownloadClicked', { platform: 'windows' });
+            return;
+        }
+
+        if (anchor.hostname.toLowerCase() === 'github.com') {
+            window.posthog.capture('WebsiteGitHubClicked');
+        }
+    });
+
     // Mobile menu toggle
     const mobileToggle = document.querySelector('.nav-mobile-toggle');
     const mobileMenu = document.querySelector('.mobile-menu');
