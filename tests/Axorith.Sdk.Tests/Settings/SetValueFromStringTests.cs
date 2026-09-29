@@ -1,3 +1,4 @@
+using System.Globalization;
 using Axorith.Sdk.Settings;
 using FluentAssertions;
 
@@ -130,7 +131,7 @@ public class SetValueFromStringTests
     {
         // Arrange
         ISetting setting = Setting.AsNumber("key", "Label", 0m);
-        var expected = decimal.Parse(expectedStr);
+        var expected = decimal.Parse(expectedStr, CultureInfo.InvariantCulture);
 
         // Act
         setting.SetValueFromString(input);

@@ -1,5 +1,7 @@
 using Autofac;
 using Avalonia;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
@@ -29,6 +31,8 @@ using Polly;
 using System.Runtime.CompilerServices;
 using Xunit;
 using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
+
+[assembly: AvaloniaTestApplication(typeof(Axorith.Integrations.Tests.HostGrpcEndToEndTests.TestAppBuilder))]
 
 namespace Axorith.Integrations.Tests;
 
@@ -113,13 +117,12 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
 
 public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<HostTestFactory>
 {
-    [Fact]
+    [AvaloniaFact]
     public async Task MainViewKeepsIdleAndSidebarActionsClearAndReadable()
     {
         var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
         using var channelLifetime = channel;
         using var api = new GrpcSessionsApi(sessions, Policy.Handle<Exception>().RetryAsync(0), NullLogger.Instance);
-        EnsureAvaloniaApp();
         using var services = new ServiceCollection().BuildServiceProvider();
         using var viewModel = new MainViewModel(null!, null!, api, null!, services);
         var view = new MainView { DataContext = viewModel };
@@ -408,7 +411,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         }
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task FrontendInteractionsAndSessionEditorLayoutStayConsistent()
     {
         var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
@@ -418,7 +421,6 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         using (var services = new ServiceCollection().BuildServiceProvider())
         using (var viewModel = new MainViewModel(null!, null!, api, null!, services))
         {
-            EnsureAvaloniaApp();
             using var editorViewModel = new SessionEditorViewModel(null!, null!, null!, null!, null!, services);
             Dispatcher.UIThread.RunJobs();
             await editorViewModel.InitializationTask;
@@ -537,8 +539,9 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 Assert.Equal(behavior, options.AfterEnd);
             }
 
-            var resolveEndAt = typeof(Axorith.Core.Services.SessionManager).GetMethod("ResolveEndAt",
-                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+            var resolveEndAt = typeof(Axorith.Core.Services.SessionManager)
+                .GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
+                .Single(method => method.Name == "ResolveEndAt" && method.GetParameters().Length == 3);
             var resolvedEnd = (DateTimeOffset)resolveEndAt.Invoke(null,
                 [options.EndAtLocalTime!.Value, options.EndAtDaysOfWeek,
                     new DateTimeOffset(2024, 1, 1, 19, 0, 0, TimeSpan.FromHours(3))])!;
@@ -550,6 +553,9 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             Assert.False(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
 
             var view = new MainView { DataContext = viewModel };
+            var mainContent = Assert.IsType<Grid>(view.Content).Children.OfType<Grid>()
+                .Single(grid => Grid.GetColumn(grid) == 1);
+            var homeContent = view.FindControl<ScrollViewer>("HomeScrollViewer")!;
             Assert.True(viewModel.CreateSessionCommand.CanExecute(null));
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
                 .SetValue(viewModel, true);
@@ -557,7 +563,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             Assert.False(viewModel.CreateSessionCommand.CanExecute(null));
             Assert.False(viewModel.StartSelectedCommand.CanExecute(null));
             Assert.False(viewModel.OpenSettingsCommand.CanExecute(null));
-            Assert.False(view.FindControl<Grid>("WorkspaceListArea")!.IsEnabled);
+            Assert.False(mainContent.IsEnabled);
 
             view.Measure(new Size(320, 300));
             Assert.True(view.FindControl<Border>("StartDialogCard")!.DesiredSize.Width <= 320);
@@ -569,7 +575,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 .SetValue(viewModel, false);
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsEmergencyUnlockOpen))!
                 .SetValue(viewModel, true);
-            Assert.False(view.FindControl<Grid>("WorkspaceListArea")!.IsEnabled);
+            Assert.False(mainContent.IsEnabled);
             Assert.False(viewModel.CreateSessionCommand.CanExecute(null));
             view.Measure(new Size(320, 300));
             Assert.True(view.FindControl<Border>("EmergencyDialogCard")!.DesiredSize.Width <= 320);
@@ -580,7 +586,8 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 .SetValue(viewModel, false);
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsSessionActive))!
                 .SetValue(viewModel, true);
-            Assert.True(view.FindControl<Border>("ActiveSessionCard")!.IsVisible);
+            Assert.Contains(homeContent.GetLogicalDescendants().OfType<TextBlock>(),
+                text => text.Text == viewModel.ActiveWorkspaceName && text.IsVisible);
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
                 .SetValue(viewModel, true);
             Assert.Equal(720, view.FindControl<Border>("StartDialogCard")!.MaxWidth);
@@ -594,8 +601,8 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             using var preset = new SessionPresetViewModel(new SessionPreset { Name = "Deep Work" },
                 [], null!, services);
             var card = view.FindControl<ListBox>("PresetsListBox")!.ItemTemplate!.Build(preset)!;
-            var actions = card.GetVisualDescendants().OfType<StackPanel>()
-                .Single(panel => panel.Name == "PresetActionButtons");
+            var actions = card.GetVisualDescendants().OfType<Button>()
+                .Single(button => button.Name == "PresetActionsButton");
             Assert.Equal(1, actions.Opacity);
 
             var editor = new SessionEditorView();
@@ -611,15 +618,17 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
 
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
                 .SetValue(viewModel, "Protection failed");
-            Assert.Equal(Brushes.IndianRed, view.FindControl<TextBlock>("ProtectionStatusText")!.Foreground);
+            var protectionStatus = homeContent.GetLogicalDescendants().OfType<TextBlock>()
+                .Single(text => text.Text == "Protection failed");
+            Assert.Equal(Brushes.IndianRed, protectionStatus.Foreground);
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
                 .SetValue(viewModel, "Protection active");
-            Assert.Equal(Brushes.LightGreen, view.FindControl<TextBlock>("ProtectionStatusText")!.Foreground);
-            Assert.False(view.FindControl<TextBlock>("ProtectionStatusText")!.IsVisible);
+            Assert.Equal(Brushes.LightGreen, protectionStatus.Foreground);
+            Assert.False(protectionStatus.IsVisible);
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
                 .SetValue(viewModel, "Protection inactive");
-            Assert.Equal(Brushes.Gray, view.FindControl<TextBlock>("ProtectionStatusText")!.Foreground);
-            Assert.False(view.FindControl<TextBlock>("ProtectionStatusText")!.IsVisible);
+            Assert.Equal(Brushes.Gray, protectionStatus.Foreground);
+            Assert.False(protectionStatus.IsVisible);
 
             var window = new Window { Content = view, Width = 900, Height = 700 };
             try
@@ -675,8 +684,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 Dispatcher.UIThread.RunJobs();
                 Assert.Same(confirmation.FindControl<Button>("StartConfirmationCancelButton"),
                     confirmationWindow.FocusManager?.GetFocusedElement());
-                Assert.InRange(confirmation.FindControl<Border>("StartDialogCard")!.DesiredSize.Width,
-                    500, 720);
+                Assert.Equal(720, confirmation.FindControl<Border>("StartDialogCard")!.MaxWidth);
             }
             finally
             {
@@ -685,13 +693,11 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         }
     }
 
-    private static void EnsureAvaloniaApp()
-    {
-        if (Application.Current is null)
-        {
-            AppBuilder.Configure<TestApplication>().UsePlatformDetect().SetupWithoutStarting();
-        }
-    }
-
     public sealed class TestApplication : Application;
+
+    public sealed class TestAppBuilder
+    {
+        public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<TestApplication>()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    }
 }
