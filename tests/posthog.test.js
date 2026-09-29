@@ -2,6 +2,16 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const test = require("node:test");
 const { isWindowsInstallerDownloadUrl, normalizeWebsitePath, sanitizeWebsiteEvent } = require("../js/posthog.js");
+const { configurePosthogScript } = require("../scripts/configure-posthog.js");
+
+test("website deployment fills the PostHog browser config", () => {
+    const source = readFileSync(require.resolve("../js/posthog.js"), "utf8");
+    const configured = configurePosthogScript(source, "phc_testkey123", "https://us.i.posthog.com/");
+
+    assert.match(configured, /const posthogProjectToken = "phc_testkey123";/);
+    assert.match(configured, /const posthogApiHost = "https:\/\/us\.i\.posthog\.com";/);
+    assert.equal(configured.includes("##POSTHOG_API_KEY##"), false);
+});
 
 test("homepage Download for Windows button links straight to the installer", () => {
     const homepage = readFileSync(require.resolve("../index.html"), "utf8");

@@ -1,0 +1,36 @@
+name: Configure website PostHog
+
+on:
+  push:
+    branches: [gh-pages]
+    paths:
+      - ".github/workflows/configure-website-posthog.yml"
+      - "js/posthog.js"
+      - "scripts/configure-posthog.js"
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure browser client
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_API_HOST: ${{ secrets.POSTHOG_API_HOST }}
+        run: node scripts/configure-posthog.js
+      - name: Commit configured browser client
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git diff --quiet -- js/posthog.js; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add js/posthog.js
+            git commit -m "chore(website): configure PostHog client"
+            git push
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds"
