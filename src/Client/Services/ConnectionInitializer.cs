@@ -18,8 +18,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     private const int MaxRetries = 3;
     private const int RetryDelayMs = 1000;
 
-    private static readonly string HostInfoPath = Path.Combine(
-        Environment.ExpandEnvironmentVariables("%AppData%/Axorith"), "config", "host-info.json");
+    private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
 
     public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger)
     {
@@ -119,7 +118,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         {
             await foreach (var notification in api.StreamNotificationsAsync())
             {
-                toastService.Show(notification.Message, notification.Type);
+                toastService.Show(notification.Message, notification.Type, notification.Source);
             }
         }
         catch (Exception ex)

@@ -2,11 +2,13 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using System.Reactive.Linq;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ReactiveUI;
 
 namespace Axorith.Client.Services;
 
@@ -29,6 +31,9 @@ public sealed class HostTrayService(
     private NativeMenuItem? _hostRestartItem;
     private CancellationTokenSource? _cts;
     private bool _isHostRunning;
+    private bool _canControlHost;
+    private IDisposable? _shellSubscription;
+    private IDisposable? _sessionSubscription;
 
     public void Initialize(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> appLogger)
     {
@@ -72,7 +77,7 @@ public sealed class HostTrayService(
         };
 
         _hostStatusItem = new NativeMenuItem("Host: Checking...") { IsEnabled = false };
-        _hostStartStopItem = new NativeMenuItem("Start Host");
+        _hostStartStopItem = new NativeMenuItem("Start Host") { IsEnabled = false };
         _hostStartStopItem.Click += async (_, _) =>
         {
             try
@@ -102,7 +107,7 @@ public sealed class HostTrayService(
             }
         };
 
-        _hostRestartItem = new NativeMenuItem("Restart Host");
+        _hostRestartItem = new NativeMenuItem("Restart Host") { IsEnabled = false };
         _hostRestartItem.Click += async (_, _) =>
         {
             try
@@ -130,6 +135,20 @@ public sealed class HostTrayService(
         menu.Add(exitItem);
 
         _trayIcon.Menu = menu;
+
+        if (services.GetService<ShellViewModel>() is { } shell)
+        {
+            _shellSubscription = shell.WhenAnyValue(vm => vm.Content).Subscribe(content =>
+            {
+                if (content is not MainViewModel main) return;
+                _sessionSubscription?.Dispose();
+                _sessionSubscription = main.WhenAnyValue(vm => vm.IsCommittedSession).Subscribe(committed =>
+                {
+                    _canControlHost = !committed;
+                    _ = UpdateMenuAsync();
+                });
+            });
+        }
 
         _trayIcon.Clicked += (_, _) => { ShowMainWindow(desktop); };
 
@@ -172,6 +191,8 @@ public sealed class HostTrayService(
         {
             _hostStatusItem?.Header = _isHostRunning ? "Host: Running" : "Host: Stopped";
             _hostStartStopItem?.Header = _isHostRunning ? "Stop Host" : "Start Host";
+            if (_hostStartStopItem != null) _hostStartStopItem.IsEnabled = !_isHostRunning || _canControlHost;
+            if (_hostRestartItem != null) _hostRestartItem.IsEnabled = _isHostRunning && _canControlHost;
         });
     }
 
@@ -244,6 +265,8 @@ public sealed class HostTrayService(
 
     public void Dispose()
     {
+        _shellSubscription?.Dispose();
+        _sessionSubscription?.Dispose();
         _cts?.Cancel();
         _cts?.Dispose();
         _trayIcon?.Dispose();

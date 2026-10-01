@@ -79,6 +79,14 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         private set => SetProperty(ref _applicationPicker, value);
     }
 
+    private ActionViewModel? _inlineAction;
+
+    public ActionViewModel? InlineAction
+    {
+        get => _inlineAction;
+        set => SetProperty(ref _inlineAction, value);
+    }
+
     public string ApplicationInputText
     {
         get => _applicationInputText;

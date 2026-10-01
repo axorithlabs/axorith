@@ -55,7 +55,7 @@ internal sealed class SteamApp(
         if (string.IsNullOrWhiteSpace(steamPath))
         {
             logger.LogError(null, "Steam path not configured");
-            notifier.ShowToast("Steam: Path not configured.", NotificationType.Error);
+            notifier.ShowToast("Steam: Path not configured.", NotificationType.Error, "Steam");
             return;
         }
 
@@ -118,7 +118,7 @@ internal sealed class SteamApp(
         if (_currentProcess == null)
         {
             logger.LogError(null, "Failed to obtain Steam process handle");
-            notifier.ShowToast("Steam: Failed to launch.", NotificationType.Error);
+            notifier.ShowToast("Steam: Failed to launch.", NotificationType.Error, "Steam");
             return;
         }
 
@@ -153,7 +153,7 @@ internal sealed class SteamApp(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to launch game {AppId}", appId);
-            notifier.ShowToast("Steam: Failed to launch game.", NotificationType.Error);
+            notifier.ShowToast("Steam: Failed to launch game.", NotificationType.Error, "Steam");
         }
     }
 

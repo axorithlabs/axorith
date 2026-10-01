@@ -136,7 +136,7 @@ public class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger)
     /// <summary>
     ///     Broadcasts a notification to all connected clients.
     /// </summary>
-    public Task BroadcastAsync(string message, NotificationType type, string source = "System")
+    public Task BroadcastAsync(string message, NotificationType type, string source = "Axorith")
     {
         if (_subscribers.IsEmpty)
         {

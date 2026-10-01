@@ -226,6 +226,7 @@ try
 
     // Determine actual port to use (check if configured port is available)
     var config = builder.Configuration.Get<Configuration>() ?? new Configuration();
+    hostInfoPath = config.Persistence.ResolveHostInfoPath();
     var bindAddress = IPAddress.Parse(config.Grpc.BindAddress);
     var configuredPort = config.Grpc.Port;
     var actualPort = IsPortAvailable(bindAddress, configuredPort) ? configuredPort : 0;
@@ -277,6 +278,8 @@ try
     });
 
     var app = builder.Build();
+    hostInfoPath = app.Services.GetRequiredService<IOptions<Configuration>>()
+        .Value.Persistence.ResolveHostInfoPath();
 
     try
     {
@@ -656,7 +659,8 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
             var commitmentProtection = ctx.Resolve<ICommitmentProtectionService>();
 
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout,
-                telemetryService, committedSessionPath, commitmentProtection);
+                telemetryService, committedSessionPath, commitmentProtection,
+                Path.Combine(config.Persistence.ResolveConfigPath(), "session-history.json"));
         })
         .As<ISessionManager>()
         .SingleInstance()

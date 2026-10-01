@@ -90,8 +90,26 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
+    public bool HasWarnings
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public string? WarningMessage
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public bool IsApplicationLauncher => Definition.Name == "Application Launcher";
+    public bool IsSiteBlocker => Definition.Name == "Site Blocker";
+    public bool ShowsActionsAtBottom => !IsApplicationLauncher && !IsSiteBlocker;
+
     public ObservableCollection<SettingViewModel> Settings { get; } = [];
     public ObservableCollection<ActionViewModel> Actions { get; } = [];
+    public ObservableCollection<SettingViewModel> LauncherBaseSettings { get; } = [];
+    public ObservableCollection<SettingViewModel> LauncherSubmoduleSettings { get; } = [];
 
     public ReactiveCommand<Unit, Unit> AddDelayCommand { get; }
     public ReactiveCommand<Unit, Unit> RemoveDelayCommand { get; }
@@ -189,6 +207,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             {
                 Settings.Clear();
                 Actions.Clear();
+                LauncherBaseSettings.Clear();
+                LauncherSubmoduleSettings.Clear();
 
                 foreach (var setting in settingsInfo.Settings)
                 {
@@ -197,6 +217,18 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
                     var vm = new SettingViewModel(adaptedSetting, Definition.Id, Model.InstanceId, _modulesApi, _serviceProvider);
                     Settings.Add(vm);
+                }
+
+                if (IsApplicationLauncher)
+                {
+                    var workingDirectoryIndex = Settings.ToList()
+                        .FindIndex(setting => setting.Setting.Key == "WorkingDirectory");
+                    var baseSettingCount = workingDirectoryIndex < 0 ? Settings.Count : workingDirectoryIndex + 1;
+
+                    for (var index = 0; index < baseSettingCount; index++)
+                        LauncherBaseSettings.Add(Settings[index]);
+                    for (var index = baseSettingCount; index < Settings.Count; index++)
+                        LauncherSubmoduleSettings.Add(Settings[index]);
                 }
 
                 if (Definition.Name == "App Blocker")
@@ -228,7 +260,18 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                         Model.InstanceId,
                         Definition.Name,
                         _telemetry);
-                    Actions.Add(new ActionViewModel(adaptedAction));
+                    var actionViewModel = new ActionViewModel(adaptedAction);
+                    if (action.SettingKey is not null)
+                    {
+                        var targetSetting = Settings.FirstOrDefault(setting => setting.Setting.Key == action.SettingKey);
+                        if (targetSetting is not null)
+                        {
+                            targetSetting.InlineAction = actionViewModel;
+                            actionViewModel.SetInline(true);
+                        }
+                    }
+
+                    Actions.Add(actionViewModel);
                 }
 
                 UpdateLauncherActionVisibility();
@@ -317,6 +360,8 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             {
                 var hasErrors = result.Status == ValidationStatus.Error;
                 HasErrors = hasErrors;
+                HasWarnings = result.Status == ValidationStatus.Warning;
+                WarningMessage = HasWarnings ? result.Message : null;
 
                 foreach (var setting in Settings)
                 {

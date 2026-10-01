@@ -216,18 +216,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     } = string.Empty;
 
-    public string StartReviewApps
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
-
-    public string StartReviewBlockers
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
-
     public string StartReviewBreakPolicy
     {
         get;
@@ -252,13 +240,10 @@ public class MainViewModel : ReactiveObject, IDisposable
     private int _activeBreaksRemaining;
     private DateTimeOffset _lastSessionStatePoll = DateTimeOffset.MinValue;
     private bool _sessionStatePollRunning;
-    // ponytail: focus history stays in memory until the host exposes persisted session history.
-    private readonly List<SessionActivity> _sessionActivity = [];
-    private DateTimeOffset? _trackedSessionStartedAt;
-    private Guid? _trackedSessionPresetId;
-    private string _trackedSessionPresetName = string.Empty;
+    private IReadOnlyList<SessionActivity> _sessionHistory = [];
+    private DateTimeOffset? _activeSessionStartedAt;
+    private string _activeSessionName = string.Empty;
     private bool _isPresetsPage;
-    private DateTimeOffset _lastDashboardActivityRefresh = DateTimeOffset.MinValue;
 
     public bool UpdateAvailable
     {
@@ -317,7 +302,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     } = new double[7];
 
-    public bool HasSessionActivity => _sessionActivity.Count > 0 || _trackedSessionStartedAt.HasValue;
+    public bool HasSessionActivity => _sessionHistory.Count > 0 || _activeSessionStartedAt.HasValue;
 
     public string NextScheduledPresetName
     {
@@ -418,7 +403,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         {
             UpdateActiveSessionClock();
             UpdateDashboardActivity();
-            if (IsCommittedSession && !_sessionStatePollRunning &&
+            if (!_sessionStatePollRunning &&
                 DateTimeOffset.UtcNow - _lastSessionStatePoll >= TimeSpan.FromSeconds(5))
             {
                 _lastSessionStatePoll = DateTimeOffset.UtcNow;
@@ -440,11 +425,12 @@ public class MainViewModel : ReactiveObject, IDisposable
                             ActiveFocusCommitmentMode = activePreset.Model.FocusCommitment.Mode;
                         }
                         IsSessionActive = true;
-                        BeginTrackingSession(evt.PresetId, evt.Timestamp);
                         _ = RefreshSessionStateAsync();
                         break;
                     case SessionEventType.Stopped:
-                        EndTrackingSession(evt.Timestamp);
+                        _activeSessionStartedAt = null;
+                        _activeSessionName = string.Empty;
+                        _ = RefreshSessionStateAsync();
                         SetActiveSessionPreset(null);
                         ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
                         IsSessionActive = false;
@@ -456,7 +442,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                     case SessionEventType.ModuleError:
                         if (evt.Type == SessionEventType.ModuleError)
                         {
-                            _toastService?.Show(evt.Message ?? "A module failed.", NotificationType.Error);
+                            _toastService?.Show(evt.Message ?? "A module failed.", NotificationType.Error, "Sessions");
                             _telemetry?.TrackEvent("ModuleExecutionFailed", new Dictionary<string, object?>
                             {
                                 ["presetId"] = evt.PresetId,
@@ -467,7 +453,7 @@ public class MainViewModel : ReactiveObject, IDisposable
 
                         break;
                     case SessionEventType.ValidationWarning:
-                        _toastService?.Show(evt.Message ?? "Session validation warning.", NotificationType.Warning);
+                        _toastService?.Show(evt.Message ?? "Session validation warning.", NotificationType.Warning, "Sessions");
                         _telemetry?.TrackEvent("SessionValidationWarning", new Dictionary<string, object?>
                         {
                             ["presetId"] = evt.PresetId,
@@ -666,7 +652,7 @@ public class MainViewModel : ReactiveObject, IDisposable
             {
                 TrackSessionStartFailed(presetVm, sessionInstanceId, "preflight", "validation_failed");
                 var error = $"{presetVm.Model.FocusCommitment.Mode} Session cannot start: {result.Message}";
-                _toastService?.Show(error, NotificationType.Error);
+                _toastService?.Show(error, NotificationType.Error, "Sessions");
                 return;
             }
 
@@ -688,7 +674,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                     ["stage"] = "preflight"
                 });
             var error = $"Session preflight failed: {ex.Message}";
-            _toastService?.Show(error, NotificationType.Error);
+            _toastService?.Show(error, NotificationType.Error, "Sessions");
         }
     }
 
@@ -763,55 +749,14 @@ public class MainViewModel : ReactiveObject, IDisposable
         this.RaisePropertyChanged(nameof(IsStrictStartReview));
         StartReviewEndTime = options.EndCondition switch
         {
-            FocusEndCondition.Duration => $"Duration: {options.Duration?.TotalMinutes:0} minutes · ends at {DateTimeOffset.Now.Add(options.Duration ?? TimeSpan.FromHours(1)).AddSeconds(10):HH:mm}",
+            FocusEndCondition.Duration => $"Duration: {options.Duration?.TotalMinutes:0} minutes | ends at {DateTimeOffset.Now.Add(options.Duration ?? TimeSpan.FromHours(1)).AddSeconds(10):HH:mm}",
             FocusEndCondition.EndAt => FormatEndAtReview(options, DateTime.Now),
             _ => "No fixed end time"
         };
 
-        var apps = presetVm.Modules
-            .Where(module => module.Definition.Name == "Application Launcher")
-            .Select(module =>
-            {
-                var path = module.Model.Settings.GetValueOrDefault("ApplicationPath");
-                if (string.Equals(path, "custom-app", StringComparison.OrdinalIgnoreCase))
-                    path = module.Model.Settings.GetValueOrDefault("CustomPath");
-                var executableName = Path.GetFileNameWithoutExtension(path ?? string.Empty);
-                return string.IsNullOrWhiteSpace(executableName) ? module.DisplayName : executableName;
-            })
-            .ToArray();
-        StartReviewApps = apps.Length == 0 ? "No applications will be opened." : string.Join(", ", apps);
-
-        var blockers = new List<string>();
-        foreach (var module in presetVm.Modules.Where(module => module.Definition.Name is "App Blocker" or "Site Blocker"))
-        {
-            if (module.Definition.Name == "App Blocker" &&
-                module.Model.Settings.GetValueOrDefault("Mode") == "AllowList")
-            {
-                var allowedApps = presetVm.Modules
-                    .Where(app => app.Definition.Name == "Application Launcher")
-                    .Select(app =>
-                    {
-                        var path = app.Model.Settings.GetValueOrDefault("ApplicationPath");
-                        if (string.Equals(path, "custom-app", StringComparison.OrdinalIgnoreCase))
-                            path = app.Model.Settings.GetValueOrDefault("CustomPath");
-                        return Path.GetFileNameWithoutExtension(path ?? string.Empty);
-                    })
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(StringComparer.OrdinalIgnoreCase);
-                blockers.Add($"Only allow Workspace apps: {string.Join(", ", allowedApps)}");
-            }
-            else
-            {
-                blockers.Add(module.Definition.Name);
-            }
-        }
-
-        var blockerList = blockers.Distinct().ToArray();
-        StartReviewBlockers = blockerList.Length == 0 ? "No blockers configured." : string.Join(" · ", blockerList);
-
         StartReviewBreakPolicy = options.BreakCount == 0
             ? "No breaks"
-            : $"{options.BreakCount} break{(options.BreakCount == 1 ? string.Empty : "s")} · {options.BreakDuration.TotalMinutes:0} min each";
+            : $"{options.BreakCount} break{(options.BreakCount == 1 ? string.Empty : "s")} | {options.BreakDuration.TotalMinutes:0} min each";
 
         StartReviewAfterEnd = options.AfterEnd switch
         {
@@ -881,7 +826,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                 _pendingStartPreset = null;
                 _pendingStartSessionInstanceId = null;
                 IsStartConfirmationOpen = false;
-                _toastService?.Show(error, NotificationType.Error);
+                _toastService?.Show(error, NotificationType.Error, "Sessions");
                 return;
             }
 
@@ -953,14 +898,14 @@ public class MainViewModel : ReactiveObject, IDisposable
             if (!result.Success)
             {
                 var error = $"Failed to start session: {result.Message}";
-                _toastService?.Show(error, NotificationType.Error);
+                _toastService?.Show(error, NotificationType.Error, "Sessions");
                 SetActiveSessionPreset(null);
                 ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
                 IsSessionActive = false;
             }
             else
             {
-                _toastService?.Show($"Session '{presetVm.Name}' started.", NotificationType.Success);
+                _toastService?.Show($"Session '{presetVm.Name}' started.", NotificationType.Success, "Sessions");
                 await RefreshSessionStateAsync();
             }
         }
@@ -975,7 +920,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                     ["stage"] = "rpc_request"
                 });
             var error = $"Failed to start session: {ex.Message}";
-            _toastService?.Show(error, NotificationType.Error);
+            _toastService?.Show(error, NotificationType.Error, "Sessions");
             SetActiveSessionPreset(null);
             ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
             IsSessionActive = false;
@@ -989,17 +934,17 @@ public class MainViewModel : ReactiveObject, IDisposable
             var result = await _sessionsApi.StopSessionAsync();
             if (!result.Success)
             {
-                _toastService?.Show($"Failed to stop session: {result.Message}", NotificationType.Error);
+                _toastService?.Show($"Failed to stop session: {result.Message}", NotificationType.Error, "Sessions");
             }
             else
             {
-                _toastService?.Show("Session stopped.", NotificationType.Success);
+                _toastService?.Show("Session stopped.", NotificationType.Success, "Sessions");
                 await RefreshSessionStateAsync();
             }
         }
         catch (Exception ex)
         {
-            _toastService?.Show($"Failed to stop session: {ex.Message}", NotificationType.Error);
+            _toastService?.Show($"Failed to stop session: {ex.Message}", NotificationType.Error, "Sessions");
         }
     }
 
@@ -1124,7 +1069,7 @@ public class MainViewModel : ReactiveObject, IDisposable
             {
                 await RefreshSessionStateAsync();
                 await Dispatcher.UIThread.InvokeAsync(() =>
-                    _toastService?.Show("Emergency unlock completed.", NotificationType.Success));
+                    _toastService?.Show("Emergency unlock completed.", NotificationType.Success, "Sessions"));
             }
         }
     }
@@ -1161,11 +1106,11 @@ public class MainViewModel : ReactiveObject, IDisposable
             await _presetsApi.DeletePresetAsync(presetVm.Id);
             Presets.Remove(presetVm);
             presetVm.Dispose();
-            _toastService?.Show($"Preset '{presetVm.Name}' deleted.", NotificationType.Success);
+            _toastService?.Show($"Preset '{presetVm.Name}' deleted.", NotificationType.Success, "Presets");
         }
         catch (Exception ex)
         {
-            _toastService?.Show($"Failed to delete preset: {ex.Message}", NotificationType.Error);
+            _toastService?.Show($"Failed to delete preset: {ex.Message}", NotificationType.Error, "Presets");
         }
     }
 
@@ -1227,7 +1172,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
-            _toastService?.Show($"Failed to load presets: {ex.Message}", NotificationType.Error);
+            _toastService?.Show($"Failed to load presets: {ex.Message}", NotificationType.Error, "Presets");
         }
     }
 
@@ -1281,7 +1226,8 @@ public class MainViewModel : ReactiveObject, IDisposable
                     {
                         ActiveWorkspaceName = state.PresetName;
                     }
-                    BeginTrackingSession(state.PresetId, state.StartedAt, state.PresetName);
+                    _activeSessionStartedAt = state.StartedAt;
+                    _activeSessionName = state.PresetName ?? string.Empty;
                     _activeSessionEndsAt = state.EndsAt;
                     _activeBreakEndsAt = state.BreakEndsAt;
                     _activeSessionRemainingDeadline = state.Remaining is { } sessionRemaining
@@ -1300,7 +1246,9 @@ public class MainViewModel : ReactiveObject, IDisposable
                 }
                 else
                 {
-                    EndTrackingSession(DateTimeOffset.Now);
+                    _activeSessionStartedAt = null;
+                    _activeSessionName = string.Empty;
+                    UpdateDashboardActivity(DateTimeOffset.Now);
                     SetActiveSessionPreset(null);
                     ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
                     IsSessionActive = false;
@@ -1308,6 +1256,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                     ResetActiveSessionDetails();
                 }
             });
+            await RefreshSessionHistoryAsync();
         }
         catch (Exception ex)
         {
@@ -1316,7 +1265,7 @@ public class MainViewModel : ReactiveObject, IDisposable
             {
                 if (!_sessionStateFailureNotified)
                 {
-                    _toastService?.Show(message, NotificationType.Error);
+                    _toastService?.Show(message, NotificationType.Error, "Sessions");
                     _sessionStateFailureNotified = true;
                 }
 
@@ -1346,16 +1295,16 @@ public class MainViewModel : ReactiveObject, IDisposable
             var result = await _sessionsApi.StartBreakAsync();
             if (!result.Success)
             {
-                _toastService?.Show($"Failed to start break: {result.Message}", NotificationType.Error);
+                _toastService?.Show($"Failed to start break: {result.Message}", NotificationType.Error, "Sessions");
                 return;
             }
 
-            _toastService?.Show("Break started.", NotificationType.Success);
+            _toastService?.Show("Break started.", NotificationType.Success, "Sessions");
             await RefreshSessionStateAsync();
         }
         catch (Exception ex)
         {
-            _toastService?.Show($"Failed to start break: {ex.Message}", NotificationType.Error);
+            _toastService?.Show($"Failed to start break: {ex.Message}", NotificationType.Error, "Sessions");
         }
     }
 
@@ -1377,110 +1326,36 @@ public class MainViewModel : ReactiveObject, IDisposable
         CanStartBreak = IsCommittedSession && !_activeBreakEndsAt.HasValue && _activeBreaksRemaining > 0;
     }
 
-    private sealed record SessionActivity(DateTimeOffset StartedAt, DateTimeOffset EndedAt, string PresetName);
-
-    private void BeginTrackingSession(Guid? presetId, DateTimeOffset? startedAt, string? presetName = null)
+    private async Task RefreshSessionHistoryAsync()
     {
-        if (startedAt is not { } start)
+        try
         {
-            return;
-        }
-
-        if (_trackedSessionStartedAt != start || _trackedSessionPresetId != presetId)
-        {
-            _trackedSessionStartedAt = start;
-            _trackedSessionPresetId = presetId;
-            _trackedSessionPresetName = string.Empty;
-        }
-
-        _trackedSessionPresetName = !string.IsNullOrWhiteSpace(presetName)
-            ? presetName
-            : Presets.FirstOrDefault(preset => preset.Id == presetId)?.Name ?? _trackedSessionPresetName;
-        UpdateDashboardActivity(DateTimeOffset.Now);
-    }
-
-    private void EndTrackingSession(DateTimeOffset endedAt)
-    {
-        if (_trackedSessionStartedAt is { } startedAt && endedAt > startedAt)
-        {
-            var duration = endedAt - startedAt;
-            _sessionActivity.RemoveAll(activity => activity.EndedAt < endedAt.AddDays(-7));
-            _sessionActivity.Add(new SessionActivity(startedAt, endedAt, _trackedSessionPresetName));
-            if (!string.IsNullOrWhiteSpace(_trackedSessionPresetName))
+            var history = await _sessionsApi.GetSessionHistoryAsync();
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                RecentSessions.Insert(0, $"{_trackedSessionPresetName} · {FormatDuration(duration)}");
-                while (RecentSessions.Count > 5)
-                {
-                    RecentSessions.RemoveAt(RecentSessions.Count - 1);
-                }
-
-                this.RaisePropertyChanged(nameof(HasRecentSessions));
-            }
+                _sessionHistory = history;
+                UpdateDashboardActivity(DateTimeOffset.Now);
+            });
         }
-
-        _trackedSessionStartedAt = null;
-        _trackedSessionPresetId = null;
-        _trackedSessionPresetName = string.Empty;
-        UpdateDashboardActivity(endedAt);
+        catch (Exception ex)
+        {
+            _toastService?.Show($"Unable to load session history: {ex.Message}", NotificationType.Error, "Sessions");
+        }
     }
 
     private void UpdateDashboardActivity(DateTimeOffset? timestamp = null)
     {
-        var now = timestamp ?? DateTimeOffset.Now;
-        if (timestamp is null && _lastDashboardActivityRefresh.Date == now.Date &&
-            _lastDashboardActivityRefresh.Minute == now.Minute)
-        {
-            return;
-        }
-
-        _lastDashboardActivityRefresh = now;
-        var startOfToday = StartOfLocalDay(now);
-        var startOfWeek = now.AddDays(-6).Date;
-        var activity = _sessionActivity.ToList();
-        if (_trackedSessionStartedAt is { } startedAt)
-        {
-            activity.Add(new SessionActivity(startedAt, now, _trackedSessionPresetName));
-        }
-
-        FocusTodayLabel = FormatDuration(SumOverlap(activity, startOfToday, now));
-        FocusThisWeekLabel = FormatDuration(SumOverlap(activity, new DateTimeOffset(startOfWeek,
-            TimeZoneInfo.Local.GetUtcOffset(startOfWeek)), now));
-        SessionsThisWeek = activity.Count(session => session.StartedAt >= now.AddDays(-7));
-        FocusActivityValues = Enumerable.Range(0, 7)
-            .Select(day =>
-            {
-                var dayStart = StartOfLocalDay(now.AddDays(day - 6));
-                var dayEnd = StartOfLocalDay(dayStart.AddDays(1));
-                if (dayEnd > now)
-                {
-                    dayEnd = now;
-                }
-
-                return SumOverlap(activity, dayStart, dayEnd).TotalMinutes;
-            })
-            .ToArray();
+        var overview = SessionOverview.Calculate(_sessionHistory, _activeSessionStartedAt, _activeSessionName,
+            timestamp ?? DateTimeOffset.Now);
+        FocusTodayLabel = FormatDuration(overview.Today);
+        FocusThisWeekLabel = FormatDuration(overview.Week);
+        SessionsThisWeek = overview.SessionCount;
+        FocusActivityValues = overview.DailyMinutes;
+        RecentSessions.Clear();
+        foreach (var session in overview.Recent)
+            RecentSessions.Add($"{session.PresetName} | {FormatDuration(session.EndedAt - session.StartedAt)}");
+        this.RaisePropertyChanged(nameof(HasRecentSessions));
         this.RaisePropertyChanged(nameof(HasSessionActivity));
-    }
-
-    private static TimeSpan SumOverlap(IEnumerable<SessionActivity> sessions, DateTimeOffset start,
-        DateTimeOffset end)
-    {
-        return sessions.Aggregate(TimeSpan.Zero,
-            (total, session) => total + GetOverlap(session.StartedAt, session.EndedAt, start, end));
-    }
-
-    private static TimeSpan GetOverlap(DateTimeOffset sessionStart, DateTimeOffset sessionEnd,
-        DateTimeOffset rangeStart, DateTimeOffset rangeEnd)
-    {
-        var start = sessionStart > rangeStart ? sessionStart : rangeStart;
-        var end = sessionEnd < rangeEnd ? sessionEnd : rangeEnd;
-        return end > start ? end - start : TimeSpan.Zero;
-    }
-
-    private static DateTimeOffset StartOfLocalDay(DateTimeOffset value)
-    {
-        var localDate = value.LocalDateTime.Date;
-        return new DateTimeOffset(localDate, TimeZoneInfo.Local.GetUtcOffset(localDate));
     }
 
     private static string FormatDuration(TimeSpan duration)
@@ -1512,10 +1387,17 @@ public class MainViewModel : ReactiveObject, IDisposable
 
     private void UpdateActiveSessionClock()
     {
-        if (!IsSessionActive || !_activeSessionEndsAt.HasValue)
+        if (!IsSessionActive)
         {
             ActiveSessionRemaining = string.Empty;
             ActiveSessionEndTime = string.Empty;
+        }
+        else if (!_activeSessionEndsAt.HasValue)
+        {
+            var elapsed = _activeSessionStartedAt is { } start ? DateTimeOffset.UtcNow - start : TimeSpan.Zero;
+            var seconds = Math.Max(0, (long)elapsed.TotalSeconds);
+            ActiveSessionRemaining = $"{seconds / 60:00}:{seconds % 60:00}";
+            ActiveSessionEndTime = "Elapsed";
         }
         else
         {
@@ -1533,7 +1415,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                 ? GetRemainingFromStopwatch(deadline)
                 : breakEndsAt - DateTimeOffset.UtcNow;
             var seconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
-            ActiveBreakStatus = $"Break in progress · {seconds / 60:00}:{seconds % 60:00} remaining";
+            ActiveBreakStatus = $"Break in progress | {seconds / 60:00}:{seconds % 60:00} remaining";
         }
         else
         {

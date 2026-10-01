@@ -12,8 +12,6 @@ public class NativeMessagingRegistrar(
     ILogger<NativeMessagingRegistrar> logger,
     IConfiguration configuration) : IHostedService
 {
-    private const string FirefoxExtensionId = "site-blocker-firefox@axorithlabs.com";
-
     public Task StartAsync(CancellationToken cancellationToken)
     {
         try
@@ -57,7 +55,7 @@ public class NativeMessagingRegistrar(
 
         logger.LogInformation("Found Shim executable at: {Path}", TelemetryGuard.SafePath(shimPath));
 
-        manager.RegisterFirefoxHost(hostName, shimPath, [FirefoxExtensionId]);
+        manager.RegisterFirefoxHost(hostName, shimPath, [Axorith.Shared.Utils.SiteBlockerExtensionIds.Firefox]);
 
         var allowedOriginsByBrowser = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
@@ -71,7 +69,7 @@ public class NativeMessagingRegistrar(
         {
             logger.LogWarning(
                 "No Chromium extension IDs are configured. Chrome, Edge, and Chromium native messaging is disabled. " +
-                "Set SiteBlocker:NativeMessaging:<Browser>ExtensionIds to the published extension IDs.");
+                "Set SiteBlocker:NativeMessaging:<Browser>ExtensionIds to the installed extension IDs.");
         }
         else
         {

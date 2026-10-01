@@ -154,7 +154,7 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
 
         _lastNotificationTime[processName] = now;
 
-        _ = _notifier.ShowSystemAsync("Focus Mode Active", $"Blocked distraction: {processName}");
+        _ = _notifier.ShowSystemAsync("Focus Mode Active", $"Blocked distraction: {processName}", category: "Focus Mode");
 
         _logger.LogInfo("Blocked process '{ProcessName}' and notified user.", processName);
     }

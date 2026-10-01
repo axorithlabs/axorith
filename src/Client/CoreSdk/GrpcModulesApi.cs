@@ -359,7 +359,7 @@ internal class GrpcModulesApi(
 
             if (response.IsValid)
             {
-                return ValidationResult.Success;
+                return response.IsWarning ? ValidationResult.Warn(response.Message) : ValidationResult.Success;
             }
 
             var fieldErrors = new Dictionary<string, string>();
@@ -411,7 +411,8 @@ internal class GrpcModulesApi(
                 a.Key,
                 a.Label,
                 string.IsNullOrEmpty(a.Description) ? null : a.Description,
-                a.IsEnabled
+                a.IsEnabled,
+                string.IsNullOrEmpty(a.SettingKey) ? null : a.SettingKey
             ))
             .ToList();
 

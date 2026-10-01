@@ -4,7 +4,6 @@ using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
-using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Discord;
 
@@ -13,8 +12,6 @@ internal sealed class Settings : LauncherSettingsBase
     public override Setting<string> ApplicationPath => DiscordPath;
 
     public Setting<string> DiscordPath { get; }
-    public Action RefreshPathAction { get; }
-
     private readonly IAppDiscoveryService _appDiscovery;
 
     public Settings(IAppDiscoveryService appDiscovery)
@@ -29,9 +26,6 @@ internal sealed class Settings : LauncherSettingsBase
             description: "Path to Discord executable."
         );
 
-        RefreshPathAction = Action.Create("RefreshPath", "Refresh Path");
-        RefreshPathAction.OnInvokeAsync(RefreshPathAsync);
-
         SetupBaseReactiveVisibility();
     }
 
@@ -40,10 +34,7 @@ internal sealed class Settings : LauncherSettingsBase
         yield break;
     }
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return RefreshPathAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [];
 
     protected override async Task InitializeAdditionalAsync()
     {
@@ -113,7 +104,6 @@ internal sealed class Settings : LauncherSettingsBase
     public override void Dispose()
     {
         DiscordPath.Dispose();
-        RefreshPathAction.Dispose();
         base.Dispose();
     }
 }

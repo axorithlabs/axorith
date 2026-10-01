@@ -28,8 +28,6 @@ internal sealed class Settings : LauncherSettingsBase
     public override Setting<string> ApplicationPath => ObsPath;
 
     public Setting<string> ObsPath { get; }
-    public Action RefreshPathAction { get; }
-
     public Setting<bool> EnableWebSocket { get; }
     public Setting<int> WebSocketPort { get; }
     public Setting<string> WebSocketPassword { get; }
@@ -50,9 +48,6 @@ internal sealed class Settings : LauncherSettingsBase
             initialChoices: [new KeyValuePair<string, string>("", "Scanning for OBS...")],
             description: "Path to OBS Studio executable."
         );
-
-        RefreshPathAction = Action.Create("RefreshPath", "Refresh Path");
-        RefreshPathAction.OnInvokeAsync(RefreshPathAsync);
 
         EnableWebSocket = Setting.AsCheckbox(
             key: "EnableWebSocket",
@@ -132,10 +127,7 @@ internal sealed class Settings : LauncherSettingsBase
         yield return SessionEndAction;
     }
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return RefreshPathAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [];
 
     protected override async Task InitializeAdditionalAsync()
     {
@@ -213,7 +205,6 @@ internal sealed class Settings : LauncherSettingsBase
     public override void Dispose()
     {
         ObsPath.Dispose();
-        RefreshPathAction.Dispose();
         EnableWebSocket.Dispose();
         WebSocketPort.Dispose();
         WebSocketPassword.Dispose();

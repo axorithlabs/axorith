@@ -43,6 +43,16 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
 
     public IObservable<SessionEvent> SessionEvents => _eventsSubject.AsObservable();
 
+    public async Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default)
+    {
+        var response = await _retryPolicy.ExecuteAsync(async () =>
+            await _client.GetSessionHistoryAsync(new GetSessionStateRequest(), cancellationToken: ct)
+                .ConfigureAwait(false)).ConfigureAwait(false);
+        return response.Entries.Select(entry => new SessionActivity(
+            DateTimeOffset.FromUnixTimeMilliseconds(entry.StartedAtUnixMs),
+            DateTimeOffset.FromUnixTimeMilliseconds(entry.EndedAtUnixMs), entry.PresetName)).ToArray();
+    }
+
     public async Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default)
     {
         return await _retryPolicy.ExecuteAsync(async () =>

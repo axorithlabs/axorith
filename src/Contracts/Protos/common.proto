@@ -104,6 +104,7 @@ message Action {
   string label = 2;
   string description = 3;
   bool is_enabled = 4;
+  string setting_key = 5;
 }
 
 message ModuleDefinition {

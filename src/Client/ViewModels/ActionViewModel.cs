@@ -23,6 +23,11 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     } = string.Empty;
 
+    public bool IsSuccess => Label == "Connected OK";
+
+    public bool IsFailure => Label.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+                             Label.Contains("Error", StringComparison.OrdinalIgnoreCase);
+
     public bool IsEnabled
     {
         get;
@@ -35,7 +40,24 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     } = true;
 
-    public void SetVisible(bool visible) => IsVisible = visible;
+    private bool _isInline;
+
+    public bool IsVisibleInActionsList => IsVisible && !_isInline;
+
+    public void SetVisible(bool visible)
+    {
+        IsVisible = visible;
+        this.RaisePropertyChanged(nameof(IsVisibleInActionsList));
+    }
+
+    public void SetInline(bool inline)
+    {
+        if (_isInline == inline)
+            return;
+
+        _isInline = inline;
+        this.RaisePropertyChanged(nameof(IsVisibleInActionsList));
+    }
 
     public ICommand InvokeCommand { get; }
 
@@ -53,7 +75,12 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
         action.Label
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(
-                v => Label = v,
+                v =>
+                {
+                    Label = v;
+                    this.RaisePropertyChanged(nameof(IsSuccess));
+                    this.RaisePropertyChanged(nameof(IsFailure));
+                },
                 _ =>
                 {
                     /* Ignore errors after module disposal */

@@ -14,17 +14,14 @@ public class ToastViewModel : ReactiveObject
     public ToastViewModel(ToastNotification model)
     {
         Type = model.Type;
+        Title = string.IsNullOrWhiteSpace(model.Category) ? "Axorith" : model.Category;
+        Body = model.Message;
 
-        if (!string.IsNullOrEmpty(model.Message) && model.Message.Contains(": "))
+        if (string.IsNullOrWhiteSpace(model.Category) && !string.IsNullOrEmpty(model.Message) && model.Message.Contains(": "))
         {
             var parts = model.Message.Split(": ", 2);
             Title = parts[0];
             Body = parts[1];
-        }
-        else
-        {
-            Title = "Notification";
-            Body = model.Message;
         }
     }
 }

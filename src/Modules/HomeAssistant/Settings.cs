@@ -79,7 +79,7 @@ internal sealed class Settings : IDisposable
             "Entity to activate/deactivate when session ends. Scripts/Scenes are turned ON. Lights/Switches are turned OFF."
         );
 
-        TestConnectionAction = Action.Create("TestConnection", "Test Connection");
+        TestConnectionAction = Action.Create("TestConnection", "TEST", settingKey: BaseUrl.Key);
 
         _allSettings =
         [

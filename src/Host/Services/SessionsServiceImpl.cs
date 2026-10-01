@@ -22,11 +22,24 @@ public class SessionsServiceImpl(
     IPresetManager presetManager,
     SessionEventBroadcaster eventBroadcaster,
     ILogger<SessionsServiceImpl> logger,
-    ITelemetryService? telemetry = null)
+    ITelemetryService? telemetry = null,
+    ISessionAutoStopService? autoStopService = null,
+    IScheduleManager? scheduleManager = null)
     : SessionsService.SessionsServiceBase
 {
     private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
-    public override Task<SessionState> GetSessionState(GetSessionStateRequest request, ServerCallContext context)
+    public override Task<SessionHistory> GetSessionHistory(GetSessionStateRequest request, ServerCallContext context)
+    {
+        var result = new SessionHistory();
+        result.Entries.AddRange(sessionManager.SessionHistory.Select(activity => new SessionHistoryEntry
+        {
+            StartedAtUnixMs = activity.StartedAt.ToUnixTimeMilliseconds(),
+            EndedAtUnixMs = activity.EndedAt.ToUnixTimeMilliseconds(),
+            PresetName = activity.PresetName
+        }));
+        return Task.FromResult(result);
+    }
+    public override async Task<SessionState> GetSessionState(GetSessionStateRequest request, ServerCallContext context)
     {
         try
         {
@@ -49,7 +62,23 @@ public class SessionsServiceImpl(
                 state.FocusCommitment = (Axorith.Contracts.FocusCommitmentMode)(commitment?.Mode ?? FocusCommitmentMode.Normal);
                 state.BreaksRemaining = sessionManager.BreaksRemaining;
                 state.BreaksTotal = commitment?.BreakCount ?? 0;
-                state.RemainingSeconds = (long)Math.Ceiling(sessionManager.SessionTimeRemaining?.TotalSeconds ?? 0);
+                var remaining = sessionManager.SessionTimeRemaining ?? autoStopService?.GetTimeRemaining();
+                var endsAt = sessionManager.SessionEndsAt ??
+                    (remaining.HasValue ? DateTimeOffset.UtcNow + remaining.Value : (DateTimeOffset?)null);
+                if (commitment?.Mode == FocusCommitmentMode.Normal && scheduleManager != null)
+                {
+                    var now = DateTimeOffset.Now;
+                    var schedules = await scheduleManager.GetSchedulesForPresetAsync(snapshot.PresetId,
+                        context.CancellationToken).ConfigureAwait(false);
+                    var scheduledEnd = schedules.Where(schedule => schedule.Type == ScheduleType.StopRecurring)
+                        .Select(schedule => schedule.GetNextRun(now)).Where(end => end.HasValue).Min();
+                    if (scheduledEnd.HasValue && (!endsAt.HasValue || scheduledEnd < endsAt))
+                    {
+                        endsAt = scheduledEnd;
+                        remaining = scheduledEnd - now;
+                    }
+                }
+                state.RemainingSeconds = (long)Math.Ceiling(Math.Max(0, remaining?.TotalSeconds ?? 0));
                 state.BreakRemainingSeconds = (long)Math.Ceiling(sessionManager.BreakTimeRemaining?.TotalSeconds ?? 0);
                 state.AfterEnd = (Axorith.Contracts.AfterEndBehavior)(commitment?.AfterEnd ?? AfterEndBehavior.DoNothing);
                 state.ProtectionStatus = sessionManager.ProtectionStatus ?? "Protection active";
@@ -60,7 +89,7 @@ public class SessionsServiceImpl(
                     state.BreakEndsAt = Timestamp.FromDateTimeOffset(breakEndsAt);
                 }
 
-                if (sessionManager.SessionEndsAt is { } sessionEndsAt)
+                if (endsAt is { } sessionEndsAt)
                 {
                     state.EndsAt = Timestamp.FromDateTimeOffset(sessionEndsAt);
                 }
@@ -117,7 +146,7 @@ public class SessionsServiceImpl(
             }
 
             logger.LogDebug("Session active: {IsActive}", state.IsActive);
-            return Task.FromResult(state);
+            return state;
         }
         catch (Exception ex)
         {

@@ -17,7 +17,7 @@
         Background="{x:Null}"
         TransparencyLevelHint="Transparent"
         WindowStartupLocation="Manual"
-        Title="Axorith Notification">
+        Title="{Binding Title}">
 
     <Window.Styles>
         <Style Selector="Window">

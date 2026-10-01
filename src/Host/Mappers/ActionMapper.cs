@@ -18,7 +18,8 @@ public static class ActionMapper
             Key = action.Key,
             Label = action.Label.FirstAsync().Wait(),
             Description = string.Empty, // IAction doesn't have Description
-            IsEnabled = action.IsEnabled.FirstAsync().Wait()
+            IsEnabled = action.IsEnabled.FirstAsync().Wait(),
+            SettingKey = action.SettingKey ?? string.Empty
         };
     }
 }

@@ -14,6 +14,11 @@ public interface IAction
     string Key { get; }
 
     /// <summary>
+    ///     Optional key of the setting whose input should host this action.
+    /// </summary>
+    string? SettingKey { get; }
+
+    /// <summary>
     ///     Reactive label displayed in the UI.
     /// </summary>
     IObservable<string> Label { get; }

@@ -3,7 +3,6 @@ using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
-using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Browser;
 
@@ -41,8 +40,6 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<string> ProfileName { get; }
     public Setting<bool> IncognitoMode { get; }
     public Setting<string> AdditionalArgs { get; }
-
-    public Action RefreshBrowsersAction { get; }
 
     private readonly IAppDiscoveryService _appDiscovery;
 
@@ -86,9 +83,6 @@ internal sealed class Settings : LauncherSettingsBase
             description: "Additional command-line arguments to pass to the browser."
         );
 
-        RefreshBrowsersAction = Action.Create("RefreshBrowsers", "Refresh Browser List");
-        RefreshBrowsersAction.OnInvokeAsync(RefreshBrowsersAsync);
-
         SetupBaseReactiveVisibility();
     }
 
@@ -100,10 +94,7 @@ internal sealed class Settings : LauncherSettingsBase
         yield return AdditionalArgs;
     }
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return RefreshBrowsersAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [];
 
     protected override Task InitializeAdditionalAsync()
     {
@@ -243,7 +234,6 @@ internal sealed class Settings : LauncherSettingsBase
         ProfileName.Dispose();
         IncognitoMode.Dispose();
         AdditionalArgs.Dispose();
-        RefreshBrowsersAction.Dispose();
         base.Dispose();
     }
 }

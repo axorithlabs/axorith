@@ -366,7 +366,7 @@ public class ScheduleManager(
                 logger.LogInformation("Triggering stop schedule '{Name}' for preset {PresetId} at {RunTime}",
                     schedule.Name, schedule.PresetId, runTime);
 
-                await notifier.ShowSystemAsync("Session Scheduler", "Stopping session now...");
+                await notifier.ShowSystemAsync("Session Scheduler", "Stopping session now...", category: "Session Scheduler");
 
                 var expectedSession = sessionManager.ActiveSession;
                 if (expectedSession == null ||
@@ -382,7 +382,7 @@ public class ScheduleManager(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to execute stop schedule '{Name}'", schedule.Name);
-                await notifier.ShowSystemAsync("Schedule Error", $"Failed to stop session: {ex.Message}");
+                await notifier.ShowSystemAsync("Schedule Error", $"Failed to stop session: {ex.Message}", category: "Session Scheduler");
                 await UpdateLastRunAsync(schedule, now, ct);
             }
             finally
@@ -416,7 +416,7 @@ public class ScheduleManager(
                     continue;
                 }
 
-                await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...");
+                await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...", category: "Session Scheduler");
 
                 await sessionManager.StartSessionAsync(preset, ct, startSource: "schedule");
 
@@ -431,7 +431,7 @@ public class ScheduleManager(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to execute start schedule '{Name}'", schedule.Name);
-                await notifier.ShowSystemAsync("Schedule Error", $"Failed to start '{schedule.Name}': {ex.Message}");
+                await notifier.ShowSystemAsync("Schedule Error", $"Failed to start '{schedule.Name}': {ex.Message}", category: "Session Scheduler");
                 await UpdateLastRunAsync(schedule, now, ct);
             }
             finally
@@ -469,7 +469,7 @@ public class ScheduleManager(
 
         logger.LogInformation("Sending stop schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
 
-        await notifier.ShowSystemAsync("Session Scheduler", $"Session will stop in {timeText}.");
+        await notifier.ShowSystemAsync("Session Scheduler", $"Session will stop in {timeText}.", category: "Session Scheduler");
     }
 
     private async Task CheckAndNotifyAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
@@ -490,7 +490,7 @@ public class ScheduleManager(
 
         logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
 
-        await notifier.ShowSystemAsync("Session Scheduler", $"Session '{preset.Name}' will start in {timeText}.");
+        await notifier.ShowSystemAsync("Session Scheduler", $"Session '{preset.Name}' will start in {timeText}.", category: "Session Scheduler");
     }
 
     private void CleanupNotificationCache()

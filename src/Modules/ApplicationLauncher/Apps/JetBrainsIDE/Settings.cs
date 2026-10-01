@@ -3,7 +3,6 @@ using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
-using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.JetBrainsIDE;
 
@@ -14,8 +13,6 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<string> IdePath { get; }
     public Setting<string> ProjectPath { get; }
     public Setting<string> ApplicationArgs { get; }
-
-    public Action RefreshIdeListAction { get; }
 
     private readonly IAppDiscoveryService _appDiscovery;
 
@@ -45,9 +42,6 @@ internal sealed class Settings : LauncherSettingsBase
             defaultValue: ""
         );
 
-        RefreshIdeListAction = Action.Create("RefreshIdeList", "Refresh IDE List");
-        RefreshIdeListAction.OnInvokeAsync(RefreshIdeListAsync);
-
         SetupBaseReactiveVisibility();
     }
 
@@ -61,10 +55,7 @@ internal sealed class Settings : LauncherSettingsBase
         yield return ApplicationArgs;
     }
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return RefreshIdeListAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [];
 
     protected override Task InitializeAdditionalAsync()
     {
@@ -133,7 +124,6 @@ internal sealed class Settings : LauncherSettingsBase
         IdePath.Dispose();
         ProjectPath.Dispose();
         ApplicationArgs.Dispose();
-        RefreshIdeListAction.Dispose();
         base.Dispose();
     }
 }

@@ -25,6 +25,7 @@ internal class ModuleActionAdapter(
     private readonly BehaviorSubject<bool> _enabledSubject = new(action.IsEnabled);
 
     public string Key { get; } = action.Key;
+    public string? SettingKey { get; } = action.SettingKey;
     public IObservable<string> Label => _labelSubject.AsObservable();
     public IObservable<bool> IsEnabled => _enabledSubject.AsObservable();
     public IObservable<Unit> Invoked => _invokedSubject.AsObservable();

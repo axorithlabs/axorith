@@ -66,6 +66,7 @@ public class PersistenceConfiguration
     public string PresetsPath { get; init; } = string.Empty;
     public string LogsPath { get; init; } = string.Empty;
     public string ConfigPath { get; init; } = string.Empty;
+    public string HostInfoPath { get; init; } = string.Empty;
 
     public string ResolvePresetsPath()
     {
@@ -95,6 +96,16 @@ public class PersistenceConfiguration
         }
 
         return ApplicationPaths.ExpandPath(ConfigPath);
+    }
+
+    public string ResolveHostInfoPath()
+    {
+        if (string.IsNullOrWhiteSpace(HostInfoPath))
+        {
+            return ApplicationPaths.HostInfoFile;
+        }
+
+        return ApplicationPaths.ExpandPath(HostInfoPath);
     }
 }
 

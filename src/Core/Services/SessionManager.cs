@@ -23,10 +23,13 @@ public class SessionManager(
     TimeSpan shutdownTimeout,
     ITelemetryService telemetry,
     string? committedSessionPath = null,
-    ICommitmentProtectionService? commitmentProtection = null)
+    ICommitmentProtectionService? commitmentProtection = null,
+    string? sessionHistoryPath = null)
     : ISessionManager
 {
     private const string PreflightFailureDataKey = "Axorith.SessionPreflight";
+    private readonly SessionHistoryStore _history = new(sessionHistoryPath);
+    public IReadOnlyList<SessionActivity> SessionHistory => _history.Read();
 
     private sealed record PersistedCommittedSession(SessionPreset Preset, DateTimeOffset StartedAt,
         DateTimeOffset EndDeadline, int BreaksUsed = 0, DateTimeOffset? BreakEndsAt = null);
@@ -1172,6 +1175,17 @@ public class SessionManager(
                 }
             }
 
+            if (reason != SessionEndReason.StartupFailure && startedAt is { } sessionStart && ActiveSession is { } completedSession)
+            {
+                try
+                {
+                    _history.Add(new SessionActivity(sessionStart, DateTimeOffset.UtcNow, completedSession.Name));
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Could not persist session history.");
+                }
+            }
             CleanupSessionState();
 
             logger.LogInformation("Session stopped successfully.");

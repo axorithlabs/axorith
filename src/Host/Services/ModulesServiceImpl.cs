@@ -581,7 +581,8 @@ public class ModulesServiceImpl(
             var response = new ValidationResponse
             {
                 IsValid = result.Status != ValidationStatus.Error,
-                Message = result.Message
+                Message = result.Message,
+                IsWarning = result.Status == ValidationStatus.Warning
             };
 
             foreach (var fieldError in result.FieldErrors)

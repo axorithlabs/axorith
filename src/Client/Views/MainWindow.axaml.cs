@@ -9,19 +9,6 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        TitleBar.PointerPressed += (_, e) =>
-        {
-            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-                BeginMoveDrag(e);
-        };
-
-        TitleBar.DoubleTapped += (_, _) =>
-        {
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-        };
-
         DataContextChanged += (_, _) =>
         {
             if (DataContext is ShellViewModel shell)

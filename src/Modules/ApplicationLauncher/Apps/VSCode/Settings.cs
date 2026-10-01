@@ -4,7 +4,6 @@ using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
-using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.VSCode;
 
@@ -15,8 +14,6 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<string> CodePath { get; }
     public Setting<string> ProjectPath { get; }
     public Setting<string> ApplicationArgs { get; }
-
-    public Action RefreshPathAction { get; }
 
     private readonly IAppDiscoveryService _appDiscovery;
 
@@ -46,9 +43,6 @@ internal sealed class Settings : LauncherSettingsBase
             defaultValue: ""
         );
 
-        RefreshPathAction = Action.Create("RefreshPath", "Refresh Path");
-        RefreshPathAction.OnInvokeAsync(RefreshPathAsync);
-
         SetupBaseReactiveVisibility();
     }
 
@@ -62,10 +56,7 @@ internal sealed class Settings : LauncherSettingsBase
         yield return ApplicationArgs;
     }
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return RefreshPathAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [];
 
     protected override Task InitializeAdditionalAsync()
     {
@@ -135,7 +126,6 @@ internal sealed class Settings : LauncherSettingsBase
         CodePath.Dispose();
         ProjectPath.Dispose();
         ApplicationArgs.Dispose();
-        RefreshPathAction.Dispose();
         base.Dispose();
     }
 }

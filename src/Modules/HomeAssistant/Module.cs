@@ -122,8 +122,6 @@ public class Module : IModule
         }
         finally
         {
-            await Task.Delay(3000);
-            _settings.TestConnectionAction.SetLabel("Test Connection");
             _settings.TestConnectionAction.SetEnabled(true);
         }
     }

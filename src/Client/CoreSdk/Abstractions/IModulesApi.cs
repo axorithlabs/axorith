@@ -153,7 +153,8 @@ public record ModuleAction(
     string Key,
     string Label,
     string? Description,
-    bool IsEnabled
+    bool IsEnabled,
+    string? SettingKey = null
 );
 
 /// <summary>

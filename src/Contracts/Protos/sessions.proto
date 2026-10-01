@@ -8,6 +8,7 @@ option csharp_namespace = "Axorith.Contracts";
 
 service SessionsService {
   rpc GetSessionState(GetSessionStateRequest) returns (SessionState);
+  rpc GetSessionHistory(GetSessionStateRequest) returns (SessionHistory);
   rpc PreflightSession(PreflightSessionRequest) returns (OperationResult);
   rpc StartSession(StartSessionRequest) returns (OperationResult);
   rpc StopSession(StopSessionRequest) returns (OperationResult);
@@ -18,6 +19,16 @@ service SessionsService {
 
 message GetSessionStateRequest {
   // Empty on purpose: reserved for future filter fields (for example, session_id).
+}
+
+message SessionHistoryEntry {
+  int64 started_at_unix_ms = 1;
+  int64 ended_at_unix_ms = 2;
+  string preset_name = 3;
+}
+
+message SessionHistory {
+  repeated SessionHistoryEntry entries = 1;
 }
 
 message StartSessionRequest {

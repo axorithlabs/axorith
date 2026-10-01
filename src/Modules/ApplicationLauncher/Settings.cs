@@ -70,7 +70,7 @@ internal sealed class Settings : LauncherSettingsBase
             foreach (var action in module.GetActions())
             {
                 var proxy = Action.Create($"{moduleKey}.{action.Key}", action.GetCurrentLabel(),
-                    action.GetCurrentEnabled() && _selectedModule == moduleKey);
+                    action.GetCurrentEnabled() && _selectedModule == moduleKey, action.SettingKey);
                 proxy.OnInvokeAsync(action.InvokeAsync);
                 _subscriptions.Add(action.Label.Subscribe(proxy.SetLabel));
                 _subscriptions.Add(action.IsEnabled.Subscribe(enabled =>

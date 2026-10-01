@@ -13,7 +13,8 @@ namespace Axorith.Sdk.Actions;
 /// <param name="key">The unique identifier for this action.</param>
 /// <param name="label">The display label for the action button.</param>
 /// <param name="isEnabled">Whether the action is initially enabled.</param>
-public sealed class Action(string key, string label, bool isEnabled = true) : IAction, IDisposable
+/// <param name="settingKey">Optional setting key whose input should host the action.</param>
+public sealed class Action(string key, string label, bool isEnabled = true, string? settingKey = null) : IAction, IDisposable
 {
     private readonly BehaviorSubject<string> _label = new(label);
     private readonly BehaviorSubject<bool> _isEnabled = new(isEnabled);
@@ -24,6 +25,9 @@ public sealed class Action(string key, string label, bool isEnabled = true) : IA
     ///     Gets the unique identifier for this action.
     /// </summary>
     public string Key { get; } = key;
+
+    /// <inheritdoc />
+    public string? SettingKey { get; } = settingKey;
 
     /// <summary>
     ///     Gets an observable stream that emits the current label text for this action.
@@ -111,10 +115,11 @@ public sealed class Action(string key, string label, bool isEnabled = true) : IA
     /// <param name="key">The unique identifier for this action.</param>
     /// <param name="label">The display label for the action button.</param>
     /// <param name="isEnabled">Whether the action is initially enabled.</param>
+    /// <param name="settingKey">Optional setting key whose input should host the action.</param>
     /// <returns>A new <see cref="Action" /> instance.</returns>
-    public static Action Create(string key, string label, bool isEnabled = true)
+    public static Action Create(string key, string label, bool isEnabled = true, string? settingKey = null)
     {
-        return new Action(key, label, isEnabled);
+        return new Action(key, label, isEnabled, settingKey);
     }
 
     /// <summary>

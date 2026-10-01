@@ -284,7 +284,7 @@ public class SessionAutoStopService(
         }
 
         logger.LogInformation("Sending auto-stop warning: {Message}", message);
-        await notifier.ShowSystemAsync("Session Auto-Stop", message).ConfigureAwait(false);
+        await notifier.ShowSystemAsync("Session Auto-Stop", message, category: "Session Auto-Stop").ConfigureAwait(false);
     }
 
     public async Task<bool> CompleteNaturallyAsync(SessionPreset expectedSession, Guid? fallbackNextPresetId,
@@ -353,7 +353,7 @@ public class SessionAutoStopService(
             {
                 logger.LogError(ex, "Failed to auto-stop session '{PresetName}'", currentPreset.Name);
                 await notifier.ShowSystemAsync("Auto-Stop Error",
-                    $"Failed to stop session '{currentPreset.Name}': {ex.Message}").ConfigureAwait(false);
+                    $"Failed to stop session '{currentPreset.Name}': {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
                 return false;
             }
             finally
@@ -375,14 +375,14 @@ public class SessionAutoStopService(
                     {
                         logger.LogWarning("Next preset {NextPresetId} not found", nextPresetId.Value);
                         await notifier.ShowSystemAsync("Auto-Stop",
-                                $"Session stopped. Next preset (ID: {nextPresetId.Value}) not found.")
+                                $"Session stopped. Next preset (ID: {nextPresetId.Value}) not found.", category: "Session Auto-Stop")
                             .ConfigureAwait(false);
                         return true;
                     }
 
                     logger.LogInformation("Starting next preset '{NextPresetName}'", nextPreset.Name);
                     await notifier.ShowSystemAsync("Session Transition",
-                        $"Starting '{nextPreset.Name}'...").ConfigureAwait(false);
+                        $"Starting '{nextPreset.Name}'...", category: "Session Auto-Stop").ConfigureAwait(false);
 
                     await sessionManager.StartSessionAsync(nextPreset, CancellationToken.None, startSource: "chained").ConfigureAwait(false);
 
@@ -392,13 +392,13 @@ public class SessionAutoStopService(
                 {
                     logger.LogError(ex, "Failed to start next preset {NextPresetId}", nextPresetId.Value);
                     await notifier.ShowSystemAsync("Auto-Stop Error",
-                        $"Failed to start next preset: {ex.Message}").ConfigureAwait(false);
+                        $"Failed to start next preset: {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
                 }
             }
             else
             {
                 await notifier.ShowSystemAsync("Session Auto-Stop",
-                    $"Session '{currentPreset.Name}' has ended.").ConfigureAwait(false);
+                    $"Session '{currentPreset.Name}' has ended.", category: "Session Auto-Stop").ConfigureAwait(false);
                 await ExecuteAfterEndActionAsync(afterEnd).ConfigureAwait(false);
             }
 
@@ -470,7 +470,7 @@ public class SessionAutoStopService(
         {
             logger.LogError(ex, "Failed to execute after-end action {Action}.", behavior);
             await notifier.ShowSystemAsync("After-Session Action Failed",
-                $"Could not perform '{behavior}': {ex.Message}").ConfigureAwait(false);
+                $"Could not perform '{behavior}': {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
         }
     }
 

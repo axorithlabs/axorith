@@ -19,8 +19,6 @@ internal sealed class Settings : LauncherSettingsBase
 
     public override Setting<string> ApplicationPath => SpotifyPath;
     public Setting<string> SpotifyPath { get; }
-    public Action RefreshSpotifyAction { get; }
-
     public Setting<string> AuthStatus { get; }
     public Setting<bool> EnablePlayback { get; }
     public Setting<string> DeviceSelectionMode { get; }
@@ -45,9 +43,6 @@ internal sealed class Settings : LauncherSettingsBase
             initialChoices: [new KeyValuePair<string, string>("", "Scanning for Spotify...")],
             description: "Select installed Spotify or enter custom path."
         );
-
-        RefreshSpotifyAction = Action.Create("RefreshSpotify", "Refresh Spotify Path");
-        RefreshSpotifyAction.OnInvokeAsync(RefreshSpotifyAsync);
 
         EnablePlayback = Setting.AsCheckbox(
             key: "EnablePlayback",
@@ -160,7 +155,6 @@ internal sealed class Settings : LauncherSettingsBase
 
     protected override IEnumerable<IAction> GetAdditionalActions()
     {
-        yield return RefreshSpotifyAction;
         yield return LoginAction;
         yield return LogoutAction;
     }
@@ -221,7 +215,6 @@ internal sealed class Settings : LauncherSettingsBase
     public override void Dispose()
     {
         SpotifyPath.Dispose();
-        RefreshSpotifyAction.Dispose();
         AuthStatus.Dispose();
         EnablePlayback.Dispose();
         DeviceSelectionMode.Dispose();

@@ -828,6 +828,12 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
+    public string? FocusCommitmentError
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
     public IReadOnlyList<string> FocusCommitmentModes { get; } = ["Normal", "Locked", "Strict"];
     public IReadOnlyList<string> BreakOptions { get; } = ["No breaks", "One 5-minute break", "Custom break budget"];
     public IReadOnlyList<string> ScheduleLockOptions { get; } = ["Off", "5 minutes", "15 minutes", "1 hour"];
@@ -840,6 +846,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             if (value is < 0 or > 2) return;
             _focusCommitment.Mode = (FocusCommitmentMode)value;
             RaiseFocusCommitmentChanged();
+            ValidateFocusCommitment();
         }
     }
 
@@ -874,25 +881,38 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                 _focusCommitment.BreakDuration = TimeSpan.FromMinutes(5);
             }
             RaiseFocusCommitmentChanged();
+            ValidateFocusCommitment();
         }
     }
 
     public int BreakCount
     {
         get => _focusCommitment.BreakCount;
-        set => _focusCommitment.BreakCount = Math.Clamp(value, 1, 5);
+        set
+        {
+            _focusCommitment.BreakCount = Math.Clamp(value, 1, 5);
+            ValidateFocusCommitment();
+        }
     }
 
     public int BreakDurationMinutes
     {
         get => (int)Math.Clamp(Math.Round(_focusCommitment.BreakDuration.TotalMinutes), 1, 60);
-        set => _focusCommitment.BreakDuration = TimeSpan.FromMinutes(Math.Clamp(value, 1, 60));
+        set
+        {
+            _focusCommitment.BreakDuration = TimeSpan.FromMinutes(Math.Clamp(value, 1, 60));
+            ValidateFocusCommitment();
+        }
     }
 
     public int ScheduleLockIndex
     {
         get => _focusCommitment.ScheduleLockMinutes switch { 5 => 1, 15 => 2, 60 => 3, _ => 0 };
-        set => _focusCommitment.ScheduleLockMinutes = value switch { 1 => 5, 2 => 15, 3 => 60, _ => 0 };
+        set
+        {
+            _focusCommitment.ScheduleLockMinutes = value switch { 1 => 5, 2 => 15, 3 => 60, _ => 0 };
+            ValidateFocusCommitment();
+        }
     }
 
     private string _scheduledConfigurationLockStatus = "Configuration unlocked";
@@ -989,11 +1009,18 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             .Select(t => t.Item1 == null && t.Item2 == null && t.Item3 == null && t.Item4 == null)
             .ToProperty(this, x => x.IsFooterVisible);
 
-        _hasValidationErrors = ConfiguredModules
+        var moduleValidationErrors = ConfiguredModules
             .ToObservableChangeSet()
             .AutoRefresh(m => m.HasErrors)
             .ToCollection()
-            .Select(modules => modules.Any(m => m.HasErrors))
+            .Select(modules => modules.Any(m => m.HasErrors));
+
+        var focusCommitmentValidationErrors = this.WhenAnyValue(vm => vm.FocusCommitmentError)
+            .Select(error => !string.IsNullOrWhiteSpace(error));
+
+        _hasValidationErrors = moduleValidationErrors
+            .CombineLatest(focusCommitmentValidationErrors,
+                (hasModuleErrors, hasFocusCommitmentErrors) => hasModuleErrors || hasFocusCommitmentErrors)
             .ObserveOn(RxApp.MainThreadScheduler)
             .ToProperty(this, x => x.HasValidationErrors);
 
@@ -1095,6 +1122,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             var trigger = new StopAtTimeTriggerViewModel();
             StopTriggers.Add(trigger);
+            ValidateFocusCommitment();
             SelectedStopTrigger = trigger;
         }, canAddStopAtTime);
 
@@ -1110,12 +1138,14 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             var trigger = new StopAfterDurationTriggerViewModel();
             StopTriggers.Add(trigger);
+            ValidateFocusCommitment();
             SelectedStopTrigger = trigger;
         }, canAddStopAfterDuration);
 
         RemoveStopTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
         {
             StopTriggers.Remove(t);
+            ValidateFocusCommitment();
             if (SelectedStopTrigger == t)
             {
                 SelectedStopTrigger = null;
@@ -1218,6 +1248,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     private void LoadFromPreset()
     {
         _focusCommitment = CopyFocusCommitment(_preset.FocusCommitment ?? new FocusCommitmentOptions());
+        FocusCommitmentError = null;
         _customBreakBudgetSelected = _focusCommitment.BreakCount > 0 &&
                                      (_focusCommitment.BreakCount != 1 ||
                                       _focusCommitment.BreakDuration != TimeSpan.FromMinutes(5));
@@ -1394,6 +1425,8 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
                     StopTriggers.Add(trigger);
                 }
+
+                ValidateFocusCommitment();
             });
         }
         catch
@@ -1475,7 +1508,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        if (!ValidateFocusCommitment())
+        if (!ValidateFocusCommitment(applyOptions: true))
         {
             return;
         }
@@ -1708,7 +1741,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                 await _schedulerApi.DeleteScheduleAsync(s.Id);
             }
 
-            _toastService.Show("Preset saved successfully", NotificationType.Success);
+            _toastService.Show("Preset saved successfully", NotificationType.Success, "Presets");
 
             Cancel();
         }
@@ -1722,19 +1755,19 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private bool ValidateFocusCommitment()
+    private bool ValidateFocusCommitment(bool applyOptions = false)
     {
         var options = _focusCommitment;
         if (options.BreakCount is < 0 or > 5 || options.BreakCount > 0 &&
             (options.BreakDuration < TimeSpan.FromMinutes(1) || options.BreakDuration > TimeSpan.FromMinutes(60)))
         {
-            ErrorMessage = "Break budget must be between 0 and 5 breaks of 1 to 60 minutes each.";
+            FocusCommitmentError = "Break budget must be between 0 and 5 breaks of 1 to 60 minutes each.";
             return false;
         }
 
         if (options.ScheduleLockMinutes is not (0 or 5 or 15 or 60))
         {
-            ErrorMessage = "Choose Off, 5 minutes, 15 minutes, or 1 hour for the scheduled configuration lock.";
+            FocusCommitmentError = "Choose Off, 5 minutes, 15 minutes, or 1 hour for the scheduled configuration lock.";
             return false;
         }
 
@@ -1742,55 +1775,68 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             if (StopTriggers.Count == 0)
             {
-                ErrorMessage = "Add one Stop Trigger to set when a Locked or Strict session ends.";
+                FocusCommitmentError = "Add one Stop Trigger to set when a Locked or Strict session ends.";
                 return false;
             }
 
             if (StopTriggers.Count > 1)
             {
-                ErrorMessage = "Use only one Stop Trigger for a Locked or Strict session.";
+                FocusCommitmentError = "Use only one Stop Trigger for a Locked or Strict session.";
                 return false;
             }
 
             switch (StopTriggers[0])
             {
                 case StopAfterDurationTriggerViewModel duration:
-                    options.EndCondition = FocusEndCondition.Duration;
-                    options.Duration = duration.Duration;
-                    options.EndAtLocalTime = null;
-                    options.EndAtDaysOfWeek = [];
+                    if (applyOptions)
+                    {
+                        options.EndCondition = FocusEndCondition.Duration;
+                        options.Duration = duration.Duration;
+                        options.EndAtLocalTime = null;
+                        options.EndAtDaysOfWeek = [];
+                    }
                     break;
                 case StopAtTimeTriggerViewModel fixedTime:
-                    options.EndCondition = FocusEndCondition.EndAt;
-                    options.Duration = null;
-                    options.EndAtLocalTime = TimeOnly.FromTimeSpan(fixedTime.Time);
-                    options.EndAtDaysOfWeek = GetSelectedDays(fixedTime);
+                    if (applyOptions)
+                    {
+                        options.EndCondition = FocusEndCondition.EndAt;
+                        options.Duration = null;
+                        options.EndAtLocalTime = TimeOnly.FromTimeSpan(fixedTime.Time);
+                        options.EndAtDaysOfWeek = GetSelectedDays(fixedTime);
+                    }
                     break;
                 default:
-                    ErrorMessage = "Choose a Fixed Time or Session Duration Stop Trigger.";
+                    FocusCommitmentError = "Choose a Fixed Time or Session Duration Stop Trigger.";
                     return false;
             }
 
         }
         else
         {
-            options.EndCondition = FocusEndCondition.None;
-            options.Duration = null;
-            options.EndAtLocalTime = null;
-            options.EndAtDaysOfWeek = [];
+            if (applyOptions)
+            {
+                options.EndCondition = FocusEndCondition.None;
+                options.Duration = null;
+                options.EndAtLocalTime = null;
+                options.EndAtDaysOfWeek = [];
+            }
         }
 
-        var thenTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
-        options.AfterEnd = thenTrigger?.Behavior ?? AfterEndBehavior.DoNothing;
-        options.NextWorkspaceId = options.AfterEnd == AfterEndBehavior.StartNextWorkspace
-            ? thenTrigger?.NextPresetId
-            : null;
-        if (options.AfterEnd == AfterEndBehavior.StartNextWorkspace && !options.NextWorkspaceId.HasValue)
+        if (applyOptions)
         {
-            ErrorMessage = "Select the Workspace for the Start next Workspace action.";
-            return false;
+            var thenTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
+            options.AfterEnd = thenTrigger?.Behavior ?? AfterEndBehavior.DoNothing;
+            options.NextWorkspaceId = options.AfterEnd == AfterEndBehavior.StartNextWorkspace
+                ? thenTrigger?.NextPresetId
+                : null;
+            if (options.AfterEnd == AfterEndBehavior.StartNextWorkspace && !options.NextWorkspaceId.HasValue)
+            {
+                FocusCommitmentError = "Select the Workspace for the Start next Workspace action.";
+                return false;
+            }
         }
 
+        FocusCommitmentError = null;
         return true;
     }
 

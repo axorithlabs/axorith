@@ -39,6 +39,8 @@ public interface ISessionManager : IAsyncDisposable
 
     string ProtectionStatus { get; }
 
+    IReadOnlyList<SessionActivity> SessionHistory { get; }
+
     /// <summary>
     ///     Returns an immutable snapshot of the currently running session, including active modules,
     ///     their settings and actions. Returns null if no session is running.

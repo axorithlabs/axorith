@@ -45,10 +45,10 @@ public static class ApplicationPaths
     public const string ApplicationName = "Axorith";
 
     private static readonly Lazy<string> LazyRoamingRoot = new(() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ApplicationName));
+        ResolveRoot("AXORITH_ROAMING_ROOT", Environment.SpecialFolder.ApplicationData));
 
     private static readonly Lazy<string> LazyLocalRoot = new(() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ApplicationName));
+        ResolveRoot("AXORITH_LOCAL_ROOT", Environment.SpecialFolder.LocalApplicationData));
 
     private static readonly Lazy<string> LazyProgramFiles = new(() =>
         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
@@ -58,6 +58,14 @@ public static class ApplicationPaths
 
     private static readonly Lazy<string> LazyCommonAppData = new(() =>
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
+
+    private static string ResolveRoot(string environmentVariable, Environment.SpecialFolder specialFolder)
+    {
+        var configuredRoot = Environment.GetEnvironmentVariable(environmentVariable);
+        return string.IsNullOrWhiteSpace(configuredRoot)
+            ? Path.Combine(Environment.GetFolderPath(specialFolder), ApplicationName)
+            : Path.GetFullPath(configuredRoot);
+    }
 
     /// <summary>
     ///     Gets the root application data directory (roaming profile).

@@ -24,6 +24,24 @@
             <Setter Property="Background" Value="#111"/>
             <Setter Property="BorderBrush" Value="#FF6B6B"/>
         </Style>
+        <Style Selector="Border.warning">
+            <Setter Property="BorderBrush" Value="#E5B546"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.appPicker">
+            <Setter Property="CornerRadius" Value="6,0,0,6"/>
+        </Style>
+        <Style Selector="Button.inline-action.success">
+            <Setter Property="Background" Value="#183622"/>
+            <Setter Property="BorderBrush" Value="#3D8B56"/>
+            <Setter Property="Foreground" Value="#8FE0A6"/>
+        </Style>
+        <Style Selector="Button.inline-action.failure">
+            <Setter Property="Background" Value="#3A1919"/>
+            <Setter Property="BorderBrush" Value="#A84848"/>
+            <Setter Property="Foreground" Value="#FF9A9A"/>
+        </Style>
         
         <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ RepeatButton">
             <Setter Property="Background" Value="Transparent"/>
@@ -47,6 +65,16 @@
         <converters:IsNotNullOrEmptyConverter x:Key="IsNotNullOrEmptyConverter"/>
         <converters:ApplicationIconConverter x:Key="ApplicationIconConverter"/>
         <converters:ApplicationChoiceTextConverter x:Key="ApplicationChoiceTextConverter"/>
+
+        <DataTemplate x:Key="InlineActionTemplate" x:DataType="vm:ActionViewModel">
+            <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}"
+                    IsVisible="{Binding IsVisible}" Background="#111" BorderBrush="#333" Foreground="#AAA"
+                    BorderThickness="1" CornerRadius="0,6,6,0" Padding="8,0" MinWidth="64" Height="36"
+                    FontSize="11" FontWeight="SemiBold" Classes="inline-action"
+                    Classes.success="{Binding IsSuccess}" Classes.failure="{Binding IsFailure}"
+                    ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}">
+            </Button>
+        </DataTemplate>
 
         <DataTemplate x:Key="ApplicationChoiceItemTemplate" x:DataType="vm:ApplicationChoiceViewModel">
             <Border Background="#111" BorderBrush="#292929" BorderThickness="1"
@@ -117,6 +145,10 @@
                      CornerRadius="6" 
                      Padding="10,8"
                      Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                <TextBox.InnerRightContent>
+                    <ContentControl Content="{Binding InlineAction}"
+                                    ContentTemplate="{StaticResource InlineActionTemplate}"/>
+                </TextBox.InnerRightContent>
                 <TextBox.Styles>
                     <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
                         <Setter Property="BorderBrush" Value="#FF4444"/>
@@ -128,11 +160,12 @@
 
         <DataTemplate x:Key="TextAreaSettingTemplate" x:DataType="vm:SettingViewModel">
             <StackPanel Spacing="8">
-                <Grid ColumnDefinitions="*,44">
+                <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch" MinWidth="0">
                     <TextBox Grid.Column="0" Text="{Binding StringValue, Mode=TwoWay}"
                              AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
-                             IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch"
-                             Background="#050505" BorderBrush="#333" CornerRadius="6,0,0,6" Padding="10,8"
+                             IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" MinWidth="0"
+                             Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"
+                             Classes.appPicker="{Binding IsCustomAppsField}"
                              Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
                         <TextBox.Styles>
                             <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
@@ -384,6 +417,26 @@
                                            DirectoryPickerTemplate="{StaticResource DirectoryPickerSettingTemplate}"
                                            MultiChoiceTemplate="{StaticResource MultiChoiceSettingTemplate}"
                                            ButtonTemplate="{StaticResource ButtonSettingTemplate}"/>
+
+        <DataTemplate x:Key="ModuleSettingRowTemplate" x:DataType="vm:SettingViewModel">
+            <StackPanel Margin="0,0,0,24" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch">
+                <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" Foreground="#E0E0E0"
+                           Margin="0,0,0,6" HorizontalAlignment="Left"/>
+                <TextBlock Text="{Binding Setting.Description}" Foreground="#A0A0A0" FontSize="12"
+                           TextWrapping="Wrap" MaxWidth="520" Margin="0,0,0,10" HorizontalAlignment="Left"
+                           IsVisible="{Binding Setting.Description, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingSelector}"
+                                HorizontalAlignment="Stretch"/>
+                <TextBlock Text="{Binding Error}" Foreground="#FF6B6B" FontSize="12" Margin="0,4,0,0"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding Error, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="ModuleActionRowTemplate" x:DataType="vm:ActionViewModel">
+            <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}"
+                    IsVisible="{Binding IsVisibleInActionsList}" HorizontalAlignment="Stretch"
+                    Margin="0,0,0,16" Padding="10"/>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Panel>
@@ -417,7 +470,7 @@
                                                    Foreground="#FF4444" 
                                                    FontWeight="Bold" 
                                                    FontSize="14"/>
-                                        <TextBlock Text="Please fix the highlighted issues in the modules below before saving." 
+                                        <TextBlock Text="Please fix the highlighted configuration errors before saving."
                                                    Foreground="#FFCCCC" 
                                                    FontSize="13" 
                                                    TextWrapping="Wrap"/>
@@ -427,7 +480,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="FocusCommitmentCard" Classes="Card" Padding="24" Margin="0,40,0,0" Width="500">
+                    <Border x:Name="FocusCommitmentCard" Classes="Card" Classes.error="{Binding FocusCommitmentError, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}" Padding="24" Margin="0,40,0,0" Width="500">
                         <StackPanel Spacing="12">
                             <TextBlock Text="Focus commitment" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBlock Text="Choose whether this Workspace can be stopped once it starts."
@@ -467,6 +520,9 @@
                                                Foreground="#E6C878" FontSize="12" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>
+                            <TextBlock x:Name="FocusCommitmentErrorText" Text="{Binding FocusCommitmentError}"
+                                       Foreground="#FF6B6B" FontSize="12" TextWrapping="Wrap"
+                                       IsVisible="{Binding FocusCommitmentError, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
                     </Border>
 
@@ -576,7 +632,9 @@
                                             Command="{Binding $parent[ListBox].DataContext.OpenModuleSettingsCommand}" 
                                             CommandParameter="{Binding}"
                                             Width="500">
-                                        <Border Classes.error="{Binding HasErrors}">
+                                        <Border Classes.error="{Binding HasErrors}"
+                                                Classes.warning="{Binding HasWarnings}"
+                                                ToolTip.Tip="{Binding WarningMessage}">
                                             <Grid ColumnDefinitions="*, Auto">
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -1263,39 +1321,24 @@
                                         </StackPanel>
                                         <Separator Background="#333" Height="1" Margin="0"/>
                                         <StackPanel Margin="30,24,30,24">
-                                            <ItemsControl ItemsSource="{Binding Actions}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate x:DataType="vm:ActionViewModel">
-                                                        <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch" Margin="0,0,0,16" Padding="10"/>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                            <ItemsControl ItemsSource="{Binding Settings}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate x:DataType="vm:SettingViewModel">
-                                                        <StackPanel Margin="0,0,0,24" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch">
-                                                            <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" Foreground="#E0E0E0" Margin="0,0,0,6" HorizontalAlignment="Left"/>
-                                                            
-                                                            <TextBlock Text="{Binding Setting.Description}" 
-                                                                       Foreground="#A0A0A0" FontSize="12" 
-                                                                       TextWrapping="Wrap" MaxWidth="520" 
-                                                                       Margin="0,0,0,10" HorizontalAlignment="Left" 
-                                                                       IsVisible="{Binding Setting.Description, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
-                                                            
-                                                            <ContentControl Content="{Binding}" 
-                                                                            ContentTemplate="{StaticResource SettingSelector}" 
-                                                                            HorizontalAlignment="Stretch"/>
-                                                            
-                                                            <TextBlock Text="{Binding Error}" 
-                                                                       Foreground="#FF6B6B" 
-                                                                       FontSize="12" 
-                                                                       Margin="0,4,0,0"
-                                                                       TextWrapping="Wrap"
-                                                                       IsVisible="{Binding Error, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
+                                            <ItemsControl ItemsSource="{Binding LauncherBaseSettings}"
+                                                          ItemTemplate="{StaticResource ModuleSettingRowTemplate}"
+                                                          IsVisible="{Binding IsApplicationLauncher}"/>
+                                            <ItemsControl ItemsSource="{Binding Actions}"
+                                                          ItemTemplate="{StaticResource ModuleActionRowTemplate}"
+                                                          IsVisible="{Binding IsApplicationLauncher}"/>
+                                            <ItemsControl ItemsSource="{Binding LauncherSubmoduleSettings}"
+                                                          ItemTemplate="{StaticResource ModuleSettingRowTemplate}"
+                                                          IsVisible="{Binding IsApplicationLauncher}"/>
+                                            <ItemsControl ItemsSource="{Binding Actions}"
+                                                          ItemTemplate="{StaticResource ModuleActionRowTemplate}"
+                                                          IsVisible="{Binding IsSiteBlocker}"/>
+                                            <ItemsControl x:Name="ModuleSettingsList" ItemsSource="{Binding Settings}"
+                                                          ItemTemplate="{StaticResource ModuleSettingRowTemplate}"
+                                                          IsVisible="{Binding !IsApplicationLauncher}"/>
+                                            <ItemsControl ItemsSource="{Binding Actions}"
+                                                          ItemTemplate="{StaticResource ModuleActionRowTemplate}"
+                                                          IsVisible="{Binding ShowsActionsAtBottom}"/>
                                         </StackPanel>
                                         <Border Height="20"/>
                                     </StackPanel>

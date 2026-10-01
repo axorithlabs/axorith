@@ -281,11 +281,11 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
                 {
                     _toastService?.Show(
                         $"Setup complete: Created {result.CreatedCount} preset(s): {string.Join(", ", result.CreatedPresetNames)}",
-                        NotificationType.Success);
+                        NotificationType.Success, "Settings");
                 }
                 else
                 {
-                    _toastService?.Show("No new presets created. Required modules may not be installed.");
+                    _toastService?.Show("No new presets created. Required modules may not be installed.", category: "Settings");
                 }
             }
             else
@@ -296,7 +296,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
                 });
                 _toastService?.Show(
                     $"Setup completed with errors: {result.Errors.FirstOrDefault() ?? result.ErrorMessage}",
-                    NotificationType.Warning);
+                    NotificationType.Warning, "Settings");
             }
         }
         catch (Exception ex)
@@ -307,7 +307,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
             {
                 ["stage"] = "onboarding"
             });
-            _toastService?.Show($"Setup failed: {ex.Message}", NotificationType.Error);
+            _toastService?.Show($"Setup failed: {ex.Message}", NotificationType.Error, "Settings");
         }
         finally
         {

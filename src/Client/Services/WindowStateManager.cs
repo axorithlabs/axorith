@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Platform;
 using Axorith.Client.Services.Abstractions;
 
 namespace Axorith.Client.Services;
@@ -21,9 +22,10 @@ public class WindowStateManager : IWindowStateManager
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Axorith");
 
-        Directory.CreateDirectory(appDataPath);
         _stateFilePath = Path.Combine(appDataPath, "config", "window_state.json");
     }
+
+    internal WindowStateManager(string stateFilePath) => _stateFilePath = stateFilePath;
 
     public void SaveWindowState(Window window)
     {
@@ -39,6 +41,7 @@ public class WindowStateManager : IWindowStateManager
             };
 
             var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+            Directory.CreateDirectory(Path.GetDirectoryName(_stateFilePath)!);
             File.WriteAllText(_stateFilePath, json);
         }
         catch
@@ -51,6 +54,7 @@ public class WindowStateManager : IWindowStateManager
     {
         try
         {
+            ConstrainSizeToScreen(window, window.Screens.Primary, window.Width, window.Height);
             if (!File.Exists(_stateFilePath))
             {
                 return;
@@ -67,19 +71,26 @@ public class WindowStateManager : IWindowStateManager
             // File size and MaxDepth are validated to prevent DoS attacks
             var state = JsonSerializer.Deserialize<WindowState>(json, DeserializeOptions); //-V5611
 
-            switch (state)
-            {
-                case null:
-                    return;
-                case { X: >= 0, Y: >= 0 }:
-                    window.Position = new PixelPoint(state.X, state.Y);
-                    break;
-            }
+            if (state is null)
+                return;
 
-            if (state is { Width: > 0, Height: > 0 })
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            var screen = window.Screens.ScreenFromPoint(new PixelPoint(state.X, state.Y)) ?? window.Screens.Primary;
+            ConstrainSizeToScreen(window, screen, state.Width, state.Height);
+
+            if (screen is { WorkingArea.Width: > 0, WorkingArea.Height: > 0 } &&
+                double.IsFinite(screen.Scaling) && screen.Scaling > 0)
             {
-                window.Width = state.Width;
-                window.Height = state.Height;
+                var area = screen.WorkingArea;
+                var scale = screen.Scaling;
+
+                window.Position = new PixelPoint(
+                    Math.Clamp(state.X, area.X, Math.Max(area.X, area.Right - (int)Math.Ceiling(window.Width * scale))),
+                    Math.Clamp(state.Y, area.Y, Math.Max(area.Y, area.Bottom - (int)Math.Ceiling(window.Height * scale))));
+            }
+            else
+            {
+                window.Position = new PixelPoint(state.X, state.Y);
             }
 
             if (state.IsMaximized)
@@ -90,6 +101,33 @@ public class WindowStateManager : IWindowStateManager
         catch
         {
             // Ignore errors - use default window state
+        }
+    }
+
+    private static void ConstrainSizeToScreen(Window window, Screen? screen, double width, double height)
+    {
+        if (screen is { WorkingArea.Width: > 0, WorkingArea.Height: > 0 } &&
+            double.IsFinite(screen.Scaling) && screen.Scaling > 0)
+        {
+            var maxWidth = screen.WorkingArea.Width / screen.Scaling;
+            var maxHeight = screen.WorkingArea.Height / screen.Scaling;
+            window.MinWidth = Math.Min(window.MinWidth, maxWidth);
+            window.MinHeight = Math.Min(window.MinHeight, maxHeight);
+            window.Width = Math.Clamp(
+                double.IsFinite(width) && width > 0 ? width : window.Width,
+                window.MinWidth,
+                maxWidth);
+            window.Height = Math.Clamp(
+                double.IsFinite(height) && height > 0 ? height : window.Height,
+                window.MinHeight,
+                maxHeight);
+        }
+        else
+        {
+            if (double.IsFinite(width) && width > 0)
+                window.Width = width;
+            if (double.IsFinite(height) && height > 0)
+                window.Height = height;
         }
     }
 

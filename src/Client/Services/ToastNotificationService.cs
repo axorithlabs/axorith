@@ -11,9 +11,9 @@ public class ToastNotificationService : IToastNotificationService, IDisposable
 
     public IObservable<ToastNotification> Notifications => _notifications.AsObservable();
 
-    public void Show(string message, NotificationType type = NotificationType.Info)
+    public void Show(string message, NotificationType type = NotificationType.Info, string? category = null)
     {
-        var notification = new ToastNotification(message, type, Guid.NewGuid());
+        var notification = new ToastNotification(message, type, Guid.NewGuid(), category);
         _notifications.OnNext(notification);
     }
 

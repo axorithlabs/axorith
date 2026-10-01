@@ -140,6 +140,8 @@ public class App : Application
         // This ensures Avalonia shows the window immediately
         desktop.MainWindow = _mainWindow;
 
+        windowStateManager.RestoreWindowState(_mainWindow);
+
         if (_isTrayMode)
         {
             logger.LogInformation("Starting with window hidden (--tray flag)");
@@ -150,7 +152,6 @@ public class App : Application
         {
             logger.LogInformation("Starting with window visible");
             _mainWindow.ShowInTaskbar = true;
-            windowStateManager.RestoreWindowState(_mainWindow);
         }
 
         var trayService = Services.GetRequiredService<IHostTrayService>();
@@ -240,9 +241,9 @@ public class App : Application
             _notificationManager?.Dispose();
 
             var windowStateManager = Services.GetService<IWindowStateManager>();
-            if (windowStateManager != null && desktop.MainWindow != null)
+            if (windowStateManager != null && desktop.MainWindow is { WindowState: not WindowState.Minimized } mainWindow)
             {
-                windowStateManager.SaveWindowState(desktop.MainWindow);
+                windowStateManager.SaveWindowState(mainWindow);
             }
 
             var conn = Services.GetService<ICoreConnection>();

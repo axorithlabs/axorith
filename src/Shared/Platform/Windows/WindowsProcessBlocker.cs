@@ -1,31 +1,25 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Microsoft.Diagnostics.Tracing.Parsers;
-using Microsoft.Diagnostics.Tracing.Session;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
 
 /// <summary>
-///     Windows process blocker with clean architecture:
-///     - Admin mode: ETW only (real-time, zero overhead)
-///     - User mode: Polling only (simple, reliable fallback)
-///     No hybrid chaos - one strategy per privilege level.
+///     Windows process blocker. Scans every 500ms regardless of elevation so process starts
+///     cannot escape protection when kernel event delivery is unavailable.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
     private readonly Lock _lock = new();
-    private TraceEventSession? _etwSession;
     private CancellationTokenSource? _pollingScanCts;
     private HashSet<string> _targetProcessNames = [];
     private bool _allowOnlyMode;
     // ponytail: cache each image path for the blocker lifetime; cap this if sessions launch thousands of distinct executables.
     private readonly ConcurrentDictionary<string, string> _originalExecutableNames = new(StringComparer.OrdinalIgnoreCase);
-    private bool _isAdmin;
 
     private static readonly HashSet<string> SafeList = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -83,7 +77,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         {
             lock (_lock)
             {
-                return _etwSession != null || _pollingScanCts != null;
+                return _pollingScanCts != null;
             }
         }
     }
@@ -100,18 +94,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             var killed = ScanAndKillByList(initialScan: true);
             killed.AddRange(ScanAndKillRenamedProcesses(initialScan: true));
 
-            _isAdmin = TraceEventSession.IsElevated() ?? false;
-
-            if (_isAdmin)
-            {
-                logger.LogInformation("Admin privileges detected. Using ETW for real-time monitoring.");
-                StartEtwMonitoring();
-            }
-            else
-            {
-                logger.LogInformation("Running as standard user. Using polling-based monitoring.");
-                StartPollingMonitoring();
-            }
+            StartPollingMonitoring();
 
             return killed;
         }
@@ -159,74 +142,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         }
     }
 
-    private void StartEtwMonitoring()
-    {
-        if (_etwSession != null)
-        {
-            return;
-        }
-
-        try
-        {
-            var sessionName = "AxorithProcessBlocker-" + Guid.NewGuid();
-            _etwSession = new TraceEventSession(sessionName);
-            _etwSession.EnableKernelProvider(KernelTraceEventParser.Keywords.Process);
-
-            _etwSession.Source.Kernel.ProcessStart += data =>
-            {
-                var processName = data.ProcessName;
-                var pid = data.ProcessID;
-                var imagePath = data.ImageFileName;
-
-                if (string.IsNullOrEmpty(processName))
-                {
-                    return;
-                }
-
-                var normalized = NormalizeName(processName);
-
-                var blockedTarget = FindBlockedTarget(normalized, imagePath);
-                if (blockedTarget != null)
-                {
-                    if (string.Equals(normalized, blockedTarget, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Task.Run(() => KillProcessWithValidation(pid, normalized, blockedTarget, imagePath));
-                    }
-                    else
-                    {
-                        Task.Run(() => CheckStartedImagePath(pid, normalized, imagePath));
-                    }
-                }
-                else if (HasTargets())
-                {
-                    Task.Run(() => CheckStartedImagePath(pid, normalized, imagePath));
-                }
-            };
-
-            Task.Run(() =>
-            {
-                try
-                {
-                    _etwSession.Source.Process();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "ETW session processing failed");
-                }
-            });
-
-            logger.LogInformation("ETW monitoring started successfully");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to start ETW session. Falling back to polling.");
-            _etwSession?.Dispose();
-            _etwSession = null;
-            _isAdmin = false;
-            StartPollingMonitoring();
-        }
-    }
-
     private void StartPollingMonitoring()
     {
         if (_pollingScanCts != null)
@@ -271,24 +186,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private void StopMonitoring()
     {
-        if (_etwSession != null)
-        {
-            try
-            {
-                _etwSession.Stop();
-                _etwSession.Dispose();
-                logger.LogInformation("ETW monitoring stopped");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Error stopping ETW session");
-            }
-            finally
-            {
-                _etwSession = null;
-            }
-        }
-
         if (_pollingScanCts != null)
         {
             _pollingScanCts.Cancel();
@@ -382,9 +279,8 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 }
 
                 var path = process.MainModule?.FileName;
-                var originalName = GetOriginalExecutableName(path);
-                if (string.IsNullOrEmpty(originalName) || SafeList.Contains(originalName) ||
-                    !targets.Contains(originalName, StringComparer.OrdinalIgnoreCase) || process.HasExited)
+                var originalName = FindBlockedTarget(processName, path);
+                if (originalName == null || process.HasExited)
                 {
                     continue;
                 }
@@ -616,37 +512,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             : null;
     }
 
-    private bool HasTargets()
-    {
-        lock (_lock)
-        {
-            return _targetProcessNames.Count > 0;
-        }
-    }
-
-    private void CheckStartedImagePath(int pid, string expectedName, string? eventImagePath)
-    {
-        try
-        {
-            using var process = Process.GetProcessById(pid);
-            if (!string.Equals(NormalizeName(process.ProcessName), expectedName, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            var imagePath = process.MainModule?.FileName ?? eventImagePath;
-            var blockedTarget = FindBlockedTarget(expectedName, imagePath);
-            if (blockedTarget != null)
-            {
-                KillProcessWithValidation(pid, expectedName, blockedTarget, imagePath);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Could not inspect process start image (PID: {Pid})", pid);
-        }
-    }
-
     private string GetOriginalExecutableName(string? imagePath)
     {
         if (string.IsNullOrWhiteSpace(imagePath))
@@ -670,82 +535,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         });
     }
 
-    private bool KillProcessWithValidation(int pid, string expectedName, string blockedTarget, string? imagePath)
-    {
-        try
-        {
-            Process? p = null;
-            try
-            {
-                p = Process.GetProcessById(pid);
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
-
-            using (p)
-            {
-                var actualName = NormalizeName(p.ProcessName);
-
-                if (!string.Equals(actualName, expectedName, StringComparison.OrdinalIgnoreCase))
-                {
-                    logger.LogDebug(
-                        "PID {Pid} name mismatch. Expected: {Expected}, Got: {Actual}. Possible PID reuse, skipping.",
-                        pid, expectedName, actualName);
-                    return false;
-                }
-
-                if (!string.Equals(actualName, blockedTarget, StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(GetOriginalExecutableName(p.MainModule?.FileName), blockedTarget,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                if (!string.IsNullOrEmpty(imagePath))
-                {
-                    try
-                    {
-                        var processPath = p.MainModule?.FileName;
-                        if (!string.IsNullOrEmpty(processPath) &&
-                            !string.Equals(processPath, imagePath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            logger.LogDebug(
-                                "PID {Pid} path mismatch. Expected: {Expected}, Got: {Actual}. Possible PID reuse, skipping.",
-                                pid, imagePath, processPath);
-                            return false;
-                        }
-                    }
-                    catch
-                    {
-                        // Access denied or process exited - continue with name-only validation
-                    }
-                }
-
-                if (p.HasExited)
-                {
-                    return false;
-                }
-
-                p.Kill();
-                logger.LogInformation("Blocked process: {Name} (PID: {Pid})", expectedName, pid);
-                ProcessBlocked?.Invoke(expectedName);
-                return true;
-            }
-        }
-        catch (Win32Exception ex)
-        {
-            logger.LogDebug("Could not kill process '{Name}' (PID: {Pid}). {Error}", expectedName, pid, ex.Message);
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Failed to kill process {Name} (PID: {Pid})", expectedName, pid);
-        }
-
-        return false;
-    }
-
     private static HashSet<string> NormalizeNames(IEnumerable<string> names)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -753,7 +542,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
-                set.Add(NormalizeName(name));
+                set.Add(NormalizeName(name.Trim()));
             }
         }
 

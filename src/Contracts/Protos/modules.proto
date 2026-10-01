@@ -93,6 +93,7 @@ message ValidationResponse {
   bool is_valid = 1;
   string message = 2;
   repeated ValidationError field_errors = 3;
+  bool is_warning = 4;
 }
 
 message ValidationError {

@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Win32;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
@@ -92,28 +93,36 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public IReadOnlyList<IAction> GetActions()
     {
-        var installFirefoxAction = Action.Create("InstallFirefoxExtension", "Install Firefox Extension");
-        installFirefoxAction.OnInvokeAsync(OpenFirefoxExtensionPageAsync);
+        var installFirefoxAction = Action.Create("InstallExtension.Firefox", "Install Firefox Extension");
+        installFirefoxAction.OnInvokeAsync(InstallFirefoxExtensionAsync);
 
-        var installChromeAction = Action.Create("InstallChromeExtension", "Install Chrome Extension", false);
-        installChromeAction.OnInvokeAsync(OpenChromeExtensionPageAsync);
-
-        return [installFirefoxAction, installChromeAction];
+        return [installFirefoxAction];
     }
 
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
+    public async Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
         var categories = _categories.GetCurrentValue();
         var custom = _customSites.GetCurrentValue();
+        var allowList = _mode.GetCurrentValue() == "AllowList";
+        var noSitesConfigured = categories.Count == 0 && string.IsNullOrWhiteSpace(custom) && !allowList;
 
-        if (categories.Count == 0 && string.IsNullOrWhiteSpace(custom))
+        var extensionResults = await SendToAllExtensionsAsync(new { command = "health" }, cancellationToken)
+            .ConfigureAwait(false);
+        UpdateBrowserStatuses(extensionResults);
+
+        var warnings = new List<string>();
+        if (noSitesConfigured)
         {
-            return Task.FromResult(_mode.GetCurrentValue() == "AllowList"
-                ? ValidationResult.Success
-                : ValidationResult.Warn("No categories or sites selected. The module will not block anything."));
+            warnings.Add("No categories or sites selected. The module will not block anything.");
         }
 
-        return Task.FromResult(ValidationResult.Success);
+        if (!extensionResults.Any(result => result.Status == "Connected"))
+        {
+            warnings.Add(
+                "No Site Blocker browser extension is connected. Open Chrome or Firefox with the extension installed.");
+        }
+
+        return warnings.Count == 0 ? ValidationResult.Success : ValidationResult.Warn(string.Join(" ", warnings));
     }
 
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)
@@ -447,8 +456,14 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
                 return;
             }
 
-            var jsonPath = Path.Combine(AppContext.BaseDirectory, "Modules", "SiteBlocker", "Data",
-                "blocked_sites.json");
+            var moduleDirectory = Path.GetDirectoryName(typeof(Module).Assembly.Location);
+            if (string.IsNullOrEmpty(moduleDirectory))
+            {
+                _categorySites = new Dictionary<string, string[]>();
+                return;
+            }
+
+            var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_sites.json");
 
             if (!File.Exists(jsonPath))
             {
@@ -504,38 +519,73 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         return choices;
     }
 
-    private async Task OpenFirefoxExtensionPageAsync()
+    private Task InstallFirefoxExtensionAsync()
     {
-        const string url = "https://addons.mozilla.org/firefox/addon/axorith-site-blocker/";
+        if (!OperatingSystem.IsWindows())
+        {
+            notifier.ShowToast("Automatic browser extension installation is supported on Windows only.",
+                NotificationType.Error, "Site Blocker");
+            return Task.CompletedTask;
+        }
+
         try
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            notifier.ShowToast("Firefox extension page opened in your browser", NotificationType.Success);
+            RegisterFirefoxExtensionPolicy();
+            var firefoxIsRunning = IsBrowserRunning(["firefox"]);
+            if (!firefoxIsRunning)
+                Process.Start(new ProcessStartInfo("firefox.exe") { UseShellExecute = true });
+
+            notifier.ShowToast(firefoxIsRunning
+                    ? "Firefox is running. Site Blocker will install automatically the next time Firefox starts."
+                    : "Firefox opened. Site Blocker will install automatically.",
+                firefoxIsRunning ? NotificationType.Warning : NotificationType.Success, "Site Blocker");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to open Firefox extension page in browser");
-            notifier.ShowToast("Failed to open browser. Please manually visit: " + url, NotificationType.Error);
+            logger.LogError(ex, "Failed to configure automatic Firefox extension installation");
+            notifier.ShowToast("Could not configure automatic Firefox extension installation.",
+                NotificationType.Error, "Site Blocker");
         }
 
-        await Task.Delay(100);
+        return Task.CompletedTask;
     }
 
-    private async Task OpenChromeExtensionPageAsync()
+    private static void RegisterFirefoxExtensionPolicy()
     {
-        const string url = "https://chromewebstore.google.com/detail/axorith-site-blocker/";
-        try
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Firefox extension policies are available on Windows only.");
+
+        using var key = Registry.CurrentUser.CreateSubKey(
+            @"Software\Policies\Mozilla\Firefox\ExtensionSettings", writable: true)
+            ?? throw new InvalidOperationException("Could not create the Firefox extension policy key.");
+
+        var policies = new JsonObject();
+        var existingValues = key.GetValue(string.Empty) switch
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            notifier.ShowToast("Chrome extension page opened in your browser", NotificationType.Success);
-        }
-        catch (Exception ex)
+            string[] values => values,
+            string value => [value],
+            _ => []
+        };
+
+        foreach (var value in existingValues)
         {
-            logger.LogError(ex, "Failed to open Chrome extension page in browser");
-            notifier.ShowToast("Failed to open browser. Please manually visit: " + url, NotificationType.Error);
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+
+            if (JsonNode.Parse(value) is not JsonObject existing)
+                continue;
+
+            foreach (var policy in existing)
+                policies[policy.Key] = policy.Value?.DeepClone();
         }
 
-        await Task.Delay(100);
+        policies[Axorith.Shared.Utils.SiteBlockerExtensionIds.Firefox] = new JsonObject
+        {
+            ["installation_mode"] = "normal_installed",
+            ["install_url"] = "https://addons.mozilla.org/firefox/downloads/latest/axorith-site-blocker/latest.xpi"
+        };
+
+        key.SetValue(string.Empty, new[] { policies.ToJsonString() }, RegistryValueKind.MultiString);
     }
 
     public void Dispose()

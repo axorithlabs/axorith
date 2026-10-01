@@ -83,7 +83,7 @@ internal sealed class OBSApp : ILauncherApp
             {
                 _notifier.ShowToast(
                     "OBS: WebSocket connection failed. Enable WebSocket in OBS: Tools → WebSocket Server Settings.",
-                    NotificationType.Error);
+                    NotificationType.Error, "OBS");
             }
         }
     }

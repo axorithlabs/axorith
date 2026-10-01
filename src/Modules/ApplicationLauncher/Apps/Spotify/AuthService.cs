@@ -273,7 +273,7 @@ internal sealed class AuthService : IDisposable
             _logger.LogError(null, msg);
             _notifier.ShowToast(
                 "Error: Could not bind local port for Spotify login. Free port 8888-8895 or allow a dynamic port and retry.",
-                NotificationType.Error);
+                NotificationType.Error, "Spotify");
             return false;
         }
 
@@ -293,18 +293,18 @@ internal sealed class AuthService : IDisposable
             {
                 _logger.LogInfo("Attempting to open browser for Spotify login.");
                 Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
-                _notifier.ShowToast("Your browser has been opened to log in to Spotify. Please grant access.");
+                _notifier.ShowToast("Your browser has been opened to log in to Spotify. Please grant access.", NotificationType.Info, "Spotify");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to open browser automatically.");
                 _notifier.ShowToast(
                     $"Failed to open browser automatically. Please copy and paste this URL into your browser: {authUrl}",
-                    NotificationType.Error);
+                    NotificationType.Error, "Spotify");
                 return false;
             }
 
-            _notifier.ShowToast("Waiting for Spotify authorization in browser...");
+            _notifier.ShowToast("Waiting for Spotify authorization in browser...", NotificationType.Info, "Spotify");
 
             var contextTask = listener.GetContextAsync();
             var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
@@ -314,7 +314,7 @@ internal sealed class AuthService : IDisposable
             if (completedTask == timeoutTask)
             {
                 _logger.LogWarning("Spotify authentication timed out after 5 minutes");
-                _notifier.ShowToast("Error: Authentication timed out", NotificationType.Error);
+                _notifier.ShowToast("Error: Authentication timed out", NotificationType.Error, "Spotify");
                 return false;
             }
 
@@ -335,7 +335,7 @@ internal sealed class AuthService : IDisposable
                 response.ContentLength64 = csrfBuffer.Length;
                 await response.OutputStream.WriteAsync(csrfBuffer);
                 response.OutputStream.Close();
-                _notifier.ShowToast("Error: Security validation failed", NotificationType.Error);
+                _notifier.ShowToast("Error: Security validation failed", NotificationType.Error, "Spotify");
                 return false;
             }
 
@@ -352,7 +352,7 @@ internal sealed class AuthService : IDisposable
             {
                 _logger.LogError(null, "Spotify login failed or was denied by user. Error: {Error}",
                     error ?? "Unknown error");
-                _notifier.ShowToast($"Error: {error ?? "Unknown error"}", NotificationType.Error);
+                _notifier.ShowToast($"Error: {error ?? "Unknown error"}", NotificationType.Error, "Spotify");
                 return false;
             }
 
@@ -394,7 +394,7 @@ internal sealed class AuthService : IDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to exchange authorization code for tokens.");
-                _notifier.ShowToast("Error: Token exchange failed.", NotificationType.Error);
+                _notifier.ShowToast("Error: Token exchange failed.", NotificationType.Error, "Spotify");
                 return false;
             }
         }

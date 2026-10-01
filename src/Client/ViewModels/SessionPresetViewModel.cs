@@ -29,7 +29,7 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
             var options = Model.FocusCommitment;
             return options.EndCondition switch
             {
-                FocusEndCondition.Duration when options.Duration is { } value => $"{value.TotalMinutes:0} min",
+                FocusEndCondition.Duration when options.Duration is { } value => $"Session duration: {value.TotalMinutes:0} min",
                 FocusEndCondition.EndAt when options.EndAtLocalTime is { } endAt => $"Until {endAt:HH:mm}",
                 _ => "Until stopped"
             };
@@ -48,11 +48,11 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
         }
     }
 
-    public bool HasSchedule => _schedules.Count > 0;
+    public bool HasSchedule => _schedules.Any(schedule => schedule.Type != ScheduleType.StopDuration);
 
-    public string ScheduleSummary => !HasSchedule
-        ? string.Empty
-        : string.Join(" · ", _schedules.Select(schedule =>
+    public string ScheduleSummary => string.Join(" | ", _schedules
+        .Where(schedule => schedule.Type != ScheduleType.StopDuration)
+        .Select(schedule =>
             string.IsNullOrWhiteSpace(schedule.Name) ? schedule.Type.ToString() : schedule.Name));
 
     public bool IsActive

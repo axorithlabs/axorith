@@ -13,6 +13,8 @@ public interface ISessionsApi
     /// </summary>
     Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default);
 
+    Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default);
+
     Task<OperationResult> PreflightSessionAsync(Guid presetId, CancellationToken ct = default);
 
     /// <summary>
