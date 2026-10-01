@@ -1,36 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy — Axorith</title>
-    <meta name="description" content="How Axorith handles website and desktop telemetry.">
-    <link rel="canonical" href="https://axorith.com/privacy/">
-    <link rel="icon" href="../assets/icon.ico" type="image/x-icon">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../css/main.css">
-    <script src="../js/posthog.js" defer></script>
-    <script src="../js/main.js" defer></script>
-</head>
-<body>
-    <nav class="nav">
-        <div class="nav-container">
-            <a href="../index.html" class="nav-logo"><span class="logo-text">Axorith</span></a>
-            <div class="nav-links">
-                <a href="../index.html#features" class="nav-link">Features</a>
-                <a href="../modules.html" class="nav-link">Modules</a>
-            </div>
-            <div class="nav-actions"><a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" class="nav-cta">Download</a></div>
-        </div>
-    </nav>
-
-    <main class="section" style="padding-top: 132px; min-height: 70vh;">
-        <article class="container" style="max-width: 860px;">
-            <span class="section-label">Privacy</span>
-            <h1 class="section-title">Telemetry and data</h1>
-            <p class="section-subtitle">Axorith uses PostHog for website analytics and optional desktop product telemetry. The website and desktop app keep separate visitor identities.</p>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Privacy — Axorith</title><meta name="description" content="How Axorith handles website and desktop telemetry."><link rel="canonical" href="https://axorith.com/privacy/"><link rel="icon" href="../assets/icon.ico" type="image/x-icon"><link rel="stylesheet" href="../css/main.css"><script src="../js/posthog.js" defer></script><script src="../js/main.js" defer></script></head><body><header class="site-header"><div class="site-header__inner"><a class="brand" href="/">Axorith</a><nav class="desktop-nav"><a href="/index.html#workflow">How it works</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download</a><button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/index.html#workflow">How it works</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav></header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
+            <span >Privacy</span>
+            <h1 >Telemetry and data</h1>
+            <p >Axorith uses PostHog for website analytics and optional desktop product telemetry. The website and desktop app keep separate visitor identities.</p>
 
             <h2>Website analytics</h2>
             <p>When you visit axorith.com, the PostHog Web SDK records page views, page exits, visit sessions, Web Vitals, referrer source categories, and validated UTM source, medium, and campaign tags. Pages are reduced to fixed categories such as home, modules, and privacy. Full page and referrer URLs, domains, ad click IDs, UTM content, and UTM search terms are removed before events are sent. It also records clicks on download and GitHub links. Download click events include the CTA location and Windows platform; a release version is included only when the site actually knows it. PostHog may infer coarse location from network metadata.</p>
@@ -48,16 +19,4 @@
             <p>Website and desktop events go to the same Axorith PostHog project, but use separate identities. The website does not use the desktop device identifier, and <code>installAttemptId</code> is a funnel correlation value rather than an identity.</p>
 
             <p>For questions, contact <a href="mailto:mail@axorith.com">mail@axorith.com</a>.</p>
-        </article>
-    </main>
-
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-bottom">
-                <p>&copy; 2025 Axorith Labs. All rights reserved.</p>
-                <p><a href="../index.html">Home</a> · <a href="https://github.com/axorithlabs/axorith">GitHub</a></p>
-            </div>
-        </div>
-    </footer>
-</body>
-</html>
+        </article></section></main><footer class="footer"><div class="footer__inner"><div><a class="brand" href="/">Axorith</a><span>Source-available under BSL 1.1</span></div><nav><a href="/download/">Download</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav></div></footer></body></html>

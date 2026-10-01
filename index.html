@@ -1,272 +1,254 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- SEO & Social Media Meta Tags -->
-    <title>Axorith — One click to automate your focus rituals</title>
-    <meta name="description" content="A free, local, open-source alternative to Freedom and Cold Turkey — with Home Assistant integration and a plugin system.">
-    <meta name="keywords" content="productivity, automation, flow state, distraction blocker, windows, session scheduler, smart home, app launcher">
-    <meta name="author" content="Axorith Labs">
-    <link rel="canonical" href="https://axorith.com">
-
-    <!-- Open Graph -->
-    <meta property="og:title" content="Axorith — One click to automate your focus rituals">
-    <meta property="og:description" content="A free, local, open-source alternative to Freedom and Cold Turkey — with Home Assistant integration and a plugin system.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://axorith.com">
-    <meta property="og:image" content="https://axorith.com/assets/og_banner.jpg">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Axorith — One click to automate your focus rituals">
-    <meta name="twitter:description" content="A free, local, open-source alternative to Freedom and Cold Turkey — with Home Assistant integration and a plugin system.">
-    <meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg">
-
-    <!-- Favicon -->
-    <link rel="icon" href="assets/icon.ico" type="image/x-icon">
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="css/main.css">
-    <script src="js/posthog.js" defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Axorith — Stop rebuilding your workspace every time you start</title>
+  <meta name="description" content="Save your apps, blockers, schedules and Focus Commitment rules in a preset. Start it yourself or let Axorith move your day from one workspace to the next.">
+  <meta name="author" content="Axorith Labs">
+  <link rel="canonical" href="https://axorith.com/">
+  <meta property="og:title" content="Axorith — Stop rebuilding your workspace every time you start">
+  <meta property="og:description" content="Save your work setup once. Axorith can open the right apps, apply blockers and run the session by your rules.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://axorith.com/">
+  <meta property="og:image" content="https://axorith.com/assets/og_banner.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Axorith — Stop rebuilding your workspace every time you start">
+  <meta name="twitter:description" content="Save your work setup once. Axorith can open the right apps, apply blockers and run the session by your rules.">
+  <meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg">
+  <link rel="icon" href="assets/icon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="js/posthog.js" defer></script>
+  <script src="js/main.js" defer></script>
 </head>
-<body>
-    <!-- Navigation -->
-    <nav class="nav">
-        <div class="nav-container">
-            <a href="index.html" class="nav-logo">
-                <span class="logo-text">Axorith</span>
-            </a>
-            <div class="nav-links">
-                <a href="#features" class="nav-link">Features</a>
-                <a href="modules.html" class="nav-link">Modules</a>
-            </div>
-            <div class="nav-actions">
-                <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" class="nav-cta">Download</a>
-            </div>
-            <button class="nav-mobile-toggle" aria-label="Toggle menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-    </nav>
-
-    <!-- Mobile Menu -->
-    <div class="mobile-menu">
-        <a href="#features" class="mobile-link">Features</a>
-        <a href="modules.html" class="mobile-link">Modules</a>
-        <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" class="mobile-cta">Download Free</a>
+<body class="home-page">
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="/" aria-label="Axorith home">Axorith</a>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="#workflow">Workflow</a>
+        <a href="#schedule">Schedules</a>
+        <a href="https://github.com/axorithlabs/axorith">GitHub</a>
+      </nav>
+      <a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download</a>
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">
+        <span></span><span></span>
+      </button>
     </div>
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a href="#workflow">Workflow</a>
+      <a href="#schedule">Schedules</a>
+      <a href="https://github.com/axorithlabs/axorith">GitHub</a>
+      <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
+    </nav>
+  </header>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-video-bg">
-            <video autoplay muted loop playsinline>
-                <source src="assets/video.mp4" type="video/mp4">
-            </video>
-            <div class="hero-video-overlay"></div>
+  <main>
+    <section class="hero hero-v3">
+      <div class="hero-v3__copy reveal">
+        <h1>Stop rebuilding your workspace every time you start.</h1>
+        <p>Save your apps, blockers and session rules in a preset. Start it yourself or on a schedule.</p>
+        <div class="hero__actions">
+          <a class="button button--primary" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
+          <a class="button button--secondary" href="https://github.com/axorithlabs/axorith">View on GitHub</a>
         </div>
-        <div class="hero-content">
-            <div class="hero-badge">
-                <span class="badge-dot"></span>
-                Released — Free to use
+      </div>
+
+      <div class="hero-app reveal" aria-label="Axorith Presets interface preview">
+        <div class="ax-window">
+          <div class="ax-titlebar">
+            <span class="ax-titlebar__name">Axorith</span>
+            <span class="ax-titlebar__controls" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
+          <div class="ax-shell">
+            <aside class="ax-sidebar" aria-hidden="true">
+              <div class="ax-navitem"><span class="ax-navicon ax-navicon--home"></span>Home</div>
+              <div class="ax-navitem is-active"><span class="ax-navicon ax-navicon--presets"></span>Presets</div>
+              <div class="ax-nav-spacer"></div>
+              <div class="ax-navitem"><span class="ax-navicon ax-navicon--settings"></span>Settings</div>
+            </aside>
+
+            <div class="ax-presets">
+              <div class="ax-presets__head">
+                <h2>Presets</h2>
+                <button type="button" tabindex="-1">New preset</button>
+              </div>
+
+              <article class="ax-preset ax-preset--primary">
+                <div class="ax-preset__content">
+                  <div class="ax-preset__name">Programming</div>
+                  <div class="ax-preset__summary">
+                    <span class="ax-chip">Locked</span>
+                    <span>Launch CLion, Browser, Block Distracting Sites +2</span>
+                    <span class="ax-dot">·</span>
+                    <span>Until 18:00</span>
+                  </div>
+                  <div class="ax-preset__schedule">Schedule: Mon, Tue, Wed, Thu, Fri at 09:00</div>
+                </div>
+                <div class="ax-preset__actions">
+                  <button class="ax-start" type="button" tabindex="-1">Start</button>
+                  <button class="ax-more" type="button" tabindex="-1" aria-label="More actions"><b></b><b></b><b></b></button>
+                </div>
+              </article>
+
+              <article class="ax-preset">
+                <div class="ax-preset__content">
+                  <div class="ax-preset__name">Relax</div>
+                  <div class="ax-preset__summary">
+                    <span class="ax-chip">Normal</span>
+                    <span>Launch Steam, Discord, Spotify</span>
+                    <span class="ax-dot">·</span>
+                    <span>Until stopped</span>
+                  </div>
+                </div>
+                <div class="ax-preset__actions">
+                  <button class="ax-start" type="button" tabindex="-1">Start</button>
+                  <button class="ax-more" type="button" tabindex="-1" aria-label="More actions"><b></b><b></b><b></b></button>
+                </div>
+              </article>
+
+              <article class="ax-preset">
+                <div class="ax-preset__content">
+                  <div class="ax-preset__name">Study</div>
+                  <div class="ax-preset__summary">
+                    <span class="ax-chip">Strict</span>
+                    <span>Browser, Site Blocker, App Blocker</span>
+                    <span class="ax-dot">·</span>
+                    <span>Session duration: 120 min</span>
+                  </div>
+                </div>
+                <div class="ax-preset__actions">
+                  <button class="ax-start" type="button" tabindex="-1">Start</button>
+                  <button class="ax-more" type="button" tabindex="-1" aria-label="More actions"><b></b><b></b><b></b></button>
+                </div>
+              </article>
             </div>
-            <h1 class="hero-title">
-                One click to automate your focus rituals.<br>
-                <span class="gradient-text">Work smarter, live better.</span>
-            </h1>
-            <p class="hero-subtitle">
-                Launch and control any application, adjust lights, and block distractions — automatically on a schedule.
-            </p>
-            <div class="hero-actions">
-                <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" class="btn btn-primary">
-                    <svg width="20" height="20" viewBox="0 0 88 88" fill="currentColor">
-                        <path d="M0 12.402l35.687-4.86.016 34.423-35.67.203zm35.67 33.529l.028 34.253L.047 75.347l-.047-29.632zm5.975-39.38L88 0v41.678L41.68 41.62zm.056 38.682L88 46.516v41.018l-46.294-6.32Z"/>
-                    </svg>
-                    Download for Windows
-                </a>
-            </div>
+          </div>
         </div>
+      </div>
     </section>
 
-    <!-- Problem Section -->
-    <section class="section problem-section">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-label">The Problem</span>
-                <h2 class="section-title">The "Context Switching Tax"</h2>
-                <p class="section-subtitle">Every time you start a task, you pay a tax in time and willpower. This 15-minute setup ritual is a barrier to entry. It's friction.</p>
-            </div>
-            <div class="comparison-grid">
-                <div class="comparison-card old-way">
-                    <div class="card-header">
-                        <span class="card-icon">😩</span>
-                        <h3>The Old Way</h3>
-                        <span class="card-badge bad">Manual Chaos</span>
-                    </div>
-                    <ul class="card-list">
-                        <li>Struggle to start working</li>
-                        <li>Can't fully disconnect after work</li>
-                        <li>Fiddling with apps & smart home</li>
-                        <li>Manual distraction blocking</li>
-                        <li class="highlight">15 minutes of friction</li>
-                    </ul>
-                </div>
-                <div class="comparison-card new-way">
-                    <div class="card-header">
-                        <span class="card-icon">✨</span>
-                        <h3>The Axorith Way</h3>
-                        <span class="card-badge good">Instant Context</span>
-                    </div>                   
-                        <ul class="card-list">
-                            <li>Instant Deep Work</li>
-                            <li>Instant Gaming Mode</li>
-                            <li>Lights & Media sync automatically</li>
-                            <li>Automatic Distraction Blocker</li>
-                            <li class="highlight">&lt; 15 seconds to flow state</li>
-                        </ul>
-                </div>
-            </div>
+    <section class="ritual" id="workflow">
+      <div class="ritual__intro reveal">
+        <h2>One preset replaces the setup ritual.</h2>
+        <p>Save the apps, blockers and session rules together once. After that, starting work means starting the preset.</p>
+      </div>
+
+      <div class="ritual-compress reveal" aria-label="Programming preset replaces a repeated setup ritual">
+        <div class="ritual-compress__source ritual-compress__source--v2" aria-hidden="true">
+          <div><span>Launch</span><strong>CLion</strong></div>
+          <div><span>Launch</span><strong>Browser</strong></div>
+          <div><span>Launch</span><strong>Spotify</strong></div>
+          <div><span>Block</span><strong>Distracting apps</strong></div>
+          <div><span>Block</span><strong>Distracting sites</strong></div>
+          <div><span>Session mode</span><strong>Locked</strong></div>
         </div>
+        <div class="ritual-compress__bridge" aria-hidden="true"><i></i></div>
+        <article class="preset-light-card preset-light-card--v2">
+          <div class="preset-light-card__head">
+            <div><span>Preset</span><strong>Programming</strong></div>
+            <span class="preset-light-card__mode">Locked</span>
+          </div>
+          <div class="preset-light-card__chips">
+            <span>CLion</span><span>Browser</span><span>Spotify</span><span>App Blocker</span><span>Site Blocker</span>
+          </div>
+          <div class="preset-light-card__footer"><button type="button" tabindex="-1">Start</button></div>
+        </article>
+      </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="section features-section" id="features">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-label">Features</span>
-                <h2 class="section-title">Built for Flow State</h2>
-                <p class="section-subtitle">Axorith is not another app. It's a remote control for your digital life.</p>
-            </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                        </svg>
-                    </div>
-                    <h3>Session Presets</h3>
-                    <p>Define any state like "Work" or "Play". Axorith will launch your required software, arrange windows, and apply system settings instantly.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-                        </svg>
-                    </div>
-                    <h3>Plugin Ecosystem</h3>
-                    <p>The entire system is built on a powerful SDK. Integrate any tool with an API. A clean, developer-first approach makes creating and sharing your own modules simple.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                        </svg>
-                    </div>
-                    <h3>Bulletproof Stability</h3>
-                    <p>Client-Server architecture means if the UI crashes, your focus session keeps running. Simply restart and reconnect. Your flow is never interrupted.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                        </svg>
-                    </div>
-                    <h3>Session Scheduler</h3>
-                    <p>True autopilot. Schedule sessions to start automatically at specific times or recurring intervals. Your environment is ready before you are.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                    </div>
-                    <h3>Distraction Blocker</h3>
-                    <p>Block distracting websites during focus sessions. Works seamlessly with your browser via a lightweight extension. No admin rights required.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-                        </svg>
-                    </div>
-                    <h3>Universal App Control</h3>
-                    <p>Deep integration with the tools you use. Auto-play media, open projects, or mute communication apps when entering focus mode.</p>
-                </div>
-            </div>
-        </div>
+    <section class="editor-screenshot-section reveal" aria-label="Axorith preset editor">
+      <div class="editor-screenshot-section__copy">
+        <h2>Build the whole session in one editor.</h2>
+        <p>Set Focus Commitment, choose how the preset starts, add modules in order, define when it stops and what happens next.</p>
+      </div>
+      <img src="assets/preset-editor.png" alt="Axorith preset editor showing preset name, Focus Commitment, Start On, App Blocker, Stop On and Then sections">
     </section>
 
-    <!-- CTA Section -->
-    <section class="section cta-section">
-        <div class="container">
-            <h2 class="cta-title">Ready to take control?</h2>
-            <div class="cta-actions">
-                <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" class="btn btn-primary btn-large">
-                    Download Free
-                </a>
-            </div>
+    <section class="blockers-chapter">
+      <div class="blockers-chapter__copy reveal">
+        <h2>Keep the workspace. Remove everything else.</h2>
+        <p>Block selected apps and sites, or let App Blocker allow only the applications configured in the current Workspace.</p>
+      </div>
+
+      <div class="blocker-visual reveal" aria-label="Blocker configuration preview">
+        <div class="blocker-column">
+          <span class="blocker-column__label">App Blocker</span>
+          <strong>Only allow Workspace apps</strong>
+          <div class="allowed-list">
+            <span>CLion</span><span>Browser</span><span>Spotify</span>
+          </div>
+          <div class="blocked-list"><span>Steam</span><span>Discord</span><span>Other apps</span></div>
         </div>
+        <div class="blocker-column">
+          <span class="blocker-column__label">Site Blocker</span>
+          <strong>Block selected categories</strong>
+          <div class="category-list">
+            <span>Social</span><span>Video</span><span>Streaming</span><span>Gaming</span><span>News</span><span>Shopping</span>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-grid">
-                <div class="footer-brand">
-                    <span class="footer-logo">Axorith</span>
-                    <p class="footer-tagline">One click to automate your focus rituals.<br>Work smarter, live better.</p>
-                    <div class="footer-social">
-                        <a href="https://github.com/axorithlabs/axorith" target="_blank" aria-label="GitHub">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                            </svg>
-                        </a>
-                        <a href="mailto:mail@axorith.com" aria-label="Email">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-                <div class="footer-links">
-                    <h4>Product</h4>
-                    <a href="#features">Features</a>
-                    <a href="modules.html">Modules</a>
-                    <a href="https://github.com/axorithlabs/axorith/releases">Releases</a>
-                </div>
-                <div class="footer-links">
-                    <h4>Resources</h4>
-                    <a href="https://github.com/axorithlabs/axorith" target="_blank">GitHub</a>
-                    <a href="https://github.com/axorithlabs/axorith/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a>
-                    <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">License</a>
-                </div>
-                <div class="footer-links">
-                    <h4>Community</h4>
-                    <a href="mailto:mail@axorith.com">Contact</a>
-                    <a href="privacy/">Privacy</a>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2025 Axorith Labs. All rights reserved.</p>
-                <p class="footer-license">Source-available under <a href="https://github.com/axorithlabs/axorith/blob/main/LICENSE.md" target="_blank">BSL 1.1</a></p>
-            </div>
-        </div>
-    </footer>
+    <section class="schedule-story" id="schedule">
+      <div class="schedule-story__copy reveal">
+        <h2>Programming at 09:00. Relax at 18:00.</h2>
+        <p>Axorith can start one preset on schedule, end it at a fixed time and hand off to the next preset automatically.</p>
+      </div>
 
-    <!-- Scripts -->
-    <script src="js/main.js"></script>
+      <div class="preset-handoff reveal" aria-label="Programming preset changes to Relax preset at 18:00">
+        <article class="handoff-preset handoff-preset--work">
+          <div class="handoff-preset__time">09:00</div>
+          <div class="handoff-preset__head"><strong>Programming</strong><span>Locked</span></div>
+          <div class="handoff-preset__rule"><label>Starts</label><b>Time Schedule · Mon–Fri · 09:00</b></div>
+          <div class="handoff-preset__modules"><span>CLion</span><span>Browser</span><span>Spotify</span><span>App Blocker</span><span>Site Blocker</span></div>
+        </article>
+
+        <div class="handoff-transition" aria-hidden="true">
+          <i></i>
+        </div>
+
+        <article class="handoff-preset handoff-preset--relax">
+          <div class="handoff-preset__time">18:00</div>
+          <div class="handoff-preset__head"><strong>Relax</strong><span>Normal</span></div>
+          <div class="handoff-preset__rule"><label>Starts</label><b>Started by previous preset</b></div>
+          <div class="handoff-preset__modules"><span>Steam</span><span>Discord</span><span>Spotify</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="modules-teaser-v3">
+      <div class="modules-teaser-v3__head reveal">
+        <h2>Extend the preset when you need more.</h2>
+      </div>
+      <div class="module-table reveal">
+        <div><strong>Application Launcher</strong><span>Applications, IDE projects, window placement and lifecycle.</span></div>
+        <div><strong>App Blocker</strong><span>Block selected apps or allow only Workspace apps.</span></div>
+        <div><strong>Site Blocker</strong><span>Block sites or categories while the session is active.</span></div>
+        <div><strong>Home Assistant</strong><span>Optional actions for devices around the Workspace.</span></div>
+      </div>
+    </section>
+
+    <section class="final-cta final-cta-v3">
+      <div class="final-cta__inner reveal">
+        <h2>Build the preset once. Run the setup when you need it.</h2>
+        <div class="final-cta__actions">
+          <a class="button button--light" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
+          <a class="button button--dark-outline" href="https://github.com/axorithlabs/axorith">GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <div><a class="brand" href="/">Axorith</a><span>Source-available under BSL 1.1</span></div>
+      <nav aria-label="Footer navigation">
+        <a href="/download/">Download</a>
+        <a href="/privacy/">Privacy</a>
+        <a href="https://github.com/axorithlabs/axorith">GitHub</a>
+      </nav>
+    </div>
+  </footer>
 </body>
 </html>

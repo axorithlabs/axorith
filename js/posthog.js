@@ -10,7 +10,6 @@ function normalizeWebsitePath(value) {
         return ({
             "/": "/",
             "/index.html": "/",
-            "/modules.html": "/modules",
             "/privacy": "/privacy",
             "/privacy.html": "/privacy",
             "/privacy/index.html": "/privacy",

@@ -1,64 +1,47 @@
-document.addEventListener('DOMContentLoaded', function() {
-    document.addEventListener('click', function (event) {
-        const anchor = event.target instanceof Element ? event.target.closest('a') : null;
-        if (!anchor || !window.posthog || typeof window.posthog.capture !== 'function') return;
+document.addEventListener('DOMContentLoaded', () => {
+  const mobileToggle = document.querySelector('.nav-toggle');
+  const mobileNav = document.querySelector('.mobile-nav');
 
-        if (isWindowsInstallerDownloadUrl(anchor.href)) {
-            window.posthog.capture('WebsiteDownloadClicked', { platform: 'windows' });
-            return;
-        }
-
-        if (anchor.hostname.toLowerCase() === 'github.com') {
-            window.posthog.capture('WebsiteGitHubClicked');
-        }
+  if (mobileToggle && mobileNav) {
+    mobileToggle.addEventListener('click', () => {
+      const open = mobileNav.classList.toggle('is-open');
+      mobileToggle.setAttribute('aria-expanded', String(open));
     });
+    mobileNav.querySelectorAll('a').forEach(link => link.addEventListener('click', () => {
+      mobileNav.classList.remove('is-open');
+      mobileToggle.setAttribute('aria-expanded', 'false');
+    }));
+  }
 
-    // Mobile menu toggle
-    const mobileToggle = document.querySelector('.nav-mobile-toggle');
-    const mobileMenu = document.querySelector('.mobile-menu');
+  document.addEventListener('click', event => {
+    const anchor = event.target instanceof Element ? event.target.closest('a') : null;
+    if (!anchor || !window.posthog || typeof window.posthog.capture !== 'function') return;
 
-    if (mobileToggle && mobileMenu) {
-        mobileToggle.addEventListener('click', () => {
-            mobileMenu.classList.toggle('active');
-            mobileToggle.classList.toggle('active');
-        });
-
-        document.querySelectorAll('.mobile-link, .mobile-cta').forEach(link => {
-            link.addEventListener('click', () => {
-                mobileMenu.classList.remove('active');
-                mobileToggle.classList.remove('active');
-            });
-        });
+    if (typeof isWindowsInstallerDownloadUrl === 'function' && isWindowsInstallerDownloadUrl(anchor.href)) {
+      window.posthog.capture('WebsiteDownloadClicked', { platform: 'windows' });
+      return;
     }
 
-    // Smooth scroll for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            const href = this.getAttribute('href');
-            if (href && href.length > 1) {
-                const target = document.querySelector(href);
-                if (target) {
-                    e.preventDefault();
-                    const navHeight = document.querySelector('.nav')?.offsetHeight || 64;
-                    const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - navHeight;
-                    window.scrollTo({
-                        top: targetPosition,
-                        behavior: 'smooth'
-                    });
-                }
-            }
-        });
-    });
+    try {
+      if (new URL(anchor.href, location.href).hostname.toLowerCase() === 'github.com') {
+        window.posthog.capture('WebsiteGitHubClicked');
+      }
+    } catch { }
+  });
 
-    // Nav background on scroll
-    const nav = document.querySelector('.nav');
-    if (nav) {
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 50) {
-                nav.style.background = 'rgba(0, 0, 0, 0.95)';
-            } else {
-                nav.style.background = 'rgba(0, 0, 0, 0.8)';
-            }
-        });
-    }
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const revealEls = document.querySelectorAll('.reveal');
+  if (reduced || !('IntersectionObserver' in window)) {
+    revealEls.forEach(el => el.classList.add('is-visible'));
+  } else {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    revealEls.forEach(el => observer.observe(el));
+  }
 });
