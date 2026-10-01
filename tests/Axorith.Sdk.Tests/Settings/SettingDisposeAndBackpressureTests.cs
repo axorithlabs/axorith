@@ -191,16 +191,17 @@ public class SettingDisposeAndBackpressureTests
     }
 
     [Fact]
-    public void DisposedSubscription_ShouldNotLeakMemory()
+    public void DisposedSubscriptions_ShouldNotReceiveUpdates()
     {
         // Arrange
         var setting = Setting.AsInt("key", "Label", 0);
+        var notificationCount = 0;
         var subscriptions = new List<IDisposable>();
 
         // Act - create and dispose many subscriptions
         for (var i = 0; i < 1000; i++)
         {
-            var sub = setting.Value.Subscribe(_ => { });
+            var sub = setting.Value.Subscribe(_ => notificationCount++);
             subscriptions.Add(sub);
         }
 
@@ -212,8 +213,7 @@ public class SettingDisposeAndBackpressureTests
         // Update setting - should not notify disposed subscriptions
         setting.SetValue(42);
 
-        // Assert - if there's no memory leak, this should not throw OutOfMemoryException
-        Assert.True(true);
+        notificationCount.Should().Be(1000);
     }
 
     [Fact]

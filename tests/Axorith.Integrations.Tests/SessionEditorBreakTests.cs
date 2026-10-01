@@ -1,19 +1,20 @@
-using System.Runtime.CompilerServices;
+using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Axorith.Client.ViewModels;
-using Axorith.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Axorith.Integrations.Tests;
 
 public sealed class SessionEditorBreakTests
 {
-    [Fact]
-    public void SelectingCustomBreakBudgetKeepsCustomControlsVisible()
+    [AvaloniaFact]
+    public async Task SelectingCustomBreakBudgetKeepsCustomControlsVisible()
     {
-        var editor = (SessionEditorViewModel)RuntimeHelpers.GetUninitializedObject(typeof(SessionEditorViewModel));
-        typeof(SessionEditorViewModel).GetField("_focusCommitment",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-            .SetValue(editor, new FocusCommitmentOptions());
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var editor = new SessionEditorViewModel(null!, null!, null!, null!, null!, services);
+        Dispatcher.UIThread.RunJobs();
+        await editor.InitializationTask;
 
         editor.BreakPresetIndex = 2;
 

@@ -11,8 +11,60 @@ using Xunit;
 
 namespace Axorith.Integrations.Tests;
 
+[CollectionDefinition("SiteBlocker extension pipes", DisableParallelization = true)]
+public sealed class SiteBlockerExtensionPipeCollection
+{
+}
+
+[Collection("SiteBlocker extension pipes")]
 public sealed class SiteBlockerAllowListTests
 {
+    [Fact]
+    public void FirefoxHasOneClickPolicyInstallAndChromeIsNotPresentedAsAutomatic()
+    {
+        using var blocker = new RecordingProcessBlocker();
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+        var actions = module.GetActions();
+
+        try
+        {
+            Assert.True(actions.Single(action => action.Key == "InstallExtension.Firefox").GetCurrentEnabled());
+            Assert.False(actions.Single(action => action.Key == "InstallExtension.Chrome").GetCurrentEnabled());
+        }
+        finally
+        {
+            foreach (var action in actions.OfType<IDisposable>())
+                action.Dispose();
+        }
+    }
+
+    [Fact]
+    public void CategorySettingLoadsChoicesFromModuleData()
+    {
+        using var blocker = new RecordingProcessBlocker();
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+
+        var categories = module.GetSettings().Single(setting => setting.Key == "Categories");
+        var choices = categories.GetCurrentChoices();
+
+        Assert.NotNull(choices);
+        Assert.Equal(12, choices.Count);
+        Assert.Contains(choices, choice => choice.Key == "Social");
+        Assert.Contains(choices, choice => choice.Key == "Forums");
+    }
+
+    [Fact]
+    public async Task MissingBrowserExtensionConnectionProducesAWarning()
+    {
+        using var blocker = new RecordingProcessBlocker();
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+
+        var validation = await module.ValidateSettingsAsync(CancellationToken.None);
+
+        Assert.Equal(ValidationStatus.Warning, validation.Status);
+        Assert.Contains("extension is connected", validation.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task EmptyAllowListIsValidatedAndSentToBrowserExtensions()
     {

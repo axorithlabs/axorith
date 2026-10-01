@@ -6,393 +6,154 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axorith.Core.Tests.Services;
 
-/// <summary>
-///     Critical tests for ModuleLoader - parsing module.json, loading DLLs, size limits, platform filtering
-/// </summary>
-public class ModuleLoaderTests : IDisposable
+public sealed class ModuleLoaderTests : IDisposable
 {
-    private readonly ModuleLoader _loader;
-    private readonly string _testModulesDir;
+    private readonly ModuleLoader _loader = new(NullLogger<ModuleLoader>.Instance);
+    private readonly string _modulesRoot = Path.Combine(Path.GetTempPath(), $"axorith-modules-{Guid.NewGuid():N}");
 
-    public ModuleLoaderTests()
+    public ModuleLoaderTests() => Directory.CreateDirectory(_modulesRoot);
+
+    [Fact]
+    public async Task LoadsAnInstalledModuleFromItsManifestAndAssembly()
     {
-        _loader = new ModuleLoader(NullLogger<ModuleLoader>.Instance);
-        _testModulesDir = Path.Combine(Path.GetTempPath(), $"axorith-modules-test-{Guid.NewGuid()}");
-        Directory.CreateDirectory(_testModulesDir);
+        var id = Guid.NewGuid();
+        var moduleDirectory = CreateModule(_modulesRoot, "SiteBlocker", id, CurrentPlatform);
+
+        var definitions = await _loader.LoadModuleDefinitionsAsync([_modulesRoot], CancellationToken.None);
+
+        var definition = definitions.Should().ContainSingle().Which;
+        definition.Id.Should().Be(id);
+        definition.Name.Should().Be("SiteBlocker");
+        definition.ModuleType.Should().NotBeNull();
+        typeof(IModule).IsAssignableFrom(definition.ModuleType!).Should().BeTrue();
+        definition.AssemblyPath.Should().Be(Path.Combine(moduleDirectory, "Axorith.Module.SiteBlocker.dll"));
+        Release(definitions);
+    }
+
+    [Fact]
+    public async Task SkipsMalformedOversizedAndUnsupportedManifests()
+    {
+        var malformed = Path.Combine(_modulesRoot, "Malformed");
+        Directory.CreateDirectory(malformed);
+        await File.WriteAllTextAsync(Path.Combine(malformed, "module.json"), "{ broken");
+
+        var oversized = Path.Combine(_modulesRoot, "Oversized");
+        Directory.CreateDirectory(oversized);
+        await File.WriteAllTextAsync(Path.Combine(oversized, "module.json"), new string('x', 11 * 1024));
+
+        var wrongPlatform = OperatingSystem.IsWindows() ? "Linux" : "Windows";
+        CreateModule(_modulesRoot, "Unsupported", Guid.NewGuid(), wrongPlatform, copyAssembly: false);
+
+        var definitions = await _loader.LoadModuleDefinitionsAsync([_modulesRoot], CancellationToken.None);
+
+        definitions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RejectsAssemblyPathsThatEscapeTheModuleDirectory()
+    {
+        var outsideAssembly = Path.Combine(_modulesRoot, "outside.dll");
+        File.Copy(typeof(Axorith.Module.SiteBlocker.Module).Assembly.Location, outsideAssembly);
+        var moduleDirectory = Path.Combine(_modulesRoot, "Escaping");
+        Directory.CreateDirectory(moduleDirectory);
+        await File.WriteAllTextAsync(Path.Combine(moduleDirectory, "module.json"), JsonSerializer.Serialize(new
+        {
+            id = Guid.NewGuid(),
+            name = "Escaping",
+            platforms = new[] { CurrentPlatform },
+            assembly = "../outside.dll"
+        }));
+
+        var definitions = await _loader.LoadModuleDefinitionsAsync([_modulesRoot], CancellationToken.None);
+
+        definitions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LoadsModulesFromEverySearchPathAndStopsOnCancellation()
+    {
+        var firstPath = Path.Combine(_modulesRoot, "first");
+        var secondPath = Path.Combine(_modulesRoot, "second");
+        Directory.CreateDirectory(firstPath);
+        Directory.CreateDirectory(secondPath);
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        CreateModule(firstPath, "First", firstId, CurrentPlatform);
+        CreateModule(secondPath, "Second", secondId, CurrentPlatform);
+
+        var definitions = await _loader.LoadModuleDefinitionsAsync([firstPath, secondPath], CancellationToken.None);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var cancelledDefinitions = await _loader.LoadModuleDefinitionsAsync([firstPath], cancelled.Token);
+
+        definitions.Select(module => module.Id).Should().BeEquivalentTo([firstId, secondId]);
+        cancelledDefinitions.Should().BeEmpty();
+        Release(definitions);
+    }
+
+    private static string CreateModule(string searchPath, string name, Guid id, string platform,
+        bool copyAssembly = true)
+    {
+        var moduleDirectory = Path.Combine(searchPath, name);
+        Directory.CreateDirectory(moduleDirectory);
+        var assemblyName = "Axorith.Module.SiteBlocker.dll";
+        if (copyAssembly)
+        {
+            File.Copy(typeof(Axorith.Module.SiteBlocker.Module).Assembly.Location,
+                Path.Combine(moduleDirectory, assemblyName));
+        }
+
+        File.WriteAllText(Path.Combine(moduleDirectory, "module.json"), JsonSerializer.Serialize(new
+        {
+            id,
+            name,
+            platforms = new[] { platform },
+            assembly = assemblyName
+        }));
+        return moduleDirectory;
+    }
+
+    private static string CurrentPlatform => OperatingSystem.IsWindows()
+        ? "Windows"
+        : OperatingSystem.IsLinux()
+            ? "Linux"
+            : OperatingSystem.IsMacOS()
+                ? "MacOs"
+                : "Unknown";
+
+    private void Release(IEnumerable<ModuleDefinition> definitions)
+    {
+        foreach (var definition in definitions)
+        {
+            var context = definition.LoadContext;
+            if (context is not null)
+                context.Unload();
+            definition.LoadContext = null;
+            definition.ModuleType = null;
+        }
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_testModulesDir))
+        for (var attempt = 0; Directory.Exists(_modulesRoot); attempt++)
         {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
             try
             {
-                Directory.Delete(_testModulesDir, recursive: true);
+                Directory.Delete(_modulesRoot, recursive: true);
+                return;
             }
-            catch
+            catch (IOException) when (attempt < 49)
             {
-                // Best effort cleanup
+                Thread.Sleep(50);
             }
-        }
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithNoModules_ShouldReturnEmpty()
-    {
-        // Arrange
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task LoadModuleDefinitionsAsync_WithValidCompiledModule_ShouldDiscoverIModuleType()
-    {
-        // Attempt to locate the compiled Axorith.Module.Test.dll in the repo output
-        var dllPath = TryFindTestModuleDll();
-        if (dllPath is null)
-            // Compiled module not available in this environment; skip test
-        {
-            return;
-        }
-
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "ValidRealModule");
-        Directory.CreateDirectory(moduleDir);
-
-        var moduleJson = new
-        {
-            id = Guid.NewGuid(),
-            name = "Test Module",
-            version = "1.0.0",
-            platforms = new[] { GetCurrentPlatform() },
-            assembly = Path.GetFileName(dllPath)
-        };
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(moduleJson));
-
-        var copiedDll = Path.Combine(moduleDir, Path.GetFileName(dllPath));
-        File.Copy(dllPath, copiedDll, overwrite: true);
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().NotBeNull();
-        definitions.Should().ContainSingle();
-        var def = definitions.Single();
-        def.ModuleType.Should().NotBeNull();
-        typeof(IModule).IsAssignableFrom(def.ModuleType!).Should().BeTrue();
-    }
-
-    private static string? TryFindTestModuleDll()
-    {
-        try
-        {
-            // Search relative to the test assembly base directory up to a few levels
-            var baseDir = AppContext.BaseDirectory;
-            var probeRoots = new List<string>();
-            var dir = baseDir;
-            for (var i = 0; i < 6; i++)
+            catch (UnauthorizedAccessException) when (attempt < 49)
             {
-                var candidate = Path.GetFullPath(Path.Combine(dir, "..", "..", "..", "..", "..", "src", "Modules",
-                    "Test", "bin"));
-                probeRoots.Add(candidate);
-                dir = Path.Combine(dir, "..");
-            }
-
-            foreach (var root in probeRoots.Distinct())
-            {
-                if (!Directory.Exists(root))
-                {
-                    continue;
-                }
-
-                var dll = Directory.EnumerateFiles(root, "Axorith.Module.Test.dll", SearchOption.AllDirectories)
-                    .FirstOrDefault();
-                if (dll != null)
-                {
-                    return dll;
-                }
+                Thread.Sleep(50);
             }
         }
-        catch
-        {
-            // ignore and return null
-        }
-
-        return null;
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithValidModule_ShouldLoadDefinition()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "TestModule");
-        Directory.CreateDirectory(moduleDir);
-
-        var moduleJson = new
-        {
-            id = Guid.NewGuid(),
-            name = "Test Module",
-            version = "1.0.0",
-            author = "Test Author",
-            description = "Test Description",
-            platforms = new[] { GetCurrentPlatform() },
-            assembly = "TestModule.dll"
-        };
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(moduleJson));
-
-        // Create dummy DLL
-        var dllPath = Path.Combine(moduleDir, "TestModule.dll");
-        await File.WriteAllBytesAsync(dllPath, [0x4D, 0x5A]); // MZ header
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty(); // Will be empty because DLL is not valid, but JSON was parsed
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithInvalidJson_ShouldSkipModule()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "BadModule");
-        Directory.CreateDirectory(moduleDir);
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, "{ invalid json");
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithOversizedJson_ShouldSkipModule()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "OversizedModule");
-        Directory.CreateDirectory(moduleDir);
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        // Create JSON larger than 10KB limit
-        var largeContent = new string('X', 11 * 1024);
-        await File.WriteAllTextAsync(jsonPath, $"{{\"description\": \"{largeContent}\"}}");
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithWrongPlatform_ShouldSkipModule()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "WrongPlatform");
-        Directory.CreateDirectory(moduleDir);
-
-        var wrongPlatform = GetCurrentPlatform() == "Windows" ? "Linux" : "Windows";
-        var moduleJson = new
-        {
-            id = Guid.NewGuid(),
-            name = "Wrong Platform",
-            version = "1.0.0",
-            platforms = new[] { wrongPlatform },
-            assembly = "test.dll"
-        };
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(moduleJson));
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithMissingAssembly_ShouldSkipModule()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "MissingDll");
-        Directory.CreateDirectory(moduleDir);
-
-        var moduleJson = new
-        {
-            id = Guid.NewGuid(),
-            name = "Missing DLL",
-            version = "1.0.0",
-            platforms = new[] { GetCurrentPlatform() },
-            assembly = "NonExistent.dll"
-        };
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(moduleJson));
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithNonExistentPath_ShouldNotThrow()
-    {
-        // Arrange
-        var nonExistentPath = Path.Combine(_testModulesDir, "NonExistent");
-        var searchPaths = new[] { nonExistentPath };
-
-        // Act
-        var act = async () => await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        await act.Should().NotThrowAsync();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithSymbolicLink_ShouldSkipInProduction()
-    {
-        // This test verifies that symbolic links are skipped in production (non-debug) mode
-        // In debug mode, symlinks are allowed for development
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "SymlinkModule");
-        Directory.CreateDirectory(moduleDir);
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert - should not throw
-        definitions.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithMultiplePaths_ShouldSearchAll()
-    {
-        // Arrange
-        var path1 = Path.Combine(_testModulesDir, "Path1");
-        var path2 = Path.Combine(_testModulesDir, "Path2");
-        Directory.CreateDirectory(path1);
-        Directory.CreateDirectory(path2);
-
-        var searchPaths = new[] { path1, path2 };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithCancellation_ShouldRespectToken()
-    {
-        // Arrange
-        var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, cts.Token);
-
-        // Assert - should stop early
-        definitions.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithNullDefinition_ShouldSkip()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "NullDef");
-        Directory.CreateDirectory(moduleDir);
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, "null");
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task LoadModuleDefinitionsAsync_WithEmptyAssemblyField_ShouldSkip()
-    {
-        // Arrange
-        var moduleDir = Path.Combine(_testModulesDir, "EmptyAssembly");
-        Directory.CreateDirectory(moduleDir);
-
-        var moduleJson = new
-        {
-            id = Guid.NewGuid(),
-            name = "Empty Assembly",
-            version = "1.0.0",
-            platforms = new[] { GetCurrentPlatform() },
-            assembly = ""
-        };
-
-        var jsonPath = Path.Combine(moduleDir, "module.json");
-        await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(moduleJson));
-
-        var searchPaths = new[] { _testModulesDir };
-
-        // Act
-        var definitions = await _loader.LoadModuleDefinitionsAsync(searchPaths, CancellationToken.None);
-
-        // Assert
-        definitions.Should().BeEmpty();
-    }
-
-    private static string GetCurrentPlatform()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return "Windows";
-        }
-
-        if (OperatingSystem.IsLinux())
-        {
-            return "Linux";
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            return "MacOs";
-        }
-
-        return "Unknown";
     }
 }

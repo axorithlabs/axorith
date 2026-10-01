@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.Text.Json.Nodes;
 using Axorith.Core.Services;
@@ -87,20 +88,10 @@ public sealed class WindowsCommitmentProtectionServiceTests
         }
     }
 
-    [Fact]
+    [UnelevatedWindowsFact]
+    [SupportedOSPlatform("windows")]
     public async Task StrictPreflightRejectsAnUnelevatedHost()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        using var identity = WindowsIdentity.GetCurrent();
-        if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
-        {
-            return;
-        }
-
         var directory = Directory.CreateTempSubdirectory("axorith-strict-elevation-test-");
         try
         {
@@ -112,6 +103,22 @@ public sealed class WindowsCommitmentProtectionServiceTests
         finally
         {
             directory.Delete(recursive: true);
+        }
+    }
+
+    private sealed class UnelevatedWindowsFactAttribute : FactAttribute
+    {
+        public UnelevatedWindowsFactAttribute()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Skip = "Strict commitment preflight requires Windows.";
+                return;
+            }
+
+            using var identity = WindowsIdentity.GetCurrent();
+            if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+                Skip = "This behavior is verified only for an unelevated host.";
         }
     }
 }

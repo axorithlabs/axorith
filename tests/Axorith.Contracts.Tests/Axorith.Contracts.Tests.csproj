@@ -19,5 +19,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Contracts\Axorith.Contracts.csproj" />
+        <ProjectReference Include="..\..\src\Host\Axorith.Host.csproj" />
+        <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
     </ItemGroup>
 </Project>

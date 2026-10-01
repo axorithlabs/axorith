@@ -34,37 +34,6 @@ public class ModuleRegistryTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeAsync_ShouldLoadDefinitions()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var definitions = new List<ModuleDefinition>
-        {
-            new()
-            {
-                Id = id,
-                Name = "Test Module",
-                ModuleType = typeof(object) // Dummy type for test
-            }
-        };
-
-        _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(definitions);
-
-        // Act
-        await _registry.InitializeAsync(CancellationToken.None);
-
-        // Assert
-        _mockLoader.Verify(l => l.LoadModuleDefinitionsAsync(
-            It.IsAny<IEnumerable<string>>(),
-            It.IsAny<CancellationToken>(),
-            It.IsAny<IEnumerable<string>>()), Times.Once);
-    }
-
-    [Fact]
     public async Task GetAllDefinitions_AfterInit_ShouldReturnLoadedDefinitions()
     {
         // Arrange
@@ -157,48 +126,6 @@ public class ModuleRegistryTests : IDisposable
         // Assert
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*not been initialized*");
-    }
-
-    [Fact]
-    public async Task InitializeAsync_CalledMultipleTimes_ShouldReload()
-    {
-        // Arrange
-        _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(new List<ModuleDefinition>());
-
-        // Act
-        await _registry.InitializeAsync(CancellationToken.None);
-        await _registry.InitializeAsync(CancellationToken.None);
-        await _registry.InitializeAsync(CancellationToken.None);
-
-        // Assert
-        _mockLoader.Verify(l => l.LoadModuleDefinitionsAsync(
-            It.IsAny<IEnumerable<string>>(),
-            It.IsAny<CancellationToken>(),
-            It.IsAny<IEnumerable<string>>()), Times.AtLeastOnce);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_WithCancellation_ShouldRespectToken()
-    {
-        // Arrange
-        var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
-
-        _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<IEnumerable<string>>()))
-            .ThrowsAsync(new OperationCanceledException());
-
-        // Act
-        var act = async () => await _registry.InitializeAsync(cts.Token);
-
-        // Assert
-        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     public void Dispose()

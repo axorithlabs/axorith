@@ -59,50 +59,6 @@ public class ModuleErrorHandlingTests
     }
 
     [Fact]
-    public void ModuleLifecycle_WithInitializeException_ShouldStillAllowRetry()
-    {
-        // Arrange
-        var initializeCallCount = 0;
-        var mockModule = new Mock<IModule>();
-
-        mockModule.Setup(m => m.GetSettings()).Returns([]);
-        mockModule.Setup(m => m.GetActions()).Returns([]);
-        mockModule.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
-            .Returns(() =>
-            {
-                initializeCallCount++;
-                if (initializeCallCount == 1)
-                {
-                    throw new InvalidOperationException("First init failed");
-                }
-
-                return Task.CompletedTask;
-            });
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ValidationResult.Success);
-        mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var mockRegistry = new Mock<IModuleRegistry>();
-        var moduleId = Guid.NewGuid();
-        var definition = new ModuleDefinition
-        {
-            Id = moduleId,
-            Name = "Retry Module",
-            Platforms = [Platform.Windows],
-            ModuleType = mockModule.Object.GetType()
-        };
-        var root = new ContainerBuilder().Build();
-        var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
-        mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
-
-        // Act - first attempt fails, second succeeds
-        // Note: Current implementation doesn't retry automatically,
-        // but module should allow retry after fix
-        initializeCallCount.Should().BeGreaterThanOrEqualTo(0);
-    }
-
-    [Fact]
     public async Task ModuleLifecycle_WithSettingConfigurationError_ShouldBeDetected()
     {
         // Arrange
@@ -196,8 +152,6 @@ public class ModuleErrorHandlingTests
         };
 
         await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
-
         // Act
         await sessionManager.StopCurrentSessionAsync();
 
@@ -251,8 +205,6 @@ public class ModuleErrorHandlingTests
         };
 
         await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
-
         // Act
         await sessionManager.StopCurrentSessionAsync();
 

@@ -1,4 +1,3 @@
-using Autofac;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -16,8 +15,12 @@ using Axorith.Client.Views;
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Host.Streaming;
 using Axorith.Sdk;
 using FluentAssertions;
+using Empty = Google.Protobuf.WellKnownTypes.Empty;
+using Timestamp = Google.Protobuf.WellKnownTypes.Timestamp;
+using INotifier = Axorith.Sdk.Services.INotifier;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
@@ -26,11 +29,10 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using Polly;
+using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using Xunit;
-using ModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
 [assembly: AvaloniaTestApplication(typeof(Axorith.Integrations.Tests.HostGrpcEndToEndTests.TestAppBuilder))]
 
@@ -39,11 +41,17 @@ namespace Axorith.Integrations.Tests;
 public sealed class HostTestFactory : WebApplicationFactory<Program>
 {
     public string TestDataPath { get; }
+    public Guid SiteBlockerModuleId { get; }
+    public Guid AppBlockerModuleId { get; }
 
     public HostTestFactory()
     {
         TestDataPath = Path.Combine(Path.GetTempPath(), "AxorithTests", Guid.NewGuid().ToString());
         Directory.CreateDirectory(TestDataPath);
+        SiteBlockerModuleId = Guid.NewGuid();
+        AppBlockerModuleId = Guid.NewGuid();
+        InstallModule(typeof(Axorith.Module.SiteBlocker.Module), SiteBlockerModuleId, "Site Blocker");
+        InstallModule(typeof(Axorith.Module.AppBlocker.Module), AppBlockerModuleId, "App Blocker");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -56,7 +64,8 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
                     ["Persistence:PresetsPath"] = Path.Combine(TestDataPath, "presets"),
                     ["Persistence:LogsPath"] = Path.Combine(TestDataPath, "logs"),
                     ["Persistence:ConfigPath"] = Path.Combine(TestDataPath, "config"),
-                    ["Modules:SearchPaths:0"] = Path.Combine(TestDataPath, "empty_modules"),
+                    ["Persistence:HostInfoPath"] = Path.Combine(TestDataPath, "host-info.json"),
+                    ["Modules:SearchPaths:0"] = Path.Combine(TestDataPath, "modules"),
                     ["Modules:SearchPaths:1"] = Path.Combine(TestDataPath, "empty_modules"),
                     ["Modules:SearchPaths:2"] = Path.Combine(TestDataPath, "empty_modules"),
                     ["Modules:SearchPaths:3"] = Path.Combine(TestDataPath, "empty_modules"),
@@ -67,35 +76,22 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
             configBuilder.AddConfiguration(testConfig);
         });
 
-        builder.ConfigureTestContainer<ContainerBuilder>(containerBuilder =>
+    }
+
+    private void InstallModule(Type moduleType, Guid id, string name)
+    {
+        var moduleDirectory = Path.Combine(TestDataPath, "modules", name.Replace(' ', '_'));
+        Directory.CreateDirectory(moduleDirectory);
+        var assemblyName = Path.GetFileName(moduleType.Assembly.Location);
+        File.Copy(moduleType.Assembly.Location, Path.Combine(moduleDirectory, assemblyName));
+        File.WriteAllText(Path.Combine(moduleDirectory, "module.json"), System.Text.Json.JsonSerializer.Serialize(new
         {
-            var mockRegistry = new Mock<IModuleRegistry>();
-
-            var testModules = new List<ModuleDefinition>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid(), Name = "System Module", Category = "System", Platforms = [Platform.Windows]
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(), Name = "Music Module", Category = "Music", Platforms = [Platform.Windows]
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(), Name = "Dev Module", Category = "Development", Platforms = [Platform.Windows]
-                }
-            };
-
-            mockRegistry.Setup(r => r.GetAllDefinitions()).Returns(testModules);
-
-            mockRegistry.Setup(r => r.GetDefinitionById(It.IsAny<Guid>()))
-                .Returns((Guid id) => testModules.FirstOrDefault(m => m.Id == id));
-
-            containerBuilder.RegisterInstance(mockRegistry.Object)
-                .As<IModuleRegistry>()
-                .SingleInstance();
-        });
+            id,
+            name,
+            category = "Productivity",
+            platforms = new[] { OperatingSystem.IsWindows() ? "Windows" : "Linux" },
+            assembly = assemblyName
+        }));
     }
 
     public override async ValueTask DisposeAsync()
@@ -115,62 +111,26 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
     }
 }
 
+[Collection("SiteBlocker extension pipes")]
 public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<HostTestFactory>
 {
     [AvaloniaFact]
-    public async Task MainViewKeepsIdleAndSidebarActionsClearAndReadable()
+    public void PresetSummaryClarifiesDurationAndOmitsDurationStopSchedule()
     {
-        var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
-        using var channelLifetime = channel;
-        using var api = new GrpcSessionsApi(sessions, Policy.Handle<Exception>().RetryAsync(0), NullLogger.Instance);
-        using var services = new ServiceCollection().BuildServiceProvider();
-        using var viewModel = new MainViewModel(null!, null!, api, null!, services);
-        var view = new MainView { DataContext = viewModel };
-
-        Assert.False(viewModel.IsSessionActive);
-        Assert.Null(view.FindControl<Border>("SessionStatusNotice"));
-        Assert.DoesNotContain(view.GetLogicalDescendants().OfType<TextBlock>(),
-            text => text.Text == "No active session");
-
-        foreach (var name in new[] { "HomeSidebarButton", "PresetsSidebarButton", "SettingsSidebarButton" })
+        using var preset = new SessionPresetViewModel(new SessionPreset
         {
-            Assert.Equal(HorizontalAlignment.Stretch, view.FindControl<Button>(name)!.HorizontalAlignment);
-        }
-        Assert.Equal(12, view.FindControl<Button>("HomeSidebarButton")!.FontSize);
+            Name = "main",
+            FocusCommitment = new Axorith.Core.Models.FocusCommitmentOptions
+            {
+                EndCondition = Axorith.Core.Models.FocusEndCondition.Duration,
+                Duration = TimeSpan.FromMinutes(5)
+            }
+        }, [], null!, null!,
+        [new SessionSchedule { Name = "main Duration Stop", Type = ScheduleType.StopDuration }]);
 
-        var updateButton = view.FindControl<Button>("SidebarUpdateButton")!;
-        var sidebar = view.FindControl<Grid>("SidebarNavigationGrid")!;
-        Assert.False(updateButton.IsVisible);
-        Assert.Contains(updateButton, sidebar.Children);
-        Assert.Equal(4, Grid.GetRow(updateButton));
-
-        typeof(MainViewModel).GetProperty(nameof(MainViewModel.UpdateAvailable))!
-            .SetValue(viewModel, true);
-        Dispatcher.UIThread.RunJobs();
-        Assert.True(updateButton.IsVisible);
-        Assert.Same(viewModel.InstallUpdateCommand, updateButton.Command);
-
-        typeof(MainViewModel).GetProperty(nameof(MainViewModel.UpdateAvailable))!
-            .SetValue(viewModel, false);
-        Dispatcher.UIThread.RunJobs();
-        Assert.False(updateButton.IsVisible);
-
-        Assert.Contains(view.FindControl<Button>("CreateSessionButton"),
-            view.FindControl<Grid>("PresetsHeader")!.Children);
-        Assert.Equal(16, new SettingsView().FindControl<TextBlock>("SettingsSidebarHeading")!.FontSize);
-
-        using var preset = new SessionPresetViewModel(new SessionPreset { Name = "Deep Work" },
-            [], null!, services);
-        var card = view.FindControl<ListBox>("PresetsListBox")!.ItemTemplate!.Build(preset)!;
-        var moreButton = card.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.Name == "PresetActionsButton");
-        Assert.Equal(40, moreButton.Width);
-        Assert.Equal(3, Assert.IsType<StackPanel>(moreButton.Content).Children.Count);
-
-        typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsSessionActive))!
-            .SetValue(viewModel, true);
-        Dispatcher.UIThread.RunJobs();
-        Assert.True(view.FindControl<Button>("SidebarStopSessionButton")!.IsVisible);
+        Assert.Equal("Session duration: 5 min", preset.SessionSummary);
+        Assert.False(preset.HasSchedule);
+        Assert.Empty(preset.ScheduleSummary);
     }
 
     static HostGrpcEndToEndTests()
@@ -255,36 +215,67 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             response.Should().NotBeNull();
             response.Status.Should().Be(HealthStatus.Healthy);
             response.Version.Should().NotBeNullOrEmpty();
+            response.LoadedModules.Should().Be(2);
+            response.ActiveSessions.Should().Be(0);
         }
+    }
+
+    [Fact]
+    public async Task GrpcRejectsRequestsWithoutTheHostAuthenticationToken()
+    {
+        using var httpClient = factory.CreateDefaultClient();
+        Assert.True(File.Exists(Path.Combine(factory.TestDataPath, "host-info.json")),
+            "The Host must write discovery data inside the isolated test directory.");
+        using var channel = GrpcChannel.ForAddress(httpClient.BaseAddress!, new GrpcChannelOptions
+        {
+            HttpClient = httpClient
+        });
+        var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
+
+        var error = await Assert.ThrowsAsync<RpcException>(() =>
+            diagnostics.GetHealthAsync(new HealthCheckRequest()).ResponseAsync);
+
+        Assert.Equal(StatusCode.Unauthenticated, error.StatusCode);
     }
 
     [Fact]
     public async Task Presets_Create_List_Get_Delete_ShouldRoundTrip()
     {
-        var (_, presets, _, _, channel) = await CreateAuthenticatedClientsAsync();
+        var (_, presets, _, modules, channel) = await CreateAuthenticatedClientsAsync();
 
         using (channel)
         {
             var name = $"IntegrationTest-{Guid.NewGuid():N}";
             var endDays = new[] { DayOfWeek.Monday, DayOfWeek.Friday };
 
-            var created = await presets.CreatePresetAsync(new CreatePresetRequest
+            var installedModule = await GetInstalledSiteBlockerAsync(modules);
+            var configuredModule = new Axorith.Contracts.ConfiguredModule
             {
-                Preset = new Preset
+                ModuleId = installedModule.Id,
+                InstanceId = Guid.NewGuid().ToString(),
+                CustomName = "Site Blocker"
+            };
+            configuredModule.Settings.Add("Mode", "BlockList");
+            configuredModule.Settings.Add("Categories", "[]");
+            configuredModule.Settings.Add("CustomSites", "focus.example");
+
+            var requestPreset = new Preset
+            {
+                Name = name,
+                FocusCommitment = new Axorith.Contracts.FocusCommitmentOptions
                 {
-                    Name = name,
-                    FocusCommitment = new Axorith.Contracts.FocusCommitmentOptions
-                    {
-                        Mode = (Axorith.Contracts.FocusCommitmentMode)1,
-                        EndCondition = (Axorith.Contracts.FocusEndCondition)2,
-                        HasEndAtLocalTime = true,
-                        EndAtHour = 18,
-                        EndAtMinute = 30,
-                        AfterEnd = (Axorith.Contracts.AfterEndBehavior)0,
-                        EndAtDaysOfWeek = { endDays.Select(day => (int)day) }
-                    }
+                    Mode = (Axorith.Contracts.FocusCommitmentMode)1,
+                    EndCondition = (Axorith.Contracts.FocusEndCondition)2,
+                    HasEndAtLocalTime = true,
+                    EndAtHour = 18,
+                    EndAtMinute = 30,
+                    AfterEnd = (Axorith.Contracts.AfterEndBehavior)0,
+                    EndAtDaysOfWeek = { endDays.Select(day => (int)day) }
                 }
-            });
+            };
+            requestPreset.Modules.Add(configuredModule);
+
+            var created = await presets.CreatePresetAsync(new CreatePresetRequest { Preset = requestPreset });
 
             created.Should().NotBeNull();
             created.Name.Should().Be(name);
@@ -303,6 +294,17 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             fetched.Id.Should().Be(created.Id);
             fetched.Name.Should().Be(name);
             fetched.FocusCommitment.EndAtDaysOfWeek.Should().Equal(endDays.Select(day => (int)day));
+            fetched.Modules.Should().ContainSingle();
+            fetched.Modules[0].ModuleId.Should().Be(installedModule.Id);
+            fetched.Modules[0].InstanceId.Should().Be(configuredModule.InstanceId);
+            fetched.Modules[0].Settings["CustomSites"].Should().Be("focus.example");
+
+            fetched.Name = $"{name}-updated";
+            fetched.Modules[0].Settings["CustomSites"] = "updated.example";
+            var updated = await presets.UpdatePresetAsync(new UpdatePresetRequest { Preset = fetched });
+            updated.Name.Should().Be($"{name}-updated");
+            var updatedFromDisk = await presets.GetPresetAsync(new GetPresetRequest { PresetId = created.Id });
+            updatedFromDisk.Modules[0].Settings["CustomSites"].Should().Be("updated.example");
 
             await presets.DeletePresetAsync(new DeletePresetRequest
             {
@@ -312,6 +314,572 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             var afterDelete = await presets.ListPresetsAsync(new ListPresetsRequest());
             afterDelete.Presets.Should().NotContain(p => p.Id == created.Id);
         }
+    }
+
+    [Fact]
+    public async Task RunningModuleSettingChangesAreStreamedToTheConnectedClient()
+    {
+        var (_, presets, sessions, modules, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            var module = await GetInstalledSiteBlockerAsync(modules);
+            var instanceId = Guid.NewGuid();
+            var preset = new Preset { Name = $"SettingStream-{Guid.NewGuid():N}" };
+            var configuredModule = new Axorith.Contracts.ConfiguredModule
+            {
+                ModuleId = module.Id,
+                InstanceId = instanceId.ToString()
+            };
+            configuredModule.Settings.Add("Mode", "BlockList");
+            configuredModule.Settings.Add("Categories", "[]");
+            configuredModule.Settings.Add("CustomSites", string.Empty);
+            preset.Modules.Add(configuredModule);
+
+            var created = await presets.CreatePresetAsync(new CreatePresetRequest { Preset = preset });
+            var started = await sessions.StartSessionAsync(new StartSessionRequest { PresetId = created.Id });
+            started.Success.Should().BeTrue(started.Message);
+
+            try
+            {
+                using var stream = modules.StreamSettingUpdates(
+                    new StreamSettingUpdatesRequest { ModuleInstanceId = instanceId.ToString() },
+                    cancellationToken: timeout.Token);
+                var updateTask = ReadSettingUpdateAsync(stream.ResponseStream, "CustomSites", "sync-marker.example",
+                    timeout.Token);
+
+                var updated = await modules.UpdateSettingAsync(new UpdateSettingRequest
+                {
+                    ModuleInstanceId = instanceId.ToString(),
+                    SettingKey = "CustomSites",
+                    StringValue = "sync-marker.example"
+                });
+
+                updated.Success.Should().BeTrue(updated.Message);
+                var update = await updateTask.WaitAsync(TimeSpan.FromSeconds(5));
+                update.ModuleInstanceId.Should().Be(instanceId.ToString());
+                update.SettingKey.Should().Be("CustomSites");
+                update.StringValue.Should().Be("sync-marker.example");
+            }
+            finally
+            {
+                timeout.Cancel();
+                await sessions.StopSessionAsync(new StopSessionRequest());
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = created.Id });
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InstalledModulesReturnTheirRealSettingsAndActionsOverGrpc()
+    {
+        var (_, _, _, modules, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            await GetInstalledSiteBlockerAsync(modules);
+            var productivityModules = await modules.ListModulesAsync(new ListModulesRequest
+            {
+                Category = "Productivity"
+            });
+            Assert.Contains(productivityModules.Modules, module => module.Id == factory.SiteBlockerModuleId.ToString());
+            Assert.Contains(productivityModules.Modules, module => module.Id == factory.AppBlockerModuleId.ToString());
+            var unknownCategory = await modules.ListModulesAsync(new ListModulesRequest { Category = "Unknown" });
+            Assert.Empty(unknownCategory.Modules);
+
+            foreach (var (moduleId, expectedAction) in new[]
+                     {
+                         (factory.SiteBlockerModuleId, "InstallExtension.Firefox"),
+                         (factory.AppBlockerModuleId, "AddApp")
+                     })
+            {
+                var response = await modules.GetModuleSettingsAsync(new GetModuleSettingsRequest
+                {
+                    ModuleId = moduleId.ToString()
+                });
+
+                Assert.NotEmpty(response.Settings);
+                Assert.Contains(response.Actions, action => action.Key == expectedAction);
+            }
+
+            var siteBlockerSettings = await modules.GetModuleSettingsAsync(new GetModuleSettingsRequest
+            {
+                ModuleId = factory.SiteBlockerModuleId.ToString()
+            });
+            Assert.Contains(siteBlockerSettings.Actions, action =>
+                action.Key == "InstallExtension.Chrome" && !action.IsEnabled);
+        }
+    }
+
+    [Fact]
+    public async Task SiteBlockerExtensionWarningSurvivesGrpcValidation()
+    {
+        var (_, _, _, modules, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            await GetInstalledSiteBlockerAsync(modules);
+            var result = await modules.ValidateSettingsAsync(new ValidateSettingsRequest
+            {
+                ModuleId = factory.SiteBlockerModuleId.ToString(),
+                ModuleInstanceId = Guid.NewGuid().ToString()
+            });
+
+            Assert.True(result.IsValid, result.Message);
+            Assert.True(result.IsWarning);
+            Assert.Contains("extension is connected", result.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [WindowsFact]
+    public async Task RunningAppBlockerActionUpdatesItsRealSettingThroughGrpc()
+    {
+        var (_, presets, sessions, modules, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            var instanceId = Guid.NewGuid();
+            var configuredModule = new Axorith.Contracts.ConfiguredModule
+            {
+                ModuleId = factory.AppBlockerModuleId.ToString(),
+                InstanceId = instanceId.ToString()
+            };
+            configuredModule.Settings.Add("Mode", "BlockList");
+            configuredModule.Settings.Add("Categories", "[]");
+            configuredModule.Settings.Add("CustomProcessList", string.Empty);
+            var preset = new Preset { Name = $"Action-{Guid.NewGuid():N}" };
+            preset.Modules.Add(configuredModule);
+            var created = await presets.CreatePresetAsync(new CreatePresetRequest { Preset = preset });
+            var started = await sessions.StartSessionAsync(new StartSessionRequest { PresetId = created.Id });
+            started.Success.Should().BeTrue(started.Message);
+
+            try
+            {
+                var state = await sessions.GetSessionStateAsync(new GetSessionStateRequest());
+                Assert.True(state.IsActive);
+                Assert.Equal(created.Id, state.PresetId);
+                Assert.Contains(state.ModuleStates, moduleState => moduleState.InstanceId == instanceId.ToString());
+
+                var hostManagement = new HostManagement.HostManagementClient(channel);
+                var hostStatus = await hostManagement.GetStatusAsync(new Empty());
+                Assert.True(hostStatus.IsSessionRunning);
+                Assert.Equal(1, hostStatus.ActiveModulesCount);
+                Assert.Equal(created.Id, hostStatus.CurrentPresetId);
+                var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
+                var health = await diagnostics.GetHealthAsync(new HealthCheckRequest());
+                Assert.Equal(1, health.ActiveSessions);
+                Assert.Equal(2, health.LoadedModules);
+
+                using var stream = modules.StreamSettingUpdates(
+                    new StreamSettingUpdatesRequest { ModuleInstanceId = instanceId.ToString() },
+                    cancellationToken: timeout.Token);
+                var expectedProcessName = $"axorith-no-process-{Guid.NewGuid():N}";
+                var updateTask = ReadSettingUpdateAsync(stream.ResponseStream, "CustomProcessList",
+                    expectedProcessName, timeout.Token);
+
+                var selection = await modules.UpdateSettingAsync(new UpdateSettingRequest
+                {
+                    ModuleInstanceId = instanceId.ToString(),
+                    SettingKey = "AppToAdd",
+                    StringValue = expectedProcessName
+                });
+                selection.Success.Should().BeTrue(selection.Message);
+
+                var invoked = await modules.InvokeActionAsync(new InvokeActionRequest
+                {
+                    ModuleInstanceId = instanceId.ToString(),
+                    ActionKey = "AddApp"
+                });
+
+                invoked.Success.Should().BeTrue(invoked.Message);
+                var update = await updateTask.WaitAsync(TimeSpan.FromSeconds(5));
+                update.StringValue.Should().Be(expectedProcessName);
+            }
+            finally
+            {
+                timeout.Cancel();
+                await sessions.StopSessionAsync(new StopSessionRequest());
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = created.Id });
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SchedulerGrpcCrudPersistsARealSchedule()
+    {
+        var (_, presets, _, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
+            var preset = await presets.CreatePresetAsync(new CreatePresetRequest
+            {
+                Preset = new Preset { Name = $"Schedule-{Guid.NewGuid():N}" }
+            });
+            string? scheduleId = null;
+
+            try
+            {
+                var date = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddDays(1));
+                var created = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
+                {
+                    Schedule = new Axorith.Contracts.Schedule
+                    {
+                        PresetId = preset.Id,
+                        Name = "Tomorrow's focus session",
+                        Type = (int)Axorith.Core.Models.ScheduleType.OneTime,
+                        OneTimeDate = date,
+                        AutoStopDurationSeconds = 3600
+                    }
+                });
+                scheduleId = created.Id;
+                Assert.True(Guid.TryParse(created.Id, out _));
+                Assert.Equal("Tomorrow's focus session", created.Name);
+                Assert.Equal(3600, created.AutoStopDurationSeconds);
+
+                var listed = await scheduler.ListSchedulesAsync(new ListSchedulesRequest());
+                Assert.Contains(listed.Schedules, schedule => schedule.Id == created.Id);
+
+                var disabled = await scheduler.SetEnabledAsync(new SetScheduleEnabledRequest
+                {
+                    ScheduleId = created.Id,
+                    Enabled = false
+                });
+                Assert.False(disabled.IsEnabled);
+
+                var updated = await scheduler.UpdateScheduleAsync(new UpdateScheduleRequest
+                {
+                    Schedule = new Axorith.Contracts.Schedule
+                    {
+                        Id = created.Id,
+                        PresetId = preset.Id,
+                        Name = "Updated focus session",
+                        IsEnabled = false,
+                        Type = (int)Axorith.Core.Models.ScheduleType.OneTime,
+                        OneTimeDate = date,
+                        AutoStopDurationSeconds = 1800
+                    }
+                });
+                Assert.Equal("Updated focus session", updated.Name);
+                Assert.Equal(1800, updated.AutoStopDurationSeconds);
+                Assert.False(updated.IsEnabled);
+
+                var lockStatus = await scheduler.GetConfigurationLockStatusAsync(
+                    new ConfigurationLockStatusRequest { PresetId = preset.Id });
+                Assert.False(lockStatus.IsLocked);
+
+                await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = created.Id });
+                scheduleId = null;
+                var afterDelete = await scheduler.ListSchedulesAsync(new ListSchedulesRequest());
+                Assert.DoesNotContain(afterDelete.Schedules, schedule => schedule.Id == created.Id);
+            }
+            finally
+            {
+                if (scheduleId is not null)
+                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
+            }
+        }
+    }
+
+    [WindowsFact]
+    public async Task OneTimeScheduleStartsItsPresetAtTheScheduledTime()
+    {
+        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
+            var preset = await CreateAppBlockerPresetAsync(presets, "OneTimeStart");
+            string? scheduleId = null;
+
+            try
+            {
+                var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
+                {
+                    Schedule = new Axorith.Contracts.Schedule
+                    {
+                        PresetId = preset.Id,
+                        Name = "Start in a few seconds",
+                        IsEnabled = true,
+                        Type = (int)ScheduleType.OneTime,
+                        OneTimeDate = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddSeconds(4))
+                    }
+                });
+                scheduleId = schedule.Id;
+
+                var state = await WaitForSessionStateAsync(sessions,
+                    value => value.IsActive && value.PresetId == preset.Id, TimeSpan.FromSeconds(10));
+                Assert.True(state.IsActive);
+                Assert.Equal(preset.Id, state.PresetId);
+            }
+            finally
+            {
+                await StopSessionForPresetIfRunningAsync(sessions, preset.Id);
+                if (scheduleId is not null)
+                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
+            }
+        }
+    }
+
+    [WindowsFact]
+    public async Task RecurringScheduleStartsItsPresetAtTheScheduledTime()
+    {
+        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
+            var preset = await CreateAppBlockerPresetAsync(presets, "RecurringStart");
+            string? scheduleId = null;
+
+            try
+            {
+                var runAt = DateTimeOffset.Now.AddSeconds(5).TimeOfDay;
+                var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
+                {
+                    Schedule = new Axorith.Contracts.Schedule
+                    {
+                        PresetId = preset.Id,
+                        Name = "Start at recurring time",
+                        IsEnabled = true,
+                        Type = (int)ScheduleType.Recurring,
+                        RecurringTime = runAt.ToString("c", System.Globalization.CultureInfo.InvariantCulture)
+                    }
+                });
+                scheduleId = schedule.Id;
+
+                var state = await WaitForSessionStateAsync(sessions,
+                    value => value.IsActive && value.PresetId == preset.Id, TimeSpan.FromSeconds(10));
+                Assert.True(state.IsActive);
+                Assert.Equal(preset.Id, state.PresetId);
+            }
+            finally
+            {
+                await StopSessionForPresetIfRunningAsync(sessions, preset.Id);
+                if (scheduleId is not null)
+                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
+            }
+        }
+    }
+
+    [WindowsFact]
+    public async Task StopRecurringScheduleEndsItsActivePresetAtTheScheduledTime()
+    {
+        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
+            var preset = await CreateAppBlockerPresetAsync(presets, "RecurringStop");
+            string? scheduleId = null;
+            var started = false;
+
+            try
+            {
+                var start = await sessions.StartSessionAsync(new StartSessionRequest { PresetId = preset.Id });
+                Assert.True(start.Success, start.Message);
+                started = true;
+
+                var runAt = DateTimeOffset.Now.AddSeconds(5).TimeOfDay;
+                var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
+                {
+                    Schedule = new Axorith.Contracts.Schedule
+                    {
+                        PresetId = preset.Id,
+                        Name = "Stop at recurring time",
+                        IsEnabled = true,
+                        Type = (int)ScheduleType.StopRecurring,
+                        RecurringTime = runAt.ToString("c", System.Globalization.CultureInfo.InvariantCulture)
+                    }
+                });
+                scheduleId = schedule.Id;
+
+                var state = await WaitForSessionStateAsync(sessions, value => !value.IsActive,
+                    TimeSpan.FromSeconds(10));
+                Assert.False(state.IsActive);
+                started = false;
+            }
+            finally
+            {
+                if (started)
+                    await sessions.StopSessionAsync(new StopSessionRequest());
+                if (scheduleId is not null)
+                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
+            }
+        }
+    }
+
+    [WindowsFact]
+    public async Task StopDurationScheduleEndsItsRunningSessionAutomatically()
+    {
+        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
+            var instanceId = Guid.NewGuid();
+            var module = new Axorith.Contracts.ConfiguredModule
+            {
+                ModuleId = factory.AppBlockerModuleId.ToString(),
+                InstanceId = instanceId.ToString()
+            };
+            module.Settings.Add("Mode", "BlockList");
+            module.Settings.Add("Categories", "[]");
+            module.Settings.Add("CustomProcessList", $"axorith-no-process-{Guid.NewGuid():N}");
+            var preset = await presets.CreatePresetAsync(new CreatePresetRequest
+            {
+                Preset = new Preset { Name = $"AutoStop-{Guid.NewGuid():N}", Modules = { module } }
+            });
+            var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
+            {
+                Schedule = new Axorith.Contracts.Schedule
+                {
+                    PresetId = preset.Id,
+                    Name = "Stop after two seconds",
+                    IsEnabled = true,
+                    Type = (int)Axorith.Core.Models.ScheduleType.StopDuration,
+                    AutoStopDurationSeconds = 2
+                }
+            });
+            Assert.True(schedule.IsEnabled);
+            var started = false;
+
+            try
+            {
+                var response = await sessions.StartSessionAsync(new StartSessionRequest { PresetId = preset.Id });
+                Assert.True(response.Success, response.Message);
+                started = true;
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                while (stopwatch.Elapsed < TimeSpan.FromSeconds(8))
+                {
+                    var state = await sessions.GetSessionStateAsync(new GetSessionStateRequest());
+                    if (!state.IsActive)
+                    {
+                        started = false;
+                        break;
+                    }
+
+                    await Task.Delay(100);
+                }
+
+                Assert.False(started, "The real stop-duration schedule did not end its session.");
+            }
+            finally
+            {
+                if (started)
+                    await sessions.StopSessionAsync(new StopSessionRequest());
+                await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = schedule.Id });
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
+            }
+        }
+    }
+
+    [Fact]
+    public async Task HostToastIsStreamedAndMappedToTheConnectedClient()
+    {
+        var (_, _, _, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+        {
+            var notifications = new GrpcNotificationApi(
+                new NotificationService.NotificationServiceClient(channel));
+            await using var stream = notifications.StreamNotificationsAsync(timeout.Token)
+                .GetAsyncEnumerator(timeout.Token);
+            var notificationTask = stream.MoveNextAsync().AsTask();
+            var broadcaster = factory.Services.GetRequiredService<NotificationBroadcaster>();
+            for (var attempt = 0; attempt < 100 && !broadcaster.HasSubscribers; attempt++)
+                await Task.Delay(10, timeout.Token);
+            Assert.True(broadcaster.HasSubscribers);
+
+            factory.Services.GetRequiredService<INotifier>()
+                .ShowToast("Session saved", Axorith.Sdk.Services.NotificationType.Success);
+
+            Assert.True(await notificationTask.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.Equal("Session saved", stream.Current.Message);
+            Assert.Equal(Axorith.Sdk.Services.NotificationType.Success, stream.Current.Type);
+            Assert.Equal("System", stream.Current.Source);
+        }
+    }
+
+    private static async Task<Axorith.Contracts.SettingUpdate> ReadSettingUpdateAsync(
+        IAsyncStreamReader<Axorith.Contracts.SettingUpdate> stream, string settingKey, string value,
+        CancellationToken cancellationToken)
+    {
+        while (await stream.MoveNext(cancellationToken))
+        {
+            var update = stream.Current;
+            if (update.SettingKey == settingKey && update.ValueCase == Axorith.Contracts.SettingUpdate.ValueOneofCase.StringValue &&
+                update.StringValue == value)
+            {
+                return update;
+            }
+        }
+
+        throw new InvalidOperationException($"No update was streamed for setting '{settingKey}'.");
+    }
+
+    private async Task<Preset> CreateAppBlockerPresetAsync(PresetsService.PresetsServiceClient presets, string name)
+    {
+        var module = new Axorith.Contracts.ConfiguredModule
+        {
+            ModuleId = factory.AppBlockerModuleId.ToString(),
+            InstanceId = Guid.NewGuid().ToString()
+        };
+        module.Settings.Add("Mode", "BlockList");
+        module.Settings.Add("Categories", "[]");
+        module.Settings.Add("CustomProcessList", $"axorith-no-process-{Guid.NewGuid():N}");
+        var result = await presets.CreatePresetAsync(new CreatePresetRequest
+        {
+            Preset = new Preset { Name = $"{name}-{Guid.NewGuid():N}", Modules = { module } }
+        });
+        return result;
+    }
+
+    private static async Task<SessionState> WaitForSessionStateAsync(
+        SessionsService.SessionsServiceClient sessions, Func<SessionState, bool> condition, TimeSpan timeout)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        SessionState state;
+        do
+        {
+            state = await sessions.GetSessionStateAsync(new GetSessionStateRequest());
+            if (condition(state))
+                return state;
+
+            await Task.Delay(100);
+        } while (stopwatch.Elapsed < timeout);
+
+        return state;
+    }
+
+    private static async Task StopSessionForPresetIfRunningAsync(
+        SessionsService.SessionsServiceClient sessions, string presetId)
+    {
+        var state = await sessions.GetSessionStateAsync(new GetSessionStateRequest());
+        if (state.IsActive && state.PresetId == presetId)
+            await sessions.StopSessionAsync(new StopSessionRequest());
+    }
+
+    private async Task<Axorith.Contracts.ModuleDefinition> GetInstalledSiteBlockerAsync(
+        ModulesService.ModulesServiceClient modules)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            try
+            {
+                var response = await modules.ListModulesAsync(new ListModulesRequest());
+                var found = response.Modules.FirstOrDefault(item =>
+                    item.Id == factory.SiteBlockerModuleId.ToString());
+                if (found is not null)
+                    return found;
+            }
+            catch (RpcException)
+            {
+                // The host initializes its module registry in the background during startup.
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException("The real Site Blocker module was not discovered by the host.");
     }
 
     [Fact]
@@ -469,18 +1037,35 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             }
             editorViewModel.ThenTriggers.Clear();
 
+            editorViewModel.Name = "Focus commitment test";
             editorViewModel.FocusCommitmentModeIndex = (int)Axorith.Core.Models.FocusCommitmentMode.Strict;
+            Dispatcher.UIThread.RunJobs();
             focusCard.Measure(new Size(800, 1200));
             Assert.Equal(500, focusCard.DesiredSize.Width);
+            Assert.True(editorViewModel.HasValidationErrors);
+            Assert.False(editorViewModel.SaveAndCloseCommand.CanExecute(null));
+            Assert.Contains("Add one Stop Trigger", editorViewModel.FocusCommitmentError ?? string.Empty);
+            Assert.Contains("error", focusCard.Classes);
+            var focusCommitmentErrorText = editorView.FindControl<TextBlock>("FocusCommitmentErrorText")!;
+            Assert.True(focusCommitmentErrorText.IsVisible);
+            Assert.Contains("Add one Stop Trigger", focusCommitmentErrorText.Text ?? string.Empty);
 
             var validateCommitment = typeof(SessionEditorViewModel).GetMethod("ValidateFocusCommitment",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-            Assert.False((bool)validateCommitment.Invoke(editorViewModel, null)!);
-            Assert.Contains("Add one Stop Trigger", editorViewModel.ErrorMessage ?? string.Empty);
+            Assert.False((bool)validateCommitment.Invoke(editorViewModel, new object?[] { false })!);
 
-            editorViewModel.StopTriggers.Add(new StopAfterDurationTriggerViewModel
-                { Duration = TimeSpan.FromMinutes(45) });
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, null)!);
+            using (editorViewModel.AddStopAfterDurationTriggerCommand.Execute().Subscribe())
+            {
+                Dispatcher.UIThread.RunJobs();
+            }
+            var durationStop = editorViewModel.StopTriggers.OfType<StopAfterDurationTriggerViewModel>().Single();
+            durationStop.DurationHours = 0;
+            durationStop.DurationMinutes = 45;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(editorViewModel.FocusCommitmentError);
+            Assert.False(editorViewModel.HasValidationErrors);
+            Assert.True(editorViewModel.SaveAndCloseCommand.CanExecute(null));
+            Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
             var options = (Axorith.Core.Models.FocusCommitmentOptions)typeof(SessionEditorViewModel)
                 .GetField("_focusCommitment", System.Reflection.BindingFlags.Instance |
                                                 System.Reflection.BindingFlags.NonPublic)!
@@ -504,7 +1089,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             var nextPresetId = Guid.NewGuid();
             editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
                 Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace) { NextPresetId = nextPresetId });
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, null)!);
+            Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
             Assert.Equal(Axorith.Core.Models.FocusEndCondition.EndAt, options.EndCondition);
             Assert.Equal(new TimeOnly(18, 30), options.EndAtLocalTime);
             Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Friday }, options.EndAtDaysOfWeek);
@@ -514,7 +1099,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             editorViewModel.ThenTriggers.Clear();
             editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
                 Axorith.Core.Models.AfterEndBehavior.ShutDownPc));
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, null)!);
+            Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
             Assert.Equal(Axorith.Core.Models.AfterEndBehavior.ShutDownPc, options.AfterEnd);
             Assert.Null(options.NextWorkspaceId);
 
@@ -535,7 +1120,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 {
                     action.NextPresetId = nextPresetId;
                 }
-                Assert.True((bool)validateCommitment.Invoke(editorViewModel, null)!);
+                Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
                 Assert.Equal(behavior, options.AfterEnd);
             }
 
@@ -703,5 +1288,14 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     {
         public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<TestApplication>()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    }
+
+    private sealed class WindowsFactAttribute : FactAttribute
+    {
+        public WindowsFactAttribute()
+        {
+            if (!OperatingSystem.IsWindows())
+                Skip = "AppBlocker process monitoring requires Windows.";
+        }
     }
 }

@@ -12,7 +12,7 @@ using Moq;
 namespace Axorith.Core.Tests.Integration;
 
 /// <summary>
-///     Integration tests for module lifecycle (discovery -> initialization -> session -> disposal)
+///     SessionManager orchestration tests with controlled module collaborators.
 /// </summary>
 public class ModuleLifecycleTests
 {
@@ -25,10 +25,6 @@ public class ModuleLifecycleTests
         var mockModule = new Mock<IModule>();
         mockModule.Setup(m => m.GetSettings()).Returns([]);
         mockModule.Setup(m => m.GetActions()).Returns([]);
-
-        mockModule.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
-            .Callback(() => executionLog.Add("Initialize"))
-            .Returns(Task.CompletedTask);
 
         mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .Callback(() => executionLog.Add("Validate"))
@@ -74,11 +70,7 @@ public class ModuleLifecycleTests
         await sessionManager.DisposeAsync();
 
         // Assert
-        executionLog.Should().ContainInOrder(
-            "Validate",
-            "SessionStart",
-            "SessionEnd"
-        );
+        executionLog.Should().ContainInOrder("Validate", "SessionStart", "SessionEnd", "Dispose");
     }
 
     [Fact]
@@ -150,9 +142,6 @@ public class ModuleLifecycleTests
         var mockModule1 = new Mock<IModule>();
         mockModule1.Setup(m => m.GetSettings()).Returns([]);
         mockModule1.Setup(m => m.GetActions()).Returns([]);
-        mockModule1.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
-            .Callback(() => _ = true)
-            .Returns(Task.CompletedTask);
         mockModule1.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
         mockModule1.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
@@ -162,9 +151,6 @@ public class ModuleLifecycleTests
         var mockModule2 = new Mock<IModule>();
         mockModule2.Setup(m => m.GetSettings()).Returns([]);
         mockModule2.Setup(m => m.GetActions()).Returns([]);
-        mockModule2.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
-            .Callback(() => _ = true)
-            .Returns(Task.CompletedTask);
         mockModule2.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Success);
         mockModule2.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
@@ -206,8 +192,6 @@ public class ModuleLifecycleTests
 
         // Act
         await sessionManager.StartSessionAsync(preset);
-        await Task.Delay(50);
-
         // Assert
         module1Started.Should().BeTrue();
         module2Started.Should().BeTrue();

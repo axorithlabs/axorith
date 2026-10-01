@@ -10,12 +10,21 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
         <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+        <PackageReference Include="Grpc.Net.Client" Version="2.71.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\Client\Axorith.Client.csproj" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\..\src\Sdk\Axorith.Sdk.csproj" />
+        <ProjectReference Include="..\..\src\Host\Axorith.Host.csproj" />
+        <ProjectReference Include="..\..\src\Modules\AppBlocker\Axorith.Module.AppBlocker.csproj" />
+        <ProjectReference Include="..\..\src\Modules\ApplicationLauncher\Axorith.Module.ApplicationLauncher.csproj" />
+        <ProjectReference Include="..\..\src\Modules\HomeAssistant\Axorith.Module.HomeAssistant.csproj" />
+        <ProjectReference Include="..\..\src\Modules\SiteBlocker\Axorith.Module.SiteBlocker.csproj" />
     </ItemGroup>
 </Project>
 

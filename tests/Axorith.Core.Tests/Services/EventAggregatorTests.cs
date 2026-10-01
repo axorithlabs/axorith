@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk.Services;
 using FluentAssertions;
@@ -6,13 +9,7 @@ namespace Axorith.Core.Tests.Services;
 
 public class EventAggregatorTests
 {
-    private static IEventAggregator CreateAggregator()
-    {
-        var asm = typeof(ISessionManager).Assembly; // Axorith.Core assembly
-        var type = asm.GetType("Axorith.Core.Services.EventAggregator", throwOnError: true)!;
-        var instance = (IEventAggregator)Activator.CreateInstance(type, nonPublic: true)!;
-        return instance;
-    }
+    private static IEventAggregator CreateAggregator() => new EventAggregator();
 
     private class TestEvent
     {
@@ -190,32 +187,65 @@ public class EventAggregatorTests
     }
 
     [Fact]
-    public void ThreadSafety_ConcurrentPublishAndSubscribe_ShouldNotThrow()
+    public async Task ConcurrentPublish_ShouldDeliverEveryEvent()
     {
-        // Arrange
         var aggregator = CreateAggregator();
-        var lockObj = new object();
+        var received = 0;
+        Action<TestEvent> handler = _ => Interlocked.Increment(ref received);
+        using var subscription = aggregator.Subscribe(handler);
 
-        // Act
-        var tasks = new List<Task>();
+        await Task.WhenAll(Enumerable.Range(0, 100).Select(_ =>
+            Task.Run(() => aggregator.Publish(new TestEvent()))));
 
-        // Add subscribers
-        for (var i = 0; i < 10; i++)
-            tasks.Add(Task.Run(() =>
-            {
-                aggregator.Subscribe<TestEvent>(_ =>
-                {
-                    lock (lockObj)
-                    {
-                    }
-                });
-            }));
+        received.Should().Be(100);
+    }
 
-        // Publish events concurrently
-        for (var i = 0; i < 100; i++) tasks.Add(Task.Run(() => aggregator.Publish(new TestEvent())));
+    [Fact]
+    public async Task PublishAsync_WaitsForHandlersAndContinuesAfterAnException()
+    {
+        var aggregator = CreateAggregator();
+        var received = new ConcurrentBag<string>();
+        using var failing = aggregator.Subscribe<TestEvent>(_ => throw new InvalidOperationException());
+        using var successful = aggregator.Subscribe<TestEvent>(value => received.Add(value.Message));
 
-        // Assert
-        var act = async () => await Task.WhenAll(tasks);
-        act.Should().NotThrowAsync();
+        await aggregator.PublishAsync(new TestEvent { Message = "published" });
+
+        received.Should().ContainSingle().Which.Should().Be("published");
+    }
+
+    [Fact]
+    public void CollectedSubscribersAreWeakAndDoNotPreventPublishing()
+    {
+        var aggregator = CreateAggregator();
+        var receiver = SubscribeTemporaryReceiver(aggregator);
+
+        var collected = false;
+        for (var attempt = 0; attempt < 5 && !collected; attempt++)
+            collected = IsCollected(receiver);
+
+        collected.Should().BeTrue();
+        aggregator.Publish(new TestEvent());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool IsCollected(WeakReference<Receiver> receiver)
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        return !receiver.TryGetTarget(out _);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<Receiver> SubscribeTemporaryReceiver(IEventAggregator aggregator)
+    {
+        var receiver = new Receiver();
+        aggregator.Subscribe<TestEvent>(receiver.Handle);
+        return new WeakReference<Receiver>(receiver);
+    }
+
+    private sealed class Receiver
+    {
+        public void Handle(TestEvent value) { }
     }
 }

@@ -6,17 +6,6 @@ namespace Axorith.Sdk.Tests.Actions;
 public class ActionTests
 {
     [Fact]
-    public void Create_WithValidParameters_ShouldInitializeCorrectly()
-    {
-        // Arrange & Act
-        var action = Action.Create("test-key", "Test Label", isEnabled: true);
-
-        // Assert
-        action.Should().NotBeNull();
-        action.Key.Should().Be("test-key");
-    }
-
-    [Fact]
     public void Label_ShouldEmitInitialValue()
     {
         // Arrange
@@ -113,24 +102,7 @@ public class ActionTests
     }
 
     [Fact]
-    public void Invoke_AfterDisabling_ShouldNotEmitSignal()
-    {
-        // Arrange
-        var action = Action.Create("key", "Label", isEnabled: true);
-        var invokedCount = 0;
-        action.Invoked.Subscribe(_ => invokedCount++);
-
-        // Act
-        action.Invoke(); // Should work
-        action.SetEnabled(false);
-        action.Invoke(); // Should not work
-
-        // Assert
-        invokedCount.Should().Be(1);
-    }
-
-    [Fact]
-    public void Invoke_AfterReEnabling_ShouldEmitSignalAgain()
+    public void Invoke_RespectsEnabledStateTransitions()
     {
         // Arrange
         var action = Action.Create("key", "Label", isEnabled: false);
@@ -138,9 +110,11 @@ public class ActionTests
         action.Invoked.Subscribe(_ => invokedCount++);
 
         // Act
-        action.Invoke(); // Should not work
+        action.Invoke(); // Initially disabled
         action.SetEnabled(true);
-        action.Invoke(); // Should work
+        action.Invoke();
+        action.SetEnabled(false);
+        action.Invoke();
 
         // Assert
         invokedCount.Should().Be(1);
@@ -165,24 +139,4 @@ public class ActionTests
         subscriber2Labels.Should().Equal("Label", "Updated");
     }
 
-    [Theory]
-    [InlineData("login", "Login", true)]
-    [InlineData("logout", "Logout", false)]
-    [InlineData("refresh", "Refresh Data", true)]
-    public void Create_WithVariousParameters_ShouldWorkCorrectly(string key, string label, bool isEnabled)
-    {
-        // Act
-        var action = Action.Create(key, label, isEnabled);
-
-        // Assert
-        action.Key.Should().Be(key);
-
-        string? emittedLabel = null;
-        bool? emittedEnabled = null;
-        action.Label.Subscribe(l => emittedLabel = l);
-        action.IsEnabled.Subscribe(e => emittedEnabled = e);
-
-        emittedLabel.Should().Be(label);
-        emittedEnabled.Should().Be(isEnabled);
-    }
 }

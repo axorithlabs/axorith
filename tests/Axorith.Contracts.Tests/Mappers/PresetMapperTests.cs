@@ -1,62 +1,73 @@
+using Axorith.Host.Mappers;
 using FluentAssertions;
 using Xunit;
 
 namespace Axorith.Contracts.Tests.Mappers;
 
-/// <summary>
-///     Tests for protobuf mapping between domain models and gRPC messages
-/// </summary>
-public class PresetMapperTests
+public sealed class PresetMapperTests
 {
     [Fact]
-    public void PresetMessage_ShouldHaveRequiredFields()
+    public void PresetRoundTripPreservesModuleConfigurationAndCommitment()
     {
-        // Arrange & Act
-        var preset = new Preset
+        var presetId = Guid.NewGuid();
+        var moduleId = Guid.NewGuid();
+        var moduleInstanceId = Guid.NewGuid();
+        var nextPresetId = Guid.NewGuid();
+        var preset = new global::Axorith.Core.Models.SessionPreset
         {
-            Id = Guid.NewGuid().ToString(),
-            Name = "Test Preset"
+            Id = presetId,
+            Name = "Deep work",
+            FocusCommitment = new global::Axorith.Core.Models.FocusCommitmentOptions
+            {
+                Mode = global::Axorith.Core.Models.FocusCommitmentMode.Locked,
+                EndCondition = global::Axorith.Core.Models.FocusEndCondition.EndAt,
+                EndAtLocalTime = new TimeOnly(18, 30),
+                EndAtDaysOfWeek = [DayOfWeek.Monday, DayOfWeek.Friday],
+                BreakCount = 2,
+                BreakDuration = TimeSpan.FromMinutes(10),
+                AfterEnd = global::Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace,
+                NextWorkspaceId = nextPresetId,
+                ScheduleLockMinutes = 15
+            },
+            Modules =
+            [
+                new global::Axorith.Core.Models.ConfiguredModule
+                {
+                    ModuleId = moduleId,
+                    InstanceId = moduleInstanceId,
+                    CustomName = "Focus blocker",
+                    StartDelay = TimeSpan.FromSeconds(2.5),
+                    Settings = new Dictionary<string, string> { ["Mode"] = "AllowList", ["CustomApps"] = "editor" }
+                }
+            ]
         };
 
-        // Assert
-        preset.Id.Should().NotBeNullOrEmpty();
-        preset.Name.Should().Be("Test Preset");
-        preset.Modules.Should().NotBeNull();
+        var message = PresetMapper.ToMessage(preset);
+        var result = PresetMapper.ToModel(message);
+        var module = result.Modules.Should().ContainSingle().Which;
+
+        result.Id.Should().Be(presetId);
+        result.Name.Should().Be("Deep work");
+        module.ModuleId.Should().Be(moduleId);
+        module.InstanceId.Should().Be(moduleInstanceId);
+        module.CustomName.Should().Be("Focus blocker");
+        module.StartDelay.Should().Be(TimeSpan.FromSeconds(2.5));
+        module.Settings.Should().BeEquivalentTo(preset.Modules[0].Settings);
+        result.FocusCommitment.EndAtLocalTime.Should().Be(new TimeOnly(18, 30));
+        result.FocusCommitment.EndAtDaysOfWeek.Should().Equal(DayOfWeek.Monday, DayOfWeek.Friday);
+        result.FocusCommitment.BreakDuration.Should().Be(TimeSpan.FromMinutes(10));
+        result.FocusCommitment.NextWorkspaceId.Should().Be(nextPresetId);
+        PresetMapper.ToSummary(result).ModuleCount.Should().Be(1);
     }
 
     [Fact]
-    public void ConfiguredModule_ShouldMapCorrectly()
+    public void InvalidModuleIdInIncomingPresetIsRejected()
     {
-        // Arrange & Act
-        var module = new ConfiguredModule
-        {
-            ModuleId = Guid.NewGuid().ToString(),
-            InstanceId = Guid.NewGuid().ToString(),
-            CustomName = "Custom Name"
-        };
+        var message = new Axorith.Contracts.Preset { Id = Guid.NewGuid().ToString(), Name = "Invalid" };
+        message.Modules.Add(new Axorith.Contracts.ConfiguredModule { ModuleId = "not-a-guid" });
 
-        // Assert
-        module.ModuleId.Should().NotBeNullOrEmpty();
-        module.InstanceId.Should().NotBeNullOrEmpty();
-        module.CustomName.Should().Be("Custom Name");
-        module.Settings.Should().NotBeNull();
-    }
+        var act = () => PresetMapper.ToModel(message);
 
-    [Fact]
-    public void Preset_WithMultipleModules_ShouldContainAll()
-    {
-        // Arrange
-        var preset = new Preset
-        {
-            Id = Guid.NewGuid().ToString(),
-            Name = "Multi-Module Preset"
-        };
-
-        preset.Modules.Add(new ConfiguredModule { ModuleId = Guid.NewGuid().ToString() });
-        preset.Modules.Add(new ConfiguredModule { ModuleId = Guid.NewGuid().ToString() });
-        preset.Modules.Add(new ConfiguredModule { ModuleId = Guid.NewGuid().ToString() });
-
-        // Assert
-        preset.Modules.Should().HaveCount(3);
+        act.Should().Throw<ArgumentException>().WithMessage("*Invalid ModuleId*");
     }
 }
