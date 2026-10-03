@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Axorith.Sdk.Services;

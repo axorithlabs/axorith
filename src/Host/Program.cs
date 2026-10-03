@@ -145,6 +145,23 @@ if (!createdNew)
 
 Log.Information("✅ Acquired Host instance mutex. This is the primary Host instance.");
 
+var legacyHostInfoPath = Path.Combine(ApplicationPaths.RoamingRoot, "host-info.json");
+if (!string.Equals(hostInfoPath, legacyHostInfoPath, StringComparison.OrdinalIgnoreCase))
+{
+    try
+    {
+        File.Delete(legacyHostInfoPath);
+    }
+    catch (IOException)
+    {
+        // The host writes runtime connection information to the machine-wide path now.
+    }
+    catch (UnauthorizedAccessException)
+    {
+        // The host writes runtime connection information to the machine-wide path now.
+    }
+}
+
 try
 {
     Log.Information("Starting Axorith.Host...");
@@ -190,12 +207,6 @@ try
             string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
         Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
     }
-    else
-    {
-        telemetry?.TrackEvent("HostStarted");
-        Log.Information("Telemetry event sent: HostStarted");
-    }
-
     builder.Host.UseSerilog((context, _, configuration) =>
     {
         var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath");
@@ -472,8 +483,6 @@ try
         telemetry.IsEnabled,
         telemetry.IsEnabled);
 
-    telemetry?.TrackEvent("HostReady");
-
     await app.WaitForShutdownAsync();
 
     telemetry?.TrackEvent("HostStopped");
@@ -653,6 +662,7 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
             var shutdownTimeout = TimeSpan.FromSeconds(config.Session.ShutdownTimeoutSeconds);
 
             var telemetryService = ctx.Resolve<ITelemetryService>();
+            var secureStorage = ctx.Resolve<ISecureStorageService>();
             var commitmentStateDirectory = CommitmentStatePaths.Resolve(config.Persistence.ResolveConfigPath(),
                 secureCommitmentState);
             var committedSessionPath = Path.Combine(commitmentStateDirectory, "committed-session.json");
@@ -660,7 +670,7 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
 
             return new SessionManager(moduleRegistry, logger, validationTimeout, startupTimeout, shutdownTimeout,
                 telemetryService, committedSessionPath, commitmentProtection,
-                Path.Combine(config.Persistence.ResolveConfigPath(), "session-history.json"));
+                Path.Combine(config.Persistence.ResolveConfigPath(), "session-history.json"), secureStorage);
         })
         .As<ISessionManager>()
         .SingleInstance()
@@ -689,8 +699,10 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
             var autoStopService = ctx.Resolve<ISessionAutoStopService>();
             var notifier = ctx.Resolve<INotifier>();
             var logger = ctx.Resolve<ILogger<ScheduleManager>>();
+            var telemetryService = ctx.Resolve<ITelemetryService>();
 
-            return new ScheduleManager(rootDataDir, sessionManager, presetManager, autoStopService, notifier, logger);
+            return new ScheduleManager(rootDataDir, sessionManager, presetManager, autoStopService, notifier, logger,
+                telemetryService);
         })
         .As<IScheduleManager>()
         .SingleInstance()
@@ -702,8 +714,9 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
             var presetManager = ctx.Resolve<IPresetManager>();
             var notifier = ctx.Resolve<INotifier>();
             var logger = ctx.Resolve<ILogger<SessionAutoStopService>>();
+            var telemetryService = ctx.Resolve<ITelemetryService>();
 
-            return new SessionAutoStopService(sessionManager, presetManager, notifier, logger);
+            return new SessionAutoStopService(sessionManager, presetManager, notifier, logger, telemetryService);
         })
         .As<ISessionAutoStopService>()
         .SingleInstance()

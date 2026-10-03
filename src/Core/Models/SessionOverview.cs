@@ -7,8 +7,7 @@ public sealed record SessionOverview(TimeSpan Today, TimeSpan Week, int SessionC
         string activeName, DateTimeOffset now)
     {
         var activity = history.Where(session => session.EndedAt >= session.StartedAt).ToList();
-        if (activeStartedAt is { } startedAt && startedAt <= now &&
-            !activity.Any(session => session.StartedAt == startedAt))
+        if (activeStartedAt is { } startedAt && startedAt <= now && activity.All(session => session.StartedAt != startedAt))
             activity.Add(new SessionActivity(startedAt, now, activeName));
 
         var today = LocalDay(now.LocalDateTime.Date);

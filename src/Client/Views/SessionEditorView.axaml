@@ -27,7 +27,7 @@
         <Style Selector="Border.warning">
             <Setter Property="BorderBrush" Value="#E5B546"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="#1F0505"/>
         </Style>
         <Style Selector="TextBox.appPicker">
             <Setter Property="CornerRadius" Value="6,0,0,6"/>

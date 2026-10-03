@@ -1,7 +1,9 @@
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Telemetry;
 using Axorith.Host.Mappers;
+using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
@@ -20,10 +22,12 @@ public class PresetsServiceImpl(
     IModuleRegistry moduleRegistry,
     ISessionManager sessionManager,
     ILogger<PresetsServiceImpl> logger,
-    ITelemetryService? telemetry = null)
+    ITelemetryService? telemetry = null,
+    ISecureStorageService? secureStorage = null)
     : PresetsService.PresetsServiceBase
 {
     private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
+    private readonly ISecureStorageService? _secureStorage = secureStorage;
 
     /// <summary>
     ///     Retrieves all session presets from persistent storage.
@@ -137,7 +141,7 @@ public class PresetsServiceImpl(
 
             var response = PresetMapper.ToMessage(preset);
             logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
-            TrackPresetTelemetry("PresetCreated", preset);
+            TrackPresetTelemetry("PresetCreated", preset, "create");
             return response;
         }
         catch (RpcException)
@@ -190,7 +194,7 @@ public class PresetsServiceImpl(
 
             var response = PresetMapper.ToMessage(preset);
             logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
-            TrackPresetTelemetry("PresetUpdated", preset);
+            TrackPresetTelemetry("PresetUpdated", preset, "update");
             return response;
         }
         catch (RpcException)
@@ -217,15 +221,24 @@ public class PresetsServiceImpl(
             logger.LogDebug("DeletePreset called for {PresetId}", presetId);
 
             await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
+            var presetExisted = _telemetry.IsEnabled &&
+                                await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+                                    .ConfigureAwait(false) is not null;
 
             await presetManager.DeletePresetAsync(presetId, context.CancellationToken)
                 .ConfigureAwait(false);
 
             logger.LogInformation("Deleted preset: {PresetId}", presetId);
-            _telemetry.TrackEvent("PresetDeleted", new Dictionary<string, object?>
+            var wasDeleted = presetExisted &&
+                             await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+                                 .ConfigureAwait(false) is null;
+            if (wasDeleted)
             {
-                ["presetId"] = presetId.ToString()
-            });
+                _telemetry.TrackEvent("PresetDeleted", new Dictionary<string, object?>
+                {
+                    ["presetId"] = presetId.ToString()
+                });
+            }
             return new Empty();
         }
         catch (RpcException)
@@ -262,30 +275,26 @@ public class PresetsServiceImpl(
         throw new RpcException(new Status(StatusCode.FailedPrecondition, $"Configuration locked · {time}."));
     }
 
-    private void TrackPresetTelemetry(string eventName, SessionPreset preset)
+    private void TrackPresetTelemetry(string eventName, SessionPreset preset, string changeType)
     {
-        var allModuleDefs = moduleRegistry.GetAllDefinitions();
-        var moduleDefLookup = allModuleDefs.ToDictionary(m => m.Id, m => m.Name);
-        var modules = preset.Modules.Select(module => new Dictionary<string, object?>
-        {
-            ["moduleId"] = module.ModuleId,
-            ["moduleName"] = moduleDefLookup.GetValueOrDefault(module.ModuleId, "custom"),
-            ["instanceId"] = module.InstanceId
-        }).ToArray();
+        if (!_telemetry.IsEnabled) return;
 
-        _telemetry.TrackEvent(eventName, new Dictionary<string, object?>
+        try
         {
-            ["presetId"] = preset.Id,
-            ["commitmentMode"] = preset.FocusCommitment.Mode switch
+            var moduleDefLookup = moduleRegistry.GetAllDefinitions().ToDictionary(m => m.Id, m => m.Name);
+            _telemetry.TrackEvent(eventName, ProductAnalyticsProperties.Preset(preset, moduleDefLookup, _secureStorage));
+
+            foreach (var module in preset.Modules)
             {
-                FocusCommitmentMode.Locked => "locked",
-                FocusCommitmentMode.Strict => "strict",
-                _ => "normal"
-            },
-            ["moduleCount"] = preset.Modules.Count,
-            ["moduleIds"] = modules.Select(module => ((Guid)module["moduleId"]!).ToString()).ToArray(),
-            ["moduleTypes"] = modules.Select(module => (string)module["moduleName"]!).Distinct().ToArray(),
-            ["modules"] = modules
-        });
+                _telemetry.TrackEvent("ModuleConfigurationSaved",
+                    ProductAnalyticsProperties.ModuleConfigurationSaved(preset, module,
+                        moduleDefLookup.GetValueOrDefault(module.ModuleId, "custom"), changeType, _secureStorage));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not track saved preset configuration telemetry.");
+        }
     }
+
 }

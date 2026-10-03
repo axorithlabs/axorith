@@ -1,5 +1,4 @@
 using Axorith.Contracts;
-using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;

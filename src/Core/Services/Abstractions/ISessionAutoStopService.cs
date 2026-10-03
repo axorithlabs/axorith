@@ -1,3 +1,5 @@
+using Axorith.Core.Models;
+
 namespace Axorith.Core.Services.Abstractions;
 
 /// <summary>
@@ -19,7 +21,7 @@ public interface ISessionAutoStopService : IAsyncDisposable
     /// <param name="nextPresetId">ID of the preset to start after this session ends. Null means just stop.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, SessionSchedule? schedule = null);
 
     /// <summary>
     ///     Stops tracking the current session.
@@ -35,5 +37,5 @@ public interface ISessionAutoStopService : IAsyncDisposable
     Task ExecuteAfterEndActionAsync(Axorith.Core.Models.AfterEndBehavior behavior);
 
     Task<bool> CompleteNaturallyAsync(Axorith.Core.Models.SessionPreset expectedSession,
-        Guid? fallbackNextPresetId, CancellationToken cancellationToken = default);
+        Guid? fallbackNextPresetId, CancellationToken cancellationToken = default, SessionSchedule? schedule = null);
 }

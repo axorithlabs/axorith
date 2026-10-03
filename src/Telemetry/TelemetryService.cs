@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Diagnostics;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Axorith.Shared.Utils;
@@ -71,8 +72,10 @@ public sealed partial class TelemetryService : ITelemetryService
             ? DeviceIdProvider.GetDeviceId()
             : resolved.DistinctId;
 
+        var assembly = typeof(TelemetryService).Assembly;
         var version = string.IsNullOrWhiteSpace(resolved.AppVersion)
-            ? typeof(TelemetryService).Assembly.GetName().Version?.ToString() ?? "unknown"
+            ? assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+              ?? assembly.GetName().Version?.ToString() ?? "unknown"
             : resolved.AppVersion;
         var osVersion = string.IsNullOrWhiteSpace(resolved.OsVersion)
             ? Environment.OSVersion.VersionString

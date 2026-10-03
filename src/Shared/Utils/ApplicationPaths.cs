@@ -7,14 +7,17 @@ namespace Axorith.Shared.Utils;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         All paths are resolved relative to the user's application data directories
-///         as defined by the operating system. On Windows, this typically resolves to:
+///         User paths are resolved relative to the user's application data directories,
+///         and machine-wide state is stored under ProgramData on Windows.
 ///         <list type="bullet">
 ///             <item>
 ///                 <description>AppData: %APPDATA%\Axorith (e.g., C:\Users\{user}\AppData\Roaming\Axorith)</description>
 ///             </item>
 ///             <item>
 ///                 <description>LocalAppData: %LOCALAPPDATA%\Axorith (e.g., C:\Users\{user}\AppData\Local\Axorith)</description>
+///             </item>
+///             <item>
+///                 <description>ProgramData: %PROGRAMDATA%\Axorith (e.g., C:\ProgramData\Axorith)</description>
 ///             </item>
 ///         </list>
 ///     </para>
@@ -83,14 +86,14 @@ public static class ApplicationPaths
 
     /// <summary>
     ///     Gets the local application data directory (non-roaming).
-    ///     This is for machine-specific data that should not roam with the user profile.
+    ///     This is for per-user data that should not roam with the user profile.
     /// </summary>
     /// <value>
     ///     The full path to the Axorith local application data directory.
     ///     Example: C:\Users\{user}\AppData\Local\Axorith
     /// </value>
     /// <remarks>
-    ///     Use this for cache files, temporary data, or large files that shouldn't be synchronized.
+    ///     Use this for per-user cache files, temporary data, or large files that shouldn't be synchronized.
     /// </remarks>
     public static string LocalRoot => LazyLocalRoot.Value;
 
@@ -198,14 +201,14 @@ public static class ApplicationPaths
     /// </summary>
     /// <value>
     ///     The full path to the host-info.json file.
-    ///     Example: C:\Users\{user}\AppData\Roaming\Axorith\host-info.json
+    ///     Example: C:\ProgramData\Axorith\host-info.json
     /// </value>
     /// <remarks>
     ///     This file contains runtime information about the Host process, including
     ///     the dynamically assigned port number. It is created when the Host starts
     ///     and deleted when it shuts down.
     /// </remarks>
-    public static string HostInfoFile => Path.Combine(RoamingRoot, "host-info.json");
+    public static string HostInfoFile => Path.Combine(MachineRoot, "host-info.json");
 
     /// <summary>
     ///     Gets the Program Files directory path.
@@ -242,6 +245,18 @@ public static class ApplicationPaths
     ///     Used for application data that should be shared across all users on the machine.
     /// </remarks>
     public static string CommonAppData => LazyCommonAppData.Value;
+
+    /// <summary>
+    ///     Gets the machine-wide data root on Windows; other platforms use the local user data root.
+    /// </summary>
+    public static string MachineRoot => OperatingSystem.IsWindows()
+        ? Path.Combine(CommonAppData, ApplicationName)
+        : LocalRoot;
+
+    /// <summary>
+    ///     Gets the machine-wide configuration directory on Windows.
+    /// </summary>
+    public static string MachineConfig => Path.Combine(MachineRoot, "config");
 
     /// <summary>
     ///     Gets the secrets directory path for Linux fallback storage.

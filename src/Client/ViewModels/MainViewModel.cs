@@ -638,7 +638,6 @@ public class MainViewModel : ReactiveObject, IDisposable
     private async Task StartPresetAsync(SessionPresetViewModel presetVm)
     {
         var sessionInstanceId = Guid.NewGuid();
-        TrackSessionStartRequested(presetVm, sessionInstanceId);
         try
         {
             if (presetVm.Model.FocusCommitment.Mode == FocusCommitmentMode.Normal)
@@ -678,34 +677,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private void TrackSessionStartRequested(SessionPresetViewModel preset, Guid sessionInstanceId)
-    {
-        var options = preset.Model.FocusCommitment;
-        var modules = preset.Modules.Select(module => new Dictionary<string, object?>
-        {
-            ["moduleId"] = module.Model.ModuleId,
-            ["moduleName"] = module.Definition.Name,
-            ["instanceId"] = module.Model.InstanceId
-        }).ToArray();
-
-        _telemetry?.TrackEvent("SessionStartRequested", new Dictionary<string, object?>
-        {
-            ["sessionInstanceId"] = sessionInstanceId,
-            ["presetId"] = preset.Id,
-            ["startSource"] = "manual",
-            ["commitmentMode"] = CommitmentMode(options.Mode),
-            ["endConditionType"] = EndCondition(options.EndCondition),
-            ["plannedDurationMs"] = options.Duration is { } duration ? (long)duration.TotalMilliseconds : null,
-            ["breakCount"] = options.BreakCount,
-            ["breakDurationMs"] = (long)options.BreakDuration.TotalMilliseconds,
-            ["afterEndAction"] = AfterEndAction(options.AfterEnd),
-            ["moduleCount"] = modules.Length,
-            ["modules"] = modules,
-            ["moduleIds"] = modules.Select(module => ((Guid)module["moduleId"]!).ToString()).ToArray(),
-            ["moduleTypes"] = modules.Select(module => (string)module["moduleName"]!).Distinct().ToArray()
-        });
-    }
-
     private void TrackSessionStartFailed(SessionPresetViewModel preset, Guid sessionInstanceId, string stage,
         string failureReason) => _telemetry?.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
         {
@@ -716,30 +687,6 @@ public class MainViewModel : ReactiveObject, IDisposable
             ["failureReason"] = failureReason,
             ["result"] = "failed"
         });
-
-    private static string CommitmentMode(FocusCommitmentMode mode) => mode switch
-    {
-        FocusCommitmentMode.Locked => "locked",
-        FocusCommitmentMode.Strict => "strict",
-        _ => "normal"
-    };
-
-    private static string EndCondition(FocusEndCondition condition) => condition switch
-    {
-        FocusEndCondition.Duration => "duration",
-        FocusEndCondition.EndAt => "end_at",
-        _ => "none"
-    };
-
-    private static string AfterEndAction(AfterEndBehavior behavior) => behavior switch
-    {
-        AfterEndBehavior.StartNextWorkspace => "start_next_workspace",
-        AfterEndBehavior.LockPc => "lock_pc",
-        AfterEndBehavior.Sleep => "sleep",
-        AfterEndBehavior.SignOut => "sign_out",
-        AfterEndBehavior.ShutDownPc => "shut_down_pc",
-        _ => "do_nothing"
-    };
 
     private void PopulateStartReview(SessionPresetViewModel presetVm)
     {
@@ -911,7 +858,10 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
-            TrackSessionStartFailed(presetVm, sessionInstanceId, "rpc_request", "network_error");
+            if (ex is not Grpc.Core.RpcException { StatusCode: Grpc.Core.StatusCode.Internal })
+            {
+                TrackSessionStartFailed(presetVm, sessionInstanceId, "rpc_request", "network_error");
+            }
             _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
                 properties: new Dictionary<string, object?>
                 {
@@ -1008,7 +958,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     EmergencyUnlockProgress = progress.Progress;
-                    if (!progress.Completed && progress.Progress == 0 &&
+                    if (progress is { Completed: false, Progress: 0 } &&
                         progress.Message != "Keep holding to unlock.")
                     {
                         EmergencyUnlockError = progress.Message;

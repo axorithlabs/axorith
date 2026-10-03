@@ -2,7 +2,6 @@ using System.Reflection;
 using Axorith.Shared.Platform;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace Axorith.Shared.Tests.Platform;
 

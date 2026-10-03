@@ -23,6 +23,14 @@ internal static class Program
 
     public static async Task Main(string[] args)
     {
+        if (args.Length == 1 && string.Equals(args[0], "--remove-legacy-firefox-policy",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            PlatformServices.CreateNativeMessagingManager(NullLoggerFactory.Instance)
+                .RemoveFirefoxExtensionPolicy(SiteBlockerExtensionIds.Firefox);
+            return;
+        }
+
         StartLogFlusher();
 
         var loggerFactory = NullLoggerFactory.Instance;
@@ -164,8 +172,14 @@ internal static class Program
     {
         var browser = args.FirstOrDefault(arg => arg.StartsWith("--browser=", StringComparison.OrdinalIgnoreCase))?
             .Split('=', 2)[1].ToLowerInvariant();
-        return browser is "chrome" or "edge" or "chromium" or "firefox"
-            ? $"axorith-nm-pipe-{browser}"
+        if (browser is "chrome" or "edge" or "chromium" or "firefox")
+        {
+            return $"axorith-nm-pipe-{browser}";
+        }
+
+        // Firefox passes the add-on ID as an argument; manifest "args" are not passed to the host.
+        return args.Any(arg => string.Equals(arg, SiteBlockerExtensionIds.Firefox, StringComparison.OrdinalIgnoreCase))
+            ? "axorith-nm-pipe-firefox"
             : "axorith-nm-pipe";
     }
 

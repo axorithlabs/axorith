@@ -112,7 +112,7 @@ public sealed class EventAggregator : IEventAggregator
         }
 
         var liveReferences = handlers.Where(wr => wr.TryGetTarget(out _)).ToList();
-        _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(liveReferences);
+        _subscriptions[eventType] = [.. liveReferences];
     }
 
     private void Unsubscribe<TEvent>(Action<TEvent> handler)
@@ -127,7 +127,7 @@ public sealed class EventAggregator : IEventAggregator
             !wh.TryGetTarget(out var target) || !target.Equals(handler)
         ).ToList();
 
-        _subscriptions[eventType] = new ConcurrentBag<WeakReference<object>>(filtered);
+        _subscriptions[eventType] = [.. filtered];
     }
 
     private sealed class Unsubscriber<TEvent>(EventAggregator aggregator, Action<TEvent> handler) : IDisposable

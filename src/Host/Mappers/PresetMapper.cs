@@ -57,8 +57,7 @@ public static class PresetMapper
             Mode = (Axorith.Core.Models.FocusCommitmentMode)options.Mode,
             EndCondition = (Axorith.Core.Models.FocusEndCondition)options.EndCondition,
             Duration = options.DurationSeconds > 0 ? TimeSpan.FromSeconds(options.DurationSeconds) : null,
-            EndAtLocalTime = options.HasEndAtLocalTime && options.EndAtHour is >= 0 and <= 23 &&
-                             options.EndAtMinute is >= 0 and <= 59
+            EndAtLocalTime = options is { HasEndAtLocalTime: true, EndAtHour: >= 0 and <= 23, EndAtMinute: >= 0 and <= 59 }
                 ? new TimeOnly(options.EndAtHour, options.EndAtMinute)
                 : null,
             EndAtDaysOfWeek = [.. options.EndAtDaysOfWeek.Select(day => (DayOfWeek)day)],

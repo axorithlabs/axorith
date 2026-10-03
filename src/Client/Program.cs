@@ -19,7 +19,7 @@ internal static class Program
     private static readonly string PendingInstallationPath = Path.Combine(ApplicationPaths.Config, "pending-install.json");
     private static PendingInstallation? _pendingInstallation;
     private static SingleInstanceManager? _singleInstanceManager;
-    private static int _applicationReadySent;
+    private static int _applicationReadyHandled;
 
     [STAThread]
     public static int Main(string[] args)
@@ -133,17 +133,6 @@ internal static class Program
             Log.Information("Version: {Version}, OS: {OS}",
                 typeof(Program).Assembly.GetName().Version,
                 Environment.OSVersion);
-
-            var launchProperties = new Dictionary<string, object?>();
-            if (_pendingInstallation is not null)
-            {
-                launchProperties["launchSource"] = "installer";
-            }
-            else if (args.Contains("--autostart", StringComparer.OrdinalIgnoreCase))
-            {
-                launchProperties["launchSource"] = "autostart";
-            }
-            Telemetry?.TrackEvent("ApplicationLaunched", launchProperties);
 
             var app = BuildAvaloniaApp();
 
@@ -282,12 +271,11 @@ internal static class Program
 
     internal static void MarkApplicationReady()
     {
-        if (Interlocked.Exchange(ref _applicationReadySent, 1) != 0)
+        if (Interlocked.Exchange(ref _applicationReadyHandled, 1) != 0)
         {
             return;
         }
 
-        Telemetry?.TrackEvent("ApplicationReady");
         ConfirmPendingInstallation();
     }
 
@@ -299,7 +287,11 @@ internal static class Program
     {
         try
         {
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
+            var settingsPath = Path.Combine(ApplicationPaths.Config, "clientsettings.json");
+            if (!File.Exists(settingsPath))
+            {
+                settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
+            }
             if (!File.Exists(settingsPath))
             {
                 return true;

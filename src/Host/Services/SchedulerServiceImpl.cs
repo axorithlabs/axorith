@@ -1,9 +1,11 @@
 ﻿using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Telemetry;
 using Axorith.Host.Mappers;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using SessionSchedule = Axorith.Core.Models.SessionSchedule;
 
 namespace Axorith.Host.Services;
 
@@ -46,7 +48,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
             model.Id = Guid.NewGuid();
 
             var saved = await scheduleManager.SaveScheduleAsync(model, context.CancellationToken);
-            TrackScheduleChanged(saved.Id, "create", saved.IsEnabled);
+            TrackScheduleChanged(saved, "create");
             return ScheduleMapper.ToMessage(saved);
         }
         catch (RpcException)
@@ -81,7 +83,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
 
             await EnsurePresetMutableAsync(model.PresetId, context.CancellationToken);
             var saved = await scheduleManager.SaveScheduleAsync(model, context.CancellationToken);
-            TrackScheduleChanged(saved.Id, "update", saved.IsEnabled);
+            TrackScheduleChanged(saved, "update");
             return ScheduleMapper.ToMessage(saved);
         }
         catch (RpcException)
@@ -116,7 +118,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
             await scheduleManager.DeleteScheduleAsync(id, context.CancellationToken);
             if (existing is not null)
             {
-                TrackScheduleChanged(id, "delete");
+                TrackScheduleChanged(existing, "delete");
             }
             return new Empty();
         }
@@ -158,7 +160,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
 
             if (existing?.IsEnabled != updated.IsEnabled)
             {
-                TrackScheduleChanged(id, "update", updated.IsEnabled);
+                TrackScheduleChanged(updated, "update");
             }
 
             return ScheduleMapper.ToMessage(updated);
@@ -202,14 +204,16 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         }
     }
 
-    private void TrackScheduleChanged(Guid scheduleId, string changeType, bool? enabled = null)
+    private void TrackScheduleChanged(SessionSchedule schedule, string changeType)
     {
-        var properties = new Dictionary<string, object?>
+        if (!_telemetry.IsEnabled) return;
+        try
         {
-            ["scheduleId"] = scheduleId,
-            ["changeType"] = changeType
-        };
-        if (enabled.HasValue) properties["enabled"] = enabled.Value;
-        _telemetry.TrackEvent("ScheduleChanged", properties);
+            _telemetry.TrackEvent("ScheduleChanged", ProductAnalyticsProperties.Schedule(schedule, changeType));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not track schedule configuration telemetry.");
+        }
     }
 }

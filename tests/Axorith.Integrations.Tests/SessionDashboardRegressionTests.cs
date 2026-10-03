@@ -5,7 +5,6 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.ViewModels;
-using Axorith.Client.Views;
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services;

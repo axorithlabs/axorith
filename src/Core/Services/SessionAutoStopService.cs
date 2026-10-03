@@ -1,6 +1,8 @@
 using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Models;
+using Axorith.Core.Telemetry;
 using Axorith.Sdk.Services;
+using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.ComponentModel;
@@ -15,7 +17,8 @@ public class SessionAutoStopService(
     ISessionManager sessionManager,
     IPresetManager presetManager,
     INotifier notifier,
-    ILogger<SessionAutoStopService> logger)
+    ILogger<SessionAutoStopService> logger,
+    ITelemetryService? telemetry = null)
     : ISessionAutoStopService
 {
     private readonly object _stateLock = new();
@@ -28,6 +31,8 @@ public class SessionAutoStopService(
     private Guid? _nextPresetId;
     private DateTimeOffset? _stopAt;
     private long? _stopAtTimestamp;
+    private SessionSchedule? _stopSchedule;
+    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
     private Task? _loopTask;
     private CancellationTokenSource? _loopCts;
 
@@ -40,7 +45,7 @@ public class SessionAutoStopService(
     }
 
     public Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, SessionSchedule? schedule = null)
     {
         lock (_stateLock)
         {
@@ -51,6 +56,7 @@ public class SessionAutoStopService(
 
             _currentSessionId = sessionId;
             _nextPresetId = nextPresetId;
+            _stopSchedule = schedule;
             _sentNotificationKeys.Clear();
 
             if (autoStopDuration.HasValue)
@@ -90,6 +96,7 @@ public class SessionAutoStopService(
             _nextPresetId = null;
             _stopAt = null;
             _stopAtTimestamp = null;
+            _stopSchedule = null;
             _sentNotificationKeys.Clear();
 
             logger.LogDebug("Stopped tracking session");
@@ -163,6 +170,7 @@ public class SessionAutoStopService(
         long? stopAtTimestamp;
         Guid? nextPresetId;
         Guid? currentSessionId;
+        SessionSchedule? stopSchedule;
         SessionPreset? expectedSession;
 
         lock (_stateLock)
@@ -176,6 +184,7 @@ public class SessionAutoStopService(
             stopAtTimestamp = _stopAtTimestamp;
             nextPresetId = _nextPresetId;
             currentSessionId = _currentSessionId;
+            stopSchedule = _stopSchedule;
             expectedSession = sessionManager.ActiveSession;
         }
 
@@ -214,7 +223,7 @@ public class SessionAutoStopService(
         {
             if (expectedSession != null)
             {
-                await CompleteNaturallyAsync(expectedSession, nextPresetId, ct).ConfigureAwait(false);
+                await CompleteNaturallyAsync(expectedSession, nextPresetId, ct, stopSchedule).ConfigureAwait(false);
             }
             return;
         }
@@ -288,10 +297,11 @@ public class SessionAutoStopService(
     }
 
     public async Task<bool> CompleteNaturallyAsync(SessionPreset expectedSession, Guid? fallbackNextPresetId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, SessionSchedule? schedule = null)
     {
         if (!await _naturalEndGate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
         {
+            TrackScheduleTriggered(schedule, "skipped", skipReason: "concurrent_stop");
             return false;
         }
 
@@ -300,6 +310,7 @@ public class SessionAutoStopService(
         {
             if (!ReferenceEquals(sessionManager.ActiveSession, expectedSession))
             {
+                TrackScheduleTriggered(schedule, "skipped", skipReason: "session_changed");
                 return false;
             }
 
@@ -307,6 +318,7 @@ public class SessionAutoStopService(
             {
                 logger.LogWarning("Session already stopped, skipping auto-stop");
                 await StopTrackingAsync(CancellationToken.None).ConfigureAwait(false);
+                TrackScheduleTriggered(schedule, "skipped", skipReason: "session_not_running");
                 return false;
             }
 
@@ -344,6 +356,7 @@ public class SessionAutoStopService(
                 if (!ended)
                 {
                     logger.LogInformation("Session ended before its natural completion handler acquired the stop lock.");
+                    TrackScheduleTriggered(schedule, "skipped", skipReason: "session_ended_before_stop");
                     return false;
                 }
 
@@ -354,6 +367,7 @@ public class SessionAutoStopService(
                 logger.LogError(ex, "Failed to auto-stop session '{PresetName}'", currentPreset.Name);
                 await notifier.ShowSystemAsync("Auto-Stop Error",
                     $"Failed to stop session '{currentPreset.Name}': {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
+                TrackScheduleTriggered(schedule, "failed", failureReason: ScheduleFailureReason(ex));
                 return false;
             }
             finally
@@ -364,6 +378,7 @@ public class SessionAutoStopService(
                 }
             }
 
+            TrackScheduleTriggered(schedule, "completed");
             if (nextPresetId.HasValue)
             {
                 try
@@ -410,6 +425,23 @@ public class SessionAutoStopService(
             _naturalEndGate.Release();
         }
     }
+
+    private void TrackScheduleTriggered(SessionSchedule? schedule, string result, string? failureReason = null,
+        string? skipReason = null)
+    {
+        if (schedule is null || !_telemetry.IsEnabled) return;
+        try
+        {
+            _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
+                "stop", result, failureReason: failureReason, skipReason: skipReason));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not track duration stop schedule telemetry.");
+        }
+    }
+
+    private static string ScheduleFailureReason(Exception exception) => ProductAnalyticsProperties.FailureReason(exception);
 
     private void CleanupNotificationCache()
     {

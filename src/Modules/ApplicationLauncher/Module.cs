@@ -3,7 +3,6 @@ using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
-using System.Net.Http;
 using BrowserApp = Axorith.Module.ApplicationLauncher.Apps.Browser.BrowserApp;
 using DiscordApp = Axorith.Module.ApplicationLauncher.Apps.Discord.DiscordApp;
 using JetBrainsApp = Axorith.Module.ApplicationLauncher.Apps.JetBrainsIDE.JetBrainsIDEApp;

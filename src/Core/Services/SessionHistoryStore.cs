@@ -5,7 +5,7 @@ namespace Axorith.Core.Services;
 
 public sealed class SessionHistoryStore(string? path)
 {
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
     // Hosts supply their permanent config path. Standalone managers also use disk, in an isolated directory.
     private readonly string _path = Path.GetFullPath(path ?? Path.Combine(Path.GetTempPath(), "Axorith",
         Guid.NewGuid().ToString("N"), "session-history.json"));

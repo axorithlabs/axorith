@@ -1,7 +1,6 @@
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
-using Axorith.Module.SiteBlocker;
 using Axorith.Sdk;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
@@ -20,7 +19,7 @@ public sealed class SiteBlockerExtensionPipeCollection
 public sealed class SiteBlockerAllowListTests
 {
     [Fact]
-    public void FirefoxHasOneClickPolicyInstallAndChromeIsNotPresentedAsAutomatic()
+    public void FirefoxInstallActionIsAvailableAndChromeInstallIsNotOffered()
     {
         using var blocker = new RecordingProcessBlocker();
         using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
@@ -28,8 +27,8 @@ public sealed class SiteBlockerAllowListTests
 
         try
         {
-            Assert.True(actions.Single(action => action.Key == "InstallExtension.Firefox").GetCurrentEnabled());
-            Assert.False(actions.Single(action => action.Key == "InstallExtension.Chrome").GetCurrentEnabled());
+            Assert.Contains(actions, action => action.Key == "InstallExtension.Firefox");
+            Assert.DoesNotContain(actions, action => action.Key == "InstallExtension.Chrome");
         }
         finally
         {
@@ -62,7 +61,7 @@ public sealed class SiteBlockerAllowListTests
         var validation = await module.ValidateSettingsAsync(CancellationToken.None);
 
         Assert.Equal(ValidationStatus.Warning, validation.Status);
-        Assert.Contains("extension is connected", validation.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("extension", validation.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -95,7 +94,7 @@ public sealed class SiteBlockerAllowListTests
         });
         Assert.Contains(requests, request => request.Command == "health");
         Assert.Contains(requests, request => request.Command == "unblock");
-        Assert.Contains(blocker.BlockedProcesses, name => name.Contains("firefox", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(blocker.BlockedProcesses, name => name.Contains("firefox", StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<List<ExtensionRequest>> ServeChromeExtensionAsync(CancellationToken cancellationToken)

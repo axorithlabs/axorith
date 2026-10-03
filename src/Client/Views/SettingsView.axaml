@@ -156,7 +156,7 @@
                             <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,12">
                                 <StackPanel Spacing="7">
                                     <TextBlock Text="Data collected" FontWeight="SemiBold" />
-                                    <TextBlock Text="App and OS versions, a pseudonymous device ID, preset and module IDs/types, session and schedule lifecycle, changed setting categories, update status, and sanitized error details.&#x0a;Preset names, custom module/action names, setting values, paths, app names, URLs, domains, secrets, raw error text, and stack traces are not sent. PostHog may infer coarse location from network metadata; Axorith does not send an IP property. The website uses a separate browser identity and sends only fixed page/referrer categories plus validated UTM tags, not raw URLs or domains."
+                                    <TextBlock Text="App and OS versions, a pseudonymous device ID, preset and module IDs/types, session and schedule lifecycle, changed setting categories, update status, and sanitized error details.&#x0a;Preset names, custom module/action names, setting values, paths, app names, URLs, domains, secrets, raw error text, and stack traces are not sent. PostHog may infer coarse location from network metadata; Axorith does not send an IP property."
                                                FontSize="12" Foreground="#888888" LineHeight="20" />
                                 </StackPanel>
                             </Border>

@@ -1,5 +1,4 @@
 using Axorith.Shared.Platform;
-using Xunit;
 
 namespace Axorith.Shared.Tests.Platform;
 

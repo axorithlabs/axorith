@@ -5,7 +5,7 @@
 
         <Description>Shim for Axorith.</Description>
         
-        <OutputType>WinExe</OutputType>
+        <OutputType>Exe</OutputType>
     </PropertyGroup>
 
     <ItemGroup>

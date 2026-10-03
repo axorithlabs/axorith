@@ -131,7 +131,7 @@ public class ModuleRegistry(
     public IReadOnlyList<ModuleDefinition> GetAllDefinitions()
     {
         EnsureInitialized();
-        return _definitions.Values.ToList();
+        return [.. _definitions.Values];
     }
 
     public ModuleDefinition? GetDefinitionById(Guid moduleId)

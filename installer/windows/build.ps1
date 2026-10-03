@@ -18,7 +18,7 @@ catch {
 
 $patchScript = Join-Path $SolutionDir "scripts\patch-telemetry-defaults.ps1"
 if (-not [string]::IsNullOrWhiteSpace($env:POSTHOG_API_KEY) -and (Test-Path $patchScript)) {
-    Write-Host "--- Patching desktop and website PostHog defaults for this build ---" -ForegroundColor Cyan
+    Write-Host "--- Patching desktop PostHog defaults for this build ---" -ForegroundColor Cyan
     & $patchScript -Key $env:POSTHOG_API_KEY -ApiHost $env:POSTHOG_API_HOST
 }
 elseif (-not (Test-Path $patchScript)) {

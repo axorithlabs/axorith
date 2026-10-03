@@ -16,6 +16,7 @@
             <_GitVersionClean Condition="'$(_GitVersionRaw)' != ''">$([System.String]::Copy('$(_GitVersionRaw)').Trim())</_GitVersionClean>
             <_GitVersionClean Condition="$(_GitVersionClean.StartsWith('v'))">$(_GitVersionClean.Substring(1))</_GitVersionClean>
             <_GitVersionClean Condition="'$(_GitVersionClean)' != ''">$([System.String]::Copy('$(_GitVersionClean)').Replace(' ', '-'))</_GitVersionClean>
+            <Version Condition="'$(_GitVersionClean)' != '' and '$(Version)' == '1.0.0-dev'">$(_GitVersionClean)</Version>
         </PropertyGroup>
 
         <Message Text="[Axorith Build] git describe raw: '$(_GitVersionRaw)' (exit code $(_GitExitCode))" Importance="high" />

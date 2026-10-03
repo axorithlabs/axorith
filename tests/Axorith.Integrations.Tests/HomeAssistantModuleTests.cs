@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
-using Axorith.Sdk.Settings;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
@@ -16,7 +15,7 @@ using HomeAssistantModule = Axorith.Module.HomeAssistant.Module;
 public sealed class HomeAssistantModuleTests
 {
     [Fact]
-    public async Task TestConnectionActionSendsAuthenticatedRequestAndRestoresItsState()
+    public async Task TestConnectionActionSendsAuthenticatedRequestAndReportsSuccess()
     {
         var authorization = new ConcurrentQueue<string>();
         var builder = WebApplication.CreateBuilder();
@@ -39,7 +38,7 @@ public sealed class HomeAssistantModuleTests
         await action.InvokeAsync();
 
         Assert.Equal("Bearer integration-token", Assert.Single(authorization));
-        Assert.Equal("Test Connection", action.GetCurrentLabel());
+        Assert.Equal("Connected OK", action.GetCurrentLabel());
         Assert.True(action.GetCurrentEnabled());
     }
 

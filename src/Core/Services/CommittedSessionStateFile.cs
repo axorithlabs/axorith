@@ -25,12 +25,7 @@ public static class CommittedSessionStateFile
         }
 
         var expected = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(envelope.Payload));
-        if (!CryptographicOperations.FixedTimeEquals(signature, expected))
-        {
-            throw new InvalidDataException("Committed state signature does not match.");
-        }
-
-        return envelope.Payload;
+        return !CryptographicOperations.FixedTimeEquals(signature, expected) ? throw new InvalidDataException("Committed state signature does not match.") : envelope.Payload;
     }
 
     public static string ReadPayloadOrLegacy(string path)

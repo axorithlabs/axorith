@@ -602,7 +602,7 @@ public sealed class CommittedModuleMutationTests
         public bool FailPauseForBreak { get; set; }
         public int ResumeAfterBreakCount { get; private set; }
         public bool IsProtectionDegraded => !IsHealthy;
-        public string? ProtectionStatusMessage => "Test blocker active";
+        public string ProtectionStatusMessage => "Test blocker active";
 
         public TestBlockerModule()
         {

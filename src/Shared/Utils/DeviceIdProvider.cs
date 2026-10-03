@@ -8,7 +8,19 @@ public static class DeviceIdProvider
     private const string MutexName = "Axorith.DeviceInstallationIdentity";
 
     /// <summary>Gets the stable, randomly generated ID for this Axorith installation.</summary>
-    public static string GetDeviceId() => GetDeviceId(Path.Combine(ApplicationPaths.Config, "installation-id.txt"));
+    public static string GetDeviceId()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var machineIdPath = Path.Combine(ApplicationPaths.MachineConfig, "installation-id.txt");
+            if (Guid.TryParse(File.Exists(machineIdPath) ? File.ReadAllText(machineIdPath) : null, out var machineId))
+            {
+                return machineId.ToString("D");
+            }
+        }
+
+        return GetDeviceId(Path.Combine(ApplicationPaths.Config, "installation-id.txt"));
+    }
 
     internal static string GetDeviceId(string idFilePath)
     {

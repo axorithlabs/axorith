@@ -6,7 +6,6 @@ using System.Reactive.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Axorith.Sdk;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;

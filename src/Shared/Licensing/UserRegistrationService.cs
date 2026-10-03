@@ -5,26 +5,26 @@ using Axorith.Shared.Utils;
 namespace Axorith.Shared.Licensing;
 
 /// <summary>
-///     Provides persistent storage for user registration data.
-///     Used to track when a user first installed the application for future licensing features.
+///     Provides persistent storage for machine registration data.
+///     Used to track when the machine first launched the application for future licensing features.
 /// </summary>
 public interface IUserRegistrationService
 {
     /// <summary>
-    ///     Gets the current user registration, loading from disk or creating a new one if none exists.
+    ///     Gets the machine registration, loading from disk or creating a new one if none exists.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The user registration information.</returns>
+    /// <returns>The machine registration information.</returns>
     Task<UserRegistration> GetOrCreateAsync(CancellationToken ct = default);
 }
 
 /// <summary>
-///     Contains user registration data persisted to disk.
+///     Contains machine registration data persisted to disk.
 /// </summary>
 public sealed record UserRegistration
 {
     /// <summary>
-    ///     Unique identifier for this machine, derived from hardware identifiers.
+    ///     Stable installation identifier shared by Axorith processes on this machine.
     /// </summary>
     [JsonPropertyName("machineId")]
     public required string MachineId { get; init; }
@@ -45,8 +45,8 @@ public sealed record UserRegistration
 /// <inheritdoc />
 public sealed class UserRegistrationService : IUserRegistrationService
 {
-    private static readonly string RegistrationFilePath =
-        Path.Combine(ApplicationPaths.LocalRoot, "registration.json");
+    private readonly string _registrationFilePath;
+    private readonly string _legacyRegistrationFilePath;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -56,6 +56,22 @@ public sealed class UserRegistrationService : IUserRegistrationService
 
     private readonly SemaphoreSlim _lock = new(1, 1);
     private UserRegistration? _cached;
+
+    /// <summary>
+    ///     Creates a service backed by machine-wide registration storage.
+    /// </summary>
+    public UserRegistrationService()
+        : this(
+            Path.Combine(ApplicationPaths.MachineRoot, "registration.json"),
+            Path.Combine(ApplicationPaths.LocalRoot, "registration.json"))
+    {
+    }
+
+    internal UserRegistrationService(string registrationFilePath, string legacyRegistrationFilePath)
+    {
+        _registrationFilePath = Path.GetFullPath(registrationFilePath);
+        _legacyRegistrationFilePath = Path.GetFullPath(legacyRegistrationFilePath);
+    }
 
     /// <inheritdoc />
     public async Task<UserRegistration> GetOrCreateAsync(CancellationToken ct = default)
@@ -73,8 +89,41 @@ public sealed class UserRegistrationService : IUserRegistrationService
                 return _cached;
             }
 
-            var registration = await TryLoadAsync(ct).ConfigureAwait(false)
-                               ?? await CreateAndSaveAsync(ct).ConfigureAwait(false);
+            var existing = await TryLoadAsync(_registrationFilePath, ct).ConfigureAwait(false);
+            var hasDistinctLegacyPath = !string.Equals(_registrationFilePath, _legacyRegistrationFilePath,
+                StringComparison.OrdinalIgnoreCase);
+            var legacy = hasDistinctLegacyPath
+                ? await TryLoadAsync(_legacyRegistrationFilePath, ct).ConfigureAwait(false)
+                : null;
+            var machineId = DeviceIdProvider.GetDeviceId();
+            var registration = existing is null
+                ? legacy ?? Create(machineId)
+                : legacy is not null && legacy.FirstSeenUtc < existing.FirstSeenUtc
+                    ? legacy
+                    : existing;
+            registration = registration with { MachineId = machineId };
+
+            if (existing is null || legacy is not null ||
+                !string.Equals(existing.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                await SaveAsync(registration, ct).ConfigureAwait(false);
+            }
+
+            if (legacy is not null)
+            {
+                try
+                {
+                    File.Delete(_legacyRegistrationFilePath);
+                }
+                catch (IOException)
+                {
+                    // The machine-wide copy is already saved; stale legacy data can be removed later.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // The machine-wide copy is already saved; stale legacy data can be removed later.
+                }
+            }
 
             _cached = registration;
             return registration;
@@ -85,9 +134,9 @@ public sealed class UserRegistrationService : IUserRegistrationService
         }
     }
 
-    private static async Task<UserRegistration?> TryLoadAsync(CancellationToken ct)
+    private static async Task<UserRegistration?> TryLoadAsync(string filePath, CancellationToken ct)
     {
-        if (!File.Exists(RegistrationFilePath))
+        if (!File.Exists(filePath))
         {
             return null;
         }
@@ -97,7 +146,7 @@ public sealed class UserRegistrationService : IUserRegistrationService
             // Use FileShare.ReadWrite to allow reading even if another process is writing
             // This handles the case where Host is writing while Client is reading
             await using var stream = new FileStream(
-                RegistrationFilePath,
+                filePath,
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.ReadWrite, // Allow concurrent reads and writes
@@ -119,21 +168,24 @@ public sealed class UserRegistrationService : IUserRegistrationService
         }
     }
 
-    private static async Task<UserRegistration> CreateAndSaveAsync(CancellationToken ct)
+    private static UserRegistration Create(string machineId)
     {
-        var registration = new UserRegistration
+        return new UserRegistration
         {
-            MachineId = DeviceIdProvider.GetDeviceId(),
+            MachineId = machineId,
             FirstSeenUtc = DateTimeOffset.UtcNow,
             AppVersion = typeof(UserRegistrationService).Assembly.GetName().Version?.ToString() ?? "0.0.0"
         };
+    }
 
-        ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.LocalRoot);
+    private async Task SaveAsync(UserRegistration registration, CancellationToken ct)
+    {
+        ApplicationPaths.EnsureDirectoryExists(Path.GetDirectoryName(_registrationFilePath)!);
 
         // Use FileShare.Read to allow concurrent reads while writing
         // This prevents "file is being used by another process" errors when multiple instances start
         await using var stream = new FileStream(
-            RegistrationFilePath,
+            _registrationFilePath,
             FileMode.Create,
             FileAccess.Write,
             FileShare.Read, // Allow concurrent reads
@@ -142,7 +194,5 @@ public sealed class UserRegistrationService : IUserRegistrationService
 
         await JsonSerializer.SerializeAsync(stream, registration, JsonOptions, ct).ConfigureAwait(false);
         await stream.FlushAsync(ct).ConfigureAwait(false);
-
-        return registration;
     }
 }

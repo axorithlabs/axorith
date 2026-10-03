@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Axorith.Client.Services;
-using Axorith.Client.Views;
 using Xunit;
 
 namespace Axorith.Integrations.Tests;

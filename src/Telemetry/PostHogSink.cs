@@ -47,7 +47,8 @@ internal sealed class PostHogSink(
 
             var props = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
-                [TelemetryConstants.Properties.DistinctId] = _distinctId
+                [TelemetryConstants.Properties.DistinctId] = _distinctId,
+                [TelemetryConstants.Properties.GeoIpDisable] = true
             };
 
             foreach (var property in logEvent.Properties)
@@ -80,7 +81,8 @@ internal sealed class PostHogSink(
                 var setPayload = ExtractSet(props);
                 var identifyProps = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                 {
-                    [TelemetryConstants.Properties.Set] = setPayload
+                    [TelemetryConstants.Properties.Set] = setPayload,
+                    [TelemetryConstants.Properties.GeoIpDisable] = true
                 };
 
                 events.Add(new

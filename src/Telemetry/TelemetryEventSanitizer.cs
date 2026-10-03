@@ -5,17 +5,28 @@ namespace Axorith.Telemetry;
 
 internal static partial class TelemetryEventSanitizer
 {
-    private static readonly HashSet<string> GuidProperties = ["installAttemptId", "presetId", "sessionInstanceId", "moduleId", "instanceId", "scheduleId"];
+    private static readonly HashSet<string> GuidProperties = [
+        "installAttemptId", "presetId", "sessionInstanceId", "moduleId", "instanceId", "scheduleId",
+        "nextWorkspaceId", "nextPresetId"];
     private static readonly HashSet<string> NumberProperties = [
         "durationMs", "plannedDurationMs", "breakDurationMs", "latencyMs", "moduleCount", "breakCount", "breaksUsed",
         "occurrenceCount", "blockedAttemptCount", "configuredEntryCount", "reconnectCount", "createdCount",
-        "releaseVersionNumber"];
+        "releaseVersionNumber", "presetVersion", "endAtMinuteOfDay", "scheduleLockMinutes", "startDelayMs",
+        "windowWidth", "windowHeight", "categoryCount", "customProcessCount", "customSiteCount", "volume",
+        "daysCount",
+        "scheduledMinuteOfDay", "oneTimeMinuteOfDay", "oneTimeLeadTimeMs", "autoStopDurationMs"];
     private static readonly HashSet<string> BooleanProperties = [
         "completedAsPlanned", "handled", "fatal", "hasDesktopRuntime", "hasAspNetRuntime",
-        "browserExtensionConnected", "protectionDegraded", "emergencyUnlockUsed", "enabled"];
+        "browserExtensionConnected", "protectionDegraded", "emergencyUnlockUsed", "enabled", "endAtConfigured",
+        "hasNextWorkspace", "hasNextPreset", "useCustomSize", "moveToMonitor", "targetMonitorConfigured", "bringToForeground",
+        "isCustomApp", "hasApplicationArgs", "hasProjectPath", "useCustomWorkingDirectory", "hasWorkingDirectory",
+        "hasStartUrl", "hasProfileName", "incognitoMode", "hasAdditionalArgs", "webSocketEnabled",
+        "webSocketPortIsDefault", "playbackEnabled", "hasSpecificDeviceName", "hasCustomPlaybackUrl", "shuffle",
+        "hasSelectedGame", "hasBaseUrl", "usesHttps", "hasAccessToken", "hasStartEntity", "hasEndEntity",
+        "hasCustomProcesses", "hasCustomSites", "use24HourFormat"];
     private static readonly Dictionary<string, HashSet<string>> EnumValues = new(StringComparer.Ordinal)
     {
-        ["application"] = ["Axorith.Client", "Axorith.Host", "Axorith.Installer", "Axorith.Website"],
+        ["application"] = ["Axorith.Client", "Axorith.Host", "Axorith.Installer"],
         ["installMode"] = ["fresh", "update", "uninstall"],
         ["launchSource"] = ["manual", "autostart", "installer"],
         ["startSource"] = ["manual", "schedule", "chained", "recovered"],
@@ -24,7 +35,8 @@ internal static partial class TelemetryEventSanitizer
         ["afterEndAction"] = ["do_nothing", "start_next_workspace", "lock_pc", "sleep", "sign_out", "shut_down_pc"],
         ["stopReason"] = ["user_stop", "natural_completion", "emergency_unlock", "startup_failure"],
         ["changeType"] = ["create", "update", "delete"],
-        ["result"] = ["success", "failed", "started", "completed", "cancelled", "degraded", "recovered"],
+        ["presetChangeType"] = ["create", "update"],
+        ["result"] = ["success", "failed", "started", "completed", "cancelled", "degraded", "recovered", "skipped"],
         ["source"] = ["client", "host", "installer"],
         ["stage"] = [
             "prerequisite_download", "prerequisite_install", "existing_version_removal", "files_copy", "registration",
@@ -34,7 +46,24 @@ internal static partial class TelemetryEventSanitizer
             "schedule_save", "preset_save", "onboarding"],
         ["failureReason"] = [
             "validation_failed", "protection_unavailable", "module_unavailable", "timeout", "cancelled",
-            "session_already_running", "invalid_settings", "network_error", "unknown"],
+            "session_already_running", "invalid_settings", "network_error", "preset_not_found", "unknown"],
+        ["skipReason"] = ["session_already_running", "session_not_running", "committed_session",
+            "session_ended_before_stop", "session_changed", "concurrent_stop"],
+        ["scheduleType"] = ["one_time", "recurring_start", "recurring_stop", "duration_stop", "unknown"],
+        ["triggerAction"] = ["start", "stop"],
+        ["blockingMode"] = ["block_list", "allow_list"],
+        ["launcherAppType"] = ["browser", "discord", "jetbrains", "obs", "spotify", "steam", "vscode", "custom", "unknown"],
+        ["processMode"] = ["launch_new", "attach_existing", "launch_or_attach"],
+        ["windowState"] = ["normal", "maximized", "minimized"],
+        ["lifecycleMode"] = ["keep_running", "terminate_graceful", "terminate_force"],
+        ["browserFamily"] = ["chromium", "firefox", "tor", "arc", "palemoon", "other"],
+        ["ideFamily"] = ["rider", "clion", "idea", "pycharm", "webstorm", "goland", "phpstorm", "rubymine", "datagrip", "unknown"],
+        ["sessionStartAction"] = ["none", "start_streaming", "start_recording", "start_both", "start_virtualcam"],
+        ["sessionEndAction"] = ["none", "stop_streaming", "stop_recording", "stop_both", "stop_virtualcam", "stop_all"],
+        ["deviceSelectionMode"] = ["local_computer", "last_active", "specific_name"],
+        ["playbackContextKind"] = ["custom", "playlist", "album", "track", "liked_songs", "other"],
+        ["repeatMode"] = ["off", "context", "track"],
+        ["oneTimeDayOfWeek"] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
         ["subsystem"] = [
             "client", "host", "installer", "session", "module", "update", "preset", "schedule",
             "onboarding", "settings", "telemetry", "commitment"],
@@ -48,9 +77,8 @@ internal static partial class TelemetryEventSanitizer
         ["architecture"] = ["x86", "x64", "arm64"],
         ["build_channel"] = ["stable", "beta", "alpha", "dev"],
         ["environment"] = ["development", "staging", "production"],
-        ["ctaLocation"] = ["hero", "bottom_cta", "module_detail", "nav", "mobile_nav"],
         ["moduleName"] = ["App Blocker", "Application Launcher", "Home Assistant", "Site Blocker", "custom"],
-        ["actionKey"] = ["add", "remove", "enable", "disable", "open", "close", "login", "logout", "refresh", "pause", "resume", "start", "stop", "launch", "custom"],
+        ["actionKey"] = ["add", "remove", "enable", "disable", "open", "close", "login", "logout", "refresh", "pause", "resume", "start", "stop", "launch", "add_app", "refresh_games", "test_connection", "install_extension_firefox", "install_extension_chrome", "custom"],
         ["category"] = ["startup", "appearance", "telemetry", "tray_behavior"],
     };
 
@@ -59,7 +87,10 @@ internal static partial class TelemetryEventSanitizer
         "os_version", "build_channel", "environment", "application", "installMode", "launchSource", "source",
         "startSource", "commitmentMode", "endConditionType", "afterEndAction", "stopReason", "changeType",
         "result", "stage", "failureReason", "subsystem", "operation", "severity", "protectionState",
-        "platform", "architecture", "ctaLocation", "moduleName", "actionKey", "category"];
+        "platform", "architecture", "moduleName", "actionKey", "category", "presetChangeType",
+        "skipReason", "scheduleType", "triggerAction", "blockingMode", "launcherAppType", "processMode",
+        "windowState", "lifecycleMode", "browserFamily", "ideFamily", "sessionStartAction", "sessionEndAction",
+        "deviceSelectionMode", "playbackContextKind", "repeatMode", "oneTimeDayOfWeek"];
 
     public static IReadOnlyDictionary<string, object?> SanitizeProperties(
         IReadOnlyDictionary<string, object?> properties)
@@ -112,7 +143,8 @@ internal static partial class TelemetryEventSanitizer
             return SanitizeModules(value);
         }
 
-        if (key is "moduleIds" or "moduleTypes" or "createdModuleTypes" or "changedCategories")
+        if (key is "moduleIds" or "moduleTypes" or "createdModuleTypes" or "changedCategories" or
+            "categories" or "daysOfWeek" or "endAtDaysOfWeek")
         {
             return SanitizeStringList(key, value);
         }
@@ -173,6 +205,8 @@ internal static partial class TelemetryEventSanitizer
                 "moduleTypes" => EnumValues["moduleName"].Contains(text) ? text : "custom",
                 "createdModuleTypes" => text is "Developer" or "Gamer" or "Streamer" ? text : null,
                 "changedCategories" => EnumValues["category"].Contains(text) ? text : null,
+                "categories" => CategoryValues.Contains(text) ? text : null,
+                "daysOfWeek" or "endAtDaysOfWeek" => DayValues.Contains(text) ? text : null,
                 _ => null
             };
             if (safe is not null) result.Add(safe);
@@ -185,6 +219,11 @@ internal static partial class TelemetryEventSanitizer
     private static string? SafeOsVersion(string value) => OsVersionRegex().IsMatch(value) ? value : null;
     private static string? SafeIdentifier(string value, int maxLength) =>
         value.Length <= maxLength && IdentifierRegex().IsMatch(value) ? value : null;
+
+    private static readonly HashSet<string> CategoryValues = [
+        "Gaming", "Social", "Browsers", "Entertainment", "Productivity", "Email", "Development", "Design", "Office",
+        "Video", "Streaming", "News", "Shopping", "Music", "Work", "Adult", "Gambling", "Dating", "Forums"];
+    private static readonly HashSet<string> DayValues = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
     [GeneratedRegex("^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$")]
     private static partial Regex VersionRegex();

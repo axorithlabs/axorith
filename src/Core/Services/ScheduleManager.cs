@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Telemetry;
 using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,8 @@ public class ScheduleManager(
     IPresetManager presetManager,
     ISessionAutoStopService autoStopService,
     INotifier notifier,
-    ILogger<ScheduleManager> logger)
+    ILogger<ScheduleManager> logger,
+    ITelemetryService? telemetry = null)
     : IScheduleManager
 {
     private readonly string _storagePath = Path.Combine(storageDirectory, "config", "schedules.json");
@@ -29,6 +31,8 @@ public class ScheduleManager(
     };
 
     private readonly HashSet<string> _sentNotificationKeys = [];
+    private readonly HashSet<string> _reportedScheduleTriggerSkips = [];
+    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
     private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
 
     private volatile bool _isProcessingSchedule;
@@ -66,6 +70,28 @@ public class ScheduleManager(
             var activePreset = sessionManager.ActiveSession;
             if (activePreset?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
             {
+                if (_telemetry.IsEnabled)
+                {
+                    try
+                    {
+                        var ignoredStopSchedule = (await GetSchedulesForPresetAsync(presetId, CancellationToken.None)
+                                .ConfigureAwait(false))
+                            .FirstOrDefault(schedule => schedule is
+                                { Type: ScheduleType.StopDuration, IsEnabled: true, AutoStopDuration: not null } &&
+                                schedule.AutoStopDuration.Value > TimeSpan.Zero);
+                        if (ignoredStopSchedule is not null)
+                        {
+                            TrackScheduleTriggered(ignoredStopSchedule, "stop", "skipped",
+                                skipReason: "committed_session");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Could not track the ignored duration schedule for preset {PresetId}.",
+                            presetId);
+                    }
+                }
+
                 var remaining = sessionManager.SessionEndsAt - DateTimeOffset.UtcNow;
                 await autoStopService.StartTrackingAsync(
                     presetId,
@@ -94,7 +120,8 @@ public class ScheduleManager(
                 presetId,
                 durationSchedule.AutoStopDuration,
                 durationSchedule.NextPresetId,
-                CancellationToken.None).ConfigureAwait(false);
+                    CancellationToken.None,
+                    durationSchedule).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -147,8 +174,7 @@ public class ScheduleManager(
         var now = DateTimeOffset.Now;
         var schedules = await ListSchedulesAsync(cancellationToken).ConfigureAwait(false);
         var nextStart = schedules
-            .Where(s => s.PresetId == presetId && s.IsEnabled &&
-                        (s.Type is ScheduleType.OneTime or ScheduleType.Recurring))
+            .Where(s => s.PresetId == presetId && s is { IsEnabled: true, Type: ScheduleType.OneTime or ScheduleType.Recurring })
             .Select(s => s.GetNextRun(now))
             .Where(run => run.HasValue)
             .Select(run => run.GetValueOrDefault() - now)
@@ -277,6 +303,10 @@ public class ScheduleManager(
                     if (sessionManager.ActiveSession?.FocusCommitment.Mode is
                         FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
                     {
+                        if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
+                        {
+                            TrackScheduleSkipOnce(schedule, runTime, "stop", "committed_session");
+                        }
                         continue;
                     }
 
@@ -314,6 +344,10 @@ public class ScheduleManager(
                 {
                     if (sessionManager.IsSessionRunning)
                     {
+                        if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
+                        {
+                            TrackScheduleSkipOnce(schedule, runTime, "start", "session_already_running");
+                        }
                         continue;
                     }
 
@@ -356,11 +390,13 @@ public class ScheduleManager(
         {
             if (!sessionManager.IsSessionRunning)
             {
+                TrackScheduleTriggered(schedule, "stop", "skipped", skipReason: "session_not_running");
                 await UpdateLastRunAsync(schedule, now, ct);
                 continue;
             }
 
             _isProcessingSchedule = true;
+            var triggerReported = false;
             try
             {
                 logger.LogInformation("Triggering stop schedule '{Name}' for preset {PresetId} at {RunTime}",
@@ -369,18 +405,32 @@ public class ScheduleManager(
                 await notifier.ShowSystemAsync("Session Scheduler", "Stopping session now...", category: "Session Scheduler");
 
                 var expectedSession = sessionManager.ActiveSession;
-                if (expectedSession == null ||
-                    !await autoStopService.CompleteNaturallyAsync(expectedSession, schedule.NextPresetId, ct)
-                        .ConfigureAwait(false))
+                if (expectedSession == null)
                 {
-                    logger.LogInformation("Session ended before stop schedule '{Name}' could acquire the natural-end gate.",
-                        schedule.Name);
+                    TrackScheduleTriggered(schedule, "stop", "skipped", skipReason: "session_not_running");
+                    triggerReported = true;
+                }
+                else
+                {
+                    var stopped = await autoStopService.CompleteNaturallyAsync(expectedSession,
+                        schedule.NextPresetId, ct, schedule).ConfigureAwait(false);
+                    triggerReported = true;
+                    if (!stopped)
+                    {
+                        logger.LogInformation("Session ended before stop schedule '{Name}' could acquire the natural-end gate.",
+                            schedule.Name);
+                    }
                 }
 
                 await UpdateLastRunAsync(schedule, now, ct);
             }
             catch (Exception ex)
             {
+                if (!triggerReported)
+                {
+                    TrackScheduleTriggered(schedule, "stop", "failed",
+                        failureReason: ScheduleFailureReason(ex));
+                }
                 logger.LogError(ex, "Failed to execute stop schedule '{Name}'", schedule.Name);
                 await notifier.ShowSystemAsync("Schedule Error", $"Failed to stop session: {ex.Message}", category: "Session Scheduler");
                 await UpdateLastRunAsync(schedule, now, ct);
@@ -398,10 +448,12 @@ public class ScheduleManager(
             if (sessionManager.IsSessionRunning)
             {
                 logger.LogDebug("Skipping start schedule '{Name}' - session already running", schedule.Name);
+                TrackScheduleSkipOnce(schedule, runTime, "start", "session_already_running");
                 continue;
             }
 
             _isProcessingSchedule = true;
+            var sessionInstanceId = Guid.NewGuid();
             try
             {
                 logger.LogInformation("Triggering start schedule '{Name}' for preset {PresetId} at {RunTime}",
@@ -413,12 +465,17 @@ public class ScheduleManager(
                     logger.LogWarning("Preset {PresetId} not found for schedule '{Name}'. Disabling schedule.",
                         schedule.PresetId, schedule.Name);
                     await SetEnabledAsync(schedule.Id, false, ct);
+                    TrackScheduleTriggered(schedule, "start", "failed", sessionInstanceId,
+                        failureReason: "preset_not_found");
                     continue;
                 }
 
                 await notifier.ShowSystemAsync("Session Scheduler", $"Starting '{preset.Name}' now...", category: "Session Scheduler");
 
-                await sessionManager.StartSessionAsync(preset, ct, startSource: "schedule");
+                await sessionManager.StartSessionAsync(preset, ct, startSource: "schedule",
+                    sessionInstanceId: sessionInstanceId, scheduleId: schedule.Id);
+
+                TrackScheduleTriggered(schedule, "start", "started", sessionInstanceId);
 
                 logger.LogInformation("Session '{PresetName}' started successfully by schedule '{ScheduleName}'",
                     preset.Name, schedule.Name);
@@ -430,6 +487,8 @@ public class ScheduleManager(
             }
             catch (Exception ex)
             {
+                TrackScheduleTriggered(schedule, "start", "failed", sessionInstanceId,
+                    failureReason: ScheduleFailureReason(ex));
                 logger.LogError(ex, "Failed to execute start schedule '{Name}'", schedule.Name);
                 await notifier.ShowSystemAsync("Schedule Error", $"Failed to start '{schedule.Name}': {ex.Message}", category: "Session Scheduler");
                 await UpdateLastRunAsync(schedule, now, ct);
@@ -456,6 +515,39 @@ public class ScheduleManager(
             _lock.Release();
         }
     }
+
+    private void TrackScheduleTriggered(SessionSchedule schedule, string triggerAction, string result,
+        Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null)
+    {
+        if (!_telemetry.IsEnabled) return;
+        try
+        {
+            _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
+                triggerAction, result, sessionInstanceId, failureReason, skipReason));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not track schedule trigger telemetry.");
+        }
+    }
+
+    private void TrackScheduleSkipOnce(SessionSchedule schedule, DateTimeOffset runTime,
+        string triggerAction, string skipReason)
+    {
+        var key = $"{schedule.Id}_{runTime.Ticks}_{triggerAction}_{skipReason}";
+        if (_reportedScheduleTriggerSkips.Add(key))
+        {
+            TrackScheduleTriggered(schedule, triggerAction, "skipped", skipReason: skipReason);
+        }
+    }
+
+    private static bool IsTriggerWindow(TimeSpan timeLeft) =>
+        timeLeft <= TimeSpan.FromSeconds(2) && timeLeft >= TimeSpan.FromSeconds(-30);
+
+    private static bool IsScheduleReadyToRun(SessionSchedule schedule, DateTimeOffset now) =>
+        !schedule.LastRun.HasValue || (now - schedule.LastRun.Value).TotalSeconds >= 60;
+
+    private static string ScheduleFailureReason(Exception exception) => ProductAnalyticsProperties.FailureReason(exception);
 
     private async Task CheckAndNotifyStopAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
         string timeText, CancellationToken ct)
@@ -501,6 +593,7 @@ public class ScheduleManager(
         }
 
         _sentNotificationKeys.Clear();
+        _reportedScheduleTriggerSkips.Clear();
         _lastCleanup = DateTimeOffset.Now;
     }
 

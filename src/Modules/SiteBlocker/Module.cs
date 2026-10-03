@@ -2,8 +2,6 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using Microsoft.Win32;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
@@ -51,8 +49,10 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private sealed record BrowserEndpoint(string Name, string PipeName, string[] Processes, string ResponseBrowser);
     private sealed record ExtensionResult(BrowserEndpoint Endpoint, string Status, string? Version,
         bool Blocking, string? Message);
+    private sealed record FirefoxExtensionState(bool Active, bool UserDisabled, bool AppDisabled);
 
     private const int ExtensionProtocolVersion = 1;
+    private const string LegacyFirefoxNoResponseMessage = "The extension did not respond to the health protocol.";
     private static readonly BrowserEndpoint[] BrowserEndpoints =
     [
         new("Chrome", "axorith-nm-pipe-chrome", ["chrome"], "chromium"),
@@ -70,12 +70,15 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private HashSet<string> _fallbackBrowserProcesses = new(StringComparer.OrdinalIgnoreCase);
     private bool _browserFallbackFailed;
     private bool _disposed;
+    private volatile bool _legacyFirefoxProtocol;
+    private readonly Action _firefoxExtensionAction =
+        Action.Create("InstallExtension.Firefox", "Install Firefox Extension");
 
     public bool IsProtectionDegraded => _browserFallbackFailed ||
         ((_activeSiteList.Count > 0 || _isAllowList) && !_pausedForBreak &&
          _browserStatuses.Values.Any(status => status != "Connected"));
 
-    public string? ProtectionStatusMessage => _activeSiteList.Count == 0 && !_isAllowList
+    public string ProtectionStatusMessage => _activeSiteList.Count == 0 && !_isAllowList
         ? "Site Blocker has no configured sites"
         : _pausedForBreak
             ? "Site Blocker paused for break"
@@ -93,10 +96,27 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public IReadOnlyList<IAction> GetActions()
     {
-        var installFirefoxAction = Action.Create("InstallExtension.Firefox", "Install Firefox Extension");
-        installFirefoxAction.OnInvokeAsync(InstallFirefoxExtensionAsync);
+        _firefoxExtensionAction.OnInvokeAsync(InstallFirefoxExtensionAsync);
+        return [_firefoxExtensionAction];
+    }
 
-        return [installFirefoxAction];
+    private Task InstallFirefoxExtensionAsync()
+    {
+        const string firefoxExtensionUrl = "https://addons.mozilla.org/firefox/addon/axorith-site-blocker/";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(firefoxExtensionUrl) { UseShellExecute = true });
+            notifier.ShowToast("Firefox extension page opened in your browser", NotificationType.Success);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to open Firefox extension page in browser");
+            notifier.ShowToast("Failed to open browser. Please manually visit: " + firefoxExtensionUrl,
+                NotificationType.Error);
+        }
+
+        return Task.CompletedTask;
     }
 
     public async Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
@@ -116,10 +136,23 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             warnings.Add("No categories or sites selected. The module will not block anything.");
         }
 
-        if (!extensionResults.Any(result => result.Status == "Connected"))
+        var firefoxExtension = FindInstalledFirefoxExtension();
+        var firefoxRunning = IsBrowserRunning(["firefox"]);
+        var firefoxConnected = extensionResults.Any(result =>
+            result.Endpoint.Name == "Firefox" && result.Status == "Connected");
+        var anyExtensionConnected = extensionResults.Any(result => result.Status == "Connected");
+        if (!firefoxConnected && (firefoxRunning || !anyExtensionConnected))
         {
-            warnings.Add(
-                "No Site Blocker browser extension is connected. Open Chrome or Firefox with the extension installed.");
+            var firefoxWarning = firefoxExtension switch
+            {
+                { UserDisabled: true } => "The Firefox Site Blocker extension is disabled. Enable it in Firefox Add-ons to connect to Axorith.",
+                { AppDisabled: true } => "Firefox has disabled the Site Blocker extension. Re-enable it in Firefox Add-ons to connect to Axorith.",
+                { Active: false } => "Firefox reports the Site Blocker extension as inactive. Check its status in Firefox Add-ons.",
+                not null => "The Firefox extension is installed but cannot connect to Axorith. Check native messaging host registration.",
+                _ when firefoxRunning => "Firefox is open, but the Site Blocker extension is not installed or connected.",
+                _ => "No Site Blocker browser extension is connected. Install the Firefox extension and open Firefox."
+            };
+            warnings.Add(firefoxWarning);
         }
 
         return warnings.Count == 0 ? ValidationResult.Success : ValidationResult.Warn(string.Join(" ", warnings));
@@ -251,6 +284,11 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private async Task<ExtensionResult> SendToExtensionAsync(BrowserEndpoint endpoint, object message,
         CancellationToken cancellationToken)
     {
+        if (endpoint.Name == "Firefox" && _legacyFirefoxProtocol)
+        {
+            return await SendLegacyFirefoxMessageAsync(endpoint, message, cancellationToken).ConfigureAwait(false);
+        }
+
         var requestId = Guid.NewGuid().ToString("N");
         var request = JsonSerializer.SerializeToNode(message)?.AsObject()
                       ?? throw new InvalidOperationException("Could not serialize Site Blocker request.");
@@ -299,8 +337,20 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
                 statusElement.ValueKind == JsonValueKind.String &&
                 statusElement.GetString() is { } errorStatus && errorStatus != "Connected")
             {
+                var errorMessage = root.TryGetProperty("message", out var messageElement)
+                    ? messageElement.GetString()
+                    : null;
+                if (endpoint.Name == "Firefox" && errorStatus == "Outdated" &&
+                    errorMessage == LegacyFirefoxNoResponseMessage)
+                {
+                    _legacyFirefoxProtocol = true;
+                    return new ExtensionResult(endpoint, "Connected", null,
+                        request["command"]?.GetValue<string>() == "block",
+                        "Firefox is connected using the legacy one-way protocol.");
+                }
+
                 return new ExtensionResult(endpoint, errorStatus, null, false,
-                    root.TryGetProperty("message", out var messageElement) ? messageElement.GetString() : null);
+                    errorMessage);
             }
 
             if (!root.TryGetProperty("browser", out var browserElement) ||
@@ -335,6 +385,47 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         {
             return new ExtensionResult(endpoint, connectedToPipe ? "Error" : GetUnavailableStatus(endpoint),
                 null, false, ex.Message);
+        }
+    }
+
+    private async Task<ExtensionResult> SendLegacyFirefoxMessageAsync(BrowserEndpoint endpoint, object message,
+        CancellationToken cancellationToken)
+    {
+        var request = JsonSerializer.SerializeToNode(message)?.AsObject()
+                      ?? throw new InvalidOperationException("Could not serialize Site Blocker request.");
+        var command = request["command"]?.GetValue<string>();
+        var isBlocking = command == "block" || command == "health" && (_activeSiteList.Count > 0 || _isAllowList);
+        if (command == "health" && isBlocking)
+        {
+            request["command"] = "block";
+            request["mode"] = _isAllowList ? "AllowList" : "BlockList";
+            request["sites"] = JsonSerializer.SerializeToNode(_activeSiteList);
+        }
+
+        request.Remove("requestId");
+        request.Remove("protocolVersion");
+
+        try
+        {
+            await using var pipeClient = new NamedPipeClientStream(".", endpoint.PipeName, PipeDirection.InOut,
+                PipeOptions.Asynchronous);
+            await pipeClient.ConnectAsync(250, cancellationToken).ConfigureAwait(false);
+            using var writer = new StreamWriter(pipeClient, new UTF8Encoding(false), 1024, leaveOpen: true)
+            {
+                AutoFlush = true
+            };
+            await writer.WriteLineAsync(request.ToJsonString().AsMemory(), cancellationToken).ConfigureAwait(false);
+            return new ExtensionResult(endpoint, "Connected", null, isBlocking,
+                "Firefox is connected using the legacy one-way protocol.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _legacyFirefoxProtocol = false;
+            return new ExtensionResult(endpoint, GetUnavailableStatus(endpoint), null, false, ex.Message);
         }
     }
 
@@ -383,7 +474,8 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     private void ApplyBrowserFallback(IEnumerable<ExtensionResult> unavailable)
     {
-        var processes = unavailable.SelectMany(result => result.Endpoint.Processes)
+        var processes = GetFallbackProcesses(unavailable.Select(result =>
+                (result.Endpoint.Name, result.Endpoint.Processes)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (processes.SetEquals(_fallbackBrowserProcesses) && !_browserFallbackFailed)
         {
@@ -410,6 +502,12 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             logger.LogError(ex, "Could not apply browser process fallback for Site Blocker.");
         }
     }
+
+    private static IEnumerable<string> GetFallbackProcesses(
+        IEnumerable<(string BrowserName, string[] Processes)> unavailable) =>
+        unavailable
+            .Where(browser => !string.Equals(browser.BrowserName, "Firefox", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(browser => browser.Processes);
 
     private List<string> GetAllSites()
     {
@@ -519,74 +617,75 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         return choices;
     }
 
-    private Task InstallFirefoxExtensionAsync()
+    private static FirefoxExtensionState? FindInstalledFirefoxExtension()
     {
         if (!OperatingSystem.IsWindows())
         {
-            notifier.ShowToast("Automatic browser extension installation is supported on Windows only.",
-                NotificationType.Error, "Site Blocker");
-            return Task.CompletedTask;
+            return null;
         }
 
+        var profilesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Mozilla", "Firefox", "Profiles");
+        if (!Directory.Exists(profilesPath))
+        {
+            return null;
+        }
+
+        FirefoxExtensionState? installedExtension = null;
         try
         {
-            RegisterFirefoxExtensionPolicy();
-            var firefoxIsRunning = IsBrowserRunning(["firefox"]);
-            if (!firefoxIsRunning)
-                Process.Start(new ProcessStartInfo("firefox.exe") { UseShellExecute = true });
+            foreach (var profilePath in Directory.EnumerateDirectories(profilesPath))
+            {
+                var extensionsFile = Path.Combine(profilePath, "extensions.json");
+                if (!File.Exists(extensionsFile))
+                {
+                    continue;
+                }
 
-            notifier.ShowToast(firefoxIsRunning
-                    ? "Firefox is running. Site Blocker will install automatically the next time Firefox starts."
-                    : "Firefox opened. Site Blocker will install automatically.",
-                firefoxIsRunning ? NotificationType.Warning : NotificationType.Success, "Site Blocker");
+                try
+                {
+                    using var document = JsonDocument.Parse(File.ReadAllText(extensionsFile));
+                    if (!document.RootElement.TryGetProperty("addons", out var addons) ||
+                        addons.ValueKind != JsonValueKind.Array)
+                    {
+                        continue;
+                    }
+
+                    foreach (var addon in addons.EnumerateArray())
+                    {
+                        if (addon.TryGetProperty("id", out var id) &&
+                            string.Equals(id.GetString(), Axorith.Shared.Utils.SiteBlockerExtensionIds.Firefox,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            var extension = new FirefoxExtensionState(
+                                Active: ReadBoolean(addon, "active"),
+                                UserDisabled: ReadBoolean(addon, "userDisabled"),
+                                AppDisabled: ReadBoolean(addon, "appDisabled"));
+                            if (extension.Active && !extension.UserDisabled && !extension.AppDisabled)
+                            {
+                                return extension;
+                            }
+
+                            installedExtension ??= extension;
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+                {
+                    // Ignore profiles Firefox is updating or that the current user cannot read.
+                }
+            }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            logger.LogError(ex, "Failed to configure automatic Firefox extension installation");
-            notifier.ShowToast("Could not configure automatic Firefox extension installation.",
-                NotificationType.Error, "Site Blocker");
+            // A profile scan failure should not block module validation.
         }
 
-        return Task.CompletedTask;
+        return installedExtension;
     }
 
-    private static void RegisterFirefoxExtensionPolicy()
-    {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Firefox extension policies are available on Windows only.");
-
-        using var key = Registry.CurrentUser.CreateSubKey(
-            @"Software\Policies\Mozilla\Firefox\ExtensionSettings", writable: true)
-            ?? throw new InvalidOperationException("Could not create the Firefox extension policy key.");
-
-        var policies = new JsonObject();
-        var existingValues = key.GetValue(string.Empty) switch
-        {
-            string[] values => values,
-            string value => [value],
-            _ => []
-        };
-
-        foreach (var value in existingValues)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                continue;
-
-            if (JsonNode.Parse(value) is not JsonObject existing)
-                continue;
-
-            foreach (var policy in existing)
-                policies[policy.Key] = policy.Value?.DeepClone();
-        }
-
-        policies[Axorith.Shared.Utils.SiteBlockerExtensionIds.Firefox] = new JsonObject
-        {
-            ["installation_mode"] = "normal_installed",
-            ["install_url"] = "https://addons.mozilla.org/firefox/downloads/latest/axorith-site-blocker/latest.xpi"
-        };
-
-        key.SetValue(string.Empty, new[] { policies.ToJsonString() }, RegistryValueKind.MultiString);
-    }
+    private static bool ReadBoolean(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
 
     public void Dispose()
     {
@@ -620,5 +719,6 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         _mode.Dispose();
         _categories.Dispose();
         _customSites.Dispose();
+        _firefoxExtensionAction.Dispose();
     }
 }

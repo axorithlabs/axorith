@@ -99,6 +99,7 @@ Var TelemetryEnabled
 Var InstallAttemptId
 Var InstallerDistinctId
 Var InstallationId
+Var CommonAppData
 Var InstallationIdPersisted
 Var InstallMode
 Var CurrentVersion
@@ -155,6 +156,11 @@ Function ${Prefix}InitializeTelemetry
     StrCpy $TelemetryFailureStage "installer_launch"
     StrCpy $TelemetryEventProperties ""
     SetShellVarContext current
+    ReadEnvStr $CommonAppData "ProgramData"
+    StrCmp $CommonAppData "" 0 telemetry_common_appdata_ready
+    ReadEnvStr $CommonAppData "ALLUSERSPROFILE"
+    StrCmp $CommonAppData "" telemetry_identity_done
+    telemetry_common_appdata_ready:
     !if "${Mode}" == "uninstall"
         StrCpy $InstallAttemptId ""
         ReadRegStr $CurrentVersion HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion"
@@ -175,9 +181,19 @@ Function ${Prefix}InitializeTelemetry
 
     CreateDirectory "$APPDATA\Axorith\config"
     !if "${Mode}" != "uninstall"
+        CreateDirectory "$CommonAppData\Axorith\config"
         Delete "$APPDATA\Axorith\config\pending-install.json"
     !endif
     !if "${Mode}" == "uninstall"
+        IfFileExists "$CommonAppData\Axorith\config\installation-id.txt" 0 telemetry_uninstall_read_legacy_id
+        FileOpen $1 "$CommonAppData\Axorith\config\installation-id.txt" r
+        IfErrors telemetry_uninstall_read_legacy_id
+        FileRead $1 $InstallationId
+        FileClose $1
+        StrCpy $InstallationId $InstallationId 36
+        StrLen $2 $InstallationId
+        IntCmp $2 36 telemetry_uninstall_valid_id telemetry_uninstall_read_legacy_id telemetry_uninstall_read_legacy_id
+        telemetry_uninstall_read_legacy_id:
         IfFileExists "$APPDATA\Axorith\config\installation-id.txt" 0 telemetry_uninstall_generate_id
         FileOpen $1 "$APPDATA\Axorith\config\installation-id.txt" r
         IfErrors telemetry_uninstall_generate_id
@@ -194,7 +210,19 @@ Function ${Prefix}InitializeTelemetry
         Call ${Prefix}GenerateTelemetryGuid
         Pop $InstallerDistinctId
     !else
-        StrCmp $InstallMode "fresh" telemetry_generate_installation_id
+        IfFileExists "$CommonAppData\Axorith\config\installation-id.txt" 0 telemetry_read_legacy_installation_id
+        FileOpen $1 "$CommonAppData\Axorith\config\installation-id.txt" r
+        IfErrors telemetry_read_legacy_installation_id
+        FileRead $1 $InstallationId
+        FileClose $1
+        StrCpy $InstallationId $InstallationId 36
+        StrLen $2 $InstallationId
+        IntCmp $2 36 telemetry_installation_id_loaded telemetry_read_legacy_installation_id telemetry_read_legacy_installation_id
+        telemetry_installation_id_loaded:
+        StrCpy $InstallerDistinctId $InstallationId
+        StrCpy $InstallationIdPersisted "1"
+        Goto telemetry_identity_done
+        telemetry_read_legacy_installation_id:
         IfFileExists "$APPDATA\Axorith\config\installation-id.txt" 0 telemetry_generate_installation_id
         FileOpen $1 "$APPDATA\Axorith\config\installation-id.txt" r
         IfErrors telemetry_generate_installation_id
@@ -202,17 +230,14 @@ Function ${Prefix}InitializeTelemetry
         FileClose $1
         StrCpy $InstallationId $InstallationId 36
         StrLen $2 $InstallationId
-        IntCmp $2 36 telemetry_installation_id_loaded telemetry_generate_installation_id telemetry_generate_installation_id
-        telemetry_installation_id_loaded:
-        StrCpy $InstallerDistinctId $InstallationId
-        StrCpy $InstallationIdPersisted "1"
-        Goto telemetry_identity_done
+        IntCmp $2 36 telemetry_write_machine_installation_id telemetry_generate_installation_id telemetry_generate_installation_id
         telemetry_generate_installation_id:
         Call ${Prefix}GenerateTelemetryGuid
         Pop $InstallationId
+        telemetry_write_machine_installation_id:
         StrCpy $InstallerDistinctId $InstallationId
         ClearErrors
-        FileOpen $1 "$APPDATA\Axorith\config\installation-id.txt" w
+        FileOpen $1 "$CommonAppData\Axorith\config\installation-id.txt" w
         IfErrors telemetry_identity_done
         FileWrite $1 "$InstallationId"
         FileClose $1
@@ -220,6 +245,11 @@ Function ${Prefix}InitializeTelemetry
         StrCpy $InstallationIdPersisted "1"
     !endif
     telemetry_identity_done:
+    !if "${Mode}" != "uninstall"
+        StrCmp $InstallationIdPersisted "1" 0 telemetry_legacy_identity_done
+        Delete "$APPDATA\Axorith\config\installation-id.txt"
+        telemetry_legacy_identity_done:
+    !endif
     !if "${POSTHOG_API_KEY}" != ""
         StrCmp $InstallationIdPersisted "1" 0 telemetry_preference_done
         StrCpy $TelemetryEnabled "1"
@@ -248,12 +278,12 @@ Function ${Prefix}SendTelemetryEvent
     StrCmp $TelemetryEventProperties "" telemetry_extra_done
     StrCpy $1 ",$TelemetryEventProperties"
     telemetry_extra_done:
-    StrCpy $2 "$\"application$\":$\"Axorith.Installer$\",$\"source$\":$\"installer$\",$\"platform$\":$\"windows$\",$\"architecture$\":$\"x64$\""
+    StrCpy $2 "$\"application$\":$\"Axorith.Installer$\",$\"source$\":$\"installer$\",$\"platform$\":$\"windows$\",$\"architecture$\":$\"x64$\",$\"$$geoip_disable$\":true"
     StrCmp $InstallMode "uninstall" telemetry_no_install_attempt_id
     StrCpy $2 "$2,$\"installAttemptId$\":$\"$InstallAttemptId$\""
     telemetry_no_install_attempt_id:
     StrCpy $0 "{$\"api_key$\":$\"${POSTHOG_API_KEY}$\",$\"event$\":$\"$TelemetryEventName$\",$\"distinct_id$\":$\"$InstallerDistinctId$\",$\"properties$\":{$2,$\"installMode$\":$\"$InstallMode$\",$\"currentVersion$\":$\"$CurrentVersion$\",$\"previousVersion$\":$\"$PreviousVersion$\"$1}}"
-    inetc::post /HEADER "Content-Type: application/json" "$0" /CONNECTTIMEOUT 1 /RECEIVETIMEOUT 1 /SILENT /NOCANCEL "${POSTHOG_API_HOST}/capture" "$TEMP\axorith-telemetry-$InstallerDistinctId.txt" /END
+    inetc::post "$0" /HEADER "Content-Type: application/json" /CONNECTTIMEOUT 1 /RECEIVETIMEOUT 1 /SILENT /NOCANCEL "${POSTHOG_API_HOST}/capture" "$TEMP\axorith-telemetry-$InstallerDistinctId.txt" /END
     Pop $5
     Delete "$TEMP\axorith-telemetry-$InstallerDistinctId.txt"
     telemetry_send_done:
@@ -472,6 +502,12 @@ Section "MainSection" SEC_INSTALL
     SetShellVarContext current
     !insertmacro CheckCommittedSession "Installation or update" install_section_allowed SendTelemetryEvent
 
+    IfFileExists "$APPDATA\Axorith\config\clientsettings.json" migrate_client_settings_done
+    IfFileExists "$INSTDIR\Axorith.Client\clientsettings.json" 0 migrate_client_settings_done
+    CreateDirectory "$APPDATA\Axorith\config"
+    CopyFiles /SILENT "$INSTDIR\Axorith.Client\clientsettings.json" "$APPDATA\Axorith\config"
+    migrate_client_settings_done:
+
     StrCpy $TelemetryFailureStage "existing_version_removal"
     ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString"
     ${If} $0 != ""
@@ -525,6 +561,10 @@ Section "Uninstall"
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     Delete "$smprograms\${PRODUCT_NAME}.lnk"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+    IfFileExists "$INSTDIR\Axorith.Shim\Axorith.Shim.exe" 0 uninstaller_skip_legacy_firefox_policy
+    nsExec::ExecToStack '"$INSTDIR\Axorith.Shim\Axorith.Shim.exe" --remove-legacy-firefox-policy'
+    Pop $0
+    uninstaller_skip_legacy_firefox_policy:
     DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith"
     DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith.dev"
     DeleteRegKey /ifempty HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith"

@@ -34,9 +34,10 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         "Geek.exe", "BCUninstaller.exe", "UninstallTool.exe"
     ];
     private static readonly string[] BlockedProcessNames =
-        BlockedExecutables.Select(executable => Path.GetFileNameWithoutExtension(executable)!)
-            .Append("wt")
-            .ToArray();
+    [
+        .. BlockedExecutables.Select(executable => Path.GetFileNameWithoutExtension(executable)!),
+        "wt"
+    ];
 
     private readonly string _statePath = Path.Combine(stateDirectory, "strict-protection.json");
     private readonly SemaphoreSlim _gate = new(1, 1);

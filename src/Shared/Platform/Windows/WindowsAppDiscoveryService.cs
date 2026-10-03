@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
-using Axorith.Shared.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 

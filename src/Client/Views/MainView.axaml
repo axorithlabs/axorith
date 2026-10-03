@@ -274,7 +274,7 @@
                                         </WrapPanel>
                                         <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4">
                                             <TextBlock Text="{Binding ScheduleSummary, StringFormat='Schedule: {0}'}"
-                                                       FontSize="13" Foreground="#888888"
+                                                       FontSize="13" Foreground="#888888" TextWrapping="Wrap"
                                                        IsVisible="{Binding HasSchedule}" />
                                             <TextBlock Text="{Binding ValidationMessage}"
                                                        Foreground="#FF7777" TextWrapping="Wrap"

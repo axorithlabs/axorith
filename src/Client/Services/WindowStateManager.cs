@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Axorith.Client.Services.Abstractions;
+using Axorith.Shared.Utils;
 
 namespace Axorith.Client.Services;
 
@@ -18,11 +19,7 @@ public class WindowStateManager : IWindowStateManager
 
     public WindowStateManager()
     {
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Axorith");
-
-        _stateFilePath = Path.Combine(appDataPath, "config", "window_state.json");
+        _stateFilePath = Path.Combine(ApplicationPaths.Config, "window_state.json");
     }
 
     internal WindowStateManager(string stateFilePath) => _stateFilePath = stateFilePath;

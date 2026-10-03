@@ -3,7 +3,9 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Telemetry;
 using Axorith.Sdk;
+using Axorith.Sdk.Services;
 using Axorith.Shared.Exceptions;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
@@ -24,7 +26,8 @@ public class SessionManager(
     ITelemetryService telemetry,
     string? committedSessionPath = null,
     ICommitmentProtectionService? commitmentProtection = null,
-    string? sessionHistoryPath = null)
+    string? sessionHistoryPath = null,
+    ISecureStorageService? secureStorage = null)
     : ISessionManager
 {
     private const string PreflightFailureDataKey = "Axorith.SessionPreflight";
@@ -38,6 +41,7 @@ public class SessionManager(
 
     private readonly string? _committedSessionPath = committedSessionPath;
     private readonly ICommitmentProtectionService? _commitmentProtection = commitmentProtection;
+    private readonly ISecureStorageService? _secureStorage = secureStorage;
     private static readonly JsonSerializerOptions CommittedSessionJsonOptions = new() { WriteIndented = true };
     private CancellationTokenSource? _sessionCts;
     private readonly SemaphoreSlim _asyncLock = new(1, 1);
@@ -47,6 +51,7 @@ public class SessionManager(
     private long? _breakEndsAtTimestamp;
     private bool _protectionWasUnavailable;
     private Guid? _sessionInstanceId;
+    private Guid? _sessionScheduleId;
     private string _sessionStartSource = "manual";
     private bool _sessionTelemetryStarted;
     private string _protectionStatus = "Protection active";
@@ -160,7 +165,7 @@ public class SessionManager(
         try
         {
             await StartSessionWithTelemetryAsync(state.Preset, state.StartedAt, state.EndDeadline, state,
-                    cancellationToken, "recovered", null)
+                    cancellationToken, "recovered", null, null)
                 .ConfigureAwait(false);
         }
         catch
@@ -320,27 +325,23 @@ public class SessionManager(
 
     /// <inheritdoc />
     public Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default,
-        string startSource = "manual", Guid? sessionInstanceId = null)
+        string startSource = "manual", Guid? sessionInstanceId = null, Guid? scheduleId = null)
     {
         return StartSessionWithTelemetryAsync(preset, null, null, null, cancellationToken, startSource,
-            sessionInstanceId);
+            sessionInstanceId, scheduleId);
     }
 
     private async Task StartSessionWithTelemetryAsync(SessionPreset preset, DateTimeOffset? startedAtOverride,
         DateTimeOffset? endAtOverride, PersistedCommittedSession? recoveryState, CancellationToken cancellationToken,
-        string startSource, Guid? sessionInstanceId)
+        string startSource, Guid? sessionInstanceId, Guid? scheduleId)
     {
         ArgumentNullException.ThrowIfNull(preset);
         var instanceId = sessionInstanceId ?? Guid.NewGuid();
-        if (sessionInstanceId is null)
-        {
-            TrackSessionStartRequested(preset, instanceId, startSource);
-        }
 
         try
         {
             await StartSessionInternalAsync(preset, startedAtOverride, endAtOverride, recoveryState,
-                    cancellationToken, instanceId, startSource)
+                    cancellationToken, instanceId, startSource, scheduleId)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -361,7 +362,7 @@ public class SessionManager(
 
     private async Task StartSessionInternalAsync(SessionPreset preset, DateTimeOffset? startedAtOverride,
         DateTimeOffset? endAtOverride, PersistedCommittedSession? recoveryState, CancellationToken cancellationToken,
-        Guid sessionInstanceId, string startSource)
+        Guid sessionInstanceId, string startSource, Guid? scheduleId)
     {
         ArgumentNullException.ThrowIfNull(preset);
         preset.FocusCommitment ??= new FocusCommitmentOptions();
@@ -400,6 +401,7 @@ public class SessionManager(
 
                 ActiveSession = snapshot;
                 _sessionInstanceId = sessionInstanceId;
+                _sessionScheduleId = scheduleId;
                 _sessionStartSource = startSource;
                 _sessionTelemetryStarted = false;
                 SessionStartedAt = startedAtOverride ?? DateTimeOffset.UtcNow;
@@ -696,8 +698,6 @@ public class SessionManager(
 
             logger.LogInformation("Module '{InstanceName}' started successfully.", module.DisplayName);
             module.IsStarted = true;
-            TrackModuleStarted(module,
-                (long)System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -1118,10 +1118,6 @@ public class SessionManager(
                     shutdownCts.CancelAfter(shutdownTimeout);
 
                     await activeModule.Instance.OnSessionEndAsync(shutdownCts.Token).ConfigureAwait(false);
-                    if (activeModule.IsStarted)
-                    {
-                        TrackModuleStopped(activeModule, "success");
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -1130,7 +1126,6 @@ public class SessionManager(
                         activeModule.DisplayName);
                     if (activeModule.IsStarted)
                     {
-                        TrackModuleStopped(activeModule, "failed");
                         telemetry.TrackError(ex, "module", "module_execution", "error", handled: true,
                             fatal: false, properties: ModuleTelemetryProperties(activeModule));
                     }
@@ -1150,15 +1145,15 @@ public class SessionManager(
                 }
             }
 
-            var stoppedPresetId = ActiveSession?.Id ?? Guid.Empty;
+            var stoppedPreset = ActiveSession;
+            var stoppedPresetId = stoppedPreset?.Id ?? Guid.Empty;
             var stoppedModules = _activeModules.ToList();
             var startedAt = SessionStartedAt;
             var stoppedSessionInstanceId = _sessionInstanceId;
+            var stoppedScheduleId = _sessionScheduleId;
             var startSource = _sessionStartSource;
             var breaksUsed = _breaksUsed;
             var reportSessionStop = _sessionTelemetryStarted;
-            var commitmentMode = CommitmentMode(ActiveSession?.FocusCommitment.Mode ?? FocusCommitmentMode.Normal);
-            var breakCount = ActiveSession?.FocusCommitment.BreakCount ?? 0;
             var emergencyUnlockUsed = reason == SessionEndReason.EmergencyUnlock;
             var protectionDegraded = _protectionWasUnavailable || GetProtectionState(ProtectionStatus) == "degraded";
             if (wasCommittedSession && _commitmentProtection != null)
@@ -1195,9 +1190,8 @@ public class SessionManager(
                 SessionStopped?.Invoke(stoppedPresetId);
                 if (reportSessionStop)
                 {
-                    TrackSessionStopped(stoppedPresetId, stoppedModules, startedAt, stoppedSessionInstanceId,
-                        startSource, reason, breaksUsed, commitmentMode, breakCount, emergencyUnlockUsed,
-                        protectionDegraded);
+                    TrackSessionStopped(stoppedPreset!, stoppedModules, startedAt, stoppedSessionInstanceId,
+                        startSource, reason, breaksUsed, emergencyUnlockUsed, protectionDegraded, stoppedScheduleId);
                     if (emergencyUnlockUsed)
                     {
                         telemetry.TrackEvent("EmergencyUnlockUsed", new Dictionary<string, object?>
@@ -1236,6 +1230,7 @@ public class SessionManager(
         _sessionEndsAtTimestamp = null;
         _breakEndsAtTimestamp = null;
         _sessionInstanceId = null;
+        _sessionScheduleId = null;
         _sessionStartSource = "manual";
         _sessionTelemetryStarted = false;
         ProtectionStatus = "Protection inactive";
@@ -1369,7 +1364,7 @@ public class SessionManager(
             throw new SessionException("Schedule configuration lock must be Off, 5 minutes, 15 minutes, or 1 hour.");
         }
 
-        if (options.AfterEnd == AfterEndBehavior.StartNextWorkspace && !options.NextWorkspaceId.HasValue)
+        if (options is { AfterEnd: AfterEndBehavior.StartNextWorkspace, NextWorkspaceId: null })
         {
             throw new SessionException("Select the Workspace to start after this session.");
         }
@@ -1572,14 +1567,6 @@ public class SessionManager(
         }
     }
 
-    private void TrackModuleStarted(ActiveModule module, long latencyMs)
-    {
-        var properties = ModuleTelemetryProperties(module);
-        properties["result"] = "success";
-        properties["latencyMs"] = latencyMs;
-        telemetry.TrackEvent("ModuleStarted", properties);
-    }
-
     private void TrackModuleFailed(ActiveModule module, string failureReason, long latencyMs)
     {
         var properties = ModuleTelemetryProperties(module);
@@ -1587,13 +1574,6 @@ public class SessionManager(
         properties["failureReason"] = failureReason;
         properties["latencyMs"] = latencyMs;
         telemetry.TrackEvent("ModuleStartFailed", properties);
-    }
-
-    private void TrackModuleStopped(ActiveModule module, string result)
-    {
-        var properties = ModuleTelemetryProperties(module);
-        properties["result"] = result;
-        telemetry.TrackEvent("ModuleStopped", properties);
     }
 
     private Dictionary<string, object?> ModuleTelemetryProperties(ActiveModule module) => new()
@@ -1604,40 +1584,6 @@ public class SessionManager(
         ["moduleName"] = module.Definition.Name,
         ["instanceId"] = module.Configuration.InstanceId
     };
-
-    private void TrackSessionStartRequested(SessionPreset preset, Guid sessionInstanceId, string startSource)
-    {
-        if (!telemetry.IsEnabled)
-        {
-            return;
-        }
-
-        var definitions = moduleRegistry.GetAllDefinitions().ToDictionary(module => module.Id, module => module.Name);
-        var modules = preset.Modules.Select(module => new Dictionary<string, object?>
-        {
-            ["moduleId"] = module.ModuleId,
-            ["moduleName"] = definitions.GetValueOrDefault(module.ModuleId, "custom"),
-            ["instanceId"] = module.InstanceId
-        }).ToArray();
-        var commitment = preset.FocusCommitment;
-
-        telemetry.TrackEvent("SessionStartRequested", new Dictionary<string, object?>
-        {
-            ["sessionInstanceId"] = sessionInstanceId,
-            ["presetId"] = preset.Id,
-            ["startSource"] = startSource,
-            ["commitmentMode"] = CommitmentMode(commitment.Mode),
-            ["endConditionType"] = EndCondition(commitment.EndCondition),
-            ["plannedDurationMs"] = commitment.Duration is { } duration ? (long)duration.TotalMilliseconds : null,
-            ["breakCount"] = commitment.BreakCount,
-            ["breakDurationMs"] = (long)commitment.BreakDuration.TotalMilliseconds,
-            ["afterEndAction"] = AfterEndAction(commitment.AfterEnd),
-            ["moduleCount"] = modules.Length,
-            ["modules"] = modules,
-            ["moduleIds"] = modules.Select(module => ((Guid)module["moduleId"]!).ToString()).ToArray(),
-            ["moduleTypes"] = modules.Select(module => (string)module["moduleName"]!).Distinct().ToArray()
-        });
-    }
 
     private void TrackSessionPreflightCompleted(Guid sessionInstanceId, Guid presetId, string startSource,
         string result, string? failureReason = null)
@@ -1678,94 +1624,68 @@ public class SessionManager(
 
     private void TrackSessionStarted(SessionPreset preset, List<ActiveModule> modules)
     {
-        var moduleSummaries = modules.Select(module => new Dictionary<string, object?>
-        {
-            ["moduleId"] = module.Configuration.ModuleId,
-            ["moduleName"] = module.Definition.Name,
-            ["instanceId"] = module.Configuration.InstanceId
-        }).ToArray();
+        if (!telemetry.IsEnabled) return;
+        var moduleSummaries = modules.Select(module => ProductAnalyticsProperties.Module(
+            module.Configuration, module.Definition.Name,
+            ProductAnalyticsProperties.HasHomeAssistantAccessToken(module.Configuration,
+                module.Definition.Name, _secureStorage))).ToArray();
 
-        var commitment = preset.FocusCommitment;
-        telemetry.TrackEvent("SessionStarted", new Dictionary<string, object?>
+        var properties = new Dictionary<string, object?>
         {
             ["sessionInstanceId"] = _sessionInstanceId,
             ["presetId"] = preset.Id,
             ["startSource"] = _sessionStartSource,
-            ["commitmentMode"] = CommitmentMode(commitment.Mode),
-            ["endConditionType"] = EndCondition(commitment.EndCondition),
-            ["plannedDurationMs"] = commitment.Duration is { } duration ? (long)duration.TotalMilliseconds : null,
-            ["breakCount"] = commitment.BreakCount,
-            ["breakDurationMs"] = (long)commitment.BreakDuration.TotalMilliseconds,
-            ["afterEndAction"] = AfterEndAction(commitment.AfterEnd),
             ["moduleCount"] = modules.Count,
             ["modules"] = moduleSummaries,
             ["moduleIds"] = modules.Select(module => module.Configuration.ModuleId.ToString()).ToArray(),
-            ["moduleTypes"] = modules.Select(module => module.Definition.Name).Distinct().ToArray(),
+            ["moduleTypes"] = moduleSummaries.Select(module => (string)module["moduleName"]!).Distinct().ToArray(),
             ["protectionState"] = GetProtectionState(ProtectionStatus)
-        });
+        };
+        foreach (var (key, value) in ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment))
+        {
+            properties[key] = value;
+        }
+        if (_sessionScheduleId.HasValue) properties["scheduleId"] = _sessionScheduleId.Value;
+        telemetry.TrackEvent("SessionStarted", properties);
     }
 
-    private void TrackSessionStopped(Guid presetId, List<ActiveModule> modules, DateTimeOffset? startedAt,
-        Guid? sessionInstanceId, string startSource, SessionEndReason reason, int breaksUsed, string commitmentMode,
-        int breakCount, bool emergencyUnlockUsed, bool protectionDegraded)
+    private void TrackSessionStopped(SessionPreset preset, List<ActiveModule> modules, DateTimeOffset? startedAt,
+        Guid? sessionInstanceId, string startSource, SessionEndReason reason, int breaksUsed,
+        bool emergencyUnlockUsed, bool protectionDegraded, Guid? scheduleId)
     {
+        if (!telemetry.IsEnabled) return;
         var durationMs = startedAt.HasValue
             ? (long)(DateTimeOffset.UtcNow - startedAt.Value).TotalMilliseconds
             : (long?)null;
-
-        telemetry.TrackEvent("SessionStopped", new Dictionary<string, object?>
+        var moduleSummaries = modules.Select(module => ProductAnalyticsProperties.Module(
+            module.Configuration, module.Definition.Name,
+            ProductAnalyticsProperties.HasHomeAssistantAccessToken(module.Configuration,
+                module.Definition.Name, _secureStorage))).ToArray();
+        var properties = new Dictionary<string, object?>
         {
             ["sessionInstanceId"] = sessionInstanceId,
-            ["presetId"] = presetId,
+            ["presetId"] = preset.Id,
             ["startSource"] = startSource,
             ["stopReason"] = StopReason(reason),
             ["completedAsPlanned"] = reason == SessionEndReason.NaturalCompletion,
-            ["commitmentMode"] = commitmentMode,
-            ["breakCount"] = breakCount,
-            ["emergencyUnlockUsed"] = emergencyUnlockUsed,
-            ["protectionDegraded"] = protectionDegraded,
             ["moduleCount"] = modules.Count,
+            ["modules"] = moduleSummaries,
             ["moduleIds"] = modules.Select(module => module.Configuration.ModuleId.ToString()).ToArray(),
-            ["moduleTypes"] = modules.Select(module => module.Definition.Name).Distinct().ToArray(),
+            ["moduleTypes"] = moduleSummaries.Select(module => (string)module["moduleName"]!).Distinct().ToArray(),
             ["durationMs"] = durationMs,
-            ["breaksUsed"] = breaksUsed
-        });
-    }
-
-    private static string GetFailureReason(Exception exception)
-    {
-        return exception switch
-        {
-            OperationCanceledException => "cancelled",
-            TimeoutException => "timeout",
-            InvalidSettingsException => "invalid_settings",
-            _ => "unknown"
+            ["breaksUsed"] = breaksUsed,
+            ["emergencyUnlockUsed"] = emergencyUnlockUsed,
+            ["protectionDegraded"] = protectionDegraded
         };
+        foreach (var (key, value) in ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment))
+        {
+            properties[key] = value;
+        }
+        if (scheduleId.HasValue) properties["scheduleId"] = scheduleId.Value;
+        telemetry.TrackEvent("SessionStopped", properties);
     }
 
-    private static string CommitmentMode(FocusCommitmentMode mode) => mode switch
-    {
-        FocusCommitmentMode.Locked => "locked",
-        FocusCommitmentMode.Strict => "strict",
-        _ => "normal"
-    };
-
-    private static string EndCondition(FocusEndCondition condition) => condition switch
-    {
-        FocusEndCondition.Duration => "duration",
-        FocusEndCondition.EndAt => "end_at",
-        _ => "none"
-    };
-
-    private static string AfterEndAction(AfterEndBehavior behavior) => behavior switch
-    {
-        AfterEndBehavior.StartNextWorkspace => "start_next_workspace",
-        AfterEndBehavior.LockPc => "lock_pc",
-        AfterEndBehavior.Sleep => "sleep",
-        AfterEndBehavior.SignOut => "sign_out",
-        AfterEndBehavior.ShutDownPc => "shut_down_pc",
-        _ => "do_nothing"
-    };
+    private static string GetFailureReason(Exception exception) => ProductAnalyticsProperties.FailureReason(exception);
 
     private static string StopReason(SessionEndReason reason) => reason switch
     {

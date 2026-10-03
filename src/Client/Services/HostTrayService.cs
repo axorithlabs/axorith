@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
-using System.Reactive.Linq;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive.Linq;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
@@ -52,8 +53,36 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
 
     public string ScheduleSummary => string.Join(" | ", _schedules
         .Where(schedule => schedule.Type != ScheduleType.StopDuration)
-        .Select(schedule =>
-            string.IsNullOrWhiteSpace(schedule.Name) ? schedule.Type.ToString() : schedule.Name));
+        .Select(DescribeSchedule));
+
+    private static string DescribeSchedule(SessionSchedule schedule) => schedule.Type switch
+    {
+        ScheduleType.OneTime when schedule.OneTimeDate is { } date =>
+            $"Starts {date.ToLocalTime().ToString("ddd, d MMM yyyy", CultureInfo.CurrentCulture)} at " +
+            FormatTime(TimeOnly.FromDateTime(date.ToLocalTime().DateTime), schedule.Use24HourFormat),
+        ScheduleType.OneTime => "One-time start date not set",
+        ScheduleType.Recurring => FormatRecurringSchedule(schedule, "Starts", "Recurring start time not set"),
+        ScheduleType.StopRecurring => FormatRecurringSchedule(schedule, "Stops", "Recurring stop time not set"),
+        _ => schedule.Name
+    };
+
+    private static string FormatRecurringSchedule(SessionSchedule schedule, string action, string missingTime)
+    {
+        if (schedule.RecurringTime is not { } time || time < TimeSpan.Zero || time >= TimeSpan.FromDays(1))
+        {
+            return missingTime;
+        }
+
+        var days = schedule.DaysOfWeek.Distinct().OrderBy(day => ((int)day + 6) % 7).ToArray();
+        var daysLabel = days.Length is 0 or 7
+            ? "every day"
+            : $"on {string.Join(", ", days.Select(day => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day)))}";
+
+        return $"{action} {daysLabel} at {FormatTime(TimeOnly.FromTimeSpan(time), schedule.Use24HourFormat)}";
+    }
+
+    private static string FormatTime(TimeOnly time, bool use24HourFormat) =>
+        time.ToString(use24HourFormat ? "HH:mm" : "h:mm tt", CultureInfo.CurrentCulture);
 
     public bool IsActive
     {

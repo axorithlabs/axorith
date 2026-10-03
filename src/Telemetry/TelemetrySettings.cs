@@ -1,4 +1,4 @@
-namespace Axorith.Telemetry;
+﻿namespace Axorith.Telemetry;
 
 /// <summary>
 ///     Telemetry settings with hard defaults. CI patches key/host directly here.
@@ -13,7 +13,7 @@ public sealed record TelemetrySettings
     public bool Enabled { get; init; } = true;
 
     public string DistinctId { get; init; } = string.Empty;
-    public string PostHogApiKey { get; init; } = "##POSTHOG_API_KEY##";
+    public string PostHogApiKey { get; init; } = "phc_5JRZwyXJmWlMk1dln5MK3PipGNnAZNmRObSWLqjpMOT";
     public string PostHogHost { get; init; } = "https://us.i.posthog.com";
     public int BatchSize { get; init; } = 20;
     public TimeSpan FlushInterval { get; init; } = TimeSpan.FromSeconds(5);
@@ -103,3 +103,18 @@ public static class TelemetryGuard
         return SafeString(masked, maxLength);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

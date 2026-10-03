@@ -4,7 +4,6 @@ using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
-using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.OBS;
 

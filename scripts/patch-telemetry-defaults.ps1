@@ -24,13 +24,9 @@ $ApiHost = $ApiHost.TrimEnd('/')
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $telemetrySettingsPath = Join-Path $repoRoot "src/Telemetry/TelemetrySettings.cs"
-$websiteScriptPath = Join-Path $repoRoot "website/js/posthog.js"
-
-foreach ($path in @($telemetrySettingsPath, $websiteScriptPath)) {
-    if (-not (Test-Path $path)) {
-        Write-Error "Telemetry file not found at $path"
-        exit 1
-    }
+if (-not (Test-Path $telemetrySettingsPath)) {
+    Write-Error "Telemetry settings file not found at $telemetrySettingsPath"
+    exit 1
 }
 
 $settings = Get-Content -Path $telemetrySettingsPath -Raw
@@ -49,20 +45,4 @@ $settings = [regex]::Replace($settings,
     'public string PostHogHost { get; init; } = "' + $ApiHost + '";', 1)
 Set-Content -Path $telemetrySettingsPath -Value $settings -Encoding UTF8
 
-$websiteScript = Get-Content -Path $websiteScriptPath -Raw
-$websiteKeyPattern = 'const posthogProjectToken = "[^"]+";'
-$websiteHostPattern = 'const posthogApiHost = "[^"]+";'
-if ([regex]::Matches($websiteScript, $websiteKeyPattern).Count -ne 1 -or
-    [regex]::Matches($websiteScript, $websiteHostPattern).Count -ne 1) {
-    Write-Error "website/js/posthog.js no longer has the expected single PostHog defaults."
-    exit 1
-}
-$websiteScript = [regex]::Replace($websiteScript,
-    $websiteKeyPattern,
-    'const posthogProjectToken = "' + $Key + '";', 1)
-$websiteScript = [regex]::Replace($websiteScript,
-    $websiteHostPattern,
-    'const posthogApiHost = "' + $ApiHost + '";', 1)
-Set-Content -Path $websiteScriptPath -Value $websiteScript -Encoding UTF8
-
-Write-Host "Patched desktop and website PostHog defaults." -ForegroundColor Green
+Write-Host "Patched desktop PostHog defaults." -ForegroundColor Green

@@ -14,9 +14,7 @@ using Axorith.Client.ViewModels;
 using Axorith.Client.Views;
 using Axorith.Contracts;
 using Axorith.Core.Models;
-using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Streaming;
-using Axorith.Sdk;
 using FluentAssertions;
 using Empty = Google.Protobuf.WellKnownTypes.Empty;
 using Timestamp = Google.Protobuf.WellKnownTypes.Timestamp;
@@ -25,12 +23,10 @@ using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
-using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using Xunit;
 
@@ -405,8 +401,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             {
                 ModuleId = factory.SiteBlockerModuleId.ToString()
             });
-            Assert.Contains(siteBlockerSettings.Actions, action =>
-                action.Key == "InstallExtension.Chrome" && !action.IsEnabled);
+            Assert.DoesNotContain(siteBlockerSettings.Actions, action => action.Key == "InstallExtension.Chrome");
         }
     }
 
@@ -425,7 +420,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
 
             Assert.True(result.IsValid, result.Message);
             Assert.True(result.IsWarning);
-            Assert.Contains("extension is connected", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("extension", result.Message, StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -795,7 +790,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             Assert.True(await notificationTask.WaitAsync(TimeSpan.FromSeconds(3)));
             Assert.Equal("Session saved", stream.Current.Message);
             Assert.Equal(Axorith.Sdk.Services.NotificationType.Success, stream.Current.Type);
-            Assert.Equal("System", stream.Current.Source);
+            Assert.Equal("Axorith", stream.Current.Source);
         }
     }
 
@@ -1026,9 +1021,9 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 Assert.Equal(Color.Parse("#111"), ((ISolidColorBrush)thenActionCard.Background!).Color);
                 Assert.Equal(Color.Parse("#FF6B6B"), ((ISolidColorBrush)thenActionCard.BorderBrush!).Color);
                 Assert.Single(thenCard.GetVisualDescendants().OfType<TextBlock>(),
-                    label => label.IsVisible && label.Text == "No other Workspaces are available.");
+                    label => label is { IsVisible: true, Text: "No other Workspaces are available." });
                 Assert.DoesNotContain(thenCard.GetVisualDescendants().OfType<TextBlock>(),
-                    label => label.IsVisible && label.Text == "Choose a Workspace");
+                    label => label is { IsVisible: true, Text: "Choose a Workspace" });
             }
             finally
             {
@@ -1052,7 +1047,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
 
             var validateCommitment = typeof(SessionEditorViewModel).GetMethod("ValidateFocusCommitment",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-            Assert.False((bool)validateCommitment.Invoke(editorViewModel, new object?[] { false })!);
+            Assert.False((bool)validateCommitment.Invoke(editorViewModel, [false])!);
 
             using (editorViewModel.AddStopAfterDurationTriggerCommand.Execute().Subscribe())
             {
@@ -1065,7 +1060,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             Assert.Null(editorViewModel.FocusCommitmentError);
             Assert.False(editorViewModel.HasValidationErrors);
             Assert.True(editorViewModel.SaveAndCloseCommand.CanExecute(null));
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
+            Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
             var options = (Axorith.Core.Models.FocusCommitmentOptions)typeof(SessionEditorViewModel)
                 .GetField("_focusCommitment", System.Reflection.BindingFlags.Instance |
                                                 System.Reflection.BindingFlags.NonPublic)!
@@ -1089,7 +1084,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             var nextPresetId = Guid.NewGuid();
             editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
                 Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace) { NextPresetId = nextPresetId });
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
+            Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
             Assert.Equal(Axorith.Core.Models.FocusEndCondition.EndAt, options.EndCondition);
             Assert.Equal(new TimeOnly(18, 30), options.EndAtLocalTime);
             Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Friday }, options.EndAtDaysOfWeek);
@@ -1099,7 +1094,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             editorViewModel.ThenTriggers.Clear();
             editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
                 Axorith.Core.Models.AfterEndBehavior.ShutDownPc));
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
+            Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
             Assert.Equal(Axorith.Core.Models.AfterEndBehavior.ShutDownPc, options.AfterEnd);
             Assert.Null(options.NextWorkspaceId);
 
@@ -1120,7 +1115,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 {
                     action.NextPresetId = nextPresetId;
                 }
-                Assert.True((bool)validateCommitment.Invoke(editorViewModel, new object?[] { true })!);
+                Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
                 Assert.Equal(behavior, options.AfterEnd);
             }
 

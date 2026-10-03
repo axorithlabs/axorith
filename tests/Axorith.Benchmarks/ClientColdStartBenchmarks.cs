@@ -87,7 +87,7 @@ public class ClientColdStartBenchmarks
 
         var autostartEnabled = OperatingSystem.IsWindows() &&
                                new WindowsAutoStartManager(NullLogger.Instance).IsAutoStartEnabled;
-        File.WriteAllText(Path.Combine(_clientDirectory, "clientsettings.json"), JsonSerializer.Serialize(new
+        File.WriteAllText(Path.Combine(_configDirectory, "clientsettings.json"), JsonSerializer.Serialize(new
         {
             AutoStartEnabled = autostartEnabled,
             AutoStartMinimized = true,

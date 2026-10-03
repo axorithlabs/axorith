@@ -2,14 +2,14 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Core.Telemetry;
 using Axorith.Sdk.Actions;
 using Axorith.Telemetry;
 
 namespace Axorith.Client.Adapters;
 
 /// <summary>
-///     Adapts a ModuleAction from gRPC into an IAction for UI binding.
-///     Actions are invoked on the live module instance via gRPC.
+///     Adapts a remote ModuleAction into an IAction for UI binding.
 /// </summary>
 internal class ModuleActionAdapter(
     ModuleAction action,
@@ -52,49 +52,29 @@ internal class ModuleActionAdapter(
 
     public void Invoke()
     {
-        // Fire-and-forget invocation via gRPC against the design-time sandbox instance
-        // (keyed by the configured module InstanceId).
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
-
-                if (result.Success)
-                {
-                    _invokedSubject.OnNext(Unit.Default);
-                }
-                TrackActionInvocation(result.Success ? "success" : "failed");
-            }
-            catch (Exception ex)
-            {
-                // Adapter has no logger - silently ignore action invocation errors
-                // Errors are logged on the Host side
-                TrackActionInvocation("failed");
-                TrackActionError(ex);
-            }
-        });
+        _ = Task.Run(() => InvokeCoreAsync(throwOnError: false));
     }
 
     public async Task InvokeAsync()
     {
-        // Invoke action via gRPC and wait for completion
-        // Used for actions that require async completion (e.g., OAuth login)
+        await InvokeCoreAsync(throwOnError: true).ConfigureAwait(false);
+    }
+
+    private async Task InvokeCoreAsync(bool throwOnError)
+    {
         try
         {
             var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
-
             if (result.Success)
-            {
                 _invokedSubject.OnNext(Unit.Default);
-            }
             TrackActionInvocation(result.Success ? "success" : "failed");
         }
         catch (Exception ex)
         {
             TrackActionInvocation("failed");
             TrackActionError(ex);
-            throw;
+            if (throwOnError)
+                throw;
         }
     }
 
@@ -104,7 +84,7 @@ internal class ModuleActionAdapter(
             ["moduleId"] = moduleId,
             ["moduleName"] = moduleName,
             ["instanceId"] = designTimeId,
-            ["actionKey"] = Key,
+            ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey(Key),
             ["result"] = result
         });
 
@@ -114,7 +94,7 @@ internal class ModuleActionAdapter(
             ["moduleId"] = moduleId,
             ["moduleName"] = moduleName,
             ["instanceId"] = designTimeId,
-            ["actionKey"] = Key
+            ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey(Key)
         });
 
     public void Dispose()

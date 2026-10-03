@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -111,7 +110,7 @@ public partial class MainView : UserControl
                 target = this.FindControl<Button>("EmergencyUnlockHoldButton");
             else if (ViewModel?.IsStartConfirmationOpen == true)
                 target = this.FindControl<Button>("StartConfirmationCancelButton");
-            else if (ViewModel?.IsSessionActive == true && ViewModel.IsHomePage)
+            else if (ViewModel is { IsSessionActive: true, IsHomePage: true })
                 target = this.FindControl<Button>(ViewModel.IsCommittedSession
                     ? "OpenEmergencyUnlockButton"
                     : "StopSessionButton");
@@ -119,7 +118,7 @@ public partial class MainView : UserControl
                 target = this.FindControl<Button>(ViewModel.IsCommittedSession
                     ? "SidebarEmergencyUnlockButton"
                     : "SidebarStopSessionButton");
-            else if (ViewModel?.IsPresetsPage == true && ViewModel.Presets.Count > 0)
+            else if (ViewModel is { IsPresetsPage: true, Presets.Count: > 0 })
                 target = this.FindControl<ListBox>("PresetsListBox");
             else if (ViewModel?.IsPresetsPage == true)
                 target = this.FindControl<Button>("CreateSessionButton");

@@ -34,6 +34,8 @@ public class NativeMessagingRegistrar(
 
     private void RegisterHost()
     {
+        manager.RemoveFirefoxExtensionPolicy(Axorith.Shared.Utils.SiteBlockerExtensionIds.Firefox);
+
         #if DEBUG
         var hostName = "axorith.dev";
         #else

@@ -24,6 +24,9 @@ public interface INativeMessagingManager
     /// </param>
     void RegisterFirefoxHost(string hostName, string executablePath, string[] allowedExtensions);
 
+    /// <summary>Removes Axorith's legacy policy-based Firefox extension installation entry.</summary>
+    void RemoveFirefoxExtensionPolicy(string extensionId);
+
     /// <summary>
     ///     Registers the Native Messaging Host for Chrome/Chromium-based browsers.
     ///     Generates the JSON manifest and registers its location in the OS.

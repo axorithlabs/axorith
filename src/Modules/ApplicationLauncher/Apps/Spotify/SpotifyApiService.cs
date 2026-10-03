@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Axorith.Sdk;
 using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Spotify;
