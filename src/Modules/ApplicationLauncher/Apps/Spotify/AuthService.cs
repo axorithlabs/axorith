@@ -323,6 +323,7 @@ internal sealed class AuthService : IDisposable
             var returnedState = context.Request.QueryString.Get("state");
 
             var response = context.Response;
+            response.ContentType = "text/html; charset=utf-8";
 
             if (returnedState != state)
             {
@@ -338,9 +339,7 @@ internal sealed class AuthService : IDisposable
                 return false;
             }
 
-            var responseString = string.IsNullOrEmpty(error)
-                ? "<html><body style='background:#121212;color:#e0e0e0;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Axorith Connected!</h1><p>You can now close this tab and return to the app.</p></body></html>"
-                : $"<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Login Failed</h1><p>Spotify returned error: {error}</p></body></html>";
+            var responseString = BuildLoginResponse(error);
 
             var buffer = Encoding.UTF8.GetBytes(responseString);
             response.ContentLength64 = buffer.Length;
@@ -397,6 +396,13 @@ internal sealed class AuthService : IDisposable
                 return false;
             }
         }
+    }
+
+    private static string BuildLoginResponse(string? error)
+    {
+        return string.IsNullOrEmpty(error)
+            ? "<html><body style='background:#121212;color:#e0e0e0;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Axorith Connected!</h1><p>You can now close this tab and return to the app.</p></body></html>"
+            : $"<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Login Failed</h1><p>Spotify returned error: {WebUtility.HtmlEncode(error)}</p></body></html>";
     }
 
     private static string GenerateSecureState()

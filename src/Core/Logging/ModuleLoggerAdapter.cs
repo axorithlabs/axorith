@@ -14,37 +14,47 @@ internal class ModuleLoggerAdapter(ILogger logger, string moduleName) : IModuleL
     {
         return logger.BeginScope(new Dictionary<string, object>
         {
-            ["ModuleName"] = moduleName
+            ["ModuleName"] = Sanitize(moduleName)
         })!;
     }
 
     public void LogDebug(string messageTemplate, params object[] args)
     {
         using var scope = BeginModuleScope();
-        logger.LogDebug(messageTemplate, args);
+        logger.LogDebug(Sanitize(messageTemplate), SanitizeArguments(args));
     }
 
     public void LogInfo(string messageTemplate, params object[] args)
     {
         using var scope = BeginModuleScope();
-        logger.LogInformation(messageTemplate, args);
+        logger.LogInformation(Sanitize(messageTemplate), SanitizeArguments(args));
     }
 
     public void LogWarning(string messageTemplate, params object[] args)
     {
         using var scope = BeginModuleScope();
-        logger.LogWarning(messageTemplate, args);
+        logger.LogWarning(Sanitize(messageTemplate), SanitizeArguments(args));
     }
 
     public void LogError(Exception? exception, string messageTemplate, params object[] args)
     {
         using var scope = BeginModuleScope();
-        logger.LogError(exception, messageTemplate, args);
+        logger.LogError(exception, Sanitize(messageTemplate), SanitizeArguments(args));
     }
 
     public void LogFatal(Exception? exception, string messageTemplate, params object[] args)
     {
         using var scope = BeginModuleScope();
-        logger.LogCritical(exception, messageTemplate, args);
+        logger.LogCritical(exception, Sanitize(messageTemplate), SanitizeArguments(args));
+    }
+
+    private static string Sanitize(string value)
+    {
+        return value.Replace("\r", "\\r").Replace("\n", "\\n");
+    }
+
+    private static object[] SanitizeArguments(object[] args)
+    {
+        return Array.ConvertAll(args, arg => arg is string value ? Sanitize(value) : arg);
     }
 }
