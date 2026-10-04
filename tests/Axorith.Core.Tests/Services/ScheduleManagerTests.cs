@@ -47,22 +47,18 @@ public class ScheduleManagerTests : IAsyncDisposable
         }
     }
 
-    #region ListSchedules Tests
 
     [Fact]
     public async Task ListSchedulesAsync_WithNoSchedules_ShouldReturnEmptyList()
     {
-        // Act
         var schedules = await _manager.ListSchedulesAsync(CancellationToken.None);
 
-        // Assert
         schedules.Should().BeEmpty();
     }
 
     [Fact]
     public async Task ListSchedulesAsync_WithSchedules_ShouldReturnAll()
     {
-        // Arrange
         var schedule1 = new SessionSchedule
         {
             Id = Guid.NewGuid(),
@@ -84,23 +80,18 @@ public class ScheduleManagerTests : IAsyncDisposable
         await _manager.SaveScheduleAsync(schedule1, CancellationToken.None);
         await _manager.SaveScheduleAsync(schedule2, CancellationToken.None);
 
-        // Act
         var schedules = await _manager.ListSchedulesAsync(CancellationToken.None);
 
-        // Assert
         schedules.Should().HaveCount(2);
         schedules.Should().Contain(s => s.Name == "Schedule 1");
         schedules.Should().Contain(s => s.Name == "Schedule 2");
     }
 
-    #endregion
 
-    #region SaveSchedule Tests
 
     [Fact]
     public async Task SaveScheduleAsync_NewSchedule_ShouldAddToList()
     {
-        // Arrange
         var schedule = new SessionSchedule
         {
             Id = Guid.NewGuid(),
@@ -110,10 +101,8 @@ public class ScheduleManagerTests : IAsyncDisposable
             OneTimeDate = DateTimeOffset.Now.AddHours(1)
         };
 
-        // Act
         var saved = await _manager.SaveScheduleAsync(schedule, CancellationToken.None);
 
-        // Assert
         saved.Should().NotBeNull();
         saved.Name.Should().Be("Test Schedule");
 
@@ -124,7 +113,6 @@ public class ScheduleManagerTests : IAsyncDisposable
     [Fact]
     public async Task SaveScheduleAsync_ExistingSchedule_ShouldUpdate()
     {
-        // Arrange
         var scheduleId = Guid.NewGuid();
         var schedule = new SessionSchedule
         {
@@ -146,10 +134,8 @@ public class ScheduleManagerTests : IAsyncDisposable
             OneTimeDate = DateTimeOffset.Now.AddHours(2)
         };
 
-        // Act
         await _manager.SaveScheduleAsync(updatedSchedule, CancellationToken.None);
 
-        // Assert
         var schedules = await _manager.ListSchedulesAsync(CancellationToken.None);
         schedules.Should().HaveCount(1);
         schedules[0].Name.Should().Be("Updated Name");
@@ -158,7 +144,6 @@ public class ScheduleManagerTests : IAsyncDisposable
     [Fact]
     public async Task SaveScheduleAsync_ShouldPersistToDisk()
     {
-        // Arrange
         var schedule = new SessionSchedule
         {
             Id = Guid.NewGuid(),
@@ -168,22 +153,17 @@ public class ScheduleManagerTests : IAsyncDisposable
             RecurringTime = TimeSpan.FromHours(14)
         };
 
-        // Act
         await _manager.SaveScheduleAsync(schedule, CancellationToken.None);
 
-        // Assert
         var filePath = Path.Combine(_testStorageDirectory, "config", "schedules.json");
         File.Exists(filePath).Should().BeTrue();
     }
 
-    #endregion
 
-    #region DeleteSchedule Tests
 
     [Fact]
     public async Task DeleteScheduleAsync_ExistingSchedule_ShouldRemove()
     {
-        // Arrange
         var scheduleId = Guid.NewGuid();
         var schedule = new SessionSchedule
         {
@@ -196,10 +176,8 @@ public class ScheduleManagerTests : IAsyncDisposable
 
         await _manager.SaveScheduleAsync(schedule, CancellationToken.None);
 
-        // Act
         await _manager.DeleteScheduleAsync(scheduleId, CancellationToken.None);
 
-        // Assert
         var schedules = await _manager.ListSchedulesAsync(CancellationToken.None);
         schedules.Should().BeEmpty();
     }
@@ -207,24 +185,18 @@ public class ScheduleManagerTests : IAsyncDisposable
     [Fact]
     public async Task DeleteScheduleAsync_NonExistentSchedule_ShouldNotThrow()
     {
-        // Arrange
         var nonExistentId = Guid.NewGuid();
 
-        // Act
         var act = async () => await _manager.DeleteScheduleAsync(nonExistentId, CancellationToken.None);
 
-        // Assert
         await act.Should().NotThrowAsync();
     }
 
-    #endregion
 
-    #region SetEnabled Tests
 
     [Fact]
     public async Task SetEnabledAsync_ExistingSchedule_ShouldUpdateEnabled()
     {
-        // Arrange
         var scheduleId = Guid.NewGuid();
         var schedule = new SessionSchedule
         {
@@ -238,10 +210,8 @@ public class ScheduleManagerTests : IAsyncDisposable
 
         await _manager.SaveScheduleAsync(schedule, CancellationToken.None);
 
-        // Act
         var result = await _manager.SetEnabledAsync(scheduleId, false, CancellationToken.None);
 
-        // Assert
         result.Should().NotBeNull();
         result.IsEnabled.Should().BeFalse();
 
@@ -252,24 +222,18 @@ public class ScheduleManagerTests : IAsyncDisposable
     [Fact]
     public async Task SetEnabledAsync_NonExistentSchedule_ShouldReturnNull()
     {
-        // Arrange
         var nonExistentId = Guid.NewGuid();
 
-        // Act
         var result = await _manager.SetEnabledAsync(nonExistentId, true, CancellationToken.None);
 
-        // Assert
         result.Should().BeNull();
     }
 
-    #endregion
 
-    #region Start/Stop Tests
 
     [Fact]
     public async Task StartAsync_ShouldLoadSchedulesFromDisk()
     {
-        // Arrange - First save a schedule and dispose
         var schedule = new SessionSchedule
         {
             Id = Guid.NewGuid(),
@@ -294,10 +258,8 @@ public class ScheduleManagerTests : IAsyncDisposable
 
         try
         {
-            // Act
             await newManager.StartAsync(CancellationToken.None);
 
-            // Assert
             var schedules = await newManager.ListSchedulesAsync(CancellationToken.None);
             schedules.Should().HaveCount(1);
             schedules[0].Name.Should().Be("Persistent");
@@ -311,27 +273,21 @@ public class ScheduleManagerTests : IAsyncDisposable
     [Fact]
     public async Task DisposeAsync_ShouldCleanupResources()
     {
-        // Arrange
         await _manager.StartAsync(CancellationToken.None);
 
-        // Act
         var act = async () => await _manager.DisposeAsync();
 
-        // Assert
         await act.Should().NotThrowAsync();
     }
 
-    #endregion
 }
 
 public class SessionScheduleTests
 {
-    #region GetNextRun Tests
 
     [Fact]
     public void GetNextRun_DisabledSchedule_ShouldReturnNull()
     {
-        // Arrange
         var schedule = new SessionSchedule
         {
             IsEnabled = false,
@@ -339,17 +295,14 @@ public class SessionScheduleTests
             OneTimeDate = DateTimeOffset.Now.AddHours(1)
         };
 
-        // Act
         var result = schedule.GetNextRun(DateTimeOffset.Now);
 
-        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
     public void GetNextRun_OneTime_FutureDate_ShouldReturnDate()
     {
-        // Arrange
         var futureDate = DateTimeOffset.Now.AddHours(2);
         var schedule = new SessionSchedule
         {
@@ -358,17 +311,14 @@ public class SessionScheduleTests
             OneTimeDate = futureDate
         };
 
-        // Act
         var result = schedule.GetNextRun(DateTimeOffset.Now);
 
-        // Assert
         result.Should().Be(futureDate);
     }
 
     [Fact]
     public void GetNextRun_OneTime_PastDate_ShouldReturnNull()
     {
-        // Arrange
         var pastDate = DateTimeOffset.Now.AddHours(-2);
         var schedule = new SessionSchedule
         {
@@ -377,17 +327,14 @@ public class SessionScheduleTests
             OneTimeDate = pastDate
         };
 
-        // Act
         var result = schedule.GetNextRun(DateTimeOffset.Now);
 
-        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
     public void GetNextRun_Recurring_NoTimeSet_ShouldReturnNull()
     {
-        // Arrange
         var schedule = new SessionSchedule
         {
             IsEnabled = true,
@@ -395,17 +342,14 @@ public class SessionScheduleTests
             RecurringTime = null
         };
 
-        // Act
         var result = schedule.GetNextRun(DateTimeOffset.Now);
 
-        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
     public void GetNextRun_Recurring_WithTime_ShouldReturnNextOccurrence()
     {
-        // Arrange
         var now = new DateTimeOffset(2024, 1, 15, 10, 0, 0,
             TimeZoneInfo.Local.GetUtcOffset(new DateTime(2024, 1, 15, 10, 0, 0)));
         var futureTime = TimeSpan.FromHours(14);
@@ -416,10 +360,8 @@ public class SessionScheduleTests
             RecurringTime = futureTime
         };
 
-        // Act
         var result = schedule.GetNextRun(now);
 
-        // Assert
         result.Should().NotBeNull();
         result.Value.Date.Should().Be(now.Date);
         result.Value.TimeOfDay.Should().Be(futureTime);
@@ -428,7 +370,6 @@ public class SessionScheduleTests
     [Fact]
     public void GetNextRun_Recurring_WithDayFilter_ShouldRespectDays()
     {
-        // Arrange
         var now = DateTimeOffset.Now;
         var schedule = new SessionSchedule
         {
@@ -438,10 +379,8 @@ public class SessionScheduleTests
             DaysOfWeek = [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday]
         };
 
-        // Act
         var result = schedule.GetNextRun(now);
 
-        // Assert
         if (result.HasValue)
         {
             schedule.DaysOfWeek.Should().Contain(result.Value.DayOfWeek);
@@ -451,7 +390,6 @@ public class SessionScheduleTests
     [Fact]
     public void GetNextRun_Recurring_EmptyDayFilter_ShouldRunEveryDay()
     {
-        // Arrange - use a time before the recurring time to ensure same-day result
         var now = new DateTimeOffset(2024, 1, 15, 8, 0, 0, TimeSpan.Zero); // Monday 8 AM
         var schedule = new SessionSchedule
         {
@@ -461,14 +399,11 @@ public class SessionScheduleTests
             DaysOfWeek = [] // Empty = every day
         };
 
-        // Act
         var result = schedule.GetNextRun(now);
 
-        // Assert
         result.Should().NotBeNull();
         // The next run should be today at 10 AM (since now is 8 AM and recurring time is 10 AM)
         result.Value.TimeOfDay.Should().Be(TimeSpan.FromHours(10));
     }
 
-    #endregion
 }

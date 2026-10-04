@@ -9,24 +9,15 @@ public interface IEventAggregator
     /// <summary>
     ///     Subscribes a handler to an event of a specific type.
     /// </summary>
-    /// <typeparam name="TEvent">The type of event to subscribe to.</typeparam>
-    /// <param name="handler">The action to execute when the event is published.</param>
-    /// <returns>An IDisposable that can be used to unsubscribe the handler.</returns>
     IDisposable Subscribe<TEvent>(Action<TEvent> handler);
 
     /// <summary>
     ///     Publishes an event to all subscribed handlers.
     /// </summary>
-    /// <typeparam name="TEvent">The type of the event.</typeparam>
-    /// <param name="eventMessage">The event object to publish.</param>
     void Publish<TEvent>(TEvent eventMessage);
 
     /// <summary>
     ///     Publishes an event to all subscribed handlers asynchronously.
     /// </summary>
-    /// <typeparam name="TEvent">The type of the event.</typeparam>
-    /// <param name="eventMessage">The event object to publish.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
     Task PublishAsync<TEvent>(TEvent eventMessage, CancellationToken cancellationToken = default);
 }

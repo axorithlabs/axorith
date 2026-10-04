@@ -72,13 +72,14 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private bool _disposed;
     private volatile bool _legacyFirefoxProtocol;
     private readonly Action _firefoxExtensionAction =
-        Action.Create("InstallExtension.Firefox", "Install Firefox Extension");
+        new Action("InstallExtension.Firefox", "Install Firefox Extension");
+
+    private bool HasActiveRules => _activeSiteList.Count > 0 || _isAllowList;
 
     public bool IsProtectionDegraded => _browserFallbackFailed ||
-        ((_activeSiteList.Count > 0 || _isAllowList) && !_pausedForBreak &&
-         _browserStatuses.Values.Any(status => status != "Connected"));
+        (HasActiveRules && !_pausedForBreak && _browserStatuses.Values.Any(status => status != "Connected"));
 
-    public string ProtectionStatusMessage => _activeSiteList.Count == 0 && !_isAllowList
+    public string ProtectionStatusMessage => !HasActiveRules
         ? "Site Blocker has no configured sites"
         : _pausedForBreak
             ? "Site Blocker paused for break"
@@ -89,10 +90,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             return $"{endpoint.Name} {status}{(isFallbackBlocked ? " (browser blocked)" : string.Empty)}";
         })) + (_browserFallbackFailed ? " · browser fallback failed" : string.Empty);
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return [_mode, _categories, _customSites];
-    }
+    public IReadOnlyList<ISetting> GetSettings() => [_mode, _categories, _customSites];
 
     public IReadOnlyList<IAction> GetActions()
     {
@@ -163,25 +161,20 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         _activeSiteList = GetAllSites();
         _isAllowList = _mode.GetCurrentValue() == "AllowList";
         _pausedForBreak = false;
-        if (_activeSiteList.Count == 0 && !_isAllowList)
+        if (!HasActiveRules)
         {
             logger.LogWarning("No sites specified. Module will do nothing.");
             return;
         }
 
         logger.LogInfo("Sending site-block command to supported browsers ({Count} sites).", _activeSiteList.Count);
-        var results = await SendToAllExtensionsAsync(new
-        {
-            command = "block",
-            mode = _isAllowList ? "AllowList" : "BlockList",
-            sites = _activeSiteList
-        }, cancellationToken).ConfigureAwait(false);
+        var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         UpdateBrowserStatuses(results);
     }
 
     public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        if (_activeSiteList.Count > 0 || _isAllowList)
+        if (HasActiveRules)
         {
             await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken).ConfigureAwait(false);
         }
@@ -194,7 +187,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task PauseForBreakAsync(CancellationToken cancellationToken)
     {
-        if (_activeSiteList.Count == 0 && !_isAllowList)
+        if (!HasActiveRules)
         {
             return;
         }
@@ -208,17 +201,12 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task ResumeAfterBreakAsync(CancellationToken cancellationToken)
     {
-        if (_activeSiteList.Count == 0 && !_isAllowList)
+        if (!HasActiveRules)
         {
             return;
         }
 
-        var results = await SendToAllExtensionsAsync(new
-        {
-            command = "block",
-            mode = _isAllowList ? "AllowList" : "BlockList",
-            sites = _activeSiteList
-        }, cancellationToken).ConfigureAwait(false);
+        var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         _pausedForBreak = false;
         UpdateBrowserStatuses(results);
         ApplyBrowserFallback(results.Where(result => result.Status != "Connected"));
@@ -226,7 +214,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task<bool> IsProtectionHealthyAsync(CancellationToken cancellationToken)
     {
-        if (_activeSiteList.Count == 0 && !_isAllowList)
+        if (!HasActiveRules)
         {
             return true;
         }
@@ -240,23 +228,13 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             return true;
         }
 
-        var results = (await SendToAllExtensionsAsync(new
-        {
-            command = "health",
-            mode = _isAllowList ? "AllowList" : "BlockList",
-            sites = _activeSiteList
-        }, cancellationToken).ConfigureAwait(false)).ToList();
+        var results = (await SendToAllExtensionsAsync(CreateBlockingRequest("health"), cancellationToken).ConfigureAwait(false)).ToList();
 
         for (var i = 0; i < results.Count; i++)
         {
             if (results[i].Status == "Connected" && !results[i].Blocking)
             {
-                results[i] = await SendToExtensionAsync(results[i].Endpoint, new
-                {
-                    command = "block",
-                    mode = _mode.GetCurrentValue(),
-                    sites = _activeSiteList
-                }, cancellationToken).ConfigureAwait(false);
+                results[i] = await SendToExtensionAsync(results[i].Endpoint, CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -277,6 +255,13 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         UpdateBrowserStatuses(results);
         return results.Any(result => result.Status == "Connected");
     }
+
+    private object CreateBlockingRequest(string command) => new
+    {
+        command,
+        mode = _isAllowList ? "AllowList" : "BlockList",
+        sites = _activeSiteList
+    };
 
     private Task<ExtensionResult[]> SendToAllExtensionsAsync(object message, CancellationToken cancellationToken) =>
         Task.WhenAll(BrowserEndpoints.Select(endpoint => SendToExtensionAsync(endpoint, message, cancellationToken)));
@@ -371,12 +356,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         {
             throw;
         }
-        catch (TimeoutException ex)
-        {
-            return new ExtensionResult(endpoint, connectedToPipe ? "Outdated" : GetUnavailableStatus(endpoint),
-                null, false, ex.Message);
-        }
-        catch (OperationCanceledException ex)
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
         {
             return new ExtensionResult(endpoint, connectedToPipe ? "Outdated" : GetUnavailableStatus(endpoint),
                 null, false, ex.Message);
@@ -394,7 +374,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         var request = JsonSerializer.SerializeToNode(message)?.AsObject()
                       ?? throw new InvalidOperationException("Could not serialize Site Blocker request.");
         var command = request["command"]?.GetValue<string>();
-        var isBlocking = command == "block" || command == "health" && (_activeSiteList.Count > 0 || _isAllowList);
+        var isBlocking = command == "block" || command == "health" && HasActiveRules;
         if (command == "health" && isBlocking)
         {
             request["command"] = "block";
@@ -513,29 +493,16 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var cat in _categories.GetCurrentValue())
+        foreach (var category in _categories.GetCurrentValue())
         {
-            if (_categorySites!.TryGetValue(cat, out var sites))
+            if (_categorySites!.TryGetValue(category, out var sites))
             {
-                foreach (var site in sites)
-                {
-                    result.Add(site);
-                }
+                result.UnionWith(sites);
             }
         }
 
-        var custom = _customSites.GetCurrentValue();
-        if (!string.IsNullOrWhiteSpace(custom))
-        {
-            foreach (var site in custom.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
-            {
-                var trimmed = site.Trim();
-                if (!string.IsNullOrWhiteSpace(trimmed))
-                {
-                    result.Add(trimmed);
-                }
-            }
-        }
+        result.UnionWith(_customSites.GetCurrentValue()
+            .Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         return [.. result];
     }
@@ -602,19 +569,9 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             ["Forums"] = "Forums & Communities (Reddit, Quora...)"
         };
 
-        var choices = new List<KeyValuePair<string, string>>();
-        if (_categorySites == null)
-        {
-            return choices;
-        }
-
-        foreach (var category in _categorySites.Keys)
-        {
-            var description = descriptions.TryGetValue(category, out var desc) ? desc : category;
-            choices.Add(new KeyValuePair<string, string>(category, description));
-        }
-
-        return choices;
+        return _categorySites?.Keys
+            .Select(category => KeyValuePair.Create(category, descriptions.GetValueOrDefault(category, category)))
+            .ToList() ?? [];
     }
 
     private static FirefoxExtensionState? FindInstalledFirefoxExtension()
@@ -696,7 +653,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
         _disposed = true;
 
-        if (_activeSiteList.Count > 0 || _isAllowList)
+        if (HasActiveRules)
         {
             logger.LogWarning(
                 "Disposing module while sites are still blocked. Attempting to send final unblock command.");

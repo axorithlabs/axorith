@@ -15,9 +15,6 @@ using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
 
 namespace Axorith.Client.CoreSdk;
 
-/// <summary>
-///     gRPC implementation of ISessionsApi with streaming event support.
-/// </summary>
 internal class GrpcSessionsApi : ISessionsApi, IDisposable
 {
     private readonly SessionsService.SessionsServiceClient _client;
@@ -38,24 +35,37 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
         _eventsSubject = new Subject<SessionEvent>();
         _streamCts = new CancellationTokenSource();
 
-        _streamTask = StartStreamingEventsAsync(_streamCts.Token);
+        _streamTask = GrpcStreamRunner.RunAsync(async token =>
+        {
+            _logger.LogInformation("Starting session events stream...");
+            using var call = _client.StreamSessionEvents(new StreamSessionEventsRequest(), cancellationToken: token);
+            await foreach (var evt in call.ResponseStream.ReadAllAsync(token).ConfigureAwait(false))
+            {
+                var presetId = Guid.TryParse(evt.PresetId, out var parsed) ? parsed : (Guid?)null;
+                _eventsSubject.OnNext(new SessionEvent(
+                    (SessionEventType)evt.Type,
+                    presetId,
+                    evt.Message,
+                    evt.Timestamp.ToDateTimeOffset()));
+            }
+        }, _logger, "Session events", _streamCts.Token);
     }
 
     public IObservable<SessionEvent> SessionEvents => _eventsSubject.AsObservable();
 
-    public async Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default)
-    {
-        var response = await _retryPolicy.ExecuteAsync(async () =>
-            await _client.GetSessionHistoryAsync(new GetSessionStateRequest(), cancellationToken: ct)
-                .ConfigureAwait(false)).ConfigureAwait(false);
-        return response.Entries.Select(entry => new SessionActivity(
-            DateTimeOffset.FromUnixTimeMilliseconds(entry.StartedAtUnixMs),
-            DateTimeOffset.FromUnixTimeMilliseconds(entry.EndedAtUnixMs), entry.PresetName)).ToArray();
-    }
+    public async Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default) =>
+        await _retryPolicy.ExecuteAsync(async () =>
+        {
+            var response = await _client.GetSessionHistoryAsync(new GetSessionStateRequest(), cancellationToken: ct)
+                .ConfigureAwait(false);
+            return response.Entries.Select(entry => new SessionActivity(
+                DateTimeOffset.FromUnixTimeMilliseconds(entry.StartedAtUnixMs),
+                DateTimeOffset.FromUnixTimeMilliseconds(entry.EndedAtUnixMs), entry.PresetName)).ToArray();
+        }).ConfigureAwait(false);
 
-    public async Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default)
+    public Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return _retryPolicy.ExecuteAsync(async () =>
         {
             var response = await _client.GetSessionStateAsync(
                     new GetSessionStateRequest(),
@@ -108,12 +118,12 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 response.BreaksTotal,
                 TimeSpan.FromSeconds(response.RemainingSeconds),
                 response.BreakEndsAt == null ? null : TimeSpan.FromSeconds(response.BreakRemainingSeconds));
-        }).ConfigureAwait(false);
+        });
     }
 
-    public async Task<OperationResult> StartSessionAsync(Guid presetId, Guid sessionInstanceId, CancellationToken ct = default)
+    public Task<OperationResult> StartSessionAsync(Guid presetId, Guid sessionInstanceId, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return _retryPolicy.ExecuteAsync(async () =>
         {
             var response = await _client.StartSessionAsync(
                     new StartSessionRequest
@@ -125,55 +135,41 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            return new OperationResult(
-                response.Success,
-                response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
-    public async Task<OperationResult> StopSessionAsync(CancellationToken ct = default)
+    public Task<OperationResult> StopSessionAsync(CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return _retryPolicy.ExecuteAsync(async () =>
         {
             var response = await _client.StopSessionAsync(
                     new StopSessionRequest(),
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            return new OperationResult(
-                response.Success,
-                response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
     public async Task<OperationResult> StartBreakAsync(CancellationToken ct = default)
     {
         var response = await _client.StartBreakAsync(new StartBreakRequest(), cancellationToken: ct)
             .ConfigureAwait(false);
-        return new OperationResult(response.Success, response.Message,
-            response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-            response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
+        return GrpcResultMapper.ToModel(response);
     }
 
-    public async Task<OperationResult> PreflightSessionAsync(Guid presetId, CancellationToken ct = default)
+    public Task<OperationResult> PreflightSessionAsync(Guid presetId, CancellationToken ct = default)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return _retryPolicy.ExecuteAsync(async () =>
         {
             var response = await _client.PreflightSessionAsync(
                     new PreflightSessionRequest { PresetId = presetId.ToString() },
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            return new OperationResult(
-                response.Success,
-                response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
     public async IAsyncEnumerable<EmergencyUnlockProgress> HoldEmergencyUnlockAsync(
@@ -220,58 +216,6 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
             {
             }
         }
-    }
-
-    private async Task StartStreamingEventsAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
-            try
-            {
-                _logger.LogInformation("Starting session events stream...");
-
-                using var call = _client.StreamSessionEvents(new StreamSessionEventsRequest(),
-                    cancellationToken: ct);
-
-                await foreach (var evt in call.ResponseStream.ReadAllAsync(ct).ConfigureAwait(false))
-                {
-                    Guid? presetId = null;
-                    if (!string.IsNullOrWhiteSpace(evt.PresetId) && Guid.TryParse(evt.PresetId, out var parsed))
-                    {
-                        presetId = parsed;
-                    }
-
-                    var sessionEvent = new SessionEvent(
-                        (SessionEventType)evt.Type,
-                        presetId,
-                        evt.Message,
-                        evt.Timestamp.ToDateTimeOffset());
-
-                    _eventsSubject.OnNext(sessionEvent);
-                }
-            }
-            catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
-            {
-                _logger.LogInformation("Session events stream cancelled");
-                break;
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("Session events stream cancelled");
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Session events stream error, reconnecting in 5s...");
-
-                try
-                {
-                    await Task.Delay(5000, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-            }
     }
 
     public void Dispose()

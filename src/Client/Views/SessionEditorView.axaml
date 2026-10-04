@@ -29,6 +29,14 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="#1F0505"/>
         </Style>
+        <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#FF4444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="ComboBox.error /template/ Border#Border">
+            <Setter Property="BorderBrush" Value="#FF4444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
         <Style Selector="TextBox.appPicker">
             <Setter Property="CornerRadius" Value="6,0,0,6"/>
         </Style>
@@ -61,13 +69,9 @@
     
         
 <UserControl.Resources>
-        <converters:EqualsConverter x:Key="EqualsConverter"/>
-        <converters:IsNotNullOrEmptyConverter x:Key="IsNotNullOrEmptyConverter"/>
-        <converters:ApplicationIconConverter x:Key="ApplicationIconConverter"/>
-        <converters:ApplicationChoiceTextConverter x:Key="ApplicationChoiceTextConverter"/>
 
         <DataTemplate x:Key="InlineActionTemplate" x:DataType="vm:ActionViewModel">
-            <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}"
+            <Button Content="{Binding Label}" Command="{Binding InvokeCommand}"
                     IsVisible="{Binding IsVisible}" Background="#111" BorderBrush="#333" Foreground="#AAA"
                     BorderThickness="1" CornerRadius="0,6,6,0" Padding="8,0" MinWidth="64" Height="36"
                     FontSize="11" FontWeight="SemiBold" Classes="inline-action"
@@ -86,15 +90,15 @@
                             <PathIcon Data="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V8H20V6H4M4,18H20V10H4V18Z"
                                       Width="18" Height="18" Foreground="#888"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <Image Source="{Binding Value, Converter={StaticResource ApplicationIconConverter}}"
+                            <Image Source="{Binding Icon}"
                                    Width="26" Height="26" Stretch="Uniform"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                        <TextBlock Text="{Binding Value, Converter={StaticResource ApplicationChoiceTextConverter}, ConverterParameter=name}"
+                        <TextBlock Text="{Binding Name}"
                                    FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding Value, Converter={StaticResource ApplicationChoiceTextConverter}, ConverterParameter=path}"
+                        <TextBlock Text="{Binding Path}"
                                    FontSize="11" Foreground="#777" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                     <Button Grid.Column="2"
@@ -144,17 +148,11 @@
                      BorderBrush="#333" 
                      CornerRadius="6" 
                      Padding="10,8"
-                     Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
+                     Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBox.InnerRightContent>
                     <ContentControl Content="{Binding InlineAction}"
                                     ContentTemplate="{StaticResource InlineActionTemplate}"/>
                 </TextBox.InnerRightContent>
-                <TextBox.Styles>
-                    <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-                        <Setter Property="BorderBrush" Value="#FF4444"/>
-                        <Setter Property="BorderThickness" Value="1"/>
-                    </Style>
-                </TextBox.Styles>
             </TextBox>
         </DataTemplate>
 
@@ -166,13 +164,7 @@
                              IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" MinWidth="0"
                              Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"
                              Classes.appPicker="{Binding IsCustomAppsField}"
-                             Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                        <TextBox.Styles>
-                            <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-                                <Setter Property="BorderBrush" Value="#FF4444"/>
-                                <Setter Property="BorderThickness" Value="1"/>
-                            </Style>
-                        </TextBox.Styles>
+                             Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     </TextBox>
                     <Button Grid.Column="1" Command="{Binding ApplicationPicker.OpenApplicationSelectorCommand}"
                             IsVisible="{Binding IsCustomAppsField}" IsEnabled="{Binding !IsReadOnly}"
@@ -198,13 +190,7 @@
                      BorderBrush="#333" 
                      CornerRadius="6" 
                      Padding="10,8"
-                     Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                <TextBox.Styles>
-                    <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-                        <Setter Property="BorderBrush" Value="#FF4444"/>
-                        <Setter Property="BorderThickness" Value="1"/>
-                    </Style>
-                </TextBox.Styles>
+                     Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             </TextBox>
         </DataTemplate>
 
@@ -224,13 +210,7 @@
                            BorderBrush="#333" 
                            CornerRadius="6" 
                            Padding="10,8"
-                           Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                <NumericUpDown.Styles>
-                    <Style Selector="NumericUpDown.error /template/ TextBox">
-                        <Setter Property="BorderBrush" Value="#FF4444"/>
-                        <Setter Property="BorderThickness" Value="1"/>
-                    </Style>
-                </NumericUpDown.Styles>
+                           Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             </NumericUpDown>
         </DataTemplate>
 
@@ -264,13 +244,7 @@
                           HorizontalAlignment="Stretch"
                           IsEnabled="{Binding !IsReadOnly}"
                           MaxDropDownHeight="300"
-                          Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                <ComboBox.Styles>
-                    <Style Selector="ComboBox.error /template/ Border#Border">
-                        <Setter Property="BorderBrush" Value="#FF4444"/>
-                        <Setter Property="BorderThickness" Value="1"/>
-                    </Style>
-                </ComboBox.Styles>
+                          Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <ComboBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <VirtualizingStackPanel/>
@@ -298,13 +272,7 @@
                          CornerRadius="6" 
                          Padding="10,8"
                          IsEnabled="{Binding !IsReadOnly}"
-                         Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                    <TextBox.Styles>
-                        <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-                            <Setter Property="BorderBrush" Value="#FF4444"/>
-                            <Setter Property="BorderThickness" Value="1"/>
-                        </Style>
-                    </TextBox.Styles>
+                         Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 </TextBox>
                 
                 <ComboBox Grid.Column="1" 
@@ -349,13 +317,7 @@
                          CornerRadius="6" 
                          Padding="10,8"
                          IsEnabled="{Binding !IsReadOnly}"
-                         Classes.error="{Binding Error, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}">
-                    <TextBox.Styles>
-                        <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-                            <Setter Property="BorderBrush" Value="#FF4444"/>
-                            <Setter Property="BorderThickness" Value="1"/>
-                        </Style>
-                    </TextBox.Styles>
+                         Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 </TextBox>
                 
                 <ComboBox Grid.Column="1" 
@@ -424,16 +386,16 @@
                            Margin="0,0,0,6" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Setting.Description}" Foreground="#A0A0A0" FontSize="12"
                            TextWrapping="Wrap" MaxWidth="520" Margin="0,0,0,10" HorizontalAlignment="Left"
-                           IsVisible="{Binding Setting.Description, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                           IsVisible="{Binding Setting.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingSelector}"
                                 HorizontalAlignment="Stretch"/>
                 <TextBlock Text="{Binding Error}" Foreground="#FF6B6B" FontSize="12" Margin="0,4,0,0"
                            TextWrapping="Wrap"
-                           IsVisible="{Binding Error, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                           IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
         </DataTemplate>
         <DataTemplate x:Key="ModuleActionRowTemplate" x:DataType="vm:ActionViewModel">
-            <Button Content="{Binding Label}" Command="{Binding InvokeCommand}" IsEnabled="{Binding IsEnabled}"
+            <Button Content="{Binding Label}" Command="{Binding InvokeCommand}"
                     IsVisible="{Binding IsVisibleInActionsList}" HorizontalAlignment="Stretch"
                     Margin="0,0,0,16" Padding="10"/>
         </DataTemplate>
@@ -449,7 +411,7 @@
                         <StackPanel Spacing="8">
                             <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
-                            <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                            <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                             
                             <Border Background="#2A0505" 
                                     BorderBrush="#FF4444" 
@@ -480,7 +442,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="FocusCommitmentCard" Classes="Card" Classes.error="{Binding FocusCommitmentError, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}" Padding="24" Margin="0,40,0,0" Width="500">
+                    <Border x:Name="FocusCommitmentCard" Classes="Card" Classes.error="{Binding FocusCommitmentError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Padding="24" Margin="0,40,0,0" Width="500">
                         <StackPanel Spacing="12">
                             <TextBlock Text="Focus commitment" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBlock Text="Choose whether this Workspace can be stopped once it starts."
@@ -522,7 +484,7 @@
                             </StackPanel>
                             <TextBlock x:Name="FocusCommitmentErrorText" Text="{Binding FocusCommitmentError}"
                                        Foreground="#FF6B6B" FontSize="12" TextWrapping="Wrap"
-                                       IsVisible="{Binding FocusCommitmentError, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                                       IsVisible="{Binding FocusCommitmentError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
                     </Border>
 

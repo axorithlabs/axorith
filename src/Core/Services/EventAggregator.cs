@@ -4,10 +4,6 @@ using Serilog;
 
 namespace Axorith.Core.Services;
 
-/// <summary>
-///     A thread-safe implementation of the <see cref="IEventAggregator" /> interface.
-///     It allows for publishing messages and subscribing to them in a decoupled manner.
-/// </summary>
 public sealed class EventAggregator : IEventAggregator
 {
     private readonly ConcurrentDictionary<Type, ConcurrentBag<WeakReference<object>>> _subscriptions = new();
@@ -132,9 +128,6 @@ public sealed class EventAggregator : IEventAggregator
 
     private sealed class Unsubscriber<TEvent>(EventAggregator aggregator, Action<TEvent> handler) : IDisposable
     {
-        public void Dispose()
-        {
-            aggregator.Unsubscribe(handler);
-        }
+        public void Dispose() => aggregator.Unsubscribe(handler);
     }
 }

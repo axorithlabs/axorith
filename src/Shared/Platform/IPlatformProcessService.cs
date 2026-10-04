@@ -2,12 +2,21 @@ using System.Diagnostics;
 
 namespace Axorith.Shared.Platform;
 
-/// <summary>
-///     Cross-platform process discovery and management service.
-/// </summary>
 public interface IPlatformProcessService
 {
     List<Process> FindProcesses(string processNameOrPath);
-    bool IsProcessRunning(string processNameOrPath);
-    bool IsProcessRunningByName(string processName);
+
+    bool IsProcessRunning(string processNameOrPath) => FindProcesses(processNameOrPath).Count > 0;
+
+    bool IsProcessRunningByName(string processName)
+    {
+        try
+        {
+            return Process.GetProcessesByName(processName).Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

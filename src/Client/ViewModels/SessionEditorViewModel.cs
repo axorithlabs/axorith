@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
@@ -13,6 +14,7 @@ using DynamicData.Binding;
 using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
 using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
 
 namespace Axorith.Client.ViewModels;
@@ -25,615 +27,226 @@ public abstract class TriggerViewModel : ReactiveObject
     public virtual bool HasError => false;
 }
 
-public class ScheduleTriggerViewModel : TriggerViewModel
+public abstract class ScheduledTriggerViewModel : TriggerViewModel
+{
+    public Guid? ExistingScheduleId { get; set; }
+}
+
+public abstract class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTriggerViewModel
+{
+    private TimeSpan _time = defaultTime;
+    private decimal? _hours = defaultTime.Hours;
+    private decimal? _minutes = defaultTime.Minutes;
+    private bool _isAm = defaultTime.Hours < 12;
+    private bool _use24HourFormat = true;
+    private bool _isUpdatingTime;
+    private bool _runOnMonday = true;
+    private bool _runOnTuesday = true;
+    private bool _runOnWednesday = true;
+    private bool _runOnThursday = true;
+    private bool _runOnFriday = true;
+    private bool _runOnSaturday;
+    private bool _runOnSunday;
+
+    public override string IconKey => "TimerIcon";
+
+    public override string Description
+    {
+        get
+        {
+            var days = GetSelectedDays();
+            var daysText = days.Count == 7
+                ? "Every day"
+                : string.Join(", ", days.Select(day => day.ToString()[..3]));
+            var timeText = Use24HourFormat ? $"{Time:hh\\:mm}" : TimeOnly.FromTimeSpan(Time).ToString("h:mm tt", CultureInfo.CurrentCulture);
+            return $"{timeText} • {daysText}";
+        }
+    }
+
+    public TimeSpan Time
+    {
+        get => _time;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _time, value);
+            UpdateTimeInputs();
+            this.RaisePropertyChanged(nameof(Description));
+        }
+    }
+
+    public decimal? Hours { get => _hours; set => SetTimePart(ref _hours, value); }
+
+    public decimal? Minutes { get => _minutes; set => SetTimePart(ref _minutes, value); }
+
+    public bool HasTimeError => !_hours.HasValue || !_minutes.HasValue;
+
+    public bool IsAm
+    {
+        get => _isAm;
+        set
+        {
+            if (_isAm == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _isAm, value);
+            UpdateTimeFromInputs();
+        }
+    }
+
+    public bool Use24HourFormat
+    {
+        get => _use24HourFormat;
+        set
+        {
+            if (_use24HourFormat == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _use24HourFormat, value);
+            UpdateTimeInputs();
+            this.RaisePropertyChanged(nameof(Description));
+        }
+    }
+
+    public bool RunOnMonday { get => _runOnMonday; set => SetDay(ref _runOnMonday, value); }
+    public bool RunOnTuesday { get => _runOnTuesday; set => SetDay(ref _runOnTuesday, value); }
+    public bool RunOnWednesday { get => _runOnWednesday; set => SetDay(ref _runOnWednesday, value); }
+    public bool RunOnThursday { get => _runOnThursday; set => SetDay(ref _runOnThursday, value); }
+    public bool RunOnFriday { get => _runOnFriday; set => SetDay(ref _runOnFriday, value); }
+    public bool RunOnSaturday { get => _runOnSaturday; set => SetDay(ref _runOnSaturday, value); }
+    public bool RunOnSunday { get => _runOnSunday; set => SetDay(ref _runOnSunday, value); }
+
+    public void LoadSchedule(SessionSchedule schedule)
+    {
+        ExistingScheduleId = schedule.Id;
+        Use24HourFormat = schedule.Use24HourFormat;
+        Time = schedule.RecurringTime ?? TimeSpan.Zero;
+        var days = schedule.DaysOfWeek;
+        RunOnMonday = days.Contains(DayOfWeek.Monday);
+        RunOnTuesday = days.Contains(DayOfWeek.Tuesday);
+        RunOnWednesday = days.Contains(DayOfWeek.Wednesday);
+        RunOnThursday = days.Contains(DayOfWeek.Thursday);
+        RunOnFriday = days.Contains(DayOfWeek.Friday);
+        RunOnSaturday = days.Contains(DayOfWeek.Saturday);
+        RunOnSunday = days.Contains(DayOfWeek.Sunday);
+    }
+
+    public List<DayOfWeek> GetSelectedDays()
+    {
+        var days = new List<DayOfWeek>(7);
+        if (RunOnMonday) days.Add(DayOfWeek.Monday);
+        if (RunOnTuesday) days.Add(DayOfWeek.Tuesday);
+        if (RunOnWednesday) days.Add(DayOfWeek.Wednesday);
+        if (RunOnThursday) days.Add(DayOfWeek.Thursday);
+        if (RunOnFriday) days.Add(DayOfWeek.Friday);
+        if (RunOnSaturday) days.Add(DayOfWeek.Saturday);
+        if (RunOnSunday) days.Add(DayOfWeek.Sunday);
+        return days;
+    }
+
+    private void SetTimePart(ref decimal? field, decimal? value)
+    {
+        if (field == value)
+            return;
+
+        this.RaiseAndSetIfChanged(ref field, value);
+        this.RaisePropertyChanged(nameof(HasTimeError));
+        if (value.HasValue)
+            UpdateTimeFromInputs();
+    }
+
+    private void SetDay(ref bool field, bool value)
+    {
+        this.RaiseAndSetIfChanged(ref field, value);
+        this.RaisePropertyChanged(nameof(Description));
+    }
+
+    private void UpdateTimeInputs()
+    {
+        if (_isUpdatingTime)
+        {
+            return;
+        }
+
+        _isUpdatingTime = true;
+        try
+        {
+            if (Use24HourFormat)
+            {
+                _hours = Time.Hours;
+            }
+            else
+            {
+                var hours = Time.Hours;
+                _isAm = hours < 12;
+                var displayHours = hours % 12;
+                _hours = displayHours == 0 ? 12 : displayHours;
+            }
+
+            _minutes = Time.Minutes;
+            this.RaisePropertyChanged(nameof(Hours));
+            this.RaisePropertyChanged(nameof(Minutes));
+            this.RaisePropertyChanged(nameof(IsAm));
+            this.RaisePropertyChanged(nameof(HasTimeError));
+        }
+        finally
+        {
+            _isUpdatingTime = false;
+        }
+    }
+
+    private void UpdateTimeFromInputs()
+    {
+        if (_isUpdatingTime || !_hours.HasValue || !_minutes.HasValue)
+        {
+            return;
+        }
+
+        _isUpdatingTime = true;
+        try
+        {
+            var hours = (int)_hours.Value;
+            if (!Use24HourFormat)
+            {
+                hours %= 12;
+                if (!_isAm)
+                {
+                    hours += 12;
+                }
+            }
+
+            Time = new TimeSpan(hours, (int)_minutes.Value, 0);
+        }
+        finally
+        {
+            _isUpdatingTime = false;
+        }
+    }
+}
+
+public sealed class ScheduleTriggerViewModel() : TimeTriggerViewModel(new TimeSpan(9, 0, 0))
 {
     public override string Title => "Time Schedule";
-    public override string IconKey => "TimerIcon";
-
-    public override string Description
-    {
-        get
-        {
-            var days = new List<string>();
-            if (RunOnMonday)
-            {
-                days.Add("Mon");
-            }
-
-            if (RunOnTuesday)
-            {
-                days.Add("Tue");
-            }
-
-            if (RunOnWednesday)
-            {
-                days.Add("Wed");
-            }
-
-            if (RunOnThursday)
-            {
-                days.Add("Thu");
-            }
-
-            if (RunOnFriday)
-            {
-                days.Add("Fri");
-            }
-
-            if (RunOnSaturday)
-            {
-                days.Add("Sat");
-            }
-
-            if (RunOnSunday)
-            {
-                days.Add("Sun");
-            }
-
-            var daysStr = days.Count == 7 ? "Every day" : string.Join(", ", days);
-            var timeStr = Use24HourFormat
-                ? $"{Time:hh\\:mm}"
-                : FormatTime12Hour(Time);
-            return $"{timeStr} • {daysStr}";
-        }
-    }
-
-    private static string FormatTime12Hour(TimeSpan time)
-    {
-        var hours = time.Hours;
-        var minutes = time.Minutes;
-        var period = hours >= 12 ? "PM" : "AM";
-        var displayHours = hours % 12;
-        if (displayHours == 0)
-        {
-            displayHours = 12;
-        }
-
-        return $"{displayHours}:{minutes:D2} {period}";
-    }
-
-    public TimeSpan Time
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            UpdateTimeInputs();
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = new(9, 0, 0);
-
-    private decimal? _hours = 9;
-
-    public decimal? Hours
-    {
-        get => _hours;
-        set
-        {
-            if (_hours != value)
-            {
-                this.RaiseAndSetIfChanged(ref _hours, value);
-                this.RaisePropertyChanged(nameof(HasTimeError));
-                if (value.HasValue)
-                {
-                    UpdateTimeFromInputs();
-                }
-            }
-        }
-    }
-
-    private decimal? _minutes = 0;
-
-    public decimal? Minutes
-    {
-        get => _minutes;
-        set
-        {
-            if (_minutes != value)
-            {
-                this.RaiseAndSetIfChanged(ref _minutes, value);
-                this.RaisePropertyChanged(nameof(HasTimeError));
-                if (value.HasValue)
-                {
-                    UpdateTimeFromInputs();
-                }
-            }
-        }
-    }
-
-    public bool HasTimeError => !_hours.HasValue || !_minutes.HasValue;
-
-    private bool _isAm = true;
-
-    public bool IsAm
-    {
-        get => _isAm;
-        set
-        {
-            if (_isAm != value)
-            {
-                this.RaiseAndSetIfChanged(ref _isAm, value);
-                UpdateTimeFromInputs();
-            }
-        }
-    }
-
-    public bool Use24HourFormat
-    {
-        get;
-        set
-        {
-            if (field != value)
-            {
-                this.RaiseAndSetIfChanged(ref field, value);
-                UpdateTimeInputs();
-                this.RaisePropertyChanged(nameof(Description));
-            }
-        }
-    } = true;
-
-    private bool _isUpdatingTime;
-
-    private void UpdateTimeInputs()
-    {
-        if (_isUpdatingTime)
-        {
-            return;
-        }
-
-        _isUpdatingTime = true;
-        try
-        {
-            if (Use24HourFormat)
-            {
-                _hours = Time.Hours;
-            }
-            else
-            {
-                var hours = Time.Hours;
-                _isAm = hours < 12;
-                var displayHours = hours % 12;
-                _hours = displayHours == 0 ? 12 : displayHours;
-            }
-
-            _minutes = Time.Minutes;
-            this.RaisePropertyChanged(nameof(Hours));
-            this.RaisePropertyChanged(nameof(Minutes));
-            this.RaisePropertyChanged(nameof(IsAm));
-            this.RaisePropertyChanged(nameof(HasTimeError));
-        }
-        finally
-        {
-            _isUpdatingTime = false;
-        }
-    }
-
-    private void UpdateTimeFromInputs()
-    {
-        if (_isUpdatingTime)
-        {
-            return;
-        }
-
-        if (!_hours.HasValue || !_minutes.HasValue)
-        {
-            return;
-        }
-
-        _isUpdatingTime = true;
-        try
-        {
-            int hours;
-            if (Use24HourFormat)
-            {
-                hours = (int)_hours.Value;
-            }
-            else
-            {
-                hours = (int)_hours.Value % 12;
-                if (!_isAm)
-                {
-                    hours += 12;
-                }
-            }
-
-            Time = new TimeSpan(hours, (int)_minutes.Value, 0);
-        }
-        finally
-        {
-            _isUpdatingTime = false;
-        }
-    }
-
-    public bool RunOnMonday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnTuesday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnWednesday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnThursday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnFriday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnSaturday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    }
-
-    public bool RunOnSunday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    }
-
-    public Guid? ExistingScheduleId { get; set; }
 }
 
-public class NextPresetOption
-{
-    public Guid? PresetId { get; set; }
-    public string Name { get; set; } = string.Empty;
-}
+public sealed record NextPresetOption(Guid? PresetId, string Name);
 
-public class StopAtTimeTriggerViewModel : TriggerViewModel
+public sealed class StopAtTimeTriggerViewModel() : TimeTriggerViewModel(new TimeSpan(17, 0, 0))
 {
     public override string Title => "Fixed Time";
-    public override string IconKey => "TimerIcon";
-
-    public override string Description
-    {
-        get
-        {
-            var days = new List<string>();
-            if (RunOnMonday)
-            {
-                days.Add("Mon");
-            }
-
-            if (RunOnTuesday)
-            {
-                days.Add("Tue");
-            }
-
-            if (RunOnWednesday)
-            {
-                days.Add("Wed");
-            }
-
-            if (RunOnThursday)
-            {
-                days.Add("Thu");
-            }
-
-            if (RunOnFriday)
-            {
-                days.Add("Fri");
-            }
-
-            if (RunOnSaturday)
-            {
-                days.Add("Sat");
-            }
-
-            if (RunOnSunday)
-            {
-                days.Add("Sun");
-            }
-
-            var daysStr = days.Count == 7 ? "Every day" : string.Join(", ", days);
-            var timeStr = Use24HourFormat
-                ? $"{Time:hh\\:mm}"
-                : FormatTime12Hour(Time);
-            return $"{timeStr} • {daysStr}";
-        }
-    }
-
-    private static string FormatTime12Hour(TimeSpan time)
-    {
-        var hours = time.Hours;
-        var minutes = time.Minutes;
-        var period = hours >= 12 ? "PM" : "AM";
-        var displayHours = hours % 12;
-        if (displayHours == 0)
-        {
-            displayHours = 12;
-        }
-
-        return $"{displayHours}:{minutes:D2} {period}";
-    }
-
-    public TimeSpan Time
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            UpdateTimeInputs();
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = new(17, 0, 0);
-
-    private decimal? _hours = 17;
-
-    public decimal? Hours
-    {
-        get => _hours;
-        set
-        {
-            if (_hours != value)
-            {
-                this.RaiseAndSetIfChanged(ref _hours, value);
-                this.RaisePropertyChanged(nameof(HasTimeError));
-                if (value.HasValue)
-                {
-                    UpdateTimeFromInputs();
-                }
-            }
-        }
-    }
-
-    private decimal? _minutes = 0;
-
-    public decimal? Minutes
-    {
-        get => _minutes;
-        set
-        {
-            if (_minutes != value)
-            {
-                this.RaiseAndSetIfChanged(ref _minutes, value);
-                this.RaisePropertyChanged(nameof(HasTimeError));
-                if (value.HasValue)
-                {
-                    UpdateTimeFromInputs();
-                }
-            }
-        }
-    }
-
-    public bool HasTimeError => !_hours.HasValue || !_minutes.HasValue;
-
-    private bool _isAm;
-
-    public bool IsAm
-    {
-        get => _isAm;
-        set
-        {
-            if (_isAm != value)
-            {
-                this.RaiseAndSetIfChanged(ref _isAm, value);
-                UpdateTimeFromInputs();
-            }
-        }
-    }
-
-    public bool Use24HourFormat
-    {
-        get;
-        set
-        {
-            if (field != value)
-            {
-                this.RaiseAndSetIfChanged(ref field, value);
-                UpdateTimeInputs();
-                this.RaisePropertyChanged(nameof(Description));
-            }
-        }
-    } = true;
-
-    private bool _isUpdatingTime;
-
-    private void UpdateTimeInputs()
-    {
-        if (_isUpdatingTime)
-        {
-            return;
-        }
-
-        _isUpdatingTime = true;
-        try
-        {
-            if (Use24HourFormat)
-            {
-                _hours = Time.Hours;
-            }
-            else
-            {
-                var hours = Time.Hours;
-                _isAm = hours < 12;
-                var displayHours = hours % 12;
-                _hours = displayHours == 0 ? 12 : displayHours;
-            }
-
-            _minutes = Time.Minutes;
-            this.RaisePropertyChanged(nameof(Hours));
-            this.RaisePropertyChanged(nameof(Minutes));
-            this.RaisePropertyChanged(nameof(IsAm));
-            this.RaisePropertyChanged(nameof(HasTimeError));
-        }
-        finally
-        {
-            _isUpdatingTime = false;
-        }
-    }
-
-    private void UpdateTimeFromInputs()
-    {
-        if (_isUpdatingTime)
-        {
-            return;
-        }
-
-        if (!_hours.HasValue || !_minutes.HasValue)
-        {
-            return;
-        }
-
-        _isUpdatingTime = true;
-        try
-        {
-            int hours;
-            if (Use24HourFormat)
-            {
-                hours = (int)_hours.Value;
-            }
-            else
-            {
-                hours = (int)_hours.Value % 12;
-                if (!_isAm)
-                {
-                    hours += 12;
-                }
-            }
-
-            Time = new TimeSpan(hours, (int)_minutes.Value, 0);
-        }
-        finally
-        {
-            _isUpdatingTime = false;
-        }
-    }
-
-    public bool RunOnMonday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnTuesday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnWednesday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnThursday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnFriday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    } = true;
-
-    public bool RunOnSaturday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    }
-
-    public bool RunOnSunday
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    }
-
-    public Guid? ExistingScheduleId { get; set; }
 }
 
-public class StopAfterDurationTriggerViewModel : TriggerViewModel
+public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
 {
     public override string Title => "Session Duration";
     public override string IconKey => "TimerIcon";
 
-    public override string Description
-    {
-        get
-        {
-            var durationStr = DurationHours > 0
-                ? $"{DurationHours}h {DurationMinutes}m"
-                : $"{DurationMinutes}m";
-            return $"After {durationStr}";
-        }
-    }
-
-    public Guid? ExistingScheduleId { get; set; }
+    public override string Description => DurationHours > 0
+        ? $"After {DurationHours}h {DurationMinutes}m"
+        : $"After {DurationMinutes}m";
 
     public TimeSpan Duration
     {
@@ -646,51 +259,30 @@ public class StopAfterDurationTriggerViewModel : TriggerViewModel
     } = TimeSpan.FromHours(1);
 
     private decimal? _durationHours = 1;
-
-    public decimal? DurationHours
-    {
-        get => _durationHours;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _durationHours, value);
-            this.RaisePropertyChanged(nameof(HasDurationError));
-            this.RaisePropertyChanged(nameof(HasError));
-            this.RaisePropertyChanged(nameof(Description));
-            UpdateDuration();
-        }
-    }
+    public decimal? DurationHours { get => _durationHours; set => SetDurationPart(ref _durationHours, value); }
 
     private decimal? _durationMinutes = 0;
-
-    public decimal? DurationMinutes
-    {
-        get => _durationMinutes;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _durationMinutes, value);
-            this.RaisePropertyChanged(nameof(HasDurationError));
-            this.RaisePropertyChanged(nameof(HasError));
-            this.RaisePropertyChanged(nameof(Description));
-            UpdateDuration();
-        }
-    }
+    public decimal? DurationMinutes { get => _durationMinutes; set => SetDurationPart(ref _durationMinutes, value); }
 
     public bool HasDurationError => !_durationHours.HasValue || !_durationMinutes.HasValue ||
                                     ((int)(_durationHours ?? 0) == 0 && (int)(_durationMinutes ?? 0) == 0);
 
     public override bool HasError => HasDurationError;
 
-    private void UpdateDuration()
+    private void SetDurationPart(ref decimal? field, decimal? value)
     {
+        this.RaiseAndSetIfChanged(ref field, value);
+        this.RaisePropertyChanged(nameof(HasDurationError));
+        this.RaisePropertyChanged(nameof(HasError));
+        this.RaisePropertyChanged(nameof(Description));
         if (_durationHours.HasValue && _durationMinutes.HasValue)
         {
-            Duration = TimeSpan.FromHours((int)_durationHours.Value) +
-                       TimeSpan.FromMinutes((int)_durationMinutes.Value);
+            Duration = TimeSpan.FromHours((int)_durationHours.Value) + TimeSpan.FromMinutes((int)_durationMinutes.Value);
         }
     }
 }
 
-public class ThenActionTriggerViewModel(SessionEditorViewModel? parent, AfterEndBehavior behavior) : TriggerViewModel
+public class ThenActionTriggerViewModel(SessionEditorViewModel parent, AfterEndBehavior behavior) : TriggerViewModel
 {
     public AfterEndBehavior Behavior { get; } = behavior;
 
@@ -747,10 +339,10 @@ public class ThenActionTriggerViewModel(SessionEditorViewModel? parent, AfterEnd
     }
 
     public bool IsNextPresetSelectionVisible => Behavior == AfterEndBehavior.StartNextWorkspace &&
-                                                (parent?.AvailablePresetsForNext.Count ?? 0) > 0;
+                                                parent.AvailablePresetsForNext.Count > 0;
 
     public bool IsNoOtherPresetsAvailable => Behavior == AfterEndBehavior.StartNextWorkspace &&
-                                             (parent?.AvailablePresetsForNext.Count ?? 0) == 0;
+                                             parent.AvailablePresetsForNext.Count == 0;
 
     public NextPresetOption? SelectedNextPreset
     {
@@ -818,21 +410,15 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         set
         {
             this.RaiseAndSetIfChanged(ref field, value);
-            Validate();
+            ErrorMessage = !string.IsNullOrWhiteSpace(value) ? string.Empty : "Preset name cannot be empty.";
         }
     } = string.Empty;
 
-    public string? ErrorMessage
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public string? ErrorMessage { get; private set; }
 
-    public string? FocusCommitmentError
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public string? FocusCommitmentError { get; private set; }
 
     public IReadOnlyList<string> FocusCommitmentModes { get; } = ["Normal", "Locked", "Strict"];
     public IReadOnlyList<string> BreakOptions { get; } = ["No breaks", "One 5-minute break", "Custom break budget"];
@@ -915,12 +501,8 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private string _scheduledConfigurationLockStatus = "Configuration unlocked";
-    public string ScheduledConfigurationLockStatus
-    {
-        get => _scheduledConfigurationLockStatus;
-        private set => this.RaiseAndSetIfChanged(ref _scheduledConfigurationLockStatus, value);
-    }
+    [Reactive]
+    public string ScheduledConfigurationLockStatus { get; private set; } = "Configuration unlocked";
 
     public ObservableCollection<TriggerViewModel> Triggers { get; } = [];
     public bool HasScheduledStart => Triggers.Any(trigger => trigger is ScheduleTriggerViewModel);
@@ -928,29 +510,17 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     public ObservableCollection<TriggerViewModel> ThenTriggers { get; } = [];
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
-    public ConfiguredModuleViewModel? SelectedModule
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public ConfiguredModuleViewModel? SelectedModule { get; set; }
 
-    public TriggerViewModel? SelectedTrigger
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public TriggerViewModel? SelectedTrigger { get; set; }
 
-    public TriggerViewModel? SelectedStopTrigger
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public TriggerViewModel? SelectedStopTrigger { get; set; }
 
-    public ModuleSelectorViewModel? ModuleSelector
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public ModuleSelectorViewModel? ModuleSelector { get; set; }
 
     public ICommand SaveAndCloseCommand { get; }
     public ICommand CancelCommand { get; }
@@ -1047,7 +617,8 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         SaveAndCloseCommand = ReactiveCommand.CreateFromTask(SaveAndCloseAsync, canSave);
         CancelCommand = ReactiveCommand.Create(Cancel);
 
-        OpenAddModuleCommand = ReactiveCommand.Create(OpenModuleSelector);
+        OpenAddModuleCommand = ReactiveCommand.Create(() =>
+            ModuleSelector = new ModuleSelectorViewModel(_availableModules, OnModuleAdded, () => ModuleSelector = null));
 
         RemoveModuleCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm =>
         {
@@ -1061,34 +632,13 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             UpdateModuleLinks();
         });
 
-        OpenModuleSettingsCommand =
-            ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm => { SelectedModule = moduleVm; });
-        CloseModuleSettingsCommand = ReactiveCommand.Create(() => { SelectedModule = null; });
+        OpenModuleSettingsCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(moduleVm => SelectedModule = moduleVm);
+        CloseModuleSettingsCommand = ReactiveCommand.Create(() => SelectedModule = null);
 
-        MoveUpCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(vm =>
-        {
-            var index = ConfiguredModules.IndexOf(vm);
-            if (index > 0)
-            {
-                ConfiguredModules.Move(index, index - 1);
-                UpdateModuleLinks();
-            }
-        });
+        MoveUpCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(vm => MoveModule(vm, -1));
+        MoveDownCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(vm => MoveModule(vm, 1));
 
-        MoveDownCommand = ReactiveCommand.Create<ConfiguredModuleViewModel>(vm =>
-        {
-            var index = ConfiguredModules.IndexOf(vm);
-            if (index < ConfiguredModules.Count - 1)
-            {
-                ConfiguredModules.Move(index, index + 1);
-                UpdateModuleLinks();
-            }
-        });
-
-        var canAddSchedule = Triggers
-            .ToObservableChangeSet()
-            .Select(_ => !Triggers.Any(t => t is ScheduleTriggerViewModel))
-            .ObserveOn(RxApp.MainThreadScheduler);
+        var canAddSchedule = CanAddTrigger<ScheduleTriggerViewModel>(Triggers);
 
         _canAddAnyTrigger = canAddSchedule.ToProperty(this, x => x.CanAddAnyTrigger);
 
@@ -1111,36 +661,20 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         EditTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedTrigger = t);
         CloseTriggerSettingsCommand = ReactiveCommand.Create(() => SelectedTrigger = null);
 
-        var canAddStopAtTime = StopTriggers
-            .ToObservableChangeSet()
-            .Select(_ => !StopTriggers.Any(t => t is StopAtTimeTriggerViewModel))
-            .ObserveOn(RxApp.MainThreadScheduler);
+        var canAddStopAtTime = CanAddTrigger<StopAtTimeTriggerViewModel>(StopTriggers);
 
         _canAddStopAtTimeTrigger = canAddStopAtTime.ToProperty(this, x => x.CanAddStopAtTimeTrigger);
 
-        AddStopAtTimeTriggerCommand = ReactiveCommand.Create(() =>
-        {
-            var trigger = new StopAtTimeTriggerViewModel();
-            StopTriggers.Add(trigger);
-            ValidateFocusCommitment();
-            SelectedStopTrigger = trigger;
-        }, canAddStopAtTime);
+        AddStopAtTimeTriggerCommand = ReactiveCommand.Create(() => AddStopTrigger(new StopAtTimeTriggerViewModel()),
+            canAddStopAtTime);
 
-        var canAddStopAfterDuration = StopTriggers
-            .ToObservableChangeSet()
-            .Select(_ => !StopTriggers.Any(t => t is StopAfterDurationTriggerViewModel))
-            .ObserveOn(RxApp.MainThreadScheduler);
+        var canAddStopAfterDuration = CanAddTrigger<StopAfterDurationTriggerViewModel>(StopTriggers);
 
         _canAddStopAfterDurationTrigger =
             canAddStopAfterDuration.ToProperty(this, x => x.CanAddStopAfterDurationTrigger);
 
-        AddStopAfterDurationTriggerCommand = ReactiveCommand.Create(() =>
-        {
-            var trigger = new StopAfterDurationTriggerViewModel();
-            StopTriggers.Add(trigger);
-            ValidateFocusCommitment();
-            SelectedStopTrigger = trigger;
-        }, canAddStopAfterDuration);
+        AddStopAfterDurationTriggerCommand = ReactiveCommand.Create(
+            () => AddStopTrigger(new StopAfterDurationTriggerViewModel()), canAddStopAfterDuration);
 
         RemoveStopTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
         {
@@ -1169,21 +703,33 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                 return;
             }
 
-            var trigger = new ThenActionTriggerViewModel(this, behavior);
-            ThenTriggers.Add(trigger);
+            AddThenTrigger(behavior);
         }, canAddThenAction);
 
-        RemoveThenTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
-        {
-            ThenTriggers.Remove(t);
-        });
+        RemoveThenTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => ThenTriggers.Remove(t));
 
         InitializationTask = InitializeAsync();
     }
 
-    private void Validate()
+    private static IObservable<bool> CanAddTrigger<T>(ObservableCollection<TriggerViewModel> triggers) => triggers
+        .ToObservableChangeSet()
+        .Select(_ => !triggers.Any(trigger => trigger is T))
+        .ObserveOn(RxApp.MainThreadScheduler);
+
+    private void MoveModule(ConfiguredModuleViewModel module, int offset)
     {
-        ErrorMessage = !string.IsNullOrWhiteSpace(Name) ? string.Empty : "Preset name cannot be empty.";
+        var index = ConfiguredModules.IndexOf(module);
+        var target = index + offset;
+        if (index < 0 || target < 0 || target >= ConfiguredModules.Count) return;
+        ConfiguredModules.Move(index, target);
+        UpdateModuleLinks();
+    }
+
+    private void AddStopTrigger(ScheduledTriggerViewModel trigger)
+    {
+        StopTriggers.Add(trigger);
+        ValidateFocusCommitment();
+        SelectedStopTrigger = trigger;
     }
 
     private async Task InitializeAsync()
@@ -1234,7 +780,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             if (preset.Id != _preset.Id)
             {
-                AvailablePresetsForNext.Add(new NextPresetOption { PresetId = preset.Id, Name = preset.Name });
+                AvailablePresetsForNext.Add(new NextPresetOption(preset.Id, preset.Name));
             }
         }
 
@@ -1247,7 +793,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private void LoadFromPreset()
     {
-        _focusCommitment = CopyFocusCommitment(_preset.FocusCommitment ?? new FocusCommitmentOptions());
+        _focusCommitment = new FocusCommitmentOptions(_preset.FocusCommitment ?? new FocusCommitmentOptions());
         FocusCommitmentError = null;
         _customBreakBudgetSelected = _focusCommitment.BreakCount > 0 &&
                                      (_focusCommitment.BreakCount != 1 ||
@@ -1299,26 +845,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                     (_focusCommitment.AfterEnd != AfterEndBehavior.StartNextWorkspace ||
                      _focusCommitment.NextWorkspaceId.HasValue))
                 {
-                    var thenTrigger = new ThenActionTriggerViewModel(this, _focusCommitment.AfterEnd)
-                    {
-                        NextPresetId = _focusCommitment.AfterEnd == AfterEndBehavior.StartNextWorkspace
-                            ? _focusCommitment.NextWorkspaceId
-                            : null
-                    };
-                    ThenTriggers.Add(thenTrigger);
-                    if (thenTrigger.NextPresetId is { } nextPresetId)
-                    {
-                        var nextPreset = AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == nextPresetId);
-                        if (nextPreset != null)
-                        {
-                            thenTrigger.SelectedNextPreset = nextPreset;
-                            thenTrigger.NextPresetName = nextPreset.Name;
-                        }
-                        else
-                        {
-                            _ = LoadThenPresetNameAsync(thenTrigger, nextPresetId);
-                        }
-                    }
+                    AddThenTrigger(_focusCommitment.AfterEnd, _focusCommitment.NextWorkspaceId);
                 }
 
                 var toRemove = Triggers.Where(t => t is ScheduleTriggerViewModel).ToList();
@@ -1327,102 +854,33 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                     Triggers.Remove(t);
                 }
 
-                var toRemoveStop = StopTriggers.ToList();
-                foreach (var t in toRemoveStop)
-                {
-                    StopTriggers.Remove(t);
-                }
+                StopTriggers.Clear();
 
-                foreach (var s in presetSchedules.Where(s => s.Type == ScheduleType.Recurring))
+                foreach (var schedule in presetSchedules)
                 {
-                    var trigger = new ScheduleTriggerViewModel
+                    ScheduledTriggerViewModel? trigger = schedule.Type switch
                     {
-                        ExistingScheduleId = s.Id,
-                        Use24HourFormat = s.Use24HourFormat,
-                        Time = s.RecurringTime ?? TimeSpan.Zero,
-                        RunOnMonday = s.DaysOfWeek.Contains(DayOfWeek.Monday),
-                        RunOnTuesday = s.DaysOfWeek.Contains(DayOfWeek.Tuesday),
-                        RunOnWednesday = s.DaysOfWeek.Contains(DayOfWeek.Wednesday),
-                        RunOnThursday = s.DaysOfWeek.Contains(DayOfWeek.Thursday),
-                        RunOnFriday = s.DaysOfWeek.Contains(DayOfWeek.Friday),
-                        RunOnSaturday = s.DaysOfWeek.Contains(DayOfWeek.Saturday),
-                        RunOnSunday = s.DaysOfWeek.Contains(DayOfWeek.Sunday)
+                        ScheduleType.Recurring => new ScheduleTriggerViewModel(),
+                        ScheduleType.StopRecurring => new StopAtTimeTriggerViewModel(),
+                        ScheduleType.StopDuration => new StopAfterDurationTriggerViewModel
+                        {
+                            ExistingScheduleId = schedule.Id,
+                            Duration = schedule.AutoStopDuration ?? TimeSpan.FromHours(1),
+                            DurationHours = schedule.AutoStopDuration?.Hours ?? 1,
+                            DurationMinutes = schedule.AutoStopDuration?.Minutes ?? 0
+                        },
+                        _ => null
                     };
-
-                    Triggers.Add(trigger);
-                }
-
-                foreach (var s in presetSchedules.Where(s => s.Type == ScheduleType.StopRecurring))
-                {
-                    var trigger = new StopAtTimeTriggerViewModel
+                    if (trigger is null) continue;
+                    if (trigger is TimeTriggerViewModel time) time.LoadSchedule(schedule);
+                    if (trigger is ScheduleTriggerViewModel)
                     {
-                        ExistingScheduleId = s.Id,
-                        Use24HourFormat = s.Use24HourFormat,
-                        Time = s.RecurringTime ?? TimeSpan.Zero,
-                        RunOnMonday = s.DaysOfWeek.Contains(DayOfWeek.Monday),
-                        RunOnTuesday = s.DaysOfWeek.Contains(DayOfWeek.Tuesday),
-                        RunOnWednesday = s.DaysOfWeek.Contains(DayOfWeek.Wednesday),
-                        RunOnThursday = s.DaysOfWeek.Contains(DayOfWeek.Thursday),
-                        RunOnFriday = s.DaysOfWeek.Contains(DayOfWeek.Friday),
-                        RunOnSaturday = s.DaysOfWeek.Contains(DayOfWeek.Saturday),
-                        RunOnSunday = s.DaysOfWeek.Contains(DayOfWeek.Sunday)
-                    };
-
-                    if (ThenTriggers.Count == 0 && s.NextPresetId.HasValue)
-                    {
-                        var thenTrigger = new ThenActionTriggerViewModel(this, AfterEndBehavior.StartNextWorkspace)
-                        {
-                            NextPresetId = s.NextPresetId
-                        };
-                        var nextPreset =
-                            AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == s.NextPresetId.Value);
-                        if (nextPreset != null)
-                        {
-                            thenTrigger.SelectedNextPreset = nextPreset;
-                            thenTrigger.NextPresetName = nextPreset.Name;
-                        }
-                        else
-                        {
-                            _ = LoadThenPresetNameAsync(thenTrigger, s.NextPresetId.Value);
-                        }
-
-                        ThenTriggers.Add(thenTrigger);
+                        Triggers.Add(trigger);
+                        continue;
                     }
 
-                    StopTriggers.Add(trigger);
-                }
-
-                foreach (var s in presetSchedules.Where(s => s.Type == ScheduleType.StopDuration))
-                {
-                    var trigger = new StopAfterDurationTriggerViewModel
-                    {
-                        ExistingScheduleId = s.Id,
-                        Duration = s.AutoStopDuration ?? TimeSpan.FromHours(1),
-                        DurationHours = s.AutoStopDuration?.Hours ?? 1,
-                        DurationMinutes = s.AutoStopDuration?.Minutes ?? 0
-                    };
-
-                    if (ThenTriggers.Count == 0 && s.NextPresetId.HasValue)
-                    {
-                        var thenTrigger = new ThenActionTriggerViewModel(this, AfterEndBehavior.StartNextWorkspace)
-                        {
-                            NextPresetId = s.NextPresetId
-                        };
-                        var nextPreset =
-                            AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == s.NextPresetId.Value);
-                        if (nextPreset != null)
-                        {
-                            thenTrigger.SelectedNextPreset = nextPreset;
-                            thenTrigger.NextPresetName = nextPreset.Name;
-                        }
-                        else
-                        {
-                            _ = LoadThenPresetNameAsync(thenTrigger, s.NextPresetId.Value);
-                        }
-
-                        ThenTriggers.Add(thenTrigger);
-                    }
-
+                    if (ThenTriggers.Count == 0 && schedule.NextPresetId is { } nextPresetId)
+                        AddThenTrigger(AfterEndBehavior.StartNextWorkspace, nextPresetId);
                     StopTriggers.Add(trigger);
                 }
 
@@ -1435,6 +893,29 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         }
     }
 
+    private void AddThenTrigger(AfterEndBehavior behavior, Guid? nextPresetId = null)
+    {
+        var trigger = new ThenActionTriggerViewModel(this, behavior)
+        {
+            NextPresetId = behavior == AfterEndBehavior.StartNextWorkspace ? nextPresetId : null
+        };
+
+        if (trigger.NextPresetId is { } id)
+        {
+            if (AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == id) is { } preset)
+            {
+                trigger.SelectedNextPreset = preset;
+                trigger.NextPresetName = preset.Name;
+            }
+            else
+            {
+                _ = LoadThenPresetNameAsync(trigger, id);
+            }
+        }
+
+        ThenTriggers.Add(trigger);
+    }
+
     private async Task LoadThenPresetNameAsync(ThenActionTriggerViewModel trigger, Guid presetId)
     {
         try
@@ -1444,7 +925,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    var option = new NextPresetOption { PresetId = presetId, Name = preset.Name };
+                    var option = new NextPresetOption(presetId, preset.Name);
                     if (AvailablePresetsForNext.All(p => p.PresetId != presetId))
                     {
                         AvailablePresetsForNext.Add(option);
@@ -1459,11 +940,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             /* Ignore */
         }
-    }
-
-    private void OpenModuleSelector()
-    {
-        ModuleSelector = new ModuleSelectorViewModel(_availableModules, OnModuleAdded, () => ModuleSelector = null);
     }
 
     private void OnModuleAdded(ModuleDefinition defToAdd)
@@ -1523,12 +999,11 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             })
         ];
         _preset.Name = Name;
-        _preset.FocusCommitment = CopyFocusCommitment(_focusCommitment);
+        _preset.FocusCommitment = new FocusCommitmentOptions(_focusCommitment);
 
         try
         {
             var existingPreset = await _presetsApi.GetPresetAsync(_preset.Id);
-            var isNew = existingPreset == null;
             if (existingPreset != null)
             {
                 await _presetsApi.UpdatePresetAsync(_preset);
@@ -1543,197 +1018,45 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
 
             var activeTriggerIds = new HashSet<Guid>();
 
-            foreach (var trigger in Triggers.OfType<ScheduleTriggerViewModel>())
+            var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
+            var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
+                ? thenStartTrigger.NextPresetId
+                : null;
+
+            foreach (var trigger in Triggers.Concat(StopTriggers).OfType<ScheduledTriggerViewModel>())
             {
-                var days = new List<DayOfWeek>();
-                if (trigger.RunOnMonday)
+                var schedule = trigger switch
                 {
-                    days.Add(DayOfWeek.Monday);
-                }
-
-                if (trigger.RunOnTuesday)
-                {
-                    days.Add(DayOfWeek.Tuesday);
-                }
-
-                if (trigger.RunOnWednesday)
-                {
-                    days.Add(DayOfWeek.Wednesday);
-                }
-
-                if (trigger.RunOnThursday)
-                {
-                    days.Add(DayOfWeek.Thursday);
-                }
-
-                if (trigger.RunOnFriday)
-                {
-                    days.Add(DayOfWeek.Friday);
-                }
-
-                if (trigger.RunOnSaturday)
-                {
-                    days.Add(DayOfWeek.Saturday);
-                }
-
-                if (trigger.RunOnSunday)
-                {
-                    days.Add(DayOfWeek.Sunday);
-                }
-
-                var schedule = new SessionSchedule
-                {
-                    Id = trigger.ExistingScheduleId ?? Guid.NewGuid(),
-                    PresetId = _preset.Id,
-                    Type = ScheduleType.Recurring,
-                    Name = $"{Name} Schedule",
-                    IsEnabled = true,
-                    RecurringTime = trigger.Time,
-                    DaysOfWeek = days,
-                    Use24HourFormat = trigger.Use24HourFormat
-                };
-
-                if (!trigger.ExistingScheduleId.HasValue && presetSchedules.Count > 0)
-                {
-                    var candidate = presetSchedules.FirstOrDefault(s =>
-                        s.Type == ScheduleType.Recurring && !activeTriggerIds.Contains(s.Id));
-                    if (candidate != null)
+                    ScheduleTriggerViewModel time => new SessionSchedule
                     {
-                        schedule.Id = candidate.Id;
-                        trigger.ExistingScheduleId = candidate.Id;
-                    }
-                }
-
-                if (trigger.ExistingScheduleId.HasValue)
-                {
-                    await _schedulerApi.UpdateScheduleAsync(schedule);
-                }
-                else
-                {
-                    await _schedulerApi.CreateScheduleAsync(schedule);
-                }
-
-                activeTriggerIds.Add(schedule.Id);
-            }
-
-            foreach (var stopTrigger in StopTriggers.OfType<StopAtTimeTriggerViewModel>())
-            {
-                var days = new List<DayOfWeek>();
-                if (stopTrigger.RunOnMonday)
-                {
-                    days.Add(DayOfWeek.Monday);
-                }
-
-                if (stopTrigger.RunOnTuesday)
-                {
-                    days.Add(DayOfWeek.Tuesday);
-                }
-
-                if (stopTrigger.RunOnWednesday)
-                {
-                    days.Add(DayOfWeek.Wednesday);
-                }
-
-                if (stopTrigger.RunOnThursday)
-                {
-                    days.Add(DayOfWeek.Thursday);
-                }
-
-                if (stopTrigger.RunOnFriday)
-                {
-                    days.Add(DayOfWeek.Friday);
-                }
-
-                if (stopTrigger.RunOnSaturday)
-                {
-                    days.Add(DayOfWeek.Saturday);
-                }
-
-                if (stopTrigger.RunOnSunday)
-                {
-                    days.Add(DayOfWeek.Sunday);
-                }
-
-                var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
-                var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
-                    ? thenStartTrigger.NextPresetId
-                    : null;
-
-                var schedule = new SessionSchedule
-                {
-                    Id = stopTrigger.ExistingScheduleId ?? Guid.NewGuid(),
-                    PresetId = _preset.Id,
-                    Type = ScheduleType.StopRecurring,
-                    Name = $"{Name} Stop Schedule",
-                    IsEnabled = true,
-                    RecurringTime = stopTrigger.Time,
-                    DaysOfWeek = days,
-                    NextPresetId = nextPresetId,
-                    Use24HourFormat = stopTrigger.Use24HourFormat
-                };
-
-                if (!stopTrigger.ExistingScheduleId.HasValue && presetSchedules.Count > 0)
-                {
-                    var candidate = presetSchedules.FirstOrDefault(s =>
-                        s.Type == ScheduleType.StopRecurring && !activeTriggerIds.Contains(s.Id));
-                    if (candidate != null)
+                        Type = ScheduleType.Recurring,
+                        Name = $"{Name} Schedule",
+                        RecurringTime = time.Time,
+                        DaysOfWeek = time.GetSelectedDays(),
+                        Use24HourFormat = time.Use24HourFormat
+                    },
+                    StopAtTimeTriggerViewModel time => new SessionSchedule
                     {
-                        schedule.Id = candidate.Id;
-                        stopTrigger.ExistingScheduleId = candidate.Id;
-                    }
-                }
-
-                if (stopTrigger.ExistingScheduleId.HasValue)
-                {
-                    await _schedulerApi.UpdateScheduleAsync(schedule);
-                }
-                else
-                {
-                    await _schedulerApi.CreateScheduleAsync(schedule);
-                }
-
-                activeTriggerIds.Add(schedule.Id);
-            }
-
-            foreach (var durationTrigger in StopTriggers.OfType<StopAfterDurationTriggerViewModel>())
-            {
-                var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
-                var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
-                    ? thenStartTrigger.NextPresetId
-                    : null;
-
-                var schedule = new SessionSchedule
-                {
-                    Id = durationTrigger.ExistingScheduleId ?? Guid.NewGuid(),
-                    PresetId = _preset.Id,
-                    Type = ScheduleType.StopDuration,
-                    Name = $"{Name} Duration Stop",
-                    IsEnabled = true,
-                    AutoStopDuration = durationTrigger.Duration,
-                    NextPresetId = nextPresetId
-                };
-
-                if (!durationTrigger.ExistingScheduleId.HasValue && presetSchedules.Count > 0)
-                {
-                    var candidate = presetSchedules.FirstOrDefault(s =>
-                        s.Type == ScheduleType.StopDuration && !activeTriggerIds.Contains(s.Id));
-                    if (candidate != null)
+                        Type = ScheduleType.StopRecurring,
+                        Name = $"{Name} Stop Schedule",
+                        RecurringTime = time.Time,
+                        DaysOfWeek = time.GetSelectedDays(),
+                        NextPresetId = nextPresetId,
+                        Use24HourFormat = time.Use24HourFormat
+                    },
+                    StopAfterDurationTriggerViewModel duration => new SessionSchedule
                     {
-                        schedule.Id = candidate.Id;
-                        durationTrigger.ExistingScheduleId = candidate.Id;
-                    }
-                }
-
-                if (durationTrigger.ExistingScheduleId.HasValue)
-                {
-                    await _schedulerApi.UpdateScheduleAsync(schedule);
-                }
-                else
-                {
-                    await _schedulerApi.CreateScheduleAsync(schedule);
-                }
-
-                activeTriggerIds.Add(schedule.Id);
+                        Type = ScheduleType.StopDuration,
+                        Name = $"{Name} Duration Stop",
+                        AutoStopDuration = duration.Duration,
+                        NextPresetId = nextPresetId
+                    },
+                    _ => throw new InvalidOperationException($"Unsupported trigger type: {trigger.GetType().Name}")
+                };
+                schedule.Id = trigger.ExistingScheduleId ?? Guid.NewGuid();
+                schedule.PresetId = _preset.Id;
+                schedule.IsEnabled = true;
+                await SaveScheduleAsync(trigger, schedule, presetSchedules, activeTriggerIds);
             }
 
             foreach (var s in presetSchedules.Where(s => !activeTriggerIds.Contains(s.Id)))
@@ -1753,6 +1076,35 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             ErrorMessage = $"Failed to save: {ex.Message}";
         }
+    }
+
+    private async Task SaveScheduleAsync(
+        ScheduledTriggerViewModel trigger,
+        SessionSchedule schedule,
+        IReadOnlyList<SessionSchedule> existingSchedules,
+        HashSet<Guid> activeTriggerIds)
+    {
+        if (!trigger.ExistingScheduleId.HasValue)
+        {
+            var candidate = existingSchedules.FirstOrDefault(existing =>
+                existing.Type == schedule.Type && !activeTriggerIds.Contains(existing.Id));
+            if (candidate != null)
+            {
+                schedule.Id = candidate.Id;
+                trigger.ExistingScheduleId = candidate.Id;
+            }
+        }
+
+        if (trigger.ExistingScheduleId.HasValue)
+        {
+            await _schedulerApi.UpdateScheduleAsync(schedule);
+        }
+        else
+        {
+            await _schedulerApi.CreateScheduleAsync(schedule);
+        }
+
+        activeTriggerIds.Add(schedule.Id);
     }
 
     private bool ValidateFocusCommitment(bool applyOptions = false)
@@ -1802,7 +1154,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                         options.EndCondition = FocusEndCondition.EndAt;
                         options.Duration = null;
                         options.EndAtLocalTime = TimeOnly.FromTimeSpan(fixedTime.Time);
-                        options.EndAtDaysOfWeek = GetSelectedDays(fixedTime);
+                        options.EndAtDaysOfWeek = fixedTime.GetSelectedDays();
                     }
                     break;
                 default:
@@ -1839,33 +1191,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         FocusCommitmentError = null;
         return true;
     }
-
-    private static List<DayOfWeek> GetSelectedDays(StopAtTimeTriggerViewModel trigger)
-    {
-        var days = new List<DayOfWeek>();
-        if (trigger.RunOnMonday) days.Add(DayOfWeek.Monday);
-        if (trigger.RunOnTuesday) days.Add(DayOfWeek.Tuesday);
-        if (trigger.RunOnWednesday) days.Add(DayOfWeek.Wednesday);
-        if (trigger.RunOnThursday) days.Add(DayOfWeek.Thursday);
-        if (trigger.RunOnFriday) days.Add(DayOfWeek.Friday);
-        if (trigger.RunOnSaturday) days.Add(DayOfWeek.Saturday);
-        if (trigger.RunOnSunday) days.Add(DayOfWeek.Sunday);
-        return days;
-    }
-
-    private static FocusCommitmentOptions CopyFocusCommitment(FocusCommitmentOptions options) => new()
-    {
-        Mode = options.Mode,
-        EndCondition = options.EndCondition,
-        Duration = options.Duration,
-        EndAtLocalTime = options.EndAtLocalTime,
-        EndAtDaysOfWeek = [.. options.EndAtDaysOfWeek ?? []],
-        BreakCount = options.BreakCount,
-        BreakDuration = options.BreakDuration,
-        AfterEnd = options.AfterEnd,
-        NextWorkspaceId = options.NextWorkspaceId,
-        ScheduleLockMinutes = options.ScheduleLockMinutes
-    };
 
     private void RaiseFocusCommitmentChanged()
     {

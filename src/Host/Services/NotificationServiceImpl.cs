@@ -1,4 +1,4 @@
-﻿using Axorith.Contracts;
+using Axorith.Contracts;
 using Axorith.Host.Streaming;
 using Grpc.Core;
 
@@ -12,22 +12,7 @@ public class NotificationServiceImpl(
         IServerStreamWriter<NotificationEvent> responseStream, ServerCallContext context)
     {
         var subscriberId = Guid.NewGuid().ToString();
-
-        try
-        {
-            logger.LogInformation("Client {SubscriberId} started streaming notifications", subscriberId);
-
-            await broadcaster.SubscribeAsync(subscriberId, responseStream, context.CancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogInformation("Client {SubscriberId} notification stream cancelled", subscriberId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error streaming notifications for {SubscriberId}", subscriberId);
-            throw;
-        }
+        logger.LogInformation("Client {SubscriberId} started streaming notifications", subscriberId);
+        await broadcaster.SubscribeAsync(subscriberId, responseStream, context.CancellationToken).ConfigureAwait(false);
     }
 }

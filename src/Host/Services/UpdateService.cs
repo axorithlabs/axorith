@@ -50,9 +50,6 @@ public class UpdateService : IDisposable
         #endif
     }
 
-    /// <summary>
-    ///     Waits for the initial update check to complete (with timeout).
-    /// </summary>
     public async Task WaitForInitialCheckAsync(CancellationToken ct = default)
     {
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

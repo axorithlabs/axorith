@@ -7,10 +7,6 @@ using Serilog.Sinks.PeriodicBatching;
 
 namespace Axorith.Telemetry;
 
-/// <summary>
-///     Batching sink that sends Serilog events to PostHog /batch endpoint.
-///     Includes retry logic with exponential backoff and rate limit handling.
-/// </summary>
 internal sealed class PostHogSink(
     HttpClient httpClient,
     string apiKey,
@@ -119,10 +115,7 @@ internal sealed class PostHogSink(
         await SendWithRetryAsync(payload, events.Count, generation).ConfigureAwait(false);
     }
 
-    public Task OnEmptyBatchAsync()
-    {
-        return Task.CompletedTask;
-    }
+    public Task OnEmptyBatchAsync() => Task.CompletedTask;
 
     private async Task SendWithRetryAsync(object payload, int eventCount, int generation)
     {
@@ -154,7 +147,7 @@ internal sealed class PostHogSink(
                     }
                 }
 
-                if (IsTransientError(response.StatusCode))
+                if (response.StatusCode is >= HttpStatusCode.InternalServerError or HttpStatusCode.RequestTimeout)
                 {
                     Debug.WriteLine($"PostHog: Transient error {response.StatusCode}, will retry");
                     if (attempt < _retryOptions.MaxRetryAttempts)
@@ -201,10 +194,6 @@ internal sealed class PostHogSink(
         }
     }
 
-    private static bool IsTransientError(HttpStatusCode statusCode)
-    {
-        return statusCode is >= HttpStatusCode.InternalServerError or HttpStatusCode.RequestTimeout;
-    }
 
     private static TimeSpan? GetRetryAfterDelay(HttpResponseMessage response)
     {

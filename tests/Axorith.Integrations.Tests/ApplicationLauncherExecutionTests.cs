@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using Axorith.Sdk.Logging;
-using Axorith.Sdk.Services;
 using Axorith.Shared.Platform;
 using Xunit;
 
@@ -98,28 +96,6 @@ public sealed class ApplicationLauncherExecutionTests
         public string? FindKnownApp(params string[] processNames) => null;
         public List<AppInfo> FindAppsByPublisher(string publisherName) => [];
         public List<AppInfo> GetInstalledApplicationsIndex() => [];
-    }
-
-    private sealed class EmptySecureStorage : ISecureStorageService
-    {
-        public void StoreSecret(string key, string secret) { }
-        public string? RetrieveSecret(string key) => null;
-        public void DeleteSecret(string key) { }
-    }
-
-    private sealed class NoopNotifier : INotifier
-    {
-        public void ShowToast(string message, NotificationType type = NotificationType.Info) { }
-        public Task ShowSystemAsync(string title, string message, TimeSpan? expiration = null) => Task.CompletedTask;
-    }
-
-    private sealed class TestModuleLogger : IModuleLogger
-    {
-        public void LogDebug(string messageTemplate, params object[] args) { }
-        public void LogInfo(string messageTemplate, params object[] args) { }
-        public void LogWarning(string messageTemplate, params object[] args) { }
-        public void LogError(Exception? exception, string messageTemplate, params object[] args) { }
-        public void LogFatal(Exception? exception, string messageTemplate, params object[] args) { }
     }
 
     private sealed class ImmediateWindowService : IPlatformWindowService

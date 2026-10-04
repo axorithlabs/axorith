@@ -5,18 +5,12 @@ using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
 using Grpc.Net.Client;
-using Grpc.Net.Client.Configuration;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
-using RetryPolicy = Grpc.Net.Client.Configuration.RetryPolicy;
 
 namespace Axorith.Client.CoreSdk;
 
-/// <summary>
-///     gRPC-based implementation of ICoreConnection.
-///     Manages channel lifecycle, automatic reconnection, and delegates to API implementations.
-/// </summary>
 public class GrpcCoreConnection : ICoreConnection
 {
     private readonly string _serverAddress;
@@ -36,13 +30,6 @@ public class GrpcCoreConnection : ICoreConnection
     private GrpcUpdatesApi? _updatesApi;
     private bool _disposed;
 
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="GrpcCoreConnection" /> class.
-    /// </summary>
-    /// <param name="serverAddress">The gRPC server address (e.g., "http://localhost:5901").</param>
-    /// <param name="tokenProvider">The provider for retrieving the authentication token.</param>
-    /// <param name="logger">The logger instance.</param>
-    /// <param name="loggerFactory">The logger factory for creating loggers.</param>
     public GrpcCoreConnection(
         string serverAddress,
         ITokenProvider tokenProvider,
@@ -72,45 +59,35 @@ public class GrpcCoreConnection : ICoreConnection
                 });
     }
 
-    /// <inheritdoc />
     public IPresetsApi Presets =>
         _presetsApi ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public ISessionsApi Sessions => _sessionsApi
                                     ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public IModulesApi Modules => _modulesApi
                                   ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public IDiagnosticsApi Diagnostics => _diagnosticsApi
                                           ?? throw new InvalidOperationException(
                                               "Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public ISchedulerApi Scheduler => _schedulerApi
                                       ?? throw new InvalidOperationException(
                                           "Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public INotificationApi Notifications => _notificationApi
                                              ?? throw new InvalidOperationException(
                                                  "Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public IUpdatesApi Updates => _updatesApi
                                   ?? throw new InvalidOperationException(
                                       "Not connected. Call ConnectAsync first.");
 
-    /// <inheritdoc />
     public ConnectionState State => _stateSubject.Value;
 
-    /// <inheritdoc />
     public IObservable<ConnectionState> StateChanged => _stateSubject.AsObservable();
 
-    /// <inheritdoc />
     public async Task ConnectAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(GrpcCoreConnection));
@@ -140,72 +117,23 @@ public class GrpcCoreConnection : ICoreConnection
                 return Task.CompletedTask;
             });
 
-            ChannelCredentials channelCredentials;
-            GrpcChannelOptions channelOptions;
-
-            if (_serverAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                channelCredentials = ChannelCredentials.Create(ChannelCredentials.SecureSsl, credentials);
-                channelOptions = new GrpcChannelOptions
-                {
-                    MaxReceiveMessageSize = 16 * 1024 * 1024,
-                    MaxSendMessageSize = 16 * 1024 * 1024,
-                    Credentials = channelCredentials,
-                    ServiceConfig = new ServiceConfig
-                    {
-                        MethodConfigs =
-                        {
-                            new MethodConfig
-                            {
-                                Names = { MethodName.Default },
-                                RetryPolicy = new RetryPolicy
-                                {
-                                    MaxAttempts = 5,
-                                    InitialBackoff = TimeSpan.FromSeconds(1),
-                                    MaxBackoff = TimeSpan.FromSeconds(5),
-                                    BackoffMultiplier = 1.5,
-                                    RetryableStatusCodes =
-                                        { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
-                                }
-                            }
-                        }
-                    }
-                };
-            }
-            else
+            var useTls = _serverAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            if (!useTls)
             {
                 _logger.LogWarning(
                     "Using insecure channel for localhost communication. " +
                     "This is acceptable only for local IPC. Never use in production over network.");
-
-                channelCredentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials);
-                channelOptions = new GrpcChannelOptions
-                {
-                    MaxReceiveMessageSize = 16 * 1024 * 1024,
-                    MaxSendMessageSize = 16 * 1024 * 1024,
-                    Credentials = channelCredentials,
-                    UnsafeUseInsecureChannelCallCredentials = true,
-                    ServiceConfig = new ServiceConfig
-                    {
-                        MethodConfigs =
-                        {
-                            new MethodConfig
-                            {
-                                Names = { MethodName.Default },
-                                RetryPolicy = new RetryPolicy
-                                {
-                                    MaxAttempts = 5,
-                                    InitialBackoff = TimeSpan.FromSeconds(1),
-                                    MaxBackoff = TimeSpan.FromSeconds(5),
-                                    BackoffMultiplier = 1.5,
-                                    RetryableStatusCodes =
-                                        { StatusCode.Unavailable, StatusCode.DeadlineExceeded, StatusCode.Internal }
-                                }
-                            }
-                        }
-                    }
-                };
             }
+
+            var channelCredentials = ChannelCredentials.Create(
+                useTls ? ChannelCredentials.SecureSsl : ChannelCredentials.Insecure, credentials);
+            var channelOptions = new GrpcChannelOptions
+            {
+                MaxReceiveMessageSize = 16 * 1024 * 1024,
+                MaxSendMessageSize = 16 * 1024 * 1024,
+                Credentials = channelCredentials,
+                UnsafeUseInsecureChannelCallCredentials = !useTls
+            };
 
             _channel = GrpcChannel.ForAddress(_serverAddress, channelOptions);
 
@@ -243,7 +171,6 @@ public class GrpcCoreConnection : ICoreConnection
         }
     }
 
-    /// <inheritdoc />
     public async Task DisconnectAsync()
     {
         if (State == ConnectionState.Disconnected)
@@ -309,7 +236,6 @@ public class GrpcCoreConnection : ICoreConnection
         _stateSubject.OnNext(newState);
     }
 
-    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         if (_disposed)

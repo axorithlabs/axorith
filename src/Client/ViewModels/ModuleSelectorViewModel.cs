@@ -1,8 +1,9 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using Axorith.Sdk;
 using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
 
 namespace Axorith.Client.ViewModels;
 
@@ -10,22 +11,16 @@ public class ModuleDefinitionViewModel(ModuleDefinition definition) : ReactiveOb
 {
     public ModuleDefinition Definition { get; } = definition;
 
-    public bool IsJustAdded
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool IsJustAdded { get; set; }
 }
 
 public class CategoryViewModel : ReactiveObject
 {
     public string Name { get; }
 
-    public bool IsSelected
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool IsSelected { get; set; }
 
     public CategoryViewModel(string name, bool isSelected = false)
     {
@@ -39,17 +34,11 @@ public class ModuleSelectorViewModel : ReactiveObject
     private readonly IReadOnlyList<ModuleDefinition> _allModules;
     private readonly Action<ModuleDefinition> _onModuleSelected;
 
-    public string SearchText
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public string SearchText { get; set; } = string.Empty;
 
-    public string SelectedCategory
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "All";
+    [Reactive]
+    public string SelectedCategory { get; set; } = "All";
 
     public ObservableCollection<CategoryViewModel> Categories { get; } = [];
 

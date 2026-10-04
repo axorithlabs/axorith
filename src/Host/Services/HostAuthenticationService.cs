@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using Axorith.Contracts;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
@@ -7,16 +7,10 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Services;
 
-public interface IHostAuthenticationService
-{
-    void InitializeToken();
-    bool ValidateToken(string? token);
-}
-
 public class HostAuthenticationService(
     IOptions<Configuration> options,
     IFilePermissionsService filePermissionsService,
-    ILogger<HostAuthenticationService> logger) : IHostAuthenticationService
+    ILogger<HostAuthenticationService> logger)
 {
     private string _currentToken = string.Empty;
 

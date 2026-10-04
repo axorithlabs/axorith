@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
 
 namespace Axorith.Client.ViewModels;
 
@@ -7,17 +8,11 @@ public class ErrorViewModel : ReactiveObject
 {
     private Func<Task>? _retryCallback;
 
-    public string ErrorMessage
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public string ErrorMessage { get; set; } = string.Empty;
 
-    public bool IsRetrying
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool IsRetrying { get; set; }
 
     public ICommand? RetryCommand { get; private set; }
 

@@ -1,18 +1,13 @@
 using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
 
 namespace Axorith.Client.ViewModels;
 
 public class LoadingViewModel : ReactiveObject
 {
-    public string Message
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "Connecting to Axorith Host...";
+    [Reactive]
+    public string Message { get; set; } = "Connecting to Axorith Host...";
 
-    public string? SubMessage
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public string? SubMessage { get; set; }
 }

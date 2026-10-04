@@ -109,7 +109,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true);
             _ = key ?? throw new InvalidOperationException("The current user's startup settings are not writable.");
-            if (IsRecoveryStartupEntryInUse(key.GetValue(RunValueName)))
+            if (key.GetValue(RunValueName) is not null)
             {
                 throw new InvalidOperationException("The Axorith recovery startup entry is already in use.");
             }
@@ -143,7 +143,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
                 var recoveryCommand = $"\"{Path.GetFullPath(executablePath)}\"";
                 using var existingKey = Registry.CurrentUser.OpenSubKey(RunKey);
                 var existingValue = existingKey?.GetValue(RunValueName);
-                if (IsRecoveryStartupEntryInUse(existingValue) && !IsRecoveryStartupCommand(existingValue))
+                if (existingValue is not null && !IsRecoveryStartupCommand(existingValue))
                 {
                     throw new InvalidOperationException("The Axorith recovery startup entry is already in use.");
                 }
@@ -325,7 +325,6 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     private static string GetRecoveryCommand() =>
         $"\"{Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Axorith.Host.exe"))}\"";
 
-    private static bool IsRecoveryStartupEntryInUse(object? value) => value is not null;
 
     private static bool IsRecoveryStartupCommand(object? value) =>
         value is string command && string.Equals(command, GetRecoveryCommand(), StringComparison.OrdinalIgnoreCase);

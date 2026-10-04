@@ -1,4 +1,4 @@
-﻿# Contributing to Axorith
+# Contributing to Axorith
 
 First off, thank you for considering contributing. It’s people like you that make open-source projects and ambitious visions a reality.
 

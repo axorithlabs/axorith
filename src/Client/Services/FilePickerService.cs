@@ -1,10 +1,9 @@
-﻿using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
-using Axorith.Client.Services.Abstractions;
 
 namespace Axorith.Client.Services;
 
-public class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop) : IFilePickerService
+public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime desktop)
 {
     private IStorageProvider? StorageProvider => desktop.MainWindow?.StorageProvider;
 

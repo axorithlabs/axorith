@@ -1,4 +1,4 @@
-﻿namespace Axorith.Sdk;
+namespace Axorith.Sdk;
 
 /// <summary>
 ///     Represents the result of a module's settings validation.
@@ -29,16 +29,11 @@ public class ValidationResult
     /// <summary>
     ///     Creates a new failed validation result with a specific global error message.
     /// </summary>
-    public static ValidationResult Fail(string errorMessage)
-    {
-        return new ValidationResult(ValidationStatus.Error, errorMessage);
-    }
+    public static ValidationResult Fail(string errorMessage) => new ValidationResult(ValidationStatus.Error, errorMessage);
 
     /// <summary>
     ///     Creates a new failed validation result with specific field errors.
     /// </summary>
-    /// <param name="fieldErrors">Dictionary of setting keys and error messages.</param>
-    /// <param name="globalMessage">Optional global message.</param>
     public static ValidationResult Fail(IDictionary<string, string> fieldErrors,
         string globalMessage = "Validation failed")
     {
@@ -48,10 +43,7 @@ public class ValidationResult
     /// <summary>
     ///     Creates a new warning validation result.
     /// </summary>
-    public static ValidationResult Warn(string warningMessage)
-    {
-        return new ValidationResult(ValidationStatus.Warning, warningMessage);
-    }
+    public static ValidationResult Warn(string warningMessage) => new ValidationResult(ValidationStatus.Warning, warningMessage);
 
     private ValidationResult(ValidationStatus status, string message, IDictionary<string, string>? fieldErrors = null)
     {

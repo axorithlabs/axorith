@@ -45,64 +45,34 @@ public class SettingBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public void SetTextValue()
-    {
-        _textSetting.SetValue("new value");
-    }
+    public void SetTextValue() => _textSetting.SetValue("new value");
 
     [Benchmark]
-    public void SetIntValue()
-    {
-        _intSetting.SetValue(42);
-    }
+    public void SetIntValue() => _intSetting.SetValue(42);
 
     [Benchmark]
-    public void SetBoolValue()
-    {
-        _boolSetting.SetValue(true);
-    }
+    public void SetBoolValue() => _boolSetting.SetValue(true);
 
     [Benchmark]
-    public string GetTextValue()
-    {
-        return _textSetting.GetCurrentValue();
-    }
+    public string GetTextValue() => _textSetting.GetCurrentValue();
 
     [Benchmark]
-    public int GetIntValue()
-    {
-        return _intSetting.GetCurrentValue();
-    }
+    public int GetIntValue() => _intSetting.GetCurrentValue();
 
     [Benchmark]
-    public void SetValueFromString()
-    {
-        ((ISetting)_intSetting).SetValueFromString("123");
-    }
+    public void SetValueFromString() => ((ISetting)_intSetting).SetValueFromString("123");
 
     [Benchmark]
-    public string GetValueAsString()
-    {
-        return ((ISetting)_intSetting).GetValueAsString();
-    }
+    public string GetValueAsString() => ((ISetting)_intSetting).GetValueAsString();
 
     [Benchmark]
-    public void SetLabel()
-    {
-        _textSetting.SetLabel("New Label");
-    }
+    public void SetLabel() => _textSetting.SetLabel("New Label");
 
     [Benchmark]
-    public void SetVisibility()
-    {
-        _textSetting.SetVisibility(false);
-    }
+    public void SetVisibility() => _textSetting.SetVisibility(false);
 
     [Benchmark]
-    public void SetReadOnly()
-    {
-        _textSetting.SetReadOnly(true);
-    }
+    public void SetReadOnly() => _textSetting.SetReadOnly(true);
 
     [Benchmark]
     public void SetChoices()

@@ -6,10 +6,7 @@ using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.OBS;
 
-/// <summary>
-///     Service for communicating with OBS via WebSocket (obs-websocket 5.x protocol).
-/// </summary>
-internal sealed class ObsWebSocketService(IModuleLogger logger, Settings settings) : IObsWebSocketService
+internal sealed class ObsWebSocketService(IModuleLogger logger, Settings settings)
 {
     private ClientWebSocket? _webSocket;
     private int _messageId;
@@ -113,35 +110,17 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
         _isConnected = false;
     }
 
-    public Task<bool> StartStreamingAsync(CancellationToken ct = default)
-    {
-        return SendRequestAsync("StartStream", null, ct);
-    }
+    public Task<bool> StartStreamingAsync(CancellationToken ct = default) => SendRequestAsync("StartStream", null, ct);
 
-    public Task<bool> StopStreamingAsync(CancellationToken ct = default)
-    {
-        return SendRequestAsync("StopStream", null, ct);
-    }
+    public Task<bool> StopStreamingAsync(CancellationToken ct = default) => SendRequestAsync("StopStream", null, ct);
 
-    public Task<bool> StartRecordingAsync(CancellationToken ct = default)
-    {
-        return SendRequestAsync("StartRecord", null, ct);
-    }
+    public Task<bool> StartRecordingAsync(CancellationToken ct = default) => SendRequestAsync("StartRecord", null, ct);
 
-    public Task<bool> StopRecordingAsync(CancellationToken ct = default)
-    {
-        return SendRequestAsync("StopRecord", null, ct);
-    }
+    public Task<bool> StopRecordingAsync(CancellationToken ct = default) => SendRequestAsync("StopRecord", null, ct);
 
-    public Task<bool> StartVirtualCameraAsync(CancellationToken ct = default)
-    {
-        return SendRequestAsync("StartVirtualCam", null, ct);
-    }
+    public Task<bool> StartVirtualCameraAsync(CancellationToken ct = default) => SendRequestAsync("StartVirtualCam", null, ct);
 
-    public Task<bool> StopVirtualCameraAsync(CancellationToken ct = default)
-    {
-        return SendRequestAsync("StopVirtualCam", null, ct);
-    }
+    public Task<bool> StopVirtualCameraAsync(CancellationToken ct = default) => SendRequestAsync("StopVirtualCam", null, ct);
 
     private async Task<bool> SendRequestAsync(string requestType, object? requestData,
         CancellationToken cancellationToken)
@@ -236,8 +215,5 @@ internal sealed class ObsWebSocketService(IModuleLogger logger, Settings setting
         return Convert.ToBase64String(authHash);
     }
 
-    public void Dispose()
-    {
-        _webSocket?.Dispose();
-    }
+    public void Dispose() => _webSocket?.Dispose();
 }

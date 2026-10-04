@@ -8,7 +8,7 @@ internal sealed class JetBrainsIDEApp(
     IModuleLogger logger,
     IAppDiscoveryService appDiscovery,
     IPlatformProcessService processService,
-    IPlatformWindowService windowService) : LauncherAppBase(logger, processService, windowService), ILauncherApp
+    IPlatformWindowService windowService) : LauncherAppBase(logger, processService, windowService)
 {
     private readonly Settings _settings = new(appDiscovery);
 

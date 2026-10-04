@@ -2,8 +2,6 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
-using Axorith.Sdk.Logging;
-using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform;
 using Xunit;
@@ -22,7 +20,7 @@ public sealed class SiteBlockerAllowListTests
     public void FirefoxInstallActionIsAvailableAndChromeInstallIsNotOffered()
     {
         using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
         var actions = module.GetActions();
 
         try
@@ -41,7 +39,7 @@ public sealed class SiteBlockerAllowListTests
     public void CategorySettingLoadsChoicesFromModuleData()
     {
         using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
 
         var categories = module.GetSettings().Single(setting => setting.Key == "Categories");
         var choices = categories.GetCurrentChoices();
@@ -56,7 +54,7 @@ public sealed class SiteBlockerAllowListTests
     public async Task MissingBrowserExtensionConnectionProducesAWarning()
     {
         using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
 
         var validation = await module.ValidateSettingsAsync(CancellationToken.None);
 
@@ -68,7 +66,7 @@ public sealed class SiteBlockerAllowListTests
     public async Task EmptyAllowListIsValidatedAndSentToBrowserExtensions()
     {
         using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new TestNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
         ((Setting<string>)module.GetSettings().Single(setting => setting.Key == "Mode")).SetValue("AllowList");
         ((Setting<List<string>>)module.GetSettings().Single(setting => setting.Key == "Categories")).SetValue([]);
         ((Setting<string>)module.GetSettings().Single(setting => setting.Key == "CustomSites")).SetValue(string.Empty);
@@ -146,21 +144,6 @@ public sealed class SiteBlockerAllowListTests
     }
 
     private sealed record ExtensionRequest(string Command, string? Mode, string[] Sites);
-
-    private sealed class TestModuleLogger : IModuleLogger
-    {
-        public void LogDebug(string messageTemplate, params object[] args) { }
-        public void LogInfo(string messageTemplate, params object[] args) { }
-        public void LogWarning(string messageTemplate, params object[] args) { }
-        public void LogError(Exception? exception, string messageTemplate, params object[] args) { }
-        public void LogFatal(Exception? exception, string messageTemplate, params object[] args) { }
-    }
-
-    private sealed class TestNotifier : INotifier
-    {
-        public void ShowToast(string message, NotificationType type = NotificationType.Info) { }
-        public Task ShowSystemAsync(string title, string message, TimeSpan? expiration = null) => Task.CompletedTask;
-    }
 
     private sealed class RecordingProcessBlocker : IProcessBlocker
     {

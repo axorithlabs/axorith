@@ -1,129 +1,45 @@
-using Axorith.Sdk;
-using Axorith.Sdk.Actions;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.JetBrainsIDE;
 
-internal sealed class Settings : LauncherSettingsBase
+internal sealed class Settings(IAppDiscoveryService appDiscovery) : ProjectLauncherSettingsBase(
+    Setting.AsChoice(
+        "IDEPath",
+        "IDE Executable",
+        string.Empty,
+        [new KeyValuePair<string, string>("", "Scanning for IDEs...")],
+        "Select installed JetBrains IDE or enter custom path."),
+    Setting.AsFilePicker("ProjectPath", "Project Path", "", "Path to the solution or project directory to open in IDE."),
+    "Additional command-line arguments to pass to the IDE.")
 {
-    public override Setting<string> ApplicationPath => IdePath;
-
-    public Setting<string> IdePath { get; }
-    public Setting<string> ProjectPath { get; }
-    public Setting<string> ApplicationArgs { get; }
-
-    private readonly IAppDiscoveryService _appDiscovery;
-
-    public Settings(IAppDiscoveryService appDiscovery)
-    {
-        _appDiscovery = appDiscovery;
-
-        IdePath = Setting.AsChoice(
-            key: "IDEPath",
-            label: "IDE Executable",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Scanning for IDEs...")],
-            description: "Select installed JetBrains IDE or enter custom path."
-        );
-
-        ProjectPath = Setting.AsFilePicker(
-            key: "ProjectPath",
-            label: "Project Path",
-            defaultValue: "",
-            description: "Path to the solution or project directory to open in IDE."
-        );
-
-        ApplicationArgs = Setting.AsText(
-            key: "ApplicationArgs",
-            label: "Launch Arguments",
-            description: "Additional command-line arguments to pass to the IDE.",
-            defaultValue: ""
-        );
-
-        SetupBaseReactiveVisibility();
-    }
-
-    protected override IEnumerable<ISetting> GetAdditionalSettingsBeforeBase()
-    {
-        yield return ProjectPath;
-    }
-
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield return ApplicationArgs;
-    }
-
-    protected override IEnumerable<IAction> GetAdditionalActions() => [];
-
-    protected override Task InitializeAdditionalAsync()
-    {
-        return RefreshIdeListAsync();
-    }
-
-    protected override void SetupAdditionalReactiveVisibility()
-    {
-        ProcessMode.Value.Subscribe(mode =>
-        {
-            var showArgs = mode is "LaunchNew" or "LaunchOrAttach";
-            ApplicationArgs.SetVisibility(showArgs);
-        });
-    }
-
-    protected override Task<ValidationResult> ValidateAdditionalAsync()
-    {
-        var projectPath = ProjectPath.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(projectPath))
-        {
-            return Task.FromResult(ValidationResult.Fail(
-                new Dictionary<string, string> { [ProjectPath.Key] = "Project path is required." },
-                "Project path is required."));
-        }
-
-        if (!Directory.Exists(projectPath) && !File.Exists(projectPath))
-        {
-            return Task.FromResult(ValidationResult.Fail(
-                new Dictionary<string, string> { [ProjectPath.Key] = $"Path not found: '{projectPath}'." },
-                "Project path not found."));
-        }
-
-        return Task.FromResult(ValidationResult.Success);
-    }
+    protected override Task InitializeAdditionalAsync() => RefreshIdeListAsync();
+    protected override bool ProjectPathExists(string path) => Directory.Exists(path) || File.Exists(path);
 
     private async Task RefreshIdeListAsync()
     {
-        var apps = await Task.Run(() => _appDiscovery.FindAppsByPublisher("JetBrains")).ConfigureAwait(false);
-
-        var choices =
-            (from app in apps
-                where !app.Name.Contains("Toolbox", StringComparison.OrdinalIgnoreCase)
-                select new KeyValuePair<string, string>(app.ExecutablePath, app.Name)).ToList();
+        var apps = await Task.Run(() => appDiscovery.FindAppsByPublisher("JetBrains")).ConfigureAwait(false);
+        var choices = apps
+            .Where(app => !app.Name.Contains("Toolbox", StringComparison.OrdinalIgnoreCase))
+            .Select(app => new KeyValuePair<string, string>(app.ExecutablePath, app.Name))
+            .ToList();
 
         if (choices.Count == 0)
         {
-            choices.Add(new KeyValuePair<string, string>("", "No JetBrains IDEs found"));
+            choices.Add(new("", "No JetBrains IDEs found"));
         }
 
-        var current = IdePath.GetCurrentValue();
-        if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
+        var current = ApplicationPath.GetCurrentValue();
+        if (!string.IsNullOrEmpty(current) && choices.All(choice => choice.Key != current))
         {
-            choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
+            choices.Insert(0, new(current, $"{current} (Custom)"));
         }
 
-        IdePath.SetChoices(choices);
-
-        if (string.IsNullOrEmpty(current) && choices.Count > 0 && !string.IsNullOrEmpty(choices[0].Key))
+        ApplicationPath.SetChoices(choices);
+        if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(choices[0].Key))
         {
-            IdePath.SetValue(choices[0].Key);
+            ApplicationPath.SetValue(choices[0].Key);
         }
-    }
-
-    public override void Dispose()
-    {
-        IdePath.Dispose();
-        ProjectPath.Dispose();
-        ApplicationArgs.Dispose();
-        base.Dispose();
     }
 }

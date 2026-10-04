@@ -1,16 +1,27 @@
 <Project>
-    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+    <Import Project="../Directory.Build.props" />
 
-    <PropertyGroup>
-        <BaseOutputPath>$(SolutionDir)build/$(BuildConfiguration)/Tests/$(MSBuildProjectName)/</BaseOutputPath>
-        <OutputPath>$(BaseOutputPath)</OutputPath>
-        <BaseIntermediateOutputPath>$(BaseOutputPath)obj/</BaseIntermediateOutputPath>
-        <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
-        <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
-
+    <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Axorith.Benchmarks'">
         <IsTestProject>true</IsTestProject>
-        <IsPackable>false</IsPackable>
-        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
-</Project>
 
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Axorith.Core.Tests' or '$(MSBuildProjectName)' == 'Axorith.Sdk.Tests' or '$(MSBuildProjectName)' == 'Axorith.Shared.Tests'">
+        <CollectCoverage>true</CollectCoverage>
+        <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+        <CoverletOutput>$(OutputPath)coverage.cobertura.xml</CoverletOutput>
+        <ExcludeByFile>**/obj/**/*.*;**/bin/**/*.*</ExcludeByFile>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(CollectCoverage)' == 'true'">
+        <PackageReference Include="coverlet.collector"  PrivateAssets="all"
+                          IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+        <PackageReference Include="FluentAssertions"  />
+        <PackageReference Include="Microsoft.NET.Test.Sdk"  />
+        <PackageReference Include="xunit"  />
+        <PackageReference Include="xunit.runner.visualstudio"  PrivateAssets="all"
+                          IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+    </ItemGroup>
+</Project>

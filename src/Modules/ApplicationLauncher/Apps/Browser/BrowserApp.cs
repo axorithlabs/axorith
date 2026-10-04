@@ -5,22 +5,16 @@ using Axorith.Shared.Platform;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Browser;
 
-/// <summary>
-///     Application service for launching web browsers with configurable options.
-///     Supports profile selection, incognito mode, and custom URLs.
-/// </summary>
 internal sealed class BrowserApp(
     IModuleLogger logger,
     IAppDiscoveryService appDiscovery,
     IPlatformProcessService processService,
-    IPlatformWindowService windowService) : LauncherAppBase(logger, processService, windowService), ILauncherApp
+    IPlatformWindowService windowService) : LauncherAppBase(logger, processService, windowService)
 {
     private readonly Settings _settings = new(appDiscovery);
 
-    /// <inheritdoc />
     protected override LauncherSettingsBase Settings => _settings;
 
-    /// <inheritdoc />
     protected override string GetLaunchArguments()
     {
         var args = new StringBuilder();
@@ -124,7 +118,6 @@ internal sealed class BrowserApp(
         return uri.AbsoluteUri;
     }
 
-    /// <inheritdoc />
     protected override WindowConfigTimings GetWindowConfigTimings()
     {
         return new WindowConfigTimings(

@@ -55,7 +55,6 @@ public interface ISetting
     /// <summary>
     ///     Sets the value from a boxed object, attempting safe conversion when possible.
     /// </summary>
-    /// <param name="value">The new value as object.</param>
     void SetValueFromObject(object? value);
 
     /// <summary>
@@ -112,6 +111,5 @@ public interface ISetting
     /// <summary>
     ///     Used by the Core to populate the setting's value from a saved preset.
     /// </summary>
-    /// <param name="value">The string value from the preset file.</param>
     void SetValueFromString(string? value);
 }

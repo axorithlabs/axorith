@@ -159,30 +159,39 @@ public sealed partial class TelemetryService : ITelemetryService
 
     public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null)
     {
-        lock (_flushLock)
+        try
         {
-            if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0)
+            lock (_flushLock)
             {
-                return;
-            }
+                if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0)
+                {
+                    return;
+                }
 
-            var name = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
-            if (!EventNameRegex().IsMatch(name))
-            {
-                return;
-            }
+                var name = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
+                if (!EventNameRegex().IsMatch(name))
+                {
+                    return;
+                }
 
-            var safeProperties = properties is null
-                ? new Dictionary<string, object?>()
-                : TelemetryEventSanitizer.SanitizeProperties(properties);
-            var logProperties = new List<LogEventProperty>(_baseProperties)
-            {
-                new(TelemetryConstants.Properties.EventName, new ScalarValue(name)),
-                new(TelemetryConstants.Properties.PreferenceGeneration,
-                    new ScalarValue(Volatile.Read(ref _preferenceGeneration)))
-            };
-            logProperties.AddRange(ConvertProperties(safeProperties));
-            _logger!.Write(CreateLogEvent(name, logProperties));
+                var safeProperties = properties is null
+                    ? new Dictionary<string, object?>()
+                    : TelemetryEventSanitizer.SanitizeProperties(properties);
+                var logProperties = new List<LogEventProperty>(_baseProperties)
+                {
+                    new(TelemetryConstants.Properties.EventName, new ScalarValue(name)),
+                    new(TelemetryConstants.Properties.PreferenceGeneration,
+                        new ScalarValue(Volatile.Read(ref _preferenceGeneration)))
+                };
+                logProperties.AddRange(safeProperties.Select(pair =>
+                    new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value))));
+                _logger!.Write(new LogEvent(DateTimeOffset.UtcNow, LogEventLevel.Information, null,
+                    _templateParser.Parse(name), logProperties));
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Telemetry event '{eventName}' was dropped: {ex.GetType().Name}");
         }
     }
 
@@ -354,16 +363,6 @@ public sealed partial class TelemetryService : ITelemetryService
             .ToArray();
     }
 
-    private IEnumerable<LogEventProperty> ConvertProperties(IReadOnlyDictionary<string, object?> properties)
-    {
-        foreach (var (key, value) in properties)
-        {
-            yield return new LogEventProperty(key, ConvertToPropertyValue(value));
-        }
-    }
-
-    private LogEvent CreateLogEvent(string name, IEnumerable<LogEventProperty> properties) =>
-        new(DateTimeOffset.UtcNow, LogEventLevel.Information, null, _templateParser.Parse(name), properties);
 
     private static LogEventPropertyValue ConvertToPropertyValue(object? value) => value switch
     {
@@ -387,6 +386,8 @@ public sealed partial class TelemetryService : ITelemetryService
 
 public sealed class NoopTelemetryService : ITelemetryService
 {
+    public static NoopTelemetryService Instance { get; } = new();
+
     public bool IsEnabled => false;
     public void SetEnabled(bool enabled) { }
     public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null) { }

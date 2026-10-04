@@ -1,19 +1,13 @@
-using Autofac;
 using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
-using Axorith.Telemetry;
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Axorith.Core.Tests.Services;
 
-/// <summary>
-///     Negative tests for SessionManager - validation failures, timeouts, rollback scenarios
-/// </summary>
 public class SessionManagerNegativeTests
 {
     private readonly Mock<IModuleRegistry> _mockRegistry;
@@ -22,162 +16,45 @@ public class SessionManagerNegativeTests
     public SessionManagerNegativeTests()
     {
         _mockRegistry = new Mock<IModuleRegistry>();
-        _sessionManager = new SessionManager(
-            _mockRegistry.Object,
-            NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5),
-            TimeSpan.FromSeconds(30),
-            TimeSpan.FromSeconds(10),
-            new NoopTelemetryService()
-        );
+        _sessionManager = SessionManagerTestFactory.CreateManager(_mockRegistry.Object);
     }
 
     [Fact]
-    public async Task StartSessionAsync_WithValidationFailure_ShouldRollbackAndStop()
-    {
-        // Arrange
-        var moduleId = Guid.NewGuid();
-        var mockModule = CreateMockModule();
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ValidationResult.Fail("Validation failed"));
-
-        var definition = CreateModuleDefinition(moduleId, mockModule.Object.GetType());
-        var (instance, scope) = CreateInstanceTuple(mockModule.Object, definition);
-        _mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((instance, scope));
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        // Act & Assert
-        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
-            .Should()
-            .ThrowAsync<SessionException>();
-
-        _sessionManager.IsSessionRunning.Should().BeFalse();
-    }
+    public Task StartSessionAsync_WithValidationFailure_ShouldRollbackAndStop() =>
+        AssertStartFailsAsync(module => module.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ValidationResult.Fail("Validation failed")));
 
     [Fact]
-    public async Task StartSessionAsync_WithOnSessionStartException_ShouldRollback()
-    {
-        // Arrange
-        var moduleId = Guid.NewGuid();
-        var mockModule = CreateMockModule();
-        mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Module start failed"));
-
-        var definition = CreateModuleDefinition(moduleId, mockModule.Object.GetType());
-        var (instance, scope) = CreateInstanceTuple(mockModule.Object, definition);
-        _mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((instance, scope));
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        // Act & Assert
-        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
-            .Should()
-            .ThrowAsync<SessionException>();
-
-        _sessionManager.IsSessionRunning.Should().BeFalse();
-    }
+    public Task StartSessionAsync_WithOnSessionStartException_ShouldRollback() =>
+        AssertStartFailsAsync(module => module.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Module start failed")));
 
     [Fact]
-    public async Task StartSessionAsync_WithValidationTimeout_ShouldRollback()
-    {
-        // Arrange
-        var moduleId = Guid.NewGuid();
-        var mockModule = CreateMockModule();
-        // Simulate timeout immediately by throwing OperationCanceledException
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException());
-
-        var definition = CreateModuleDefinition(moduleId, mockModule.Object.GetType());
-        var (instance, scope) = CreateInstanceTuple(mockModule.Object, definition);
-        _mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((instance, scope));
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        // Act & Assert
-        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
-            .Should()
-            .ThrowAsync<SessionException>();
-
-        _sessionManager.IsSessionRunning.Should().BeFalse();
-    }
+    public Task StartSessionAsync_WithValidationTimeout_ShouldRollback() =>
+        AssertStartFailsAsync(module => module.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException()));
 
     [Fact]
-    public async Task StartSessionAsync_WithSessionStartTimeout_ShouldRollback()
-    {
-        // Arrange
-        var moduleId = Guid.NewGuid();
-        var mockModule = CreateMockModule();
-        // Simulate startup timeout via immediate OperationCanceledException
-        mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException());
-
-        var definition = CreateModuleDefinition(moduleId, mockModule.Object.GetType());
-        var (instance, scope) = CreateInstanceTuple(mockModule.Object, definition);
-        _mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((instance, scope));
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        // Act & Assert
-        await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
-            .Should()
-            .ThrowAsync<SessionException>();
-
-        _sessionManager.IsSessionRunning.Should().BeFalse();
-    }
+    public Task StartSessionAsync_WithSessionStartTimeout_ShouldRollback() =>
+        AssertStartFailsAsync(module => module.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException()));
 
     [Fact]
     public async Task StartSessionAsync_WithMultipleModules_OneFailsValidation_ShouldRollback()
     {
-        // Arrange
         var idGood = Guid.NewGuid();
         var idBad = Guid.NewGuid();
 
-        var goodModule = CreateMockModule();
-        var badModule = CreateMockModule();
+        var goodModule = SessionManagerTestFactory.CreateModule();
+        var badModule = SessionManagerTestFactory.CreateModule();
 
         badModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Fail("Bad module validation failed"));
+        SessionManagerTestFactory.Register(_mockRegistry, goodModule, idGood);
+        SessionManagerTestFactory.Register(_mockRegistry, badModule, idBad);
 
-        var goodDef = CreateModuleDefinition(idGood, goodModule.Object.GetType());
-        var badDef = CreateModuleDefinition(idBad, badModule.Object.GetType());
-        var goodInst = CreateInstanceTuple(goodModule.Object, goodDef);
-        var badInst = CreateInstanceTuple(badModule.Object, badDef);
-        _mockRegistry.Setup(r => r.CreateInstance(idGood)).Returns(goodInst);
-        _mockRegistry.Setup(r => r.CreateInstance(idBad)).Returns(badInst);
+        var preset = SessionManagerTestFactory.CreatePreset(idGood, idBad);
 
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules =
-            [
-                new ConfiguredModule { ModuleId = idGood },
-                new ConfiguredModule { ModuleId = idBad }
-            ]
-        };
-
-        // Act & Assert
         await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
             .Should()
             .ThrowAsync<SessionException>();
@@ -188,12 +65,11 @@ public class SessionManagerNegativeTests
     [Fact]
     public async Task StartSessionAsync_WithMultipleModules_OneFailsStart_ShouldRollbackAndStopStartedOnes()
     {
-        // Arrange
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
 
-        var module1 = CreateMockModule();
-        var module2 = CreateMockModule();
+        var module1 = SessionManagerTestFactory.CreateModule();
+        var module2 = SessionManagerTestFactory.CreateModule();
 
         var module1Stopped = false;
         module1.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
@@ -202,26 +78,11 @@ public class SessionManagerNegativeTests
 
         module2.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Module 2 failed"));
+        SessionManagerTestFactory.Register(_mockRegistry, module1, id1);
+        SessionManagerTestFactory.Register(_mockRegistry, module2, id2);
 
-        var def1 = CreateModuleDefinition(id1, module1.Object.GetType());
-        var def2 = CreateModuleDefinition(id2, module2.Object.GetType());
-        var inst1 = CreateInstanceTuple(module1.Object, def1);
-        var inst2 = CreateInstanceTuple(module2.Object, def2);
-        _mockRegistry.Setup(r => r.CreateInstance(id1)).Returns(inst1);
-        _mockRegistry.Setup(r => r.CreateInstance(id2)).Returns(inst2);
+        var preset = SessionManagerTestFactory.CreatePreset(id1, id2);
 
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules =
-            [
-                new ConfiguredModule { ModuleId = id1 },
-                new ConfiguredModule { ModuleId = id2 }
-            ]
-        };
-
-        // Act & Assert
         await _sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
             .Should()
             .ThrowAsync<SessionException>();
@@ -233,12 +94,11 @@ public class SessionManagerNegativeTests
     [Fact]
     public async Task StopCurrentSessionAsync_WithModuleException_ShouldStillStopOthers()
     {
-        // Arrange
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
 
-        var module1 = CreateMockModule();
-        var module2 = CreateMockModule();
+        var module1 = SessionManagerTestFactory.CreateModule();
+        var module2 = SessionManagerTestFactory.CreateModule();
 
         var module2Stopped = false;
 
@@ -248,72 +108,30 @@ public class SessionManagerNegativeTests
         module2.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .Callback(() => module2Stopped = true)
             .Returns(Task.CompletedTask);
+        SessionManagerTestFactory.Register(_mockRegistry, module1, id1);
+        SessionManagerTestFactory.Register(_mockRegistry, module2, id2);
 
-        var def1 = CreateModuleDefinition(id1, module1.Object.GetType());
-        var def2 = CreateModuleDefinition(id2, module2.Object.GetType());
-        var inst1 = CreateInstanceTuple(module1.Object, def1);
-        var inst2 = CreateInstanceTuple(module2.Object, def2);
-        _mockRegistry.Setup(r => r.CreateInstance(id1)).Returns(inst1);
-        _mockRegistry.Setup(r => r.CreateInstance(id2)).Returns(inst2);
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules =
-            [
-                new ConfiguredModule { ModuleId = id1 },
-                new ConfiguredModule { ModuleId = id2 }
-            ]
-        };
+        var preset = SessionManagerTestFactory.CreatePreset(id1, id2);
 
         await _sessionManager.StartSessionAsync(preset);
 
-        // Act
         var stoppedTcs = new TaskCompletionSource();
         _sessionManager.SessionStopped += _ => stoppedTcs.TrySetResult();
         await _sessionManager.StopCurrentSessionAsync();
         await stoppedTcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        // Assert
         module2Stopped.Should().BeTrue("Module 2 should still be stopped despite Module 1 failure");
         _sessionManager.IsSessionRunning.Should().BeFalse();
     }
-
-    private static Mock<IModule> CreateMockModule()
+    private async Task AssertStartFailsAsync(Action<Mock<IModule>> configure)
     {
-        var mock = new Mock<IModule>();
+        var module = SessionManagerTestFactory.CreateModule();
+        configure(module);
+        var preset = SessionManagerTestFactory.CreatePreset(SessionManagerTestFactory.Register(_mockRegistry, module));
 
-        mock.Setup(m => m.GetSettings()).Returns([]);
-        mock.Setup(m => m.GetActions()).Returns([]);
-        mock.Setup(m => m.InitializeAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mock.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mock.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mock.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ValidationResult.Success);
-
-        return mock;
+        await _sessionManager.Invoking(manager => manager.StartSessionAsync(preset))
+            .Should().ThrowAsync<SessionException>();
+        _sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
-    private static ModuleDefinition CreateModuleDefinition(Guid id, Type moduleType)
-    {
-        return new ModuleDefinition
-        {
-            Id = id,
-            Name = "Test",
-            Platforms = [Platform.Windows],
-            ModuleType = moduleType
-        };
-    }
-
-    private static (IModule Instance, ILifetimeScope Scope) CreateInstanceTuple(IModule module,
-        ModuleDefinition definition)
-    {
-        var root = new ContainerBuilder().Build();
-        var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
-        return (module, scope);
-    }
 }

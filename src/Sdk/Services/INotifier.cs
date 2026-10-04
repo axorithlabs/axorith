@@ -1,4 +1,4 @@
-﻿namespace Axorith.Sdk.Services;
+namespace Axorith.Sdk.Services;
 
 /// <summary>
 ///     Defines the types of notifications available in the system.
@@ -37,8 +37,6 @@ public interface INotifier
     ///     These are intended for immediate feedback when the user is interacting with the application.
     ///     If no client UI is connected, these messages may be discarded or logged.
     /// </summary>
-    /// <param name="message">The message body.</param>
-    /// <param name="type">The severity/style of the notification.</param>
     void ShowToast(string message, NotificationType type = NotificationType.Info);
 
     /// <summary>Shows a toast under its originating feature category.</summary>
@@ -48,9 +46,6 @@ public interface INotifier
     ///     Shows a persistent, system-level notification (e.g., Windows Action Center).
     ///     These are intended for background events when the user might not be looking at the application.
     /// </summary>
-    /// <param name="title">The notification title.</param>
-    /// <param name="message">The notification body.</param>
-    /// <param name="expiration">Optional expiration time.</param>
     Task ShowSystemAsync(string title, string message, TimeSpan? expiration = null);
 
     /// <summary>Shows a persistent notification under its originating feature category.</summary>

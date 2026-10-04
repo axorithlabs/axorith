@@ -28,6 +28,7 @@ internal sealed class AuthService : IDisposable
 
     private const string RefreshTokenKey = "SpotifyRefreshToken";
     private const string SpotifyClientId = "b9335aa114364ba8b957b44d33bb735d";
+    private const string TokenEndpoint = "https://accounts.spotify.com/api/token";
 
     private static readonly int[] AllowedPorts = [.. Enumerable.Range(8888, 8)]; // 8888 to 8895
     private const string RedirectPath = "/callback/";
@@ -65,15 +66,9 @@ internal sealed class AuthService : IDisposable
             .DisposeWith(_disposables);
     }
 
-    public bool HasRefreshToken()
-    {
-        return !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
-    }
+    public bool HasRefreshToken() => !string.IsNullOrWhiteSpace(_secureStorage.RetrieveSecret(RefreshTokenKey));
 
-    public void RefreshUiState()
-    {
-        UpdateUiForAuthenticationState(HasRefreshToken());
-    }
+    public void RefreshUiState() => UpdateUiForAuthenticationState(HasRefreshToken());
 
     public async Task<string?> GetValidAccessTokenAsync()
     {
@@ -102,24 +97,12 @@ internal sealed class AuthService : IDisposable
 
             try
             {
-                var content = new FormUrlEncodedContent(new Dictionary<string, string>
+                using var jsonDoc = await RequestTokenAsync(new Dictionary<string, string>
                 {
                     { "grant_type", "refresh_token" },
                     { "refresh_token", refreshToken },
                     { "client_id", SpotifyClientId }
                 });
-
-                using var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token")
-                {
-                    Content = content
-                };
-
-                using var httpResponse = await _authClient.SendAsync(request);
-                httpResponse.EnsureSuccessStatusCode();
-
-                var responseJson = await httpResponse.Content.ReadAsStringAsync();
-
-                using var jsonDoc = JsonDocument.Parse(responseJson);
                 var newAccessToken = jsonDoc.RootElement.GetProperty("access_token").GetString();
                 var expiresInSeconds = jsonDoc.RootElement.TryGetProperty("expires_in", out var expiresInElement)
                     ? expiresInElement.GetInt32()
@@ -356,7 +339,7 @@ internal sealed class AuthService : IDisposable
 
             try
             {
-                var content = new FormUrlEncodedContent(new Dictionary<string, string>
+                using var jsonDoc = await RequestTokenAsync(new Dictionary<string, string>
                 {
                     { "grant_type", "authorization_code" },
                     { "code", code },
@@ -364,18 +347,6 @@ internal sealed class AuthService : IDisposable
                     { "client_id", SpotifyClientId },
                     { "code_verifier", codeVerifier }
                 });
-
-                using var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token")
-                {
-                    Content = content
-                };
-
-                using var httpResponse = await _authClient.SendAsync(request);
-                httpResponse.EnsureSuccessStatusCode();
-
-                var responseJson = await httpResponse.Content.ReadAsStringAsync();
-
-                using var jsonDoc = JsonDocument.Parse(responseJson);
                 var refreshToken = jsonDoc.RootElement.GetProperty("refresh_token").GetString();
 
                 if (string.IsNullOrWhiteSpace(refreshToken))
@@ -396,6 +367,14 @@ internal sealed class AuthService : IDisposable
                 return false;
             }
         }
+    }
+
+    private async Task<JsonDocument> RequestTokenAsync(Dictionary<string, string> parameters)
+    {
+        using var content = new FormUrlEncodedContent(parameters);
+        using var response = await _authClient.PostAsync(TokenEndpoint, content);
+        response.EnsureSuccessStatusCode();
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
     }
 
     private static string BuildLoginResponse(string? error)

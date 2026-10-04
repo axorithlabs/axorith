@@ -3,9 +3,6 @@ using Serilog.Events;
 
 namespace Axorith.Core.Logging;
 
-/// <summary>
-///     A Serilog enricher that shortens fully-qualified class names to their simple names for cleaner log output.
-/// </summary>
 public class ShortSourceContextEnricher : ILogEventEnricher
 {
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)

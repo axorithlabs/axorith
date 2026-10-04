@@ -6,9 +6,6 @@ using Grpc.Core;
 
 namespace Axorith.Host.Services;
 
-/// <summary>
-///     gRPC service implementation for diagnostics and health checks.
-/// </summary>
 public class DiagnosticsServiceImpl(
     ISessionManager sessionManager,
     IModuleRegistry moduleRegistry,
@@ -19,44 +16,38 @@ public class DiagnosticsServiceImpl(
 
     public override Task<HealthCheckResponse> GetHealth(HealthCheckRequest request, ServerCallContext context)
     {
+
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ?? "0.0.1-alpha";
+
+        var activeSessions = sessionManager.ActiveSession != null ? 1 : 0;
+        int loadedModules;
         try
         {
-            var version = Assembly.GetExecutingAssembly()
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-                .InformationalVersion ?? "0.0.1-alpha";
-
-            var activeSessions = sessionManager.ActiveSession != null ? 1 : 0;
-            int loadedModules;
-            try
-            {
-                loadedModules = moduleRegistry.GetAllDefinitions().Count;
-            }
-            catch (InvalidOperationException ex)
-            {
-                logger.LogWarning(ex, "ModuleRegistry not initialized during health check");
-                loadedModules = 0;
-            }
-
-            const HealthStatus status = HealthStatus.Healthy;
-
-            var response = new HealthCheckResponse
-            {
-                Status = status,
-                Version = version,
-                UptimeStarted = Timestamp.FromDateTimeOffset(_startTime),
-                ActiveSessions = activeSessions,
-                LoadedModules = loadedModules
-            };
-
-            logger.LogDebug("Health check: {Status}, Modules: {Count}, Sessions: {Sessions}",
-                status, loadedModules, activeSessions);
-
-            return Task.FromResult(response);
+            loadedModules = moduleRegistry.GetAllDefinitions().Count;
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
-            logger.LogError(ex, "Error during health check");
-            throw new RpcException(new Status(StatusCode.Internal, "Health check failed", ex));
+            logger.LogWarning(ex, "ModuleRegistry not initialized during health check");
+            loadedModules = 0;
         }
+
+        const HealthStatus status = HealthStatus.Healthy;
+
+        var response = new HealthCheckResponse
+        {
+            Status = status,
+            Version = version,
+            UptimeStarted = Timestamp.FromDateTimeOffset(_startTime),
+            ActiveSessions = activeSessions,
+            LoadedModules = loadedModules
+        };
+
+        logger.LogDebug("Health check: {Status}, Modules: {Count}, Sessions: {Sessions}",
+            status, loadedModules, activeSessions);
+
+        return Task.FromResult(response);
+
     }
 }

@@ -9,9 +9,6 @@ using static Axorith.Shared.Utils.EnvironmentUtils;
 
 namespace Axorith.Core.Services;
 
-/// <summary>
-///     The concrete implementation for discovering and loading module definitions.
-/// </summary>
 public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
 {
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -19,7 +16,6 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
         Converters = { new JsonStringEnumConverter() }
     };
 
-    /// <inheritdoc />
     public async Task<IReadOnlyList<ModuleDefinition>> LoadModuleDefinitionsAsync(
         IEnumerable<string> searchPaths,
         CancellationToken cancellationToken,

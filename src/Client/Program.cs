@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -24,7 +24,6 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        // Early logging setup for single instance check
         var earlyLogger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console()
@@ -33,14 +32,12 @@ internal static class Program
         var earlyLoggerFactory = new SerilogLoggerFactory(earlyLogger);
         var singleInstanceLogger = earlyLoggerFactory.CreateLogger<SingleInstanceManager>();
 
-        // Check for single instance BEFORE any heavy initialization
         _singleInstanceManager = new SingleInstanceManager(singleInstanceLogger);
 
         if (!_singleInstanceManager.TryAcquireLock())
         {
             earlyLogger.Information("Another instance detected - sending activation request");
 
-            // Send activation request to existing instance
             var activationTask = _singleInstanceManager.SendActivationRequestAsync();
             activationTask.Wait(TimeSpan.FromSeconds(5));
 
@@ -59,9 +56,8 @@ internal static class Program
         }
 
         var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddJsonFile("appsettings.development.json", optional: true, reloadOnChange: true)
+            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true, reloadOnChange: true)
+            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.development.json"), optional: true, reloadOnChange: true)
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
@@ -86,31 +82,9 @@ internal static class Program
             DiscardPendingInstallation();
         }
 
-        Log.Information(
-            "Telemetry (Client): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={FlushSec}",
-            telemetrySettings.Enabled,
-            telemetrySettings.IsActive,
-            Telemetry.IsEnabled,
-            telemetrySettings.PostHogHost,
-            telemetrySettings.BatchSize,
-            telemetrySettings.QueueLimit,
-            telemetrySettings.FlushInterval.TotalSeconds);
-
-        if (!telemetrySettings.IsActive)
-        {
-            Log.Warning(
-                "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
-                telemetrySettings.Enabled,
-                !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) &&
-                telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
-                string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
-                string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
-
-            if (!telemetrySettings.Enabled)
-            {
-                Log.Information("Telemetry is disabled by user preference in Settings");
-            }
-        }
+        TelemetryRuntime.LogConfiguration("Client", telemetrySettings, Telemetry.IsEnabled);
+        if (!telemetrySettings.IsActive && !telemetrySettings.Enabled)
+            Log.Information("Telemetry is disabled by user preference in Settings");
 
         var logsPath = configuration.GetValue<string>("Serilog:WriteTo:1:Args:path")
                        ?? "%AppData%/Axorith/logs/client-.log";
@@ -136,7 +110,8 @@ internal static class Program
 
             var app = BuildAvaloniaApp();
 
-            RegisterGlobalExceptionHandlers();
+            TelemetryRuntime.RegisterGlobalExceptionHandlers(Telemetry, "client");
+            Log.Debug("Global exception handlers registered");
 
             app.StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
 
@@ -161,10 +136,7 @@ internal static class Program
         }
     }
 
-    internal static SingleInstanceManager? GetSingleInstanceManager()
-    {
-        return _singleInstanceManager;
-    }
+    internal static SingleInstanceManager? GetSingleInstanceManager() => _singleInstanceManager;
 
     public static AppBuilder BuildAvaloniaApp()
     {
@@ -182,41 +154,6 @@ internal static class Program
                     // Don't mark as handled - let Avalonia decide whether to crash or not
                 };
             });
-    }
-
-    private static void RegisterGlobalExceptionHandlers()
-    {
-        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-        {
-            var exception = e.ExceptionObject as Exception;
-            if (e.IsTerminating)
-            {
-                Log.Fatal(exception, "Unhandled exception in AppDomain (terminating)");
-                if (exception is not null)
-                {
-                    Telemetry?.TrackError(exception, "client", "startup", "fatal", handled: false, fatal: true);
-                }
-                using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                Telemetry?.FlushAsync(flushCts.Token).GetAwaiter().GetResult();
-            }
-            else
-            {
-                Log.Error(exception, "Unhandled exception in AppDomain (non-terminating)");
-                if (exception is not null)
-                {
-                    Telemetry?.TrackError(exception, "client", "unknown", "error", handled: false, fatal: false);
-                }
-            }
-        };
-
-        TaskScheduler.UnobservedTaskException += (_, e) =>
-        {
-            Log.Error(e.Exception, "Unobserved task exception");
-            e.SetObserved();
-            Telemetry?.TrackError(e.Exception, "client", "unknown", "warning", handled: true, fatal: false);
-        };
-
-        Log.Debug("Global exception handlers registered");
     }
 
     internal static void ConfirmPendingInstallation()
@@ -279,10 +216,6 @@ internal static class Program
         ConfirmPendingInstallation();
     }
 
-    /// <summary>
-    ///     Loads the telemetry enabled setting from clientsettings.json.
-    ///     Returns true (default) if file doesn't exist or can't be read.
-    /// </summary>
     private static bool LoadLegacyTelemetryEnabledSetting()
     {
         try

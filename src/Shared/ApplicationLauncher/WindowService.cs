@@ -19,18 +19,8 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
                 await Task.Delay(config.BannerDelayMs, cancellationToken).ConfigureAwait(false);
             }
 
-            try
-            {
-                await windowService.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (TimeoutException)
-            {
-                logger.LogWarning(
-                    "Process {ProcessName} window did not appear in time. Propagating timeout for fallback.",
-                    process.ProcessName);
-                throw;
-            }
+            await windowService.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken)
+                .ConfigureAwait(false);
 
             if (process.MainWindowHandle == IntPtr.Zero)
             {
@@ -139,6 +129,7 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
         }
         catch (TimeoutException)
         {
+            logger.LogWarning("Process {ProcessName} window did not appear in time.", process.ProcessName);
             throw;
         }
         catch (Exception ex)

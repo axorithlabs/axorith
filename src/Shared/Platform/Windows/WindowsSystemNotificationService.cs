@@ -1,14 +1,10 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows implementation of ISystemNotificationService using PowerShell.
-///     Uses EncodedCommand to prevent script injection vulnerabilities.
-/// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsSystemNotificationService(ILogger logger) : ISystemNotificationService
 {

@@ -32,24 +32,14 @@ public class HostSessionBenchmarks
 
         _dataPath = Path.Combine(BenchmarkEnvironment.Root, "session-start", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(_dataPath, "empty"));
-        _appBlockerId = HostClientBenchmarks.InstallModule(Path.Combine(_dataPath, "modules"),
+        _appBlockerId = BenchmarkEnvironment.InstallModule(Path.Combine(_dataPath, "modules"),
             typeof(Axorith.Module.AppBlocker.Module), "App Blocker");
 
         _factory = new HostClientBenchmarks.BenchmarkHostFactory(_dataPath);
         _httpClient = _factory.CreateDefaultClient();
         var tokenPath = Path.Combine(_dataPath, "config", ".auth_token");
-        var token = await HostClientBenchmarks.WaitForAuthTokenAsync(tokenPath);
-        var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-        {
-            metadata.Add("x-axorith-auth-token", token);
-            return Task.CompletedTask;
-        });
-        _channel = GrpcChannel.ForAddress(_httpClient.BaseAddress!, new GrpcChannelOptions
-        {
-            HttpClient = _httpClient,
-            Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-            UnsafeUseInsecureChannelCallCredentials = true
-        });
+        var token = await BenchmarkEnvironment.WaitForAuthTokenAsync(tokenPath);
+        _channel = BenchmarkEnvironment.CreateAuthenticatedChannel(_httpClient.BaseAddress!, token, _httpClient);
         _presets = new PresetsService.PresetsServiceClient(_channel);
         _sessions = new SessionsService.SessionsServiceClient(_channel);
         await WaitForAppBlockerAsync();

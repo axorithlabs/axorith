@@ -1,6 +1,5 @@
 namespace Axorith.Core.Services.Abstractions;
 
-/// <summary>Manages reversible operating-system protections required by Strict sessions.</summary>
 public interface ICommitmentProtectionService
 {
     Task CheckCanEnableAsync(CancellationToken cancellationToken = default);

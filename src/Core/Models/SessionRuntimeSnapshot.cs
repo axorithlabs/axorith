@@ -2,18 +2,12 @@ using Axorith.Sdk.Settings;
 
 namespace Axorith.Core.Models;
 
-/// <summary>
-///     Immutable snapshot of the currently running session, used as a facade for Host-layer consumers.
-/// </summary>
 public sealed record SessionSnapshot(
     Guid PresetId,
     string PresetName,
     IReadOnlyList<SessionModuleSnapshot> Modules
 );
 
-/// <summary>
-///     Immutable snapshot of a single active module instance within a running session.
-/// </summary>
 public sealed record SessionModuleSnapshot(
     Guid InstanceId,
     Guid ModuleId,
@@ -23,9 +17,6 @@ public sealed record SessionModuleSnapshot(
     IReadOnlyList<SessionActionSnapshot> Actions
 );
 
-/// <summary>
-///     Immutable snapshot of a setting for a module instance.
-/// </summary>
 public sealed record SessionSettingSnapshot(
     string Key,
     string Label,
@@ -38,9 +29,6 @@ public sealed record SessionSettingSnapshot(
     string ValueString
 );
 
-/// <summary>
-///     Immutable snapshot of an action for a module instance.
-/// </summary>
 public sealed record SessionActionSnapshot(
     string Key,
     string Label,

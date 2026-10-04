@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Versioning;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -16,9 +17,6 @@ public class WindowsAppDiscoveryService(
     private const int DefaultFallbackSearchDepth = 6;
     private const int InstallLocationSearchDepth = 2;
 
-    /// <summary>
-    ///     Directories to skip during filesystem search for performance and safety.
-    /// </summary>
     private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         "Windows",
@@ -54,7 +52,7 @@ public class WindowsAppDiscoveryService(
     {
         foreach (var name in processNames)
         {
-            var exeName = EnsureExeName(name);
+            var exeName = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : $"{name}.exe";
 
             if (TryGetCachedFallback(exeName, out var cached))
             {
@@ -292,7 +290,7 @@ public class WindowsAppDiscoveryService(
         {
             try
             {
-                var found = FindExecutableInDirectory(root, exeName, maxDepth: DefaultFallbackSearchDepth);
+                var found = SafeEnumerateFiles(root, exeName, DefaultFallbackSearchDepth).FirstOrDefault();
                 if (!string.IsNullOrEmpty(found))
                 {
                     return found;
@@ -347,21 +345,6 @@ public class WindowsAppDiscoveryService(
         }
     }
 
-    private string? FindExecutableInDirectory(string rootPath, string exeName, int maxDepth)
-    {
-        if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
-        {
-            return null;
-        }
-
-        foreach (var file in SafeEnumerateFiles(rootPath, exeName, maxDepth))
-        {
-            return file;
-        }
-
-        return null;
-    }
-
     private bool TryGetCachedFallback(string exeName, out string path)
     {
         lock (_lock)
@@ -397,11 +380,6 @@ public class WindowsAppDiscoveryService(
                 _cachedIndex.Add(new AppInfo(name, path, path));
             }
         }
-    }
-
-    private static string EnsureExeName(string name)
-    {
-        return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : $"{name}.exe";
     }
 
     private static string? NormalizeExecutablePath(string? rawPath)
@@ -511,13 +489,8 @@ public class WindowsAppDiscoveryService(
             {
                 files = Directory.GetFiles(dir, searchPattern);
             }
-            catch (UnauthorizedAccessException)
+            catch
             {
-                // Ignore permission errors
-            }
-            catch (Exception)
-            {
-                // Ignore other access errors
             }
 
             if (files != null)
@@ -538,13 +511,8 @@ public class WindowsAppDiscoveryService(
             {
                 subDirs = Directory.GetDirectories(dir);
             }
-            catch (UnauthorizedAccessException)
+            catch
             {
-                // Ignore permission errors
-            }
-            catch (Exception)
-            {
-                // Ignore other access errors
             }
 
             if (subDirs == null)
@@ -566,27 +534,17 @@ public class WindowsAppDiscoveryService(
     {
         const string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths";
 
-        try
+        foreach (var root in new[] { Registry.LocalMachine, Registry.CurrentUser })
         {
-            using var key = Registry.LocalMachine.OpenSubKey(Path.Combine(keyPath, exeName));
-            var path = key?.GetValue(null) as string; // Default value
-
-            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+            try
             {
-                return path;
+                using var key = root.OpenSubKey(Path.Combine(keyPath, exeName));
+                if (key?.GetValue(null) is string path && File.Exists(path))
+                    return path;
             }
-
-            using var userKey = Registry.CurrentUser.OpenSubKey(Path.Combine(keyPath, exeName));
-            var userPath = userKey?.GetValue(null) as string;
-
-            if (!string.IsNullOrEmpty(userPath) && File.Exists(userPath))
+            catch
             {
-                return userPath;
             }
-        }
-        catch
-        {
-            // ignored
         }
 
         return null;
@@ -647,16 +605,4 @@ public class WindowsAppDiscoveryService(
         void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
     }
 
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("0000010b-0000-0000-C000-000000000046")]
-    internal interface IPersistFile
-    {
-        void GetClassID(out Guid pClassID);
-        void IsDirty();
-        void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, int dwMode);
-        void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, [MarshalAs(UnmanagedType.Bool)] bool fRemember);
-        void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
-        void GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
-    }
 }

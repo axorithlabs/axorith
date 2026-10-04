@@ -49,17 +49,7 @@ public sealed class SessionDashboardRegressionTests
         {
             var client = CreateDefaultClient();
             var token = File.ReadAllText(Path.Combine(dataPath, "config", ".auth_token"));
-            var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-            {
-                metadata.Add("x-axorith-auth-token", token);
-                return Task.CompletedTask;
-            });
-            return GrpcChannel.ForAddress(client.BaseAddress!, new GrpcChannelOptions
-            {
-                HttpClient = client,
-                Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-                UnsafeUseInsecureChannelCallCredentials = true
-            });
+            return TestGrpc.CreateAuthenticatedChannel(client, token);
         }
     }
 
@@ -287,4 +277,3 @@ public sealed class SessionDashboardRegressionTests
     private static Task RefreshState(MainViewModel vm) =>
         (Task)typeof(MainViewModel).GetMethod("RefreshSessionStateAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, null)!;
 }
-

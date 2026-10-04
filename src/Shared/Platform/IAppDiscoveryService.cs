@@ -1,4 +1,4 @@
-﻿namespace Axorith.Shared.Platform;
+namespace Axorith.Shared.Platform;
 
 public interface IAppDiscoveryService
 {

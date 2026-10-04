@@ -2,9 +2,6 @@ using ModuleDefinition = Axorith.Contracts.ModuleDefinition;
 
 namespace Axorith.Host.Mappers;
 
-/// <summary>
-///     Maps between SDK ModuleDefinition and protobuf messages.
-/// </summary>
 public static class ModuleMapper
 {
     public static ModuleDefinition ToMessage(Sdk.ModuleDefinition definition)

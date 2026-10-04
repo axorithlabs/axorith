@@ -7,9 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Grpc.Tools" Version="2.76.0" PrivateAssets="All" />
-        <PackageReference Include="Grpc.Core.Api" Version="2.71.0" />
-        <PackageReference Include="Google.Protobuf" Version="3.33.1" />
+        <PackageReference Include="Grpc.Tools"  PrivateAssets="All" />
+        <PackageReference Include="Grpc.Core.Api"  />
+        <PackageReference Include="Google.Protobuf"  />
     </ItemGroup>
 
     <ItemGroup>
@@ -17,10 +17,11 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Sdk\Axorith.Sdk.csproj" />
+      <ProjectReference Include="..\Core\Axorith.Core.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Client" />
+        <InternalsVisibleTo Include="Axorith.Host" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Mappers\" />
-    </ItemGroup>
 </Project>

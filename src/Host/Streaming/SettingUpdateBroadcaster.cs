@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
-using System.Threading.Channels;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
@@ -13,24 +12,12 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Streaming;
 
-/// <summary>
-///     Broadcasts reactive setting updates from active module instances to all connected gRPC clients.
-///     Subscribes to module setting observables and converts changes to gRPC streams.
-/// </summary>
 public class SettingUpdateBroadcaster : IDisposable
 {
     private readonly ISessionManager _sessionManager;
     private readonly ILogger<SettingUpdateBroadcaster> _logger;
 
-    private sealed class Subscriber
-    {
-        public required IServerStreamWriter<SettingUpdate> Stream { get; init; }
-        public required Channel<SettingUpdate> Queue { get; init; }
-        public required CancellationTokenSource Cts { get; init; }
-        public required Task Loop { get; init; }
-    }
-
-    private readonly ConcurrentDictionary<string, Subscriber> _subscribers = new();
+    private readonly GrpcStreamSubscribers<SettingUpdate> _subscribers;
     private readonly ConcurrentDictionary<Guid, CompositeDisposable> _moduleSubscriptions = new();
     private readonly ConcurrentDictionary<string, string> _lastChoicesFingerprint = new();
     private bool _disposed;
@@ -43,6 +30,7 @@ public class SettingUpdateBroadcaster : IDisposable
     {
         _sessionManager = sessionManager;
         _logger = logger;
+        _subscribers = new GrpcStreamSubscribers<SettingUpdate>(logger, 1024, "setting update");
         var streaming = options?.Value.Streaming;
         _choicesThrottleMs = Math.Clamp(streaming?.ChoicesThrottleMs ?? 200, 0, 10_000);
         _valueBatchWindowMs = Math.Clamp(streaming?.ValueBatchWindowMs ?? 16, 0, 1000);
@@ -53,9 +41,6 @@ public class SettingUpdateBroadcaster : IDisposable
         _logger.LogInformation("SettingUpdateBroadcaster initialized");
     }
 
-    /// <summary>
-    ///     Unsubscribes and removes all tracked subscriptions for a specific module instance.
-    /// </summary>
     public void UnsubscribeModuleInstance(Guid moduleInstanceId)
     {
         if (_moduleSubscriptions.TryRemove(moduleInstanceId, out var disposables))
@@ -73,117 +58,15 @@ public class SettingUpdateBroadcaster : IDisposable
         }
     }
 
-    /// <summary>
-    ///     Subscribes a gRPC client to setting updates.
-    ///     Optionally filtered by module instance ID.
-    /// </summary>
     public async Task SubscribeAsync(string subscriberId, string? moduleInstanceId,
         IServerStreamWriter<SettingUpdate> stream, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(subscriberId);
-        ArgumentNullException.ThrowIfNull(stream);
-
+        var key = string.IsNullOrWhiteSpace(moduleInstanceId) ? subscriberId : $"{subscriberId}:{moduleInstanceId}";
         _logger.LogInformation("Client {SubscriberId} subscribed to setting updates (filter: {Filter})",
             subscriberId, moduleInstanceId ?? "all");
-
-        var key = string.IsNullOrWhiteSpace(moduleInstanceId) ? subscriberId : $"{subscriberId}:{moduleInstanceId}";
-
-        var channel = Channel.CreateBounded<SettingUpdate>(new BoundedChannelOptions(1024)
-        {
-            FullMode = BoundedChannelFullMode.DropOldest,
-            SingleReader = true,
-            SingleWriter = false
-        });
-
-        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var loopTask = Task.Run(async () =>
-        {
-            try
-            {
-                while (await channel.Reader.WaitToReadAsync(linkedCts.Token).ConfigureAwait(false))
-                while (channel.Reader.TryRead(out var update))
-                    try
-                    {
-                        await stream.WriteAsync(update, linkedCts.Token).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to send setting update to subscriber {SubscriberId}, removing",
-                            key);
-                        try
-                        {
-                            await linkedCts.CancelAsync().ConfigureAwait(false);
-                        }
-                        catch (ObjectDisposedException)
-                        {
-                            // CTS was disposed by replacement subscriber - ignore
-                        }
-
-                        return;
-                    }
-            }
-            catch (OperationCanceledException)
-            {
-                // normal shutdown
-            }
-            finally
-            {
-                channel.Writer.TryComplete();
-            }
-        }, linkedCts.Token);
-
-        var subscriber = new Subscriber
-        {
-            Stream = stream,
-            Queue = channel,
-            Cts = linkedCts,
-            Loop = loopTask
-        };
-
-        _subscribers.AddOrUpdate(key,
-            _ => subscriber,
-            (_, oldSubscriber) =>
-            {
-                _logger.LogWarning("Client {Key} already subscribed, replacing stream atomically", key);
-                try
-                {
-                    oldSubscriber.Cts.Cancel();
-                    oldSubscriber.Queue.Writer.TryComplete();
-                    oldSubscriber.Cts.Dispose();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Ignore - already disposed
-                }
-
-                return subscriber;
-            });
-
-        try
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, linkedCts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Client {Key} unsubscribed (cancelled)", key);
-        }
-        finally
-        {
-            _subscribers.TryRemove(new KeyValuePair<string, Subscriber>(key, subscriber));
-
-            // Always dispose our own resources regardless of removal result
-            try
-            {
-                await subscriber.Cts.CancelAsync().ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-                // Already disposed (e.g., if we were replaced)
-            }
-
-            subscriber.Queue.Writer.TryComplete();
-            subscriber.Cts.Dispose();
-        }
+        await _subscribers.SubscribeAsync(key, stream, ct).ConfigureAwait(false);
+        _logger.LogInformation("Client {Key} unsubscribed (cancelled)", key);
     }
 
     private void OnSessionStarted(Guid presetId)
@@ -270,35 +153,21 @@ public class SettingUpdateBroadcaster : IDisposable
         _logger.LogDebug("Broadcast setting update: {ModuleId}.{Key}.{Property} = {Value}",
             moduleInstanceId, settingKey, property, value);
 
-        foreach (var (subscriberKey, sub) in _subscribers)
+        _subscribers.Publish(update, subscriberKey =>
         {
-            string? filter = null;
-            var sepIndex = subscriberKey.IndexOf(':');
-            if (sepIndex > 0 && sepIndex < subscriberKey.Length - 1)
+            var separator = subscriberKey.IndexOf(':');
+            if (separator <= 0 || separator == subscriberKey.Length - 1)
             {
-                filter = subscriberKey[(sepIndex + 1)..];
+                return true;
             }
 
-            if (filter != null &&
-                !string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (!sub.Queue.Writer.TryWrite(update))
-            {
-                _logger.LogDebug("Subscriber queue full for {SubscriberId}, dropping oldest", subscriberKey);
-            }
-        }
+            var filter = subscriberKey[(separator + 1)..];
+            return string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase);
+        });
 
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    ///     Subscribes to a module setting's observables.
-    ///     Used internally by OnSessionStarted (with disposables list) or externally by DesignTimeSandboxManager (without
-    ///     list, manages own lifecycle).
-    /// </summary>
     public void SubscribeToSetting(Guid moduleInstanceId, ISetting setting, CompositeDisposable? disposables = null)
     {
         ArgumentNullException.ThrowIfNull(setting);
@@ -398,7 +267,7 @@ public class SettingUpdateBroadcaster : IDisposable
 
         _moduleSubscriptions.Clear();
 
-        _subscribers.Clear();
+        _subscribers.Dispose();
 
         _logger.LogInformation("SettingUpdateBroadcaster disposed");
 

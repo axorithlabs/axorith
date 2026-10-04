@@ -69,7 +69,7 @@ internal sealed class PlaybackService : IDisposable
             return Task.CompletedTask;
         }
 
-        _ = RefreshChoicesAsync(force: true);
+        _ = LoadDynamicChoicesAsync(force: true);
 
         _ = RefreshPlaylistsLoopAsync();
         return Task.CompletedTask;
@@ -94,7 +94,7 @@ internal sealed class PlaybackService : IDisposable
             {
                 if (_authService.HasRefreshToken())
                 {
-                    _ = RefreshChoicesAsync();
+                    _ = LoadDynamicChoicesAsync();
                 }
             }
         }
@@ -310,7 +310,7 @@ internal sealed class PlaybackService : IDisposable
 
         try
         {
-            if (!force && !ShouldRefreshChoices())
+            if (!force && ShouldUseCache())
             {
                 return;
             }
@@ -439,7 +439,7 @@ internal sealed class PlaybackService : IDisposable
     {
         if (isAuthenticated)
         {
-            _ = RefreshChoicesAsync(force: true);
+            _ = LoadDynamicChoicesAsync(force: true);
         }
         else
         {
@@ -474,20 +474,6 @@ internal sealed class PlaybackService : IDisposable
                !string.IsNullOrWhiteSpace(_cachedLikedSongsUri);
     }
 
-    private bool ShouldRefreshChoices()
-    {
-        if (!ShouldUseCache())
-        {
-            return true;
-        }
-
-        return DateTime.UtcNow - _choicesLastUpdatedUtc > _choicesTtl;
-    }
-
-    private Task RefreshChoicesAsync(bool force = false)
-    {
-        return LoadDynamicChoicesAsync(force);
-    }
 
     public void Dispose()
     {

@@ -12,6 +12,7 @@ using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
 
 namespace Axorith.Client.ViewModels;
 
@@ -60,47 +61,26 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     public bool HasDelay => Model.StartDelay > TimeSpan.Zero;
 
-    public ConfiguredModuleViewModel? NextModule
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public ConfiguredModuleViewModel? NextModule { get; set; }
 
-    public bool IsFirst
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool IsFirst { get; set; }
 
-    public bool IsLast
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool IsLast { get; set; }
 
-    public bool IsLoading
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool IsLoading { get; private set; }
 
-    public bool HasErrors
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool HasErrors { get; private set; }
 
-    public bool HasWarnings
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public bool HasWarnings { get; private set; }
 
-    public string? WarningMessage
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public string? WarningMessage { get; private set; }
 
     public bool IsApplicationLauncher => Definition.Name == "Application Launcher";
     public bool IsSiteBlocker => Definition.Name == "Site Blocker";
@@ -136,21 +116,20 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         StartDelaySecondsString = model.StartDelay.TotalSeconds.ToString("G29");
 
-        AddDelayCommand = ReactiveCommand.Create(AddDelay);
-        RemoveDelayCommand = ReactiveCommand.Create(RemoveDelay);
+        AddDelayCommand = ReactiveCommand.Create(() =>
+        {
+            if (NextModule is { } nextModule)
+                nextModule.StartDelaySecondsString = "1";
+        });
+        RemoveDelayCommand = ReactiveCommand.Create(() =>
+        {
+            if (NextModule is { } nextModule)
+                nextModule.StartDelaySecondsString = "0";
+        });
 
         _ = LoadSettingsAndActionsAsync();
     }
 
-    private void AddDelay()
-    {
-        NextModule?.StartDelaySecondsString = "1";
-    }
-
-    private void RemoveDelay()
-    {
-        NextModule?.StartDelaySecondsString = "0";
-    }
 
     private async Task LoadSettingsAndActionsAsync()
     {
@@ -236,7 +215,7 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     var appPicker = Settings.FirstOrDefault(setting => setting.Setting.Key == "AppToAdd");
                     var customApps = Settings.FirstOrDefault(setting => setting.Setting.Key == "CustomProcessList");
                     if (appPicker != null && customApps != null)
-                        customApps.AttachApplicationPicker(appPicker);
+                        customApps.ApplicationPicker = appPicker;
                 }
 
                 if (Definition.Name == "Application Launcher")

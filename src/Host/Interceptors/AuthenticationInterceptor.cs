@@ -1,15 +1,12 @@
-﻿using Axorith.Contracts;
+using Axorith.Contracts;
 using Axorith.Host.Services;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 
 namespace Axorith.Host.Interceptors;
 
-/// <summary>
-///     Global gRPC interceptor that enforces token-based authentication for all requests.
-/// </summary>
 public class AuthenticationInterceptor(
-    IHostAuthenticationService authService,
+    HostAuthenticationService authService,
     ILogger<AuthenticationInterceptor> logger) : Interceptor
 {
     public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(

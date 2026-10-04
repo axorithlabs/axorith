@@ -1,39 +1,16 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Shared.Platform.Linux;
 
-/// <summary>
-///     Linux-specific window management API using X11.
-///     Supports both X11 and Wayland through xdotool.
-/// </summary>
 [SupportedOSPlatform("linux")]
 internal static class LinuxWindowApi
 {
-    /// <summary>
-    ///     Waits for a process to create its main window.
-    /// </summary>
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
-        CancellationToken cancellationToken = default)
-    {
-        var startTime = DateTime.Now;
+    public static Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
+        CancellationToken cancellationToken = default) =>
+        WindowWaiter.WaitAsync(process, HasWindow, timeoutMs, cancellationToken);
 
-        while (!HasWindow(process))
-        {
-            if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
-            {
-                throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            await Task.Delay(100, cancellationToken);
-        }
-    }
-
-    /// <summary>
-    ///     Moves a window to a specific monitor by index.
-    /// </summary>
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         var windowId = windowHandle.ToInt64();
@@ -49,17 +26,15 @@ internal static class LinuxWindowApi
         var targetX = monitor.X + 50;
         var targetY = monitor.Y + 50;
 
-        ExecuteCommand("xdotool", $"windowmove {windowId} {targetX} {targetY}");
+        CommandRunner.RunChecked("xdotool",
+            ["windowmove", windowId.ToString(), targetX.ToString(), targetY.ToString()]);
     }
 
-    /// <summary>
-    ///     Checks if process has a window.
-    /// </summary>
     private static bool HasWindow(Process process)
     {
         try
         {
-            var output = ExecuteCommand("xdotool", $"search --pid {process.Id}");
+            var output = CommandRunner.RunChecked("xdotool", ["search", "--pid", process.Id.ToString()]);
             return !string.IsNullOrWhiteSpace(output);
         }
         catch
@@ -68,16 +43,13 @@ internal static class LinuxWindowApi
         }
     }
 
-    /// <summary>
-    ///     Gets list of available monitors.
-    /// </summary>
     private static List<MonitorInfo> GetMonitors()
     {
         var monitors = new List<MonitorInfo>();
 
         try
         {
-            var output = ExecuteCommand("xrandr", "--query");
+            var output = CommandRunner.RunChecked("xrandr", ["--query"]);
             var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var line in lines)
@@ -98,19 +70,13 @@ internal static class LinuxWindowApi
 
                     var resolution = parts[i].Split('x');
                     if (resolution.Length != 2 ||
-                        !int.TryParse(resolution[0], out var width) ||
-                        !int.TryParse(resolution[1], out var height))
+                        !int.TryParse(resolution[0], out _) ||
+                        !int.TryParse(resolution[1], out _))
                     {
                         continue;
                     }
 
-                    monitors.Add(new MonitorInfo
-                    {
-                        X = x,
-                        Y = y,
-                        Width = width,
-                        Height = height
-                    });
+                    monitors.Add(new MonitorInfo { X = x, Y = y });
                     break;
                 }
             }
@@ -118,45 +84,16 @@ internal static class LinuxWindowApi
         catch
         {
             // Fallback to single monitor
-            monitors.Add(new MonitorInfo { X = 0, Y = 0, Width = 1920, Height = 1080 });
+            monitors.Add(new MonitorInfo());
         }
 
-        return monitors.Count > 0 ? monitors : [new MonitorInfo { X = 0, Y = 0, Width = 1920, Height = 1080 }];
+        return monitors.Count > 0 ? monitors : [new MonitorInfo()];
     }
 
-    /// <summary>
-    ///     Executes a shell command and returns output.
-    /// </summary>
-    private static string ExecuteCommand(string command, string arguments)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = command,
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Failed to start {command}");
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(5000);
-
-        if (process.ExitCode == 0)
-        {
-            return output;
-        }
-
-        var error = process.StandardError.ReadToEnd();
-        throw new InvalidOperationException($"{command} failed: {error}");
-    }
 
     private class MonitorInfo
     {
         public int X { get; init; }
         public int Y { get; init; }
-        public int Width { get; set; }
-        public int Height { get; set; }
     }
 }

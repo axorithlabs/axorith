@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Telemetry;
@@ -32,7 +32,7 @@ public class ScheduleManager(
 
     private readonly HashSet<string> _sentNotificationKeys = [];
     private readonly HashSet<string> _reportedScheduleTriggerSkips = [];
-    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
+    private readonly ITelemetryService _telemetry = telemetry ?? NoopTelemetryService.Instance;
     private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
 
     private volatile bool _isProcessingSchedule;
@@ -68,7 +68,7 @@ public class ScheduleManager(
         try
         {
             var activePreset = sessionManager.ActiveSession;
-            if (activePreset?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+            if (activePreset?.FocusCommitment.IsCommitted == true)
             {
                 if (_telemetry.IsEnabled)
                 {
@@ -298,84 +298,37 @@ public class ScheduleManager(
                     continue;
                 }
 
-                if (schedule.Type == ScheduleType.StopRecurring)
+                if (schedule.Type == ScheduleType.StopDuration)
                 {
-                    if (sessionManager.ActiveSession?.FocusCommitment.Mode is
-                        FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+                    continue;
+                }
+
+                var isStop = schedule.Type == ScheduleType.StopRecurring;
+                if (isStop)
+                {
+                    if (sessionManager.ActiveSession?.FocusCommitment.IsCommitted == true)
                     {
                         if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
-                        {
                             TrackScheduleSkipOnce(schedule, runTime, "stop", "committed_session");
-                        }
                         continue;
                     }
-
-                    if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromSeconds(15), "15 seconds", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromMinutes(1), "1 minute", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyStopAsync(schedule, runTime, TimeSpan.FromMinutes(5), "5 minutes", ct);
-                    }
-
-                    if (timeLeft > TimeSpan.FromSeconds(2) || timeLeft < TimeSpan.FromSeconds(-30))
-                    {
-                        continue;
-                    }
-
-                    if (schedule.LastRun.HasValue && (now - schedule.LastRun.Value).TotalSeconds < 60)
-                    {
-                        continue;
-                    }
-
-                    toStop.Add((schedule, runTime));
                 }
-                else if (schedule.Type == ScheduleType.StopDuration)
+                else if (sessionManager.IsSessionRunning)
                 {
-                    // StopDuration schedules are handled by ISessionAutoStopService when session starts
-                    // They don't run on a fixed time, but track duration from session start
+                    if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
+                        TrackScheduleSkipOnce(schedule, runTime, "start", "session_already_running");
+                    continue;
                 }
-                else
+
+                if (timeLeft > TimeSpan.Zero)
+                    await NotifyScheduleWarningAsync(schedule, runTime, timeLeft, isStop, ct);
+
+                if (!IsTriggerWindow(timeLeft) || !IsScheduleReadyToRun(schedule, now))
                 {
-                    if (sessionManager.IsSessionRunning)
-                    {
-                        if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
-                        {
-                            TrackScheduleSkipOnce(schedule, runTime, "start", "session_already_running");
-                        }
-                        continue;
-                    }
-
-                    if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromSeconds(15), "15 seconds", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromMinutes(1), "1 minute", ct);
-                    }
-                    else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.Zero)
-                    {
-                        await CheckAndNotifyAsync(schedule, runTime, TimeSpan.FromMinutes(5), "5 minutes", ct);
-                    }
-
-                    if (timeLeft > TimeSpan.FromSeconds(2) || timeLeft < TimeSpan.FromSeconds(-30))
-                    {
-                        continue;
-                    }
-
-                    if (schedule.LastRun.HasValue && (now - schedule.LastRun.Value).TotalSeconds < 60)
-                    {
-                        continue;
-                    }
-
-                    toRun.Add((schedule, runTime));
+                    continue;
                 }
+
+                (isStop ? toStop : toRun).Add((schedule, runTime));
             }
         }
         finally
@@ -429,7 +382,7 @@ public class ScheduleManager(
                 if (!triggerReported)
                 {
                     TrackScheduleTriggered(schedule, "stop", "failed",
-                        failureReason: ScheduleFailureReason(ex));
+                        failureReason: ProductAnalyticsProperties.FailureReason(ex));
                 }
                 logger.LogError(ex, "Failed to execute stop schedule '{Name}'", schedule.Name);
                 await notifier.ShowSystemAsync("Schedule Error", $"Failed to stop session: {ex.Message}", category: "Session Scheduler");
@@ -488,7 +441,7 @@ public class ScheduleManager(
             catch (Exception ex)
             {
                 TrackScheduleTriggered(schedule, "start", "failed", sessionInstanceId,
-                    failureReason: ScheduleFailureReason(ex));
+                    failureReason: ProductAnalyticsProperties.FailureReason(ex));
                 logger.LogError(ex, "Failed to execute start schedule '{Name}'", schedule.Name);
                 await notifier.ShowSystemAsync("Schedule Error", $"Failed to start '{schedule.Name}': {ex.Message}", category: "Session Scheduler");
                 await UpdateLastRunAsync(schedule, now, ct);
@@ -517,19 +470,9 @@ public class ScheduleManager(
     }
 
     private void TrackScheduleTriggered(SessionSchedule schedule, string triggerAction, string result,
-        Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null)
-    {
-        if (!_telemetry.IsEnabled) return;
-        try
-        {
-            _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
-                triggerAction, result, sessionInstanceId, failureReason, skipReason));
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not track schedule trigger telemetry.");
-        }
-    }
+        Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null) =>
+        _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
+            triggerAction, result, sessionInstanceId, failureReason, skipReason));
 
     private void TrackScheduleSkipOnce(SessionSchedule schedule, DateTimeOffset runTime,
         string triggerAction, string skipReason)
@@ -547,30 +490,43 @@ public class ScheduleManager(
     private static bool IsScheduleReadyToRun(SessionSchedule schedule, DateTimeOffset now) =>
         !schedule.LastRun.HasValue || (now - schedule.LastRun.Value).TotalSeconds >= 60;
 
-    private static string ScheduleFailureReason(Exception exception) => ProductAnalyticsProperties.FailureReason(exception);
 
-    private async Task CheckAndNotifyStopAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
-        string timeText, CancellationToken ct)
+    private async Task NotifyScheduleWarningAsync(SessionSchedule schedule, DateTimeOffset runTime,
+        TimeSpan timeLeft, bool isStop, CancellationToken ct)
     {
-        var key = $"stop_{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
+        TimeSpan threshold;
+        string timeText;
+        if (timeLeft <= TimeSpan.FromSeconds(15))
+        {
+            threshold = TimeSpan.FromSeconds(15);
+            timeText = "15 seconds";
+        }
+        else if (timeLeft <= TimeSpan.FromMinutes(1))
+        {
+            threshold = TimeSpan.FromMinutes(1);
+            timeText = "1 minute";
+        }
+        else if (timeLeft <= TimeSpan.FromMinutes(5))
+        {
+            threshold = TimeSpan.FromMinutes(5);
+            timeText = "5 minutes";
+        }
+        else
+        {
+            return;
+        }
 
+        var key = $"{(isStop ? "stop_" : string.Empty)}{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
         if (!_sentNotificationKeys.Add(key))
         {
             return;
         }
 
-        logger.LogInformation("Sending stop schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
-
-        await notifier.ShowSystemAsync("Session Scheduler", $"Session will stop in {timeText}.", category: "Session Scheduler");
-    }
-
-    private async Task CheckAndNotifyAsync(SessionSchedule schedule, DateTimeOffset runTime, TimeSpan threshold,
-        string timeText, CancellationToken ct)
-    {
-        var key = $"{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
-
-        if (!_sentNotificationKeys.Add(key))
+        if (isStop)
         {
+            logger.LogInformation("Sending stop schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
+            await notifier.ShowSystemAsync("Session Scheduler", $"Session will stop in {timeText}.",
+                category: "Session Scheduler");
             return;
         }
 
@@ -581,8 +537,8 @@ public class ScheduleManager(
         }
 
         logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
-
-        await notifier.ShowSystemAsync("Session Scheduler", $"Session '{preset.Name}' will start in {timeText}.", category: "Session Scheduler");
+        await notifier.ShowSystemAsync("Session Scheduler", $"Session '{preset.Name}' will start in {timeText}.",
+            category: "Session Scheduler");
     }
 
     private void CleanupNotificationCache()

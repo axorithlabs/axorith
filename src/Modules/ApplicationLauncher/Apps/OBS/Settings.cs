@@ -117,26 +117,11 @@ internal sealed class Settings : LauncherSettingsBase
         SetupBaseReactiveVisibility();
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield return EnableWebSocket;
-        yield return WebSocketPort;
-        yield return WebSocketPassword;
-        yield return SessionStartAction;
-        yield return SessionEndAction;
-    }
+    protected override IEnumerable<ISetting> GetAdditionalSettings() => [EnableWebSocket, WebSocketPort, WebSocketPassword, SessionStartAction, SessionEndAction];
 
-    protected override IEnumerable<IAction> GetAdditionalActions() => [];
+    protected override Task InitializeAdditionalAsync() => RefreshPathAsync();
 
-    protected override async Task InitializeAdditionalAsync()
-    {
-        await RefreshPathAsync();
-    }
-
-    public int GetPort()
-    {
-        return WebSocketPort.GetCurrentValue();
-    }
+    public int GetPort() => WebSocketPort.GetCurrentValue();
 
     public string? GetPassword()
     {
@@ -180,35 +165,7 @@ internal sealed class Settings : LauncherSettingsBase
             path = await Task.Run(() => _appDiscovery.FindKnownApp("obs64.exe", "OBS Studio")).ConfigureAwait(false);
         }
 
-        var choices = new List<KeyValuePair<string, string>>
-        {
-            !string.IsNullOrEmpty(path)
-                ? new KeyValuePair<string, string>(path, "OBS Studio (Auto-Detected)")
-                : new KeyValuePair<string, string>("", "OBS Studio not found")
-        };
-
-        var current = ObsPath.GetCurrentValue();
-        if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
-        {
-            choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
-        }
-
-        ObsPath.SetChoices(choices);
-
-        if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(path))
-        {
-            ObsPath.SetValue(path);
-        }
+        SetDetectedApplicationPath(path, "OBS Studio (Auto-Detected)", "OBS Studio not found");
     }
 
-    public override void Dispose()
-    {
-        ObsPath.Dispose();
-        EnableWebSocket.Dispose();
-        WebSocketPort.Dispose();
-        WebSocketPassword.Dispose();
-        SessionStartAction.Dispose();
-        SessionEndAction.Dispose();
-        base.Dispose();
-    }
 }

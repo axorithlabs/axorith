@@ -164,11 +164,11 @@ internal static partial class TelemetryEventSanitizer
 
         return key switch
         {
-            "currentVersion" or "previousVersion" or "releaseVersion" or "axorith_version" => SafeVersion(text),
+            "currentVersion" or "previousVersion" or "releaseVersion" or "axorith_version" => VersionRegex().IsMatch(text) ? text : null,
             "exceptionType" => SafeIdentifier(text, 128),
             "fingerprint" => FingerprintRegex().IsMatch(text) ? text : null,
             "diagnostic" => SafeIdentifier(text, 160),
-            "os_version" => SafeOsVersion(text),
+            "os_version" => OsVersionRegex().IsMatch(text) ? text : null,
             _ => null
         };
     }
@@ -215,8 +215,6 @@ internal static partial class TelemetryEventSanitizer
         return result;
     }
 
-    private static string? SafeVersion(string value) => VersionRegex().IsMatch(value) ? value : null;
-    private static string? SafeOsVersion(string value) => OsVersionRegex().IsMatch(value) ? value : null;
     private static string? SafeIdentifier(string value, int maxLength) =>
         value.Length <= maxLength && IdentifierRegex().IsMatch(value) ? value : null;
 

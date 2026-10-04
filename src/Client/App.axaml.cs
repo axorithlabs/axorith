@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -18,40 +18,16 @@ using WindowState = Avalonia.Controls.WindowState;
 
 namespace Axorith.Client;
 
-/// <summary>
-///     The main entry point for the Axorith client application.
-///     This class is responsible for initializing the application, setting up dependency injection,
-///     and creating the main window with gRPC communication to Axorith.Host.
-/// </summary>
 public class App : Application
 {
-    /// <summary>
-    ///     Gets or sets the application's dependency injection service provider.
-    /// </summary>
-    public IServiceProvider Services { get; set; } = null!;
+    public IServiceProvider Services { get; private set; } = null!;
 
     private MainWindow? _mainWindow;
     private bool _isTrayMode;
     private DesktopNotificationManager? _notificationManager;
 
-    /// <summary>
-    ///     Loads the application's XAML resources.
-    /// </summary>
-    public override void Initialize()
-    {
-        AvaloniaXamlLoader.Load(this);
-    }
+    public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
-    /// <summary>
-    ///     Handles the application's startup logic after the Avalonia framework is ready.
-    ///     This method is responsible for:
-    ///     1. Setting up logging
-    ///     2. Auto-starting Axorith.Host if not running
-    ///     3. Establishing gRPC connection to Host
-    ///     4. Setting up dependency injection container with CoreSdk API interfaces
-    ///     5. Creating and displaying the main window
-    ///     6. Registering graceful shutdown handlers
-    /// </summary>
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
@@ -63,9 +39,8 @@ public class App : Application
         _isTrayMode = Environment.GetCommandLineArgs().Contains("--tray");
 
         var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddJsonFile("appsettings.development.json", optional: true, reloadOnChange: true)
+            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true, reloadOnChange: true)
+            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.development.json"), optional: true, reloadOnChange: true)
             .Build();
 
         var clientConfig = configuration.Get<Configuration>() ?? new Configuration();
@@ -76,7 +51,7 @@ public class App : Application
             builder.AddSerilog(dispose: true);
         });
 
-        var telemetry = Program.Telemetry ?? new NoopTelemetryService();
+        var telemetry = Program.Telemetry ?? NoopTelemetryService.Instance;
 
         var uiSettingsLogger = loggerFactory.CreateLogger<UiSettingsStore>();
         var uiSettingsStore = new UiSettingsStore(uiSettingsLogger);
@@ -97,30 +72,32 @@ public class App : Application
         services.AddSingleton<ShellViewModel>();
         services.AddTransient<LoadingViewModel>();
         services.AddTransient<ErrorViewModel>();
-        services.AddSingleton<IWindowStateManager, WindowStateManager>();
+        services.AddTransient<MainViewModel>();
+        services.AddTransient<SessionEditorViewModel>();
+        services.AddTransient<SettingsViewModel>();
+        services.AddSingleton<WindowStateManager>();
         services.AddSingleton(Options.Create(clientConfig));
-        services.AddSingleton<IHostController, HostController>();
+        services.AddSingleton<HostController>();
         services.AddSingleton<ITokenProvider, FileTokenProvider>();
-        services.AddSingleton<IDiagnosticsApi, NotConnectedDiagnosticsApi>();
-        services.AddSingleton<IHostHealthMonitor, HostHealthMonitor>();
-        services.AddSingleton<IHostTrayService, HostTrayService>();
-        services.AddSingleton<IConnectionInitializer, ConnectionInitializer>();
+        services.AddSingleton<CoreConnectionHolder>();
+        services.AddTransient<IPresetsApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Presets);
+        services.AddTransient<ISessionsApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Sessions);
+        services.AddTransient<IModulesApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Modules);
+        services.AddTransient<ISchedulerApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Scheduler);
+        services.AddTransient<INotificationApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Notifications);
+        services.AddTransient<IUpdatesApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Updates);
+        services.AddSingleton<HostHealthMonitor>();
+        services.AddSingleton<HostTrayService>();
+        services.AddSingleton<ConnectionInitializer>();
         services.AddSingleton<IClientUiSettingsStore>(_ => uiSettingsStore);
-        services.AddSingleton<IFilePickerService>(_ => new FilePickerService(desktop));
+        services.AddSingleton<FilePickerService>(_ => new FilePickerService(desktop));
         services.AddSingleton(sp => new DesktopNotificationManager(
-            sp.GetRequiredService<IToastNotificationService>(),
-            desktop));
-        services.AddSingleton<IAutoStartManager>(sp =>
-            PlatformServices.CreateAutoStartManager(sp.GetRequiredService<ILoggerFactory>()
-                .CreateLogger<IAutoStartManager>()));
-        services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
-            sp.GetRequiredService<ShellViewModel>(),
-            sp.GetRequiredService<IClientUiSettingsStore>(),
-            sp.GetRequiredService<IAutoStartManager>(),
-            sp.GetRequiredService<ITelemetryService>(),
-            sp.GetRequiredService<IOptions<Configuration>>(),
-            sp,
-            sp.GetRequiredService<ILogger<SettingsViewModel>>()));
+            sp.GetRequiredService<IToastNotificationService>(), desktop));
+        services.AddSingleton<IAutoStartManager>(sp => PlatformServices.CreateAutoStartManager(
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<IAutoStartManager>()));
+        services.AddSingleton<IAppDiscoveryService>(sp =>
+            PlatformServices.CreateAppDiscoveryService(sp.GetRequiredService<ILoggerFactory>()));
+        services.AddSingleton<ClientOnboardingService>();
 
         Services = services.BuildServiceProvider();
 
@@ -129,15 +106,13 @@ public class App : Application
         var loadingViewModel = Services.GetRequiredService<LoadingViewModel>();
         shellViewModel.Content = loadingViewModel;
 
-        var windowStateManager = Services.GetRequiredService<IWindowStateManager>();
+        var windowStateManager = Services.GetRequiredService<WindowStateManager>();
 
         _mainWindow = new MainWindow
         {
             DataContext = shellViewModel
         };
 
-        // CRITICAL: Set MainWindow BEFORE any other initialization
-        // This ensures Avalonia shows the window immediately
         desktop.MainWindow = _mainWindow;
 
         windowStateManager.RestoreWindowState(_mainWindow);
@@ -154,13 +129,12 @@ public class App : Application
             _mainWindow.ShowInTaskbar = true;
         }
 
-        var trayService = Services.GetRequiredService<IHostTrayService>();
+        var trayService = Services.GetRequiredService<HostTrayService>();
         trayService.Initialize(desktop, logger);
 
         _notificationManager = Services.GetRequiredService<DesktopNotificationManager>();
         _notificationManager.Initialize();
 
-        // Register activation handler for single instance
         var singleInstanceManager = Program.GetSingleInstanceManager();
         if (singleInstanceManager != null)
         {
@@ -171,7 +145,6 @@ public class App : Application
             };
         }
 
-        // Apply auto-start settings on first run
         ApplyAutoStartSettings(uiSettingsStore, Services, logger);
 
         _mainWindow.Closing += (_, e) =>
@@ -212,14 +185,10 @@ public class App : Application
 
         RegisterShutdownHandler(desktop, logger);
 
-        // CRITICAL FIX: Call base.OnFrameworkInitializationCompleted() BEFORE heavy initialization
-        // This allows Avalonia to show the window immediately (within ~100ms)
-        // All connection logic happens AFTER the window is visible
         base.OnFrameworkInitializationCompleted();
 
-        // Now start the connection in background - window is already visible
         logger.LogInformation("Window shown. Starting Host connection in background...");
-        var connInit = Services.GetRequiredService<IConnectionInitializer>();
+        var connInit = Services.GetRequiredService<ConnectionInitializer>();
         _ = Task.Run(() => connInit.InitializeAsync(this, clientConfig, loggerFactory, logger));
     }
 
@@ -240,23 +209,19 @@ public class App : Application
 
             _notificationManager?.Dispose();
 
-            var windowStateManager = Services.GetService<IWindowStateManager>();
+            var windowStateManager = Services.GetService<WindowStateManager>();
             if (windowStateManager != null && desktop.MainWindow is { WindowState: not WindowState.Minimized } mainWindow)
             {
                 windowStateManager.SaveWindowState(mainWindow);
             }
 
-            var conn = Services.GetService<ICoreConnection>();
-            if (conn != null)
+            try
             {
-                try
-                {
-                    conn.DisconnectAsync().Wait(TimeSpan.FromSeconds(2));
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Error disconnecting client");
-                }
+                Services.GetService<CoreConnectionHolder>()?.CloseAsync().Wait(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Error disconnecting client");
             }
 
             logger.LogInformation("Client shutdown complete");
@@ -293,9 +258,6 @@ public class App : Application
         }
     }
 
-    /// <summary>
-    ///     Activates and brings the main window to the foreground.
-    /// </summary>
     private void ActivateMainWindow()
     {
         if (_mainWindow == null)
@@ -305,19 +267,16 @@ public class App : Application
 
         try
         {
-            // Restore from minimized state
             if (_mainWindow.WindowState == WindowState.Minimized)
             {
                 _mainWindow.WindowState = WindowState.Normal;
             }
 
-            // Show in taskbar if hidden
             if (!_mainWindow.ShowInTaskbar)
             {
                 _mainWindow.ShowInTaskbar = true;
             }
 
-            // Bring to front
             _mainWindow.Show();
             _mainWindow.Activate();
             _mainWindow.Topmost = true;
@@ -332,15 +291,5 @@ public class App : Application
             var logger = Services.GetService<ILogger<App>>();
             logger?.LogError(ex, "Failed to activate main window");
         }
-    }
-}
-
-// Helper class to satisfy DI before connection is established
-internal class NotConnectedDiagnosticsApi : IDiagnosticsApi
-{
-    public Task<HealthStatus> GetHealthAsync(CancellationToken ct = default)
-    {
-        // Return Unhealthy or throw, Monitor handles exceptions
-        throw new InvalidOperationException("Not connected yet");
     }
 }

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
@@ -9,15 +8,12 @@ using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Axorith.Client.Services;
 
-public sealed class ConnectionInitializer : IConnectionInitializer
+public sealed class ConnectionInitializer
 {
-    private const int MaxRetries = 3;
-    private const int RetryDelayMs = 1000;
-
+    private int _healthMonitoringStarted;
     private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
 
     public async Task InitializeAsync(App app, Configuration config, ILoggerFactory loggerFactory, ILogger<App> logger)
@@ -48,7 +44,13 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 await EnsureHostRunningAsync(app.Services, logger, UpdateStatus);
             }
 
-            var serverAddress = GetDiscoveredEndpointUrl(config, logger);
+            var serverAddress = config.Host.GetEndpointUrl();
+            if (!config.Host.UseRemoteHost && HostInfoReader.TryReadPort(HostInfoPath, out var discoveredPort))
+            {
+                serverAddress = $"http://{config.Host.Address}:{discoveredPort}";
+                logger.LogDebug("Discovered host port {Port} from host-info.json", discoveredPort);
+            }
+
             logger.LogInformation("Connecting to Host at {Address}...", serverAddress);
 
             var tokenProvider = app.Services.GetRequiredService<ITokenProvider>();
@@ -60,7 +62,8 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 UpdateStatus);
 
             await UpdateStatus("Connected to Axorith.Host", "Initializing client services...");
-            RebuildServiceProvider(app, config, loggerFactory, connection, logger);
+            await app.Services.GetRequiredService<CoreConnectionHolder>().ReplaceAsync(connection).ConfigureAwait(false);
+            app.Services.GetRequiredService<HostHealthMonitor>().SetDiagnosticsApi(connection.Diagnostics);
 
             var modulesApi = app.Services.GetRequiredService<IModulesApi>();
             _ = Task.Run(async () =>
@@ -134,7 +137,7 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     {
         try
         {
-            var controller = services.GetService<IHostController>();
+            var controller = services.GetService<HostController>();
             if (controller == null)
             {
                 logger.LogWarning("HostController not available, skipping auto-start");
@@ -149,15 +152,11 @@ public sealed class ConnectionInitializer : IConnectionInitializer
                 logger.LogInformation("Host not reachable. Attempting auto-start...");
                 await statusUpdater("Starting Axorith Client...", "Starting local Host process...");
 
-                // CRITICAL FIX: Use forceRestart: false to allow existing Host to initialize
-                // This prevents killing a Host that's still starting up
                 await controller.StartHostAsync(forceRestart: false);
 
-                // Give Host additional time to become fully ready after file write
                 await statusUpdater("Starting Axorith Client...",
                     "Waiting for Host to initialize (this may take 10-15 seconds)...");
 
-                // Wait and verify Host actually started
                 var verifyStarted = false;
                 for (var i = 0; i < 10; i++)
                 {
@@ -184,7 +183,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         catch (Exception ex)
         {
             logger.LogError(ex, "Auto-start Host attempt failed: {Message}. Will try to connect anyway.", ex.Message);
-            // Don't throw - let connection attempt handle the error with better UI feedback
         }
     }
 
@@ -197,10 +195,10 @@ public sealed class ConnectionInitializer : IConnectionInitializer
     {
         var connectionLogger = loggerFactory.CreateLogger<GrpcCoreConnection>();
         var connection = new GrpcCoreConnection(serverAddress, tokenProvider, connectionLogger, loggerFactory);
+        const int maxRetries = 5;
+        const int retryDelayMs = 2_000;
 
         Exception? lastException = null;
-        var maxRetries = 5; // Increased from 3 to 5
-        var retryDelayMs = 2000; // Increased from 1s to 2s
 
         for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
@@ -226,7 +224,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             }
             catch (Exception ex)
             {
-                // Last attempt failed
                 lastException = ex;
                 logger.LogError(ex, "Final connection attempt {Attempt}/{Max} failed: {Message}",
                     attempt, maxRetries, ex.Message);
@@ -250,79 +247,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         throw new InvalidOperationException("Connection failed with unknown error.");
     }
 
-    private void RebuildServiceProvider(
-        App app,
-        Configuration config,
-        ILoggerFactory loggerFactory,
-        ICoreConnection connection,
-        ILogger logger)
-    {
-        logger.LogInformation("Rebuilding ServiceProvider with active connection...");
-
-        var services = new ServiceCollection();
-
-        services.AddSingleton(Options.Create(config));
-        services.AddSingleton(loggerFactory);
-        services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
-        services.AddSingleton(app.Services.GetRequiredService<ITelemetryService>());
-
-        services.AddSingleton(connection);
-        services.AddSingleton(connection.Presets);
-        services.AddSingleton(connection.Sessions);
-        services.AddSingleton(connection.Modules);
-        services.AddSingleton(connection.Diagnostics);
-        services.AddSingleton(connection.Scheduler);
-        services.AddSingleton(connection.Notifications);
-        services.AddSingleton(connection.Updates);
-
-        var existingMonitor = app.Services.GetRequiredService<IHostHealthMonitor>();
-        existingMonitor.SetDiagnosticsApi(connection.Diagnostics);
-        services.AddSingleton(existingMonitor);
-
-        services.AddSingleton<IHostController, HostController>();
-        services.AddSingleton<ITokenProvider>(app.Services.GetRequiredService<ITokenProvider>());
-        services.AddSingleton<IClientUiSettingsStore, UiSettingsStore>();
-
-        services.AddSingleton(app.Services.GetRequiredService<IToastNotificationService>());
-        services.AddSingleton(app.Services.GetRequiredService<DesktopNotificationManager>());
-
-        var filePicker = app.Services.GetService<IFilePickerService>();
-        if (filePicker != null)
-        {
-            services.AddSingleton(filePicker);
-        }
-
-        services.AddSingleton(app.Services.GetRequiredService<ShellViewModel>());
-        services.AddTransient<LoadingViewModel>();
-        services.AddTransient<ErrorViewModel>();
-        services.AddTransient<MainViewModel>();
-        services.AddTransient<SessionEditorViewModel>();
-
-        var autoStartManager = app.Services.GetService<IAutoStartManager>();
-        if (autoStartManager != null)
-        {
-            services.AddSingleton(autoStartManager);
-        }
-
-        services.AddTransient<SettingsViewModel>(sp => new SettingsViewModel(
-            sp.GetRequiredService<ShellViewModel>(),
-            sp.GetRequiredService<IClientUiSettingsStore>(),
-            sp.GetService<IAutoStartManager>() ?? new NoOpAutoStartManager(),
-            sp.GetRequiredService<ITelemetryService>(),
-            sp.GetRequiredService<IOptions<Configuration>>(),
-            sp,
-            sp.GetRequiredService<ILogger<SettingsViewModel>>()));
-
-        services.AddSingleton<IAppDiscoveryService>(_ => PlatformServices.CreateAppDiscoveryService(loggerFactory));
-        services.AddSingleton<IClientOnboardingService, ClientOnboardingService>();
-
-        var newProvider = services.BuildServiceProvider();
-        app.Services = newProvider;
-
-        var shell = newProvider.GetRequiredService<ShellViewModel>();
-        shell.Services = newProvider;
-    }
-
     private void StartHealthMonitoring(
         IServiceProvider services,
         App app,
@@ -330,7 +254,12 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         ILoggerFactory loggerFactory,
         ILogger<App> logger)
     {
-        var healthMonitor = services.GetRequiredService<IHostHealthMonitor>();
+        if (Interlocked.Exchange(ref _healthMonitoringStarted, 1) != 0)
+        {
+            return;
+        }
+
+        var healthMonitor = services.GetRequiredService<HostHealthMonitor>();
         var shellViewModel = services.GetRequiredService<ShellViewModel>();
 
         healthMonitor.HostUnhealthy += () =>
@@ -365,7 +294,6 @@ public sealed class ConnectionInitializer : IConnectionInitializer
             var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
             var errorViewModel = app.Services.GetRequiredService<ErrorViewModel>();
 
-            // Enhanced error message with actionable information
             var enhancedMessage = $"❌ Failed to start Axorith\n\n{errorMessage}\n\n" +
                                   $"📁 Log files: {ApplicationPaths.Logs}\n\n" +
                                   $"💡 Troubleshooting:\n" +
@@ -383,28 +311,5 @@ public sealed class ConnectionInitializer : IConnectionInitializer
         });
     }
 
-    private string GetDiscoveredEndpointUrl(Configuration config, ILogger logger)
-    {
-        try
-        {
-            if (File.Exists(HostInfoPath))
-            {
-                var json = File.ReadAllText(HostInfoPath);
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("port", out var portElement))
-                {
-                    var port = portElement.GetInt32();
-                    var address = config.Host.Address;
-                    logger.LogDebug("Discovered host port {Port} from host-info.json", port);
-                    return $"http://{address}:{port}";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to read host-info.json, using configured endpoint");
-        }
 
-        return config.Host.GetEndpointUrl();
-    }
 }

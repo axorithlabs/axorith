@@ -28,7 +28,6 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task SavePresetAsync_ShouldCreateJsonFile()
     {
-        // Arrange
         var preset = new SessionPreset
         {
             Id = Guid.NewGuid(),
@@ -36,10 +35,8 @@ public class PresetManagerTests : IDisposable
             Version = 1
         };
 
-        // Act
         await _manager.SavePresetAsync(preset, CancellationToken.None);
 
-        // Assert
         var files = Directory.GetFiles(_testPresetsDirectory, "*.json");
         files.Should().HaveCount(1);
         files[0].Should().EndWith($"{preset.Id}.json");
@@ -48,17 +45,14 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task LoadAllPresetsAsync_WithNoPresets_ShouldReturnEmptyList()
     {
-        // Act
         var presets = await _manager.LoadAllPresetsAsync(CancellationToken.None);
 
-        // Assert
         presets.Should().BeEmpty();
     }
 
     [Fact]
     public async Task LoadAllPresetsAsync_WithSavedPreset_ShouldLoadIt()
     {
-        // Arrange
         var preset = new SessionPreset
         {
             Id = Guid.NewGuid(),
@@ -66,10 +60,8 @@ public class PresetManagerTests : IDisposable
         };
         await _manager.SavePresetAsync(preset, CancellationToken.None);
 
-        // Act
         var presets = await _manager.LoadAllPresetsAsync(CancellationToken.None);
 
-        // Assert
         presets.Should().HaveCount(1);
         presets[0].Name.Should().Be("Loaded Preset");
     }
@@ -77,7 +69,6 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task DeletePresetAsync_ShouldRemoveFile()
     {
-        // Arrange
         var preset = new SessionPreset
         {
             Id = Guid.NewGuid(),
@@ -85,10 +76,8 @@ public class PresetManagerTests : IDisposable
         };
         await _manager.SavePresetAsync(preset, CancellationToken.None);
 
-        // Act
         await _manager.DeletePresetAsync(preset.Id, CancellationToken.None);
 
-        // Assert
         var files = Directory.GetFiles(_testPresetsDirectory, "*.json");
         files.Should().BeEmpty();
     }
@@ -96,20 +85,16 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task DeletePresetAsync_NonExistentPreset_ShouldNotThrow()
     {
-        // Arrange
         var randomId = Guid.NewGuid();
 
-        // Act
         var act = async () => await _manager.DeletePresetAsync(randomId, CancellationToken.None);
 
-        // Assert
         await act.Should().NotThrowAsync();
     }
 
     [Fact]
     public async Task SavePresetAsync_UpdateExisting_ShouldOverwrite()
     {
-        // Arrange
         var presetId = Guid.NewGuid();
         var preset1 = new SessionPreset
         {
@@ -124,10 +109,8 @@ public class PresetManagerTests : IDisposable
             Name = "Updated Name"
         };
 
-        // Act
         await _manager.SavePresetAsync(preset2, CancellationToken.None);
 
-        // Assert
         var loaded = await _manager.LoadAllPresetsAsync(CancellationToken.None);
         loaded.Should().HaveCount(1);
         loaded[0].Name.Should().Be("Updated Name");
@@ -136,7 +119,6 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task LoadAllPresetsAsync_WithMultiplePresets_ShouldLoadAll()
     {
-        // Arrange
         var preset1 = new SessionPreset { Id = Guid.NewGuid(), Name = "Preset 1" };
         var preset2 = new SessionPreset { Id = Guid.NewGuid(), Name = "Preset 2" };
         var preset3 = new SessionPreset { Id = Guid.NewGuid(), Name = "Preset 3" };
@@ -145,10 +127,8 @@ public class PresetManagerTests : IDisposable
         await _manager.SavePresetAsync(preset2, CancellationToken.None);
         await _manager.SavePresetAsync(preset3, CancellationToken.None);
 
-        // Act
         var presets = await _manager.LoadAllPresetsAsync(CancellationToken.None);
 
-        // Assert
         presets.Should().HaveCount(3);
         presets.Select(p => p.Name).Should().Contain(["Preset 1", "Preset 2", "Preset 3"]);
     }
@@ -156,7 +136,6 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task SavePresetAsync_WithConfiguredModules_ShouldPersistThem()
     {
-        // Arrange
         var preset = new SessionPreset
         {
             Id = Guid.NewGuid(),
@@ -174,11 +153,9 @@ public class PresetManagerTests : IDisposable
             ]
         };
 
-        // Act
         await _manager.SavePresetAsync(preset, CancellationToken.None);
         var loaded = await _manager.LoadAllPresetsAsync(CancellationToken.None);
 
-        // Assert
         loaded[0].Modules.Should().HaveCount(1);
         loaded[0].Modules[0].ModuleId.Should().NotBe(Guid.Empty);
         loaded[0].Modules[0].Settings["setting1"].Should().Be("value1");
@@ -187,14 +164,11 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task Cancellation_ShouldRespectCancellationToken()
     {
-        // Arrange
         var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        // Act
         var result = await _manager.LoadAllPresetsAsync(cts.Token);
 
-        // Assert
         result.Should().BeEmpty("Cancellation should stop loading early");
     }
 }

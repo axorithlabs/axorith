@@ -6,14 +6,8 @@ using Axorith.Shared.Platform;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Browser;
 
-/// <summary>
-///     Settings for Browser module.
-/// </summary>
 internal sealed class Settings : LauncherSettingsBase
 {
-    /// <summary>
-    ///     Known browser publishers for filtering applications.
-    /// </summary>
     private static readonly string[] BrowserPublishers =
     [
         "Google", "Mozilla", "Microsoft", "Brave Software", "Opera Software",
@@ -21,17 +15,6 @@ internal sealed class Settings : LauncherSettingsBase
         "LibreWolf", "Ablaze Floorp", "Zen Browser", "Moonchild Productions",
         "Yandex", "The Browser Company", "Tor Project"
     ];
-
-    /// <summary>
-    ///     Known browser executable names for precise matching.
-    /// </summary>
-    private static readonly HashSet<string> BrowserExecutables = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "chrome.exe", "firefox.exe", "msedge.exe", "brave.exe", "opera.exe",
-        "vivaldi.exe", "chromium.exe", "waterfox.exe", "librewolf.exe",
-        "floorp.exe", "zen.exe", "palemoon.exe", "browser.exe", "arc.exe",
-        "tor.exe", "safari.exe", "maxthon.exe", "slimbrowser.exe", "iexplore.exe"
-    };
 
     public override Setting<string> ApplicationPath => BrowserPath;
 
@@ -86,20 +69,9 @@ internal sealed class Settings : LauncherSettingsBase
         SetupBaseReactiveVisibility();
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield return StartUrl;
-        yield return ProfileName;
-        yield return IncognitoMode;
-        yield return AdditionalArgs;
-    }
+    protected override IEnumerable<ISetting> GetAdditionalSettings() => [StartUrl, ProfileName, IncognitoMode, AdditionalArgs];
 
-    protected override IEnumerable<IAction> GetAdditionalActions() => [];
-
-    protected override Task InitializeAdditionalAsync()
-    {
-        return RefreshBrowsersAsync();
-    }
+    protected override Task InitializeAdditionalAsync() => RefreshBrowsersAsync();
 
     protected override Task<ValidationResult> ValidateAdditionalAsync()
     {
@@ -121,9 +93,6 @@ internal sealed class Settings : LauncherSettingsBase
         return Task.FromResult(ValidationResult.Success);
     }
 
-    /// <summary>
-    ///     Gets the browser profile for the currently selected browser.
-    /// </summary>
     public BrowserProfile? GetSelectedBrowserProfile()
     {
         var path = BrowserPath.GetCurrentValue();
@@ -141,7 +110,7 @@ internal sealed class Settings : LauncherSettingsBase
                 try
                 {
                     var publisherApps = _appDiscovery.FindAppsByPublisher(publisher);
-                    browsers.AddRange(publisherApps.Where(IsBrowserApplication));
+                    browsers.AddRange(publisherApps.Where(ApplicationSelector.IsBrowserApp));
                 }
                 catch
                 {
@@ -150,7 +119,7 @@ internal sealed class Settings : LauncherSettingsBase
             }
 
             var allApps = _appDiscovery.GetInstalledApplicationsIndex();
-            var additionalBrowsers = allApps.Where(IsBrowserByExecutableName);
+            var additionalBrowsers = allApps.Where(ApplicationSelector.IsBrowserApp);
             browsers.AddRange(additionalBrowsers);
 
             var uniqueBrowsers = browsers
@@ -184,10 +153,6 @@ internal sealed class Settings : LauncherSettingsBase
         });
     }
 
-    /// <summary>
-    ///     Picks the best entry from a group of duplicate browsers (same exe name).
-    ///     Prefers entries with human-readable names over technical names.
-    /// </summary>
     private static AppInfo PickBestBrowserEntry(IGrouping<string, AppInfo> group)
     {
         var entries = group.ToList();
@@ -205,35 +170,4 @@ internal sealed class Settings : LauncherSettingsBase
             .First();
     }
 
-    /// <summary>
-    ///     Determines if an application is a browser by checking its executable name against known browser executables.
-    /// </summary>
-    private static bool IsBrowserByExecutableName(AppInfo app)
-    {
-        if (string.IsNullOrWhiteSpace(app.ExecutablePath))
-        {
-            return false;
-        }
-
-        var fileName = Path.GetFileName(app.ExecutablePath);
-        return BrowserExecutables.Contains(fileName);
-    }
-
-    /// <summary>
-    ///     Determines if an application is a browser by checking both executable name and application characteristics.
-    /// </summary>
-    private static bool IsBrowserApplication(AppInfo app)
-    {
-        return IsBrowserByExecutableName(app);
-    }
-
-    public override void Dispose()
-    {
-        BrowserPath.Dispose();
-        StartUrl.Dispose();
-        ProfileName.Dispose();
-        IncognitoMode.Dispose();
-        AdditionalArgs.Dispose();
-        base.Dispose();
-    }
 }

@@ -36,7 +36,6 @@ public class ModuleRegistryTests : IDisposable
     [Fact]
     public async Task GetAllDefinitions_AfterInit_ShouldReturnLoadedDefinitions()
     {
-        // Arrange
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         var definition1 = new ModuleDefinition
@@ -61,10 +60,8 @@ public class ModuleRegistryTests : IDisposable
 
         await _registry.InitializeAsync(CancellationToken.None);
 
-        // Act
         var definitions = _registry.GetAllDefinitions();
 
-        // Assert
         definitions.Should().HaveCount(2);
         definitions.Should().Contain(d => d.Id == id1);
         definitions.Should().Contain(d => d.Id == id2);
@@ -73,7 +70,6 @@ public class ModuleRegistryTests : IDisposable
     [Fact]
     public async Task GetDefinition_WithValidId_ShouldReturnDefinition()
     {
-        // Arrange
         var id = Guid.NewGuid();
         var definition = new ModuleDefinition
         {
@@ -90,10 +86,8 @@ public class ModuleRegistryTests : IDisposable
 
         await _registry.InitializeAsync(CancellationToken.None);
 
-        // Act
         var result = _registry.GetDefinitionById(id);
 
-        // Assert
         result.Should().NotBeNull();
         result!.Id.Should().Be(id);
     }
@@ -101,7 +95,6 @@ public class ModuleRegistryTests : IDisposable
     [Fact]
     public async Task GetDefinition_WithInvalidId_ShouldReturnNull()
     {
-        // Arrange
         _mockLoader.Setup(l => l.LoadModuleDefinitionsAsync(
                 It.IsAny<IEnumerable<string>>(),
                 It.IsAny<CancellationToken>(),
@@ -110,26 +103,19 @@ public class ModuleRegistryTests : IDisposable
 
         await _registry.InitializeAsync(CancellationToken.None);
 
-        // Act
         var result = _registry.GetDefinitionById(Guid.NewGuid());
 
-        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
     public void GetAllDefinitions_BeforeInit_ShouldThrow()
     {
-        // Act
         var act = () => _registry.GetAllDefinitions();
 
-        // Assert
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*not been initialized*");
     }
 
-    public void Dispose()
-    {
-        _registry.Dispose();
-    }
+    public void Dispose() => _registry.Dispose();
 }

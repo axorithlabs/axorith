@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using Axorith.Sdk.Logging;
-using Axorith.Sdk.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
@@ -104,19 +102,4 @@ public sealed class HomeAssistantModuleTests
         public HttpClient CreateClient(string name) => client;
     }
 
-    private sealed class EmptySecureStorage : ISecureStorageService
-    {
-        public void StoreSecret(string key, string secret) { }
-        public string? RetrieveSecret(string key) => null;
-        public void DeleteSecret(string key) { }
-    }
-
-    private sealed class TestModuleLogger : IModuleLogger
-    {
-        public void LogDebug(string messageTemplate, params object[] args) { }
-        public void LogInfo(string messageTemplate, params object[] args) { }
-        public void LogWarning(string messageTemplate, params object[] args) { }
-        public void LogError(Exception? exception, string messageTemplate, params object[] args) { }
-        public void LogFatal(Exception? exception, string messageTemplate, params object[] args) { }
-    }
 }

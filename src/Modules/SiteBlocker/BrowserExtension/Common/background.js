@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file background.js
- * @description Background service worker for the Axorith Site Blocker Chrome extension (v2.2).
+ * @description Background script for the Axorith Site Blocker browser extension.
  * Supports BlockList/AllowList and automatic fallback between Dev/Prod native hosts.
  */
 
@@ -10,6 +10,8 @@
 const STORAGE_KEY_BLOCKED_DOMAINS = "axorith_blocked_domains";
 const STORAGE_KEY_MODE = "axorith_blocking_mode";
 const PROTOCOL_VERSION = 1;
+const extensionApi = globalThis.browser ?? globalThis.chrome;
+const browserKind = extensionApi.runtime.getManifest().browser_specific_settings?.gecko ? "firefox" : "chromium";
 
 // Host names to try. Priority: Dev -> Prod
 const HOSTS = ["axorith.dev", "axorith"];
@@ -23,7 +25,7 @@ function connectToHost() {
     console.log(`Axorith: Attempting to connect to native host: ${hostName}`);
     
     try {
-        nativePort = chrome.runtime.connectNative(hostName);
+        nativePort = extensionApi.runtime.connectNative(hostName);
     } catch (e) {
         console.error(`Axorith: Failed to initiate connection to ${hostName}:`, e);
         handleConnectionFailure();
@@ -33,7 +35,7 @@ function connectToHost() {
     nativePort.onMessage.addListener(handleNativeMessage);
     
     nativePort.onDisconnect.addListener(() => {
-        const error = chrome.runtime.lastError;
+        const error = extensionApi.runtime.lastError;
         if (error) {
             console.warn(`Axorith: Failed to connect/disconnected from ${hostName}: ${error.message}`);
             handleConnectionFailure();
@@ -73,7 +75,7 @@ async function handleNativeMessage(message) {
         } else if (message.command === "unblock") {
             await unblockSites();
         } else if (message.command === "health") {
-            const state = await chrome.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+            const state = await extensionApi.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
             blocking = sameSites(state[STORAGE_KEY_BLOCKED_DOMAINS], message.sites) &&
                 state[STORAGE_KEY_MODE] === message.mode;
         }
@@ -82,8 +84,8 @@ async function handleNativeMessage(message) {
             nativePort.postMessage({
                 requestId: message.requestId,
                 protocolVersion: PROTOCOL_VERSION,
-                browser: "chromium",
-                version: chrome.runtime.getManifest().version,
+                browser: browserKind,
+                version: extensionApi.runtime.getManifest().version,
                 ok: message.command !== "block" || blocking,
                 blocking
             });
@@ -93,8 +95,8 @@ async function handleNativeMessage(message) {
             nativePort.postMessage({
                 requestId: message.requestId,
                 protocolVersion: PROTOCOL_VERSION,
-                browser: "chromium",
-                version: chrome.runtime.getManifest().version,
+                browser: browserKind,
+                version: extensionApi.runtime.getManifest().version,
                 ok: false,
                 status: "Error",
                 message: error.message
@@ -116,12 +118,12 @@ async function blockSites(domains, mode) {
 
     console.log(`Axorith: Activating ${mode} for ${domains.length} domains.`);
     
-    await chrome.storage.local.set({ 
+    await extensionApi.storage.local.set({ 
         [STORAGE_KEY_BLOCKED_DOMAINS]: domains,
         [STORAGE_KEY_MODE]: mode
     });
 
-    const tabs = await chrome.tabs.query({});
+    const tabs = await extensionApi.tabs.query({});
     const results = await Promise.all(tabs
         .filter(tab => shouldBlockUrl(tab.url, domains, mode))
         .map(tab => injectBlocker(tab.id)));
@@ -131,7 +133,7 @@ async function blockSites(domains, mode) {
 async function unblockSites() {
     console.log("Axorith: Deactivating all blocks.");
     
-    const storage = await chrome.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+    const storage = await extensionApi.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
     const blockedDomains = storage[STORAGE_KEY_BLOCKED_DOMAINS];
     const mode = storage[STORAGE_KEY_MODE];
     
@@ -139,20 +141,20 @@ async function unblockSites() {
         return;
     }
 
-    await chrome.storage.local.remove([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+    await extensionApi.storage.local.remove([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
 
-    const tabs = await chrome.tabs.query({});
+    const tabs = await extensionApi.tabs.query({});
     for (const tab of tabs) {
         if (shouldBlockUrl(tab.url, blockedDomains, mode)) {
             console.log(`Axorith: Reloading previously blocked tab ${tab.id} (${tab.url})`);
-            chrome.tabs.reload(tab.id).catch(e => console.warn(`Could not reload tab ${tab.id}: ${e.message}`));
+            extensionApi.tabs.reload(tab.id).catch(e => console.warn(`Could not reload tab ${tab.id}: ${e.message}`));
         }
     }
 }
 
 function injectBlocker(tabId) {
     console.log(`Axorith: Injecting blocker into tab ${tabId}`);
-    return chrome.scripting.executeScript({
+    return extensionApi.scripting.executeScript({
         target: { tabId: tabId },
         files: ["content.js"]
     }).then(() => true).catch(err => {
@@ -172,12 +174,12 @@ function sameSites(left, right) {
 
 // --- Event Listeners ---
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+extensionApi.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status !== 'complete' || !tab.url) {
         return;
     }
 
-    const storage = await chrome.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+    const storage = await extensionApi.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
     const domains = storage[STORAGE_KEY_BLOCKED_DOMAINS];
     const mode = storage[STORAGE_KEY_MODE];
 
@@ -197,8 +199,7 @@ function shouldBlockUrl(urlString, domainList, mode) {
     try {
         const url = new URL(urlString);
         
-        // Chrome-specific protocols to ignore
-        const safeProtocols = ['chrome:', 'chrome-extension:', 'edge:', 'about:', 'file:', 'view-source:', 'devtools:'];
+        const safeProtocols = ['chrome:', 'chrome-extension:', 'edge:', 'about:', 'moz-extension:', 'file:', 'view-source:', 'devtools:'];
         if (safeProtocols.some(proto => url.protocol.startsWith(proto))) {
             return false;
         }
@@ -219,5 +220,5 @@ function shouldBlockUrl(urlString, domainList, mode) {
 }
 
 // --- Initialization ---
-console.log("Axorith Background Service Worker Loaded.");
+console.log("Axorith background loaded.");
 connectToHost();

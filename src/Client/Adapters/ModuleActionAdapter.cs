@@ -8,9 +8,6 @@ using Axorith.Telemetry;
 
 namespace Axorith.Client.Adapters;
 
-/// <summary>
-///     Adapts a remote ModuleAction into an IAction for UI binding.
-/// </summary>
 internal class ModuleActionAdapter(
     ModuleAction action,
     IModulesApi modulesApi,
@@ -30,30 +27,15 @@ internal class ModuleActionAdapter(
     public IObservable<bool> IsEnabled => _enabledSubject.AsObservable();
     public IObservable<Unit> Invoked => _invokedSubject.AsObservable();
 
-    public string GetCurrentLabel()
-    {
-        return _labelSubject.Value;
-    }
+    public string GetCurrentLabel() => _labelSubject.Value;
 
-    public bool GetCurrentEnabled()
-    {
-        return _enabledSubject.Value;
-    }
+    public bool GetCurrentEnabled() => _enabledSubject.Value;
 
-    public void SetLabel(string label)
-    {
-        _labelSubject.OnNext(label);
-    }
+    public void SetLabel(string label) => _labelSubject.OnNext(label);
 
-    public void SetEnabled(bool enabled)
-    {
-        _enabledSubject.OnNext(enabled);
-    }
+    public void SetEnabled(bool enabled) => _enabledSubject.OnNext(enabled);
 
-    public void Invoke()
-    {
-        _ = Task.Run(() => InvokeCoreAsync(throwOnError: false));
-    }
+    public void Invoke() => _ = Task.Run(() => InvokeCoreAsync(throwOnError: false));
 
     public async Task InvokeAsync()
     {

@@ -12,71 +12,24 @@ public abstract class Setting
     /// <summary>
     ///     Creates a setting that is rendered as a text input field.
     /// </summary>
-    /// <example>
-    ///     _greetingMessage = Setting.AsText(
-    ///     key: "GreetingMessage",
-    ///     label: "Greeting Message",
-    ///     description: "This message will be logged on session start.",
-    ///     defaultValue: "Hello from TestModule!"
-    ///     );
-    /// </example>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default text value.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive text setting.</returns>
     public static Setting<string> AsText(string key, string label, string defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<string>(key, label, description, defaultValue, SettingControlType.Text, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue);
+        return CreateString(key, label, defaultValue, SettingControlType.Text, description, isVisible, isReadOnly);
     }
 
     /// <summary>
     ///     Creates a setting that is rendered as a text area input field.
     /// </summary>
-    /// <example>
-    ///     _blockedSites = Setting.AsTextArea(
-    ///     key: "BlockedSites",
-    ///     label: "Sites to Block",
-    ///     description: "A comma-separated list of domains to block (e.g., youtube.com, twitter.com, reddit.com).",
-    ///     defaultValue: "youtube.com, twitter.com, reddit.com"
-    ///     );
-    /// </example>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default text value.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive text setting.</returns>
     public static Setting<string> AsTextArea(string key, string label, string defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<string>(key, label, description, defaultValue, SettingControlType.TextArea, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue);
+        return CreateString(key, label, defaultValue, SettingControlType.TextArea, description, isVisible, isReadOnly);
     }
 
     /// <summary>
     ///     Creates a setting that is rendered as a checkbox.
     /// </summary>
-    /// <example>
-    ///     _enableExtraLogging = Setting.AsCheckbox(
-    ///     key: "EnableExtraLogging",
-    ///     label: "Enable Extra Logging",
-    ///     description: "If checked, the module will log a countdown.",
-    ///     defaultValue: true
-    ///     );
-    /// </example>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default boolean value (checked/unchecked).</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive checkbox setting.</returns>
     public static Setting<bool> AsCheckbox(string key, string label, bool defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
@@ -87,21 +40,6 @@ public abstract class Setting
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field.
     /// </summary>
-    /// <example>
-    ///     _workDurationSeconds = Setting.AsNumber(
-    ///     key: "WorkDurationSeconds",
-    ///     label: "Work Duration (sec)",
-    ///     description: "How long the module should simulate work.",
-    ///     defaultValue: 5
-    ///     );
-    /// </example>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default numeric value.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive number setting.</returns>
     public static Setting<decimal> AsNumber(string key, string label, decimal defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
@@ -113,13 +51,6 @@ public abstract class Setting
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field bound to an integer value.
     /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default integer value.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive integer setting.</returns>
     public static Setting<int> AsInt(string key, string label, int defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
@@ -131,13 +62,6 @@ public abstract class Setting
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field bound to a double value.
     /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default double value.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive double setting.</returns>
     public static Setting<double> AsDouble(string key, string label, double defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
@@ -149,13 +73,6 @@ public abstract class Setting
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field bound to a TimeSpan value (in seconds).
     /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default TimeSpan value.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive TimeSpan setting.</returns>
     public static Setting<TimeSpan> AsTimeSpan(string key, string label, TimeSpan defaultValue,
         string? description = null, bool isVisible = true, bool isReadOnly = false)
     {
@@ -174,20 +91,12 @@ public abstract class Setting
     ///     - UI binding uses StringValue which contains the key
     ///     - SetChoices() updates available options dynamically
     /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The label to display for this setting.</param>
-    /// <param name="defaultValue">The initial selected key (must match a key in initialChoices).</param>
-    /// <param name="initialChoices">The list of key-value pairs representing the available options.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive choice setting.</returns>
     public static Setting<string> AsChoice(string key, string label, string defaultValue,
         IReadOnlyList<KeyValuePair<string, string>> initialChoices, string? description = null, bool isVisible = true,
         bool isReadOnly = false)
     {
-        var setting = new Setting<string>(key, label, description, defaultValue, SettingControlType.Choice, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue);
+        var setting = CreateString(key, label, defaultValue, SettingControlType.Choice, description, isVisible,
+            isReadOnly);
         setting.InitializeChoices(initialChoices);
         return setting;
     }
@@ -196,14 +105,6 @@ public abstract class Setting
     ///     Creates a setting that is rendered as a list of checkboxes (multiple selection).
     ///     The value is a list of selected keys.
     /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The label to display.</param>
-    /// <param name="defaultValues">The initial list of selected keys.</param>
-    /// <param name="initialChoices">The list of all available options.</param>
-    /// <param name="description">Optional description.</param>
-    /// <param name="isVisible">Initial visibility.</param>
-    /// <param name="isReadOnly">Initial read-only state.</param>
-    /// <returns>A new reactive multi-choice setting.</returns>
     public static Setting<List<string>> AsMultiChoice(string key, string label, List<string> defaultValues,
         IReadOnlyList<KeyValuePair<string, string>> initialChoices, string? description = null, bool isVisible = true,
         bool isReadOnly = false)
@@ -231,98 +132,43 @@ public abstract class Setting
     ///     in SecureStorage (Windows DPAPI) and restored when the session starts.
     ///     This ensures sensitive data (API tokens, passwords) never appear in plaintext on disk.
     /// </summary>
-    /// <example>
-    ///     _spotifyRefreshToken = Setting.AsSecret(
-    ///     key: "RefreshToken",
-    ///     label: "Spotify Refresh Token",
-    ///     description: "Automatically managed by the authentication system."
-    ///     );
-    /// </example>
-    /// <param name="key">The unique key for this setting. Used as the SecureStorage key.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <returns>A new reactive secret setting with Ephemeral persistence (not saved to presets).</returns>
     public static Setting<string> AsSecret(string key, string label, string? description = null, bool isVisible = true,
         bool isReadOnly = false)
     {
-        return new Setting<string>(key, label, description, string.Empty, SettingControlType.Secret, isVisible,
-            isReadOnly, SettingPersistence.Ephemeral, s => s, s => s ?? string.Empty);
+        return CreateString(key, label, string.Empty, SettingControlType.Secret, description, isVisible, isReadOnly,
+            SettingPersistence.Ephemeral);
     }
 
     /// <summary>
     ///     Creates a setting that is rendered as a text field with a file browser button.
     /// </summary>
-    /// <example>
-    ///     _inputFile = Setting.AsFilePicker(
-    ///     key: "InputFile",
-    ///     label: "Input File",
-    ///     description: "Select a configuration file.",
-    ///     defaultValue: "",
-    ///     filter: "JSON files (*.json)|*.json|All files (*.*)|*.*"
-    ///     );
-    /// </example>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default file path.</param>
-    /// <param name="filter">The file dialog filter string (e.g., "JSON files (*.json)|*.json|All files (*.*)|*.*").</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <param name="useHistory"></param>
-    /// <returns>A new reactive file picker setting.</returns>
     public static Setting<string> AsFilePicker(string key, string label, string defaultValue, string? filter = null,
         string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
     {
-        return new Setting<string>(key, label, description, defaultValue, SettingControlType.FilePicker, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue)
-        {
-            Filter = filter,
-            HasHistory = useHistory
-        };
+        return CreateString(key, label, defaultValue, SettingControlType.FilePicker, description, isVisible, isReadOnly,
+            filter: filter, hasHistory: useHistory);
     }
 
     /// <summary>
     ///     Creates a setting that is rendered as a text field with a directory browser button.
-    ///     <example>
-    ///         _outputDirectory = Setting.AsDirectoryPicker(
-    ///         key: "OutputDirectory",
-    ///         label: "Output Directory",
-    ///         description: "Select a directory for output files.",
-    ///         defaultValue: Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-    ///         );
-    ///     </example>
     /// </summary>
-    /// <param name="key">The unique key for this setting.</param>
-    /// <param name="label">The display label for the UI.</param>
-    /// <param name="defaultValue">The default directory path.</param>
-    /// <param name="description">An optional description for a tooltip.</param>
-    /// <param name="isVisible">The initial visibility of the control.</param>
-    /// <param name="isReadOnly">The initial read-only state of the control.</param>
-    /// <param name="useHistory"></param>
-    /// <returns>A new reactive directory picker setting.</returns>
     public static Setting<string> AsDirectoryPicker(string key, string label, string defaultValue,
         string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
     {
-        return new Setting<string>(key, label, description, defaultValue, SettingControlType.DirectoryPicker, isVisible,
-            isReadOnly, SettingPersistence.Persisted, s => s, s => s ?? defaultValue)
-        {
-            HasHistory = useHistory
-        };
+        return CreateString(key, label, defaultValue, SettingControlType.DirectoryPicker, description, isVisible,
+            isReadOnly, hasHistory: useHistory);
     }
+
+    private static Setting<string> CreateString(string key, string label, string defaultValue,
+        SettingControlType controlType, string? description, bool isVisible, bool isReadOnly,
+        SettingPersistence persistence = SettingPersistence.Persisted, string? filter = null, bool hasHistory = false) =>
+        new(key, label, description, defaultValue, controlType, isVisible, isReadOnly, persistence, s => s,
+            s => s ?? defaultValue) { Filter = filter, HasHistory = hasHistory };
 }
 
 /// <summary>
-///     A strongly-typed, reactive representation of a single module setting.
-///     This class encapsulates its value, UI metadata, and reactive state.
-///     THREAD-SAFETY:
-///     - All methods (SetValue, SetLabel, SetVisibility, etc.) are thread-safe and can be called from any thread.
-///     - Observable subscriptions should use ObserveOn(RxApp.MainThreadScheduler) in UI code to marshal to UI thread.
-///     - SetValueFromString/SetValueFromObject can be called from background threads (e.g., during async loading).
-///     - Reactive subjects are thread-safe by default and emit on the calling thread.
+///     A strongly-typed reactive module setting with observable value and UI metadata.
 /// </summary>
-/// <typeparam name="T">The underlying type of the setting's value (e.g., string, bool, decimal).</typeparam>
 public class Setting<T> : ISetting, IDisposable
 {
     private readonly BehaviorSubject<T> _value;
@@ -375,15 +221,9 @@ public class Setting<T> : ISetting, IDisposable
     /// <inheritdoc />
     public bool HasHistory { get; internal init; }
 
-    object? ISetting.GetCurrentValueAsObject()
-    {
-        return _value.Value;
-    }
+    object? ISetting.GetCurrentValueAsObject() => _value.Value;
 
-    string ISetting.GetValueAsString()
-    {
-        return _serializer(_value.Value);
-    }
+    string ISetting.GetValueAsString() => _serializer(_value.Value);
 
     void ISetting.SetValueFromObject(object? value)
     {
@@ -408,11 +248,6 @@ public class Setting<T> : ISetting, IDisposable
                         }
                     }
 
-                    if (typeof(T) == typeof(List<string>) && value is string strVal)
-                    {
-                        _value.OnNext(_deserializer(strVal));
-                        return;
-                    }
 
                     if (value is IConvertible)
                     {
@@ -460,18 +295,12 @@ public class Setting<T> : ISetting, IDisposable
     /// <summary>
     ///     Gets the current value of the setting synchronously.
     /// </summary>
-    public T GetCurrentValue()
-    {
-        return _value.Value;
-    }
+    public T GetCurrentValue() => _value.Value;
 
     /// <summary>
     ///     Sets the value of the setting, notifying all subscribers.
     /// </summary>
-    public void SetValue(T value)
-    {
-        _value.OnNext(value);
-    }
+    public void SetValue(T value) => _value.OnNext(value);
 
     /// <summary>
     ///     Dynamically updates the setting's label, notifying the UI.
@@ -495,48 +324,27 @@ public class Setting<T> : ISetting, IDisposable
     /// <summary>
     ///     Dynamically updates the setting's visibility, notifying the UI.
     /// </summary>
-    public void SetVisibility(bool isVisible)
-    {
-        _isVisible.OnNext(isVisible);
-    }
+    public void SetVisibility(bool isVisible) => _isVisible.OnNext(isVisible);
 
     /// <summary>
     ///     Dynamically updates the setting's read-only state, notifying the UI.
     /// </summary>
-    public void SetReadOnly(bool isReadOnly)
-    {
-        _isReadOnly.OnNext(isReadOnly);
-    }
+    public void SetReadOnly(bool isReadOnly) => _isReadOnly.OnNext(isReadOnly);
 
     /// <inheritdoc />
-    void ISetting.SetValueFromString(string? value)
-    {
-        _value.OnNext(_deserializer(value));
-    }
+    void ISetting.SetValueFromString(string? value) => _value.OnNext(_deserializer(value));
 
     /// <inheritdoc />
-    string ISetting.GetCurrentLabel()
-    {
-        return _label.Value;
-    }
+    string ISetting.GetCurrentLabel() => _label.Value;
 
     /// <inheritdoc />
-    bool ISetting.GetCurrentVisibility()
-    {
-        return _isVisible.Value;
-    }
+    bool ISetting.GetCurrentVisibility() => _isVisible.Value;
 
     /// <inheritdoc />
-    bool ISetting.GetCurrentReadOnly()
-    {
-        return _isReadOnly.Value;
-    }
+    bool ISetting.GetCurrentReadOnly() => _isReadOnly.Value;
 
     /// <inheritdoc />
-    IReadOnlyList<KeyValuePair<string, string>>? ISetting.GetCurrentChoices()
-    {
-        return _choices?.Value;
-    }
+    IReadOnlyList<KeyValuePair<string, string>>? ISetting.GetCurrentChoices() => _choices?.Value;
 
     /// <summary>
     ///     Disposes the setting and releases all resources.

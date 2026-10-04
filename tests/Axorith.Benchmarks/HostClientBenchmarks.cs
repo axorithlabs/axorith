@@ -54,22 +54,12 @@ public class HostClientBenchmarks
         File.Copy(Path.Combine(Environment.SystemDirectory, "ping.exe"), _blockerProbePath);
 
         var moduleRoot = Path.Combine(_dataPath, "modules");
-        _appBlockerId = InstallModule(moduleRoot, typeof(Axorith.Module.AppBlocker.Module), "App Blocker");
-        _siteBlockerId = InstallModule(moduleRoot, typeof(Axorith.Module.SiteBlocker.Module), "Site Blocker");
+        _appBlockerId = BenchmarkEnvironment.InstallModule(moduleRoot, typeof(Axorith.Module.AppBlocker.Module), "App Blocker");
+        _siteBlockerId = BenchmarkEnvironment.InstallModule(moduleRoot, typeof(Axorith.Module.SiteBlocker.Module), "Site Blocker");
         _factory = new BenchmarkHostFactory(_dataPath);
         _httpClient = _factory.CreateDefaultClient();
-        var token = await WaitForAuthTokenAsync(Path.Combine(_dataPath, "config", ".auth_token"));
-        var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-        {
-            metadata.Add("x-axorith-auth-token", token);
-            return Task.CompletedTask;
-        });
-        _channel = GrpcChannel.ForAddress(_httpClient.BaseAddress!, new GrpcChannelOptions
-        {
-            HttpClient = _httpClient,
-            Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-            UnsafeUseInsecureChannelCallCredentials = true
-        });
+        var token = await BenchmarkEnvironment.WaitForAuthTokenAsync(Path.Combine(_dataPath, "config", ".auth_token"));
+        _channel = BenchmarkEnvironment.CreateAuthenticatedChannel(_httpClient.BaseAddress!, token, _httpClient);
         _presets = new PresetsService.PresetsServiceClient(_channel);
         _sessions = new SessionsService.SessionsServiceClient(_channel);
         _modules = new ModulesService.ModulesServiceClient(_channel);
@@ -243,41 +233,6 @@ public class HostClientBenchmarks
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled) { }
-    }
-
-    internal static async Task<string> WaitForAuthTokenAsync(string path)
-    {
-        for (var attempt = 0; attempt < 100; attempt++)
-        {
-            if (File.Exists(path))
-            {
-                var token = await File.ReadAllTextAsync(path);
-                if (!string.IsNullOrWhiteSpace(token))
-                    return token;
-            }
-
-            await Task.Delay(50);
-        }
-
-        throw new TimeoutException("The host did not create its gRPC authentication token.");
-    }
-
-    internal static Guid InstallModule(string moduleRoot, Type moduleType, string name)
-    {
-        var id = Guid.NewGuid();
-        var directory = Path.Combine(moduleRoot, name.Replace(' ', '_'));
-        Directory.CreateDirectory(directory);
-        var assemblyName = Path.GetFileName(moduleType.Assembly.Location);
-        File.Copy(moduleType.Assembly.Location, Path.Combine(directory, assemblyName));
-        File.WriteAllText(Path.Combine(directory, "module.json"), System.Text.Json.JsonSerializer.Serialize(new
-        {
-            id,
-            name,
-            category = "Productivity",
-            platforms = new[] { "Windows" },
-            assembly = assemblyName
-        }));
-        return id;
     }
 
     internal sealed class BenchmarkHostFactory(string dataPath) : WebApplicationFactory<global::Program>

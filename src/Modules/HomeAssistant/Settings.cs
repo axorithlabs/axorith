@@ -1,4 +1,4 @@
-﻿using System.Reactive.Disposables;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
@@ -79,7 +79,7 @@ internal sealed class Settings : IDisposable
             "Entity to activate/deactivate when session ends. Scripts/Scenes are turned ON. Lights/Switches are turned OFF."
         );
 
-        TestConnectionAction = Action.Create("TestConnection", "TEST", settingKey: BaseUrl.Key);
+        TestConnectionAction = new Action("TestConnection", "TEST", settingKey: BaseUrl.Key);
 
         _allSettings =
         [
@@ -120,15 +120,9 @@ internal sealed class Settings : IDisposable
         }
     }
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _allSettings;
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
 
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _allActions;
-    }
+    public IReadOnlyList<IAction> GetActions() => _allActions;
 
     public Task<ValidationResult> ValidateAsync()
     {

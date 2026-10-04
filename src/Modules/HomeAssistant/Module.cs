@@ -21,15 +21,9 @@ public class Module : IModule
         _settings.TestConnectionAction.OnInvokeAsync(TestConnectionAsync);
     }
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _settings.GetSettings();
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _settings.GetSettings();
 
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _settings.GetActions();
-    }
+    public IReadOnlyList<IAction> GetActions() => _settings.GetActions();
 
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -37,10 +31,7 @@ public class Module : IModule
         return Task.CompletedTask;
     }
 
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
-    {
-        return _settings.ValidateAsync();
-    }
+    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) => _settings.ValidateAsync();
 
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {

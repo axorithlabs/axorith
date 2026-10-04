@@ -1,9 +1,5 @@
 namespace Axorith.Core.Models;
 
-/// <summary>
-///     Represents a complete, user-defined session preset.
-///     This is the main data object that gets serialized to and from storage (e.g., a JSON file).
-/// </summary>
 public class SessionPreset
 {
     public SessionPreset()
@@ -15,26 +11,23 @@ public class SessionPreset
         Id = id;
     }
 
-    /// <summary>
-    ///     Schema version for preset format. Used for migration when structure changes.
-    ///     Current version: 3
-    /// </summary>
+    public SessionPreset(SessionPreset source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        Version = source.Version;
+        Id = source.Id;
+        Name = source.Name;
+        FocusCommitment = new FocusCommitmentOptions(source.FocusCommitment);
+        Modules = [.. source.Modules.Select(module => new ConfiguredModule(module))];
+    }
+
     public int Version { get; set; } = 3;
 
-    /// <summary>
-    ///     A unique identifier for this preset. Crucial for updating and deleting.
-    /// </summary>
     public Guid Id { get; set; }
 
-    /// <summary>
-    ///     The user-friendly name of the preset, e.g., "Morning Coding Focus".
-    /// </summary>
     public string Name { get; set; } = string.Empty;
 
     public FocusCommitmentOptions FocusCommitment { get; set; } = new();
 
-    /// <summary>
-    ///     The list of modules that are part of this session, along with their specific configurations.
-    /// </summary>
     public List<ConfiguredModule> Modules { get; set; } = [];
 }

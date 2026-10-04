@@ -1,7 +1,4 @@
 using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
-using System.Text.Json;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Contracts;
 using Axorith.Shared.Utils;
@@ -12,10 +9,10 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Client.Services;
 
-public class HostController(
+public sealed class HostController(
     IOptions<Configuration> config,
     ILogger<HostController> logger,
-    ITokenProvider tokenProvider) : IHostController
+    ITokenProvider tokenProvider)
 {
     private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
     private static readonly Mutex HostStartMutex = new(false, "Global\\AxorithHostStartMutex");
@@ -29,14 +26,11 @@ public class HostController(
         {
             var token = await tokenProvider.GetTokenAsync(ct);
             var port = GetDiscoveredPort();
-            var channel = CreateAuthenticatedChannel(token ?? string.Empty, port);
-            using (channel)
-            {
-                var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
-                var response = await diagnostics.GetHealthAsync(new HealthCheckRequest(),
-                    deadline: DateTime.UtcNow.AddMilliseconds(500), cancellationToken: ct);
-                return response.Status == HealthStatus.Healthy;
-            }
+            using var channel = CreateAuthenticatedChannel(token ?? string.Empty, port);
+            var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(channel);
+            var response = await diagnostics.GetHealthAsync(new HealthCheckRequest(),
+                deadline: DateTime.UtcNow.AddMilliseconds(500), cancellationToken: ct);
+            return response.Status == HealthStatus.Healthy;
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unauthenticated)
         {
@@ -45,7 +39,6 @@ public class HostController(
         }
         catch
         {
-            // Clear cached port on connection failure to re-read on next attempt
             lock (_portLock)
             {
                 _cachedPort = null;
@@ -57,35 +50,22 @@ public class HostController(
 
     public async Task StartHostAsync(bool forceRestart = false, CancellationToken ct = default)
     {
-        // CRITICAL: Use global mutex to prevent multiple Client instances from starting Host simultaneously
-        // This handles the case where user launches Client multiple times quickly
-        logger.LogInformation("Attempting to acquire Host start mutex...");
-
         var mutexAcquired = false;
         try
         {
-            // Try to acquire mutex with timeout
             mutexAcquired = HostStartMutex.WaitOne(TimeSpan.FromSeconds(30));
 
             if (!mutexAcquired)
             {
                 logger.LogWarning(
-                    "⚠️ Could not acquire Host start mutex within 30 seconds. Another Client may be starting Host.");
-                logger.LogInformation("Will check if Host is already running...");
+                    "Could not acquire Host start mutex within 30 seconds; another Client may be starting Host.");
 
-                // Even without mutex, check if Host is reachable
                 if (await IsHostReachableAsync(ct))
                 {
-                    logger.LogInformation(
-                        "✅ Host is reachable (started by another Client instance). No action needed.");
                     return;
                 }
 
                 logger.LogWarning("Host not reachable and mutex timeout. Will attempt start anyway.");
-            }
-            else
-            {
-                logger.LogInformation("✅ Acquired Host start mutex. Proceeding with Host startup check.");
             }
 
             var existingProcesses = Process.GetProcessesByName("Axorith.Host");
@@ -96,25 +76,19 @@ public class HostController(
 
                 if (!forceRestart)
                 {
-                    // First quick check
                     var reachable = await IsHostReachableAsync(ct);
                     if (reachable)
                     {
-                        logger.LogInformation(
-                            "✅ Axorith.Host process is already running and reachable. Skipping start command.");
                         return;
                     }
 
-                    // Extended grace period: Host initialization can take 5-10 seconds
-                    // This includes: auth token generation, module registry init, port binding, file writes
                     logger.LogInformation(
                         "Host process detected but not yet reachable. Waiting up to 10 seconds for initialization...");
                     var graceSw = Stopwatch.StartNew();
                     var graceLastLogMs = 0L;
 
-                    while (graceSw.ElapsedMilliseconds < 10000) // 10 seconds grace period
+                    while (graceSw.ElapsedMilliseconds < 10000)
                     {
-                        // Log progress every 2 seconds
                         if (graceSw.ElapsedMilliseconds - graceLastLogMs > 2000)
                         {
                             logger.LogInformation("Still waiting for Host... ({ElapsedMs}ms / 10000ms)",
@@ -122,38 +96,25 @@ public class HostController(
                             graceLastLogMs = graceSw.ElapsedMilliseconds;
                         }
 
-                        await Task.Delay(500, ct); // Check every 500ms
 
                         if (await IsHostReachableAsync(ct))
                         {
-                            logger.LogInformation(
-                                "✅ Axorith.Host became reachable after {ElapsedMs}ms. Skipping restart.",
-                                graceSw.ElapsedMilliseconds);
                             return;
                         }
+
+                        await Task.Delay(200, ct);
                     }
 
                     logger.LogWarning(
                         "Axorith.Host process detected but not reachable after {TimeoutMs}ms grace period.",
                         graceSw.ElapsedMilliseconds);
-
-                    if (!forceRestart)
-                    {
-                        foreach (var proc in existingProcesses)
-                        {
-                            proc.Dispose();
-                        }
-
-                        throw new InvalidOperationException(
-                            "Axorith Host is running but unavailable. It was left running to protect any committed session; retry after it recovers or request an explicit restart.");
-                    }
-                }
-                else
-                {
-                    logger.LogInformation("Force restart requested. Stopping existing Host process(es)...");
+                    foreach (var process in existingProcesses) process.Dispose();
+                    throw new InvalidOperationException(
+                        "Axorith Host is running but unavailable. It was left running to protect any committed session; retry after it recovers or request an explicit restart.");
                 }
 
-                // Kill all existing Host processes
+                logger.LogInformation("Force restart requested. Stopping existing Host process(es)...");
+
                 foreach (var proc in existingProcesses)
                 {
                     try
@@ -173,15 +134,13 @@ public class HostController(
                     }
                 }
 
-                // Wait for processes to fully terminate and release resources
                 logger.LogInformation("Waiting for Host processes to fully terminate...");
                 await Task.Delay(1500, ct);
 
-                // Verify all processes are gone
                 var remainingProcesses = Process.GetProcessesByName("Axorith.Host");
                 if (remainingProcesses.Length > 0)
                 {
-                    logger.LogError("⚠️ {Count} Host process(es) still running after kill attempt!",
+                    logger.LogError("{Count} Host process(es) still running after kill attempt",
                         remainingProcesses.Length);
                     foreach (var proc in remainingProcesses)
                     {
@@ -201,21 +160,11 @@ public class HostController(
 
             var startTimestampUtc = DateTime.UtcNow;
 
-            // Clear cached port before starting
             lock (_portLock)
             {
                 _cachedPort = null;
             }
 
-            // Check if configured port is available
-            var configuredPort = config.Value.Host.Port;
-            if (!IsPortAvailable(configuredPort))
-            {
-                logger.LogWarning("⚠️ Configured port {Port} is already in use! Host will use dynamic port.",
-                    configuredPort);
-            }
-
-            // Try to delete stale host-info.json, but don't fail if locked
             try
             {
                 if (File.Exists(HostInfoPath))
@@ -224,14 +173,9 @@ public class HostController(
                     logger.LogDebug("Deleted stale host-info.json before starting new Host");
                 }
             }
-            catch (IOException ex)
-            {
-                // File might be locked by another process - this is OK, we'll wait for fresh write
-                logger.LogDebug(ex, "Could not delete host-info.json (file locked). Will wait for fresh write.");
-            }
             catch (Exception ex)
             {
-                logger.LogDebug(ex, "Failed to delete stale host-info.json; will wait for a fresh write");
+                logger.LogDebug(ex, "Could not delete stale host-info.json; will wait for a fresh write.");
             }
 
             var exe = FindHostExecutable();
@@ -251,14 +195,12 @@ public class HostController(
                 WorkingDirectory = Path.GetDirectoryName(exe) ?? AppContext.BaseDirectory
             });
 
-            // Wait for Host to write host-info.json with proper timestamp validation
             var sw = Stopwatch.StartNew();
-            var maxWaitMs = 15000; // Increased from 8s to 15s for slower systems
+            const int maxWaitMs = 15000;
             var lastLogMs = 0L;
 
             while (sw.ElapsedMilliseconds < maxWaitMs)
             {
-                // Log progress every 3 seconds
                 if (sw.ElapsedMilliseconds - lastLogMs > 3000)
                 {
                     logger.LogInformation("Waiting for Host to initialize... ({ElapsedMs}ms / {MaxMs}ms)",
@@ -270,7 +212,6 @@ public class HostController(
                 {
                     try
                     {
-                        // Verify file was written AFTER we started the process
                         var writeTime = File.GetLastWriteTimeUtc(HostInfoPath);
                         if (writeTime < startTimestampUtc)
                         {
@@ -280,33 +221,14 @@ public class HostController(
                             continue;
                         }
 
-                        // Try to read and validate the file content
                         var content = await File.ReadAllTextAsync(HostInfoPath, ct);
-                        if (string.IsNullOrWhiteSpace(content))
+                        if (!HostInfoReader.TryParsePort(content, out var port))
                         {
-                            logger.LogDebug("host-info.json is empty. Waiting for complete write...");
+                            logger.LogDebug("host-info.json is incomplete or contains an invalid port. Waiting...");
                             await Task.Delay(200, ct);
                             continue;
                         }
 
-                        // Validate JSON structure
-                        using var doc = JsonDocument.Parse(content);
-                        if (!doc.RootElement.TryGetProperty("port", out var portElement))
-                        {
-                            logger.LogDebug("host-info.json missing 'port' property. Waiting for complete write...");
-                            await Task.Delay(200, ct);
-                            continue;
-                        }
-
-                        var port = portElement.GetInt32();
-                        if (port <= 0 || port > 65535)
-                        {
-                            logger.LogWarning("host-info.json contains invalid port {Port}. Waiting...", port);
-                            await Task.Delay(200, ct);
-                            continue;
-                        }
-
-                        // Clear cached port to force re-read
                         lock (_portLock)
                         {
                             _cachedPort = null;
@@ -319,15 +241,7 @@ public class HostController(
                     }
                     catch (IOException ioEx)
                     {
-                        // File might still be being written
                         logger.LogDebug(ioEx, "Could not read host-info.json (file locked). Waiting...");
-                        await Task.Delay(200, ct);
-                        continue;
-                    }
-                    catch (JsonException jsonEx)
-                    {
-                        // Partial write - wait for complete JSON
-                        logger.LogDebug(jsonEx, "host-info.json contains incomplete JSON. Waiting...");
                         await Task.Delay(200, ct);
                         continue;
                     }
@@ -352,7 +266,6 @@ public class HostController(
         }
         finally
         {
-            // Always release mutex when done
             if (mutexAcquired)
             {
                 try
@@ -379,20 +292,17 @@ public class HostController(
             }
 
             var port = GetDiscoveredPort();
-            var channel = CreateAuthenticatedChannel(token, port);
-            using (channel)
+            using var channel = CreateAuthenticatedChannel(token, port);
+            var management = new HostManagement.HostManagementClient(channel);
+            var response = await management.RequestShutdownAsync(
+                new ShutdownRequest { Reason = "Client tray stop", TimeoutSeconds = 10 },
+                deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: ct);
+            if (!response.Accepted)
             {
-                var management = new HostManagement.HostManagementClient(channel);
-                var response = await management.RequestShutdownAsync(
-                    new ShutdownRequest { Reason = "Client tray stop", TimeoutSeconds = 10 },
-                    deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: ct);
-                if (!response.Accepted)
-                {
-                    throw new InvalidOperationException(response.Message);
-                }
-
-                logger.LogInformation("Shutdown requested to Host");
+                throw new InvalidOperationException(response.Message);
             }
+
+            logger.LogInformation("Shutdown requested to Host");
 
             logger.LogInformation("Waiting for Host process to exit...");
             var sw = Stopwatch.StartNew();
@@ -456,24 +366,11 @@ public class HostController(
                 return _cachedPort.Value;
             }
 
-            try
+            if (HostInfoReader.TryReadPort(HostInfoPath, out var port))
             {
-                if (File.Exists(HostInfoPath))
-                {
-                    var json = File.ReadAllText(HostInfoPath);
-                    using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("port", out var portElement))
-                    {
-                        var port = portElement.GetInt32();
-                        _cachedPort = port;
-                        logger.LogDebug("Discovered host port {Port} from host-info.json", port);
-                        return port;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to read host-info.json, using configured port");
+                _cachedPort = port;
+                logger.LogDebug("Discovered host port {Port} from host-info.json", port);
+                return port;
             }
 
             var fallbackPort = config.Value.Host.Port;
@@ -521,18 +418,5 @@ public class HostController(
         return null;
     }
 
-    private bool IsPortAvailable(int port)
-    {
-        try
-        {
-            using var listener = new TcpListener(IPAddress.Loopback, port);
-            listener.Start();
-            listener.Stop();
-            return true;
-        }
-        catch (SocketException)
-        {
-            return false;
-        }
-    }
+
 }

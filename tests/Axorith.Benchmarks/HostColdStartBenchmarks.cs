@@ -44,7 +44,7 @@ public class HostColdStartBenchmarks
         _installationDirectory = Path.Combine(BenchmarkEnvironment.Root, "host-installation");
         _hostDirectory = Path.Combine(_installationDirectory, "Axorith.Host");
         _moduleDirectory = Path.Combine(_installationDirectory, "Modules");
-        CopyDirectory(hostOutput, _hostDirectory);
+        BenchmarkEnvironment.CopyDirectory(hostOutput, _hostDirectory);
 
         InstallModule(typeof(Axorith.Module.AppBlocker.Module), "AppBlocker");
         InstallModule(typeof(Axorith.Module.ApplicationLauncher.Module), "ApplicationLauncher");
@@ -234,17 +234,7 @@ public class HostColdStartBenchmarks
             return;
         }
 
-        var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-        {
-            metadata.Add("x-axorith-auth-token", token);
-            return Task.CompletedTask;
-        });
-
-        _channel = GrpcChannel.ForAddress($"http://127.0.0.1:{port}", new GrpcChannelOptions
-        {
-            Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-            UnsafeUseInsecureChannelCallCredentials = true
-        });
+        _channel = BenchmarkEnvironment.CreateAuthenticatedChannel(new Uri($"http://127.0.0.1:{port}"), token);
         _modules = new ModulesService.ModulesServiceClient(_channel);
         _management = new HostManagement.HostManagementClient(_channel);
     }
@@ -254,7 +244,7 @@ public class HostColdStartBenchmarks
         var id = Guid.NewGuid();
         var moduleDirectory = Path.Combine(_moduleDirectory, name);
         var sourceDirectory = Path.GetDirectoryName(moduleType.Assembly.Location)!;
-        CopyDirectory(sourceDirectory, moduleDirectory);
+        BenchmarkEnvironment.CopyDirectory(sourceDirectory, moduleDirectory);
 
         var assemblyName = Path.GetFileName(moduleType.Assembly.Location);
         File.WriteAllText(Path.Combine(moduleDirectory, "module.json"), JsonSerializer.Serialize(new
@@ -266,15 +256,6 @@ public class HostColdStartBenchmarks
             assembly = assemblyName
         }));
         _moduleIds.Add(name, id);
-    }
-
-    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
-    {
-        Directory.CreateDirectory(destinationDirectory);
-        foreach (var file in Directory.EnumerateFiles(sourceDirectory))
-            File.Copy(file, Path.Combine(destinationDirectory, Path.GetFileName(file)));
-        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory))
-            CopyDirectory(directory, Path.Combine(destinationDirectory, Path.GetFileName(directory)));
     }
 
     private static void EnsureWindowsAndNoRunningHost()

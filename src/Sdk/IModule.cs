@@ -19,7 +19,6 @@ public interface IModule : IDisposable
     /// <summary>
     ///     Gets the list of all available settings for this module.
     /// </summary>
-    /// <returns>A read-only list of <see cref="ISetting" /> definitions.</returns>
     IReadOnlyList<ISetting> GetSettings();
 
     /// <summary>
@@ -32,7 +31,6 @@ public interface IModule : IDisposable
     ///     Called when module instance is created for editing or viewing (before session start).
     ///     Default implementation does nothing. Override to implement lazy loading.
     /// </summary>
-    /// <param name="cancellationToken">A token to signal cancellation.</param>
     Task InitializeAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
@@ -41,19 +39,16 @@ public interface IModule : IDisposable
     /// <summary>
     ///     Asynchronously validates the provided user settings.
     /// </summary>
-    /// <param name="cancellationToken">A token to signal that the validation should be cancelled.</param>
     Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken);
 
     /// <summary>
     ///     The asynchronous method that is called when a session starts.
     /// </summary>
-    /// <param name="cancellationToken">A token to signal that the start-up process should be cancelled.</param>
     Task OnSessionStartAsync(CancellationToken cancellationToken);
 
     /// <summary>
     ///     The asynchronous method that is called when a session ends.
     ///     This is where the module should clean up its resources.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token for graceful shutdown</param>
     Task OnSessionEndAsync(CancellationToken cancellationToken);
 }

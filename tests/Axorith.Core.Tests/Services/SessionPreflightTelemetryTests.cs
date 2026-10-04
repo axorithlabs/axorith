@@ -24,18 +24,7 @@ public sealed class SessionPreflightTelemetryTests
         try
         {
             var distinctId = Guid.NewGuid().ToString("D");
-            await using var telemetry = new TelemetryService(new TelemetrySettings
-            {
-                Enabled = true,
-                PostHogApiKey = "test-project-key",
-                PostHogHost = server.Host,
-                DistinctId = distinctId,
-                ApplicationName = "Axorith.Host",
-                AppVersion = "1.2.3",
-                OsVersion = "Windows 11",
-                BatchSize = 100,
-                FlushInterval = TimeSpan.FromHours(1)
-            });
+            await using var telemetry = CreateTelemetry(server, distinctId);
 
             var presetId = Guid.NewGuid();
             var moduleId = Guid.NewGuid();
@@ -57,14 +46,7 @@ public sealed class SessionPreflightTelemetryTests
                 }
             };
 
-            await using var sessionManager = new SessionManager(
-                new TestModuleRegistry(moduleId),
-                NullLogger<SessionManager>.Instance,
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5),
-                telemetry,
-                Path.Combine(directory.FullName, "committed-session.json"));
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName);
 
             await sessionManager.StartSessionAsync(preset, startSource: "manual", sessionInstanceId: sessionInstanceId);
             await Assert.ThrowsAsync<SessionException>(() =>
@@ -74,13 +56,7 @@ public sealed class SessionPreflightTelemetryTests
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await telemetry.FlushAsync(flushCts.Token);
 
-            var events = server.Payloads
-                .SelectMany(body =>
-                {
-                    using var payload = JsonDocument.Parse(body);
-                    return payload.RootElement.GetProperty("batch").EnumerateArray()
-                        .Select(item => item.Clone()).ToArray();
-                })
+            var events = ReadEvents(server)
                 .ToArray();
             var names = events.Select(item => item.GetProperty("event").GetString()).ToArray();
             var preflightIndex = Array.IndexOf(names, "SessionPreflightCompleted");
@@ -124,18 +100,7 @@ public sealed class SessionPreflightTelemetryTests
         var directory = Directory.CreateTempSubdirectory("axorith-scheduled-session-telemetry-");
         try
         {
-            await using var telemetry = new TelemetryService(new TelemetrySettings
-            {
-                Enabled = true,
-                PostHogApiKey = "test-project-key",
-                PostHogHost = server.Host,
-                DistinctId = Guid.NewGuid().ToString("D"),
-                ApplicationName = "Axorith.Host",
-                AppVersion = "1.2.3",
-                OsVersion = "Windows 11",
-                BatchSize = 100,
-                FlushInterval = TimeSpan.FromHours(1)
-            });
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
 
             var moduleId = Guid.NewGuid();
             var scheduleId = Guid.NewGuid();
@@ -143,26 +108,14 @@ public sealed class SessionPreflightTelemetryTests
             {
                 Modules = [new ConfiguredModule { ModuleId = moduleId }]
             };
-            await using var sessionManager = new SessionManager(
-                new TestModuleRegistry(moduleId),
-                NullLogger<SessionManager>.Instance,
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5),
-                telemetry,
-                Path.Combine(directory.FullName, "committed-session.json"));
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName);
 
             await sessionManager.StartSessionAsync(preset, startSource: "schedule", scheduleId: scheduleId);
             await sessionManager.StopCurrentSessionAsync();
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await telemetry.FlushAsync(flushCts.Token);
 
-            var events = server.Payloads.SelectMany(body =>
-            {
-                using var payload = JsonDocument.Parse(body);
-                return payload.RootElement.GetProperty("batch").EnumerateArray()
-                    .Select(item => item.Clone()).ToArray();
-            }).Where(item => item.GetProperty("event").GetString() is
+            var events = ReadEvents(server).Where(item => item.GetProperty("event").GetString() is
                 "SessionStarted" or "SessionStopped").ToArray();
 
             Assert.Equal(2, events.Length);
@@ -185,18 +138,7 @@ public sealed class SessionPreflightTelemetryTests
         var directory = Directory.CreateTempSubdirectory("axorith-committed-schedule-telemetry-");
         try
         {
-            await using var telemetry = new TelemetryService(new TelemetrySettings
-            {
-                Enabled = true,
-                PostHogApiKey = "test-project-key",
-                PostHogHost = server.Host,
-                DistinctId = Guid.NewGuid().ToString("D"),
-                ApplicationName = "Axorith.Host",
-                AppVersion = "1.2.3",
-                OsVersion = "Windows 11",
-                BatchSize = 100,
-                FlushInterval = TimeSpan.FromHours(1)
-            });
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
 
             var presetId = Guid.NewGuid();
             var moduleId = Guid.NewGuid();
@@ -211,14 +153,7 @@ public sealed class SessionPreflightTelemetryTests
                     Duration = TimeSpan.FromMinutes(30)
                 }
             };
-            await using var sessionManager = new SessionManager(
-                new TestModuleRegistry(moduleId),
-                NullLogger<SessionManager>.Instance,
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5),
-                telemetry,
-                Path.Combine(directory.FullName, "committed-session.json"));
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName);
 
             var autoStop = new RecordingAutoStopService();
             var notifier = new NoopNotifier();
@@ -243,11 +178,7 @@ public sealed class SessionPreflightTelemetryTests
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await telemetry.FlushAsync(flushCts.Token);
 
-            var events = server.Payloads.SelectMany(body =>
-            {
-                using var payload = JsonDocument.Parse(body);
-                return payload.RootElement.GetProperty("batch").EnumerateArray().Select(item => item.Clone()).ToArray();
-            }).ToArray();
+            var events = ReadEvents(server).ToArray();
             var skipped = events.Single(item => item.GetProperty("event").GetString() == "ScheduleTriggered")
                 .GetProperty("properties");
             Assert.Equal("duration_stop", skipped.GetProperty("scheduleType").GetString());
@@ -263,6 +194,31 @@ public sealed class SessionPreflightTelemetryTests
             directory.Delete(recursive: true);
         }
     }
+
+    private static TelemetryService CreateTelemetry(PostHogTestServer server, string distinctId) =>
+        new(new TelemetrySettings
+        {
+            Enabled = true,
+            PostHogApiKey = "test-project-key",
+            PostHogHost = server.Host,
+            DistinctId = distinctId,
+            ApplicationName = "Axorith.Host",
+            AppVersion = "1.2.3",
+            OsVersion = "Windows 11",
+            BatchSize = 100,
+            FlushInterval = TimeSpan.FromHours(1)
+        });
+
+    private static SessionManager CreateSessionManager(Guid moduleId, ITelemetryService telemetry, string directory) =>
+        new(new TestModuleRegistry(moduleId), NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), telemetry,
+            Path.Combine(directory, "committed-session.json"));
+
+    private static IEnumerable<JsonElement> ReadEvents(PostHogTestServer server) => server.Payloads.SelectMany(body =>
+    {
+        using var payload = JsonDocument.Parse(body);
+        return payload.RootElement.GetProperty("batch").EnumerateArray().Select(item => item.Clone()).ToArray();
+    });
 
     private sealed class TestModuleRegistry(Guid moduleId) : IModuleRegistry
     {

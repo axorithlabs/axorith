@@ -1,4 +1,4 @@
-using Axorith.Contracts;
+﻿using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
@@ -13,10 +13,6 @@ using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
 
 namespace Axorith.Host.Services;
 
-/// <summary>
-///     gRPC service implementation for session management.
-///     Wraps Core ISessionManager and provides event streaming via SessionEventBroadcaster.
-/// </summary>
 public class SessionsServiceImpl(
     ISessionManager sessionManager,
     IPresetManager presetManager,
@@ -27,7 +23,7 @@ public class SessionsServiceImpl(
     IScheduleManager? scheduleManager = null)
     : SessionsService.SessionsServiceBase
 {
-    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
+    private readonly ITelemetryService _telemetry = telemetry ?? NoopTelemetryService.Instance;
     public override Task<SessionHistory> GetSessionHistory(GetSessionStateRequest request, ServerCallContext context)
     {
         var result = new SessionHistory();
@@ -41,118 +37,112 @@ public class SessionsServiceImpl(
     }
     public override async Task<SessionState> GetSessionState(GetSessionStateRequest request, ServerCallContext context)
     {
-        try
+
+        logger.LogDebug("GetSessionState called");
+
+        var snapshot = sessionManager.GetCurrentSnapshot();
+
+        var state = new SessionState
         {
-            logger.LogDebug("GetSessionState called");
+            IsActive = snapshot != null
+        };
 
-            var snapshot = sessionManager.GetCurrentSnapshot();
+        if (snapshot != null)
+        {
+            state.PresetId = snapshot.PresetId.ToString();
+            state.PresetName = snapshot.PresetName;
 
-            var state = new SessionState
+            var activePreset = sessionManager.ActiveSession;
+            var commitment = activePreset?.FocusCommitment;
+            state.FocusCommitment = (Axorith.Contracts.FocusCommitmentMode)(commitment?.Mode ?? FocusCommitmentMode.Normal);
+            state.BreaksRemaining = sessionManager.BreaksRemaining;
+            state.BreaksTotal = commitment?.BreakCount ?? 0;
+            var remaining = sessionManager.SessionTimeRemaining ?? autoStopService?.GetTimeRemaining();
+            var endsAt = sessionManager.SessionEndsAt ??
+                (remaining.HasValue ? DateTimeOffset.UtcNow + remaining.Value : (DateTimeOffset?)null);
+            if (commitment?.Mode == FocusCommitmentMode.Normal && scheduleManager != null)
             {
-                IsActive = snapshot != null
-            };
-
-            if (snapshot != null)
-            {
-                state.PresetId = snapshot.PresetId.ToString();
-                state.PresetName = snapshot.PresetName;
-
-                var activePreset = sessionManager.ActiveSession;
-                var commitment = activePreset?.FocusCommitment;
-                state.FocusCommitment = (Axorith.Contracts.FocusCommitmentMode)(commitment?.Mode ?? FocusCommitmentMode.Normal);
-                state.BreaksRemaining = sessionManager.BreaksRemaining;
-                state.BreaksTotal = commitment?.BreakCount ?? 0;
-                var remaining = sessionManager.SessionTimeRemaining ?? autoStopService?.GetTimeRemaining();
-                var endsAt = sessionManager.SessionEndsAt ??
-                    (remaining.HasValue ? DateTimeOffset.UtcNow + remaining.Value : (DateTimeOffset?)null);
-                if (commitment?.Mode == FocusCommitmentMode.Normal && scheduleManager != null)
+                var now = DateTimeOffset.Now;
+                var schedules = await scheduleManager.GetSchedulesForPresetAsync(snapshot.PresetId,
+                    context.CancellationToken).ConfigureAwait(false);
+                var scheduledEnd = schedules.Where(schedule => schedule.Type == ScheduleType.StopRecurring)
+                    .Select(schedule => schedule.GetNextRun(now)).Where(end => end.HasValue).Min();
+                if (scheduledEnd.HasValue && (!endsAt.HasValue || scheduledEnd < endsAt))
                 {
-                    var now = DateTimeOffset.Now;
-                    var schedules = await scheduleManager.GetSchedulesForPresetAsync(snapshot.PresetId,
-                        context.CancellationToken).ConfigureAwait(false);
-                    var scheduledEnd = schedules.Where(schedule => schedule.Type == ScheduleType.StopRecurring)
-                        .Select(schedule => schedule.GetNextRun(now)).Where(end => end.HasValue).Min();
-                    if (scheduledEnd.HasValue && (!endsAt.HasValue || scheduledEnd < endsAt))
-                    {
-                        endsAt = scheduledEnd;
-                        remaining = scheduledEnd - now;
-                    }
-                }
-                state.RemainingSeconds = (long)Math.Ceiling(Math.Max(0, remaining?.TotalSeconds ?? 0));
-                state.BreakRemainingSeconds = (long)Math.Ceiling(sessionManager.BreakTimeRemaining?.TotalSeconds ?? 0);
-                state.AfterEnd = (Axorith.Contracts.AfterEndBehavior)(commitment?.AfterEnd ?? AfterEndBehavior.DoNothing);
-                state.ProtectionStatus = sessionManager.ProtectionStatus ?? "Protection active";
-                state.EmergencyUnlockAvailable = commitment?.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict;
-
-                if (sessionManager.BreakEndsAt is { } breakEndsAt)
-                {
-                    state.BreakEndsAt = Timestamp.FromDateTimeOffset(breakEndsAt);
-                }
-
-                if (endsAt is { } sessionEndsAt)
-                {
-                    state.EndsAt = Timestamp.FromDateTimeOffset(sessionEndsAt);
-                }
-
-                if (sessionManager.SessionStartedAt is { } startedAt)
-                {
-                    state.StartedAt = Timestamp.FromDateTimeOffset(startedAt);
-                }
-
-                foreach (var module in snapshot.Modules)
-                {
-                    state.AppBlocking |= module.ModuleName.Contains("App Blocker", StringComparison.OrdinalIgnoreCase);
-                    state.WebsiteBlocking |= module.ModuleName.Contains("Site Blocker", StringComparison.OrdinalIgnoreCase);
-                    var moduleState = new ModuleInstanceState
-                    {
-                        InstanceId = module.InstanceId.ToString(),
-                        ModuleName = module.ModuleName,
-                        CustomName = module.CustomName ?? string.Empty,
-                        Status = ModuleStatus.Running
-                    };
-
-                    foreach (var setting in module.Settings)
-                    {
-                        var protoSetting = new Setting
-                        {
-                            Key = setting.Key,
-                            Label = setting.Label,
-                            Description = setting.Description ?? string.Empty,
-                            ControlType = (SettingControlType)(int)setting.ControlType,
-                            Persistence = (SettingPersistence)(int)setting.Persistence,
-                            IsReadOnly = setting.IsReadOnly,
-                            IsVisible = setting.IsVisible,
-                            ValueType = setting.ValueType,
-                            StringValue = setting.ValueString
-                        };
-
-                        moduleState.Settings.Add(protoSetting);
-                    }
-
-                    foreach (var action in module.Actions)
-                    {
-                        var protoAction = new Action
-                        {
-                            Key = action.Key,
-                            Label = action.Label,
-                            IsEnabled = action.IsEnabled
-                        };
-
-                        moduleState.Actions.Add(protoAction);
-                    }
-
-                    state.ModuleStates.Add(moduleState);
+                    endsAt = scheduledEnd;
+                    remaining = scheduledEnd - now;
                 }
             }
+            state.RemainingSeconds = (long)Math.Ceiling(Math.Max(0, remaining?.TotalSeconds ?? 0));
+            state.BreakRemainingSeconds = (long)Math.Ceiling(sessionManager.BreakTimeRemaining?.TotalSeconds ?? 0);
+            state.AfterEnd = (Axorith.Contracts.AfterEndBehavior)(commitment?.AfterEnd ?? AfterEndBehavior.DoNothing);
+            state.ProtectionStatus = sessionManager.ProtectionStatus ?? "Protection active";
+            state.EmergencyUnlockAvailable = commitment?.IsCommitted == true;
 
-            logger.LogDebug("Session active: {IsActive}", state.IsActive);
-            return state;
+            if (sessionManager.BreakEndsAt is { } breakEndsAt)
+            {
+                state.BreakEndsAt = Timestamp.FromDateTimeOffset(breakEndsAt);
+            }
+
+            if (endsAt is { } sessionEndsAt)
+            {
+                state.EndsAt = Timestamp.FromDateTimeOffset(sessionEndsAt);
+            }
+
+            if (sessionManager.SessionStartedAt is { } startedAt)
+            {
+                state.StartedAt = Timestamp.FromDateTimeOffset(startedAt);
+            }
+
+            foreach (var module in snapshot.Modules)
+            {
+                state.AppBlocking |= module.ModuleName.Contains("App Blocker", StringComparison.OrdinalIgnoreCase);
+                state.WebsiteBlocking |= module.ModuleName.Contains("Site Blocker", StringComparison.OrdinalIgnoreCase);
+                var moduleState = new ModuleInstanceState
+                {
+                    InstanceId = module.InstanceId.ToString(),
+                    ModuleName = module.ModuleName,
+                    CustomName = module.CustomName ?? string.Empty,
+                    Status = ModuleStatus.Running
+                };
+
+                foreach (var setting in module.Settings)
+                {
+                    var protoSetting = new Setting
+                    {
+                        Key = setting.Key,
+                        Label = setting.Label,
+                        Description = setting.Description ?? string.Empty,
+                        ControlType = (SettingControlType)(int)setting.ControlType,
+                        Persistence = (SettingPersistence)(int)setting.Persistence,
+                        IsReadOnly = setting.IsReadOnly,
+                        IsVisible = setting.IsVisible,
+                        ValueType = setting.ValueType,
+                        StringValue = setting.ValueString
+                    };
+
+                    moduleState.Settings.Add(protoSetting);
+                }
+
+                foreach (var action in module.Actions)
+                {
+                    var protoAction = new Action
+                    {
+                        Key = action.Key,
+                        Label = action.Label,
+                        IsEnabled = action.IsEnabled
+                    };
+
+                    moduleState.Actions.Add(protoAction);
+                }
+
+                state.ModuleStates.Add(moduleState);
+            }
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error getting session state");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to get session state", ex));
-        }
+
+        logger.LogDebug("Session active: {IsActive}", state.IsActive);
+        return state;
+
     }
 
     public override async Task<OperationResult> StartSession(StartSessionRequest request, ServerCallContext context)
@@ -160,58 +150,50 @@ public class SessionsServiceImpl(
         Guid? sessionInstanceId = Guid.TryParse(request.SessionInstanceId, out var parsedSessionInstanceId)
             ? parsedSessionInstanceId
             : null;
+
+        if (!Guid.TryParse(request.PresetId, out var presetId))
+        {
+            TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), null, "validation_failed");
+            var result = SessionMapper.CreateResult(false, "Invalid preset ID",
+                [$"Could not parse preset ID: {request.PresetId}"]);
+            return result;
+        }
+
+        logger.LogInformation("Starting session for preset {PresetId}", presetId);
+
+        var preset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (preset == null)
+        {
+            TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), presetId, "unknown");
+            return SessionMapper.CreateResult(false, "Preset not found",
+                [$"No preset found with ID: {presetId}"]);
+        }
+
         try
         {
-            if (!Guid.TryParse(request.PresetId, out var presetId))
-            {
-                TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), null, "validation_failed");
-                var result = SessionMapper.CreateResult(false, "Invalid preset ID",
-                    [$"Could not parse preset ID: {request.PresetId}"]);
-                return result;
-            }
-
-            logger.LogInformation("Starting session for preset {PresetId}", presetId);
-
-            var preset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+            await sessionManager.StartSessionAsync(preset, context.CancellationToken, "manual", sessionInstanceId)
                 .ConfigureAwait(false);
 
-            if (preset == null)
-            {
-                TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), presetId, "unknown");
-                return SessionMapper.CreateResult(false, "Preset not found",
-                    [$"No preset found with ID: {presetId}"]);
-            }
-
-            try
-            {
-                await sessionManager.StartSessionAsync(preset, context.CancellationToken, "manual", sessionInstanceId)
-                    .ConfigureAwait(false);
-
-                logger.LogInformation("Session started successfully: {PresetId}", presetId);
-                return SessionMapper.CreateResult(true, "Session started successfully");
-            }
-            catch (SessionException ex)
-            {
-                logger.LogWarning(ex, "Session start failed: {Message}", ex.Message);
-                return SessionMapper.CreateResult(false, ex.Message, [ex.Message]);
-            }
-            catch (InvalidSettingsException ex)
-            {
-                logger.LogWarning(ex, "Session start failed due to invalid settings");
-                return SessionMapper.CreateResult(false, ex.Message,
-                    ex.InvalidKeys.Select(k => $"Invalid setting: {k}").ToList());
-            }
+            logger.LogInformation("Session started successfully: {PresetId}", presetId);
+            return SessionMapper.CreateResult(true, "Session started successfully");
         }
-        catch (RpcException)
+        catch (Exception ex) when (ex is SessionException or InvalidSettingsException)
         {
-            throw;
+            logger.LogWarning(ex, "Session start failed: {Message}", ex.Message);
+            return MapSessionFailure(ex);
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error starting session");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to start session", ex));
-        }
+
     }
+
+    private static OperationResult MapSessionFailure(Exception exception) => exception switch
+    {
+        InvalidSettingsException invalid => SessionMapper.CreateResult(false, invalid.Message,
+            invalid.InvalidKeys.Select(key => $"Invalid setting: {key}")),
+        SessionException session => SessionMapper.CreateResult(false, session.Message, [session.Message]),
+        _ => throw new ArgumentOutOfRangeException(nameof(exception))
+    };
 
     private void TrackSessionStartFailure(Guid sessionInstanceId, Guid? presetId, string failureReason)
     {
@@ -244,69 +226,40 @@ public class SessionsServiceImpl(
             await sessionManager.PreflightSessionAsync(preset, context.CancellationToken).ConfigureAwait(false);
             return SessionMapper.CreateResult(true, "Preflight passed. The Host can start this Workspace.");
         }
-        catch (SessionException ex)
+        catch (Exception ex) when (ex is SessionException or InvalidSettingsException)
         {
             logger.LogWarning(ex, "Session preflight failed: {Message}", ex.Message);
-            return SessionMapper.CreateResult(false, ex.Message, [ex.Message]);
-        }
-        catch (InvalidSettingsException ex)
-        {
-            return SessionMapper.CreateResult(false, ex.Message,
-                ex.InvalidKeys.Select(key => $"Invalid setting: {key}").ToList());
+            return MapSessionFailure(ex);
         }
     }
 
     public override async Task<OperationResult> StopSession(StopSessionRequest request, ServerCallContext context)
     {
+
+        logger.LogInformation("Stopping current session");
+
         try
         {
-            logger.LogInformation("Stopping current session");
+            await sessionManager.StopCurrentSessionAsync(context.CancellationToken).ConfigureAwait(false);
 
-            try
-            {
-                await sessionManager.StopCurrentSessionAsync(context.CancellationToken).ConfigureAwait(false);
+            logger.LogInformation("Session stopped successfully");
+            return SessionMapper.CreateResult(true, "Session stopped successfully");
+        }
+        catch (SessionException ex)
+        {
+            logger.LogWarning(ex, "Session stop failed: {Message}", ex.Message);
+            return MapSessionFailure(ex);
+        }
 
-                logger.LogInformation("Session stopped successfully");
-                return SessionMapper.CreateResult(true, "Session stopped successfully");
-            }
-            catch (SessionException ex)
-            {
-                logger.LogWarning(ex, "Session stop failed: {Message}", ex.Message);
-                return SessionMapper.CreateResult(false, ex.Message, [ex.Message]);
-            }
-        }
-        catch (RpcException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error stopping session");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to stop session", ex));
-        }
     }
 
     public override async Task StreamSessionEvents(StreamSessionEventsRequest request,
         IServerStreamWriter<SessionEvent> responseStream, ServerCallContext context)
     {
         var subscriberId = Guid.NewGuid().ToString();
-
-        try
-        {
-            logger.LogInformation("Client {SubscriberId} started streaming session events", subscriberId);
-
-            await eventBroadcaster.SubscribeAsync(subscriberId, responseStream, context.CancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogInformation("Client {SubscriberId} session event stream cancelled", subscriberId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error streaming session events for {SubscriberId}", subscriberId);
-            throw;
-        }
+        logger.LogInformation("Client {SubscriberId} started streaming session events", subscriberId);
+        await eventBroadcaster.SubscribeAsync(subscriberId, responseStream, context.CancellationToken)
+            .ConfigureAwait(false);
     }
 
     public override async Task<OperationResult> StartBreak(StartBreakRequest request, ServerCallContext context)
@@ -318,7 +271,7 @@ public class SessionsServiceImpl(
         }
         catch (SessionException ex)
         {
-            return SessionMapper.CreateResult(false, ex.Message, [ex.Message]);
+            return MapSessionFailure(ex);
         }
     }
 
@@ -332,8 +285,7 @@ public class SessionsServiceImpl(
 
         await foreach (var signal in requestStream.ReadAllAsync(context.CancellationToken).ConfigureAwait(false))
         {
-            var mode = sessionManager.ActiveSession?.FocusCommitment.Mode;
-            if (mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
+            if (sessionManager.ActiveSession?.FocusCommitment.IsCommitted != true)
             {
                 await responseStream.WriteAsync(new EmergencyUnlockHoldProgress
                 {

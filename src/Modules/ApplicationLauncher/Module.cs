@@ -16,8 +16,8 @@ namespace Axorith.Module.ApplicationLauncher;
 public sealed class Module : LauncherAppBase, IModule
 {
     private readonly Settings _settings;
-    private readonly IReadOnlyDictionary<string, ILauncherApp> _modules;
-    private ILauncherApp? _activeModule;
+    private readonly IReadOnlyDictionary<string, LauncherAppBase> _modules;
+    private LauncherAppBase? _activeModule;
 
     public Module(
         IModuleLogger logger,
@@ -29,7 +29,7 @@ public sealed class Module : LauncherAppBase, IModule
         IPlatformWindowService windowService)
         : base(logger, processService, windowService)
     {
-        _modules = new Dictionary<string, ILauncherApp>
+        _modules = new Dictionary<string, LauncherAppBase>
         {
             ["Browser"] = new BrowserApp(logger, appDiscovery, processService, windowService),
             ["OBS"] = new ObsApp(logger, appDiscovery, notifier, processService, windowService),

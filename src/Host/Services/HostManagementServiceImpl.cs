@@ -5,9 +5,6 @@ using Grpc.Core;
 
 namespace Axorith.Host.Services;
 
-/// <summary>
-///     gRPC service implementation for host lifecycle management.
-/// </summary>
 public class HostManagementServiceImpl(
     ISessionManager sessionManager,
     IHostApplicationLifetime lifetime,
@@ -23,8 +20,7 @@ public class HostManagementServiceImpl(
         {
             if (sessionManager.IsSessionRunning)
             {
-                if (sessionManager.ActiveSession?.FocusCommitment.Mode is Axorith.Core.Models.FocusCommitmentMode.Locked or
-                    Axorith.Core.Models.FocusCommitmentMode.Strict)
+                if (sessionManager.ActiveSession?.FocusCommitment.IsCommitted == true)
                 {
                     return Task.FromResult(new ShutdownResponse
                     {

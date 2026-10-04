@@ -102,27 +102,13 @@ public static class ProductAnalyticsProperties
         switch (name)
         {
             case "App Blocker":
-            {
-                properties["blockingMode"] = BlockingMode(Value(settings, "Mode"));
-                var categories = Values(settings, "Categories").Where(AppBlockerCategories.Contains).Distinct().Order().ToArray();
-                properties["categories"] = categories;
-                properties["categoryCount"] = categories.Length;
-                var customCount = CountEntries(Value(settings, "CustomProcessList"));
-                properties["hasCustomProcesses"] = customCount > 0;
-                properties["customProcessCount"] = customCount;
+                AddBlockerProperties(properties, settings, AppBlockerCategories, "CustomProcessList",
+                    "hasCustomProcesses", "customProcessCount");
                 break;
-            }
             case "Site Blocker":
-            {
-                properties["blockingMode"] = BlockingMode(Value(settings, "Mode"));
-                var categories = Values(settings, "Categories").Where(SiteBlockerCategories.Contains).Distinct().Order().ToArray();
-                properties["categories"] = categories;
-                properties["categoryCount"] = categories.Length;
-                var customCount = CountEntries(Value(settings, "CustomSites"));
-                properties["hasCustomSites"] = customCount > 0;
-                properties["customSiteCount"] = customCount;
+                AddBlockerProperties(properties, settings, SiteBlockerCategories, "CustomSites",
+                    "hasCustomSites", "customSiteCount");
                 break;
-            }
             case "Application Launcher":
                 AddLauncherProperties(properties, settings);
                 break;
@@ -147,7 +133,11 @@ public static class ProductAnalyticsProperties
             ["scheduleType"] = NormalizeScheduleType(schedule.Type),
             ["daysOfWeek"] = days,
             ["daysCount"] = days.Length,
-            ["scheduledMinuteOfDay"] = RecurringMinute(schedule),
+            ["scheduledMinuteOfDay"] = schedule is
+            { Type: ScheduleType.Recurring or ScheduleType.StopRecurring, RecurringTime: { } time }
+            && time >= TimeSpan.Zero && time < TimeSpan.FromDays(1)
+                ? time.Hours * 60 + time.Minutes
+                : null,
             ["use24HourFormat"] = schedule.Use24HourFormat,
             ["autoStopDurationMs"] = schedule is { Type: ScheduleType.StopDuration, AutoStopDuration: { } duration }
                 ? (long)duration.TotalMilliseconds
@@ -200,7 +190,6 @@ public static class ProductAnalyticsProperties
         _ => "custom"
     };
 
-    // ponytail: classify fixed message fragments; add structured session error codes if this taxonomy grows.
     public static string FailureReason(Exception exception) => exception switch
     {
         OperationCanceledException => "cancelled",
@@ -240,6 +229,24 @@ public static class ProductAnalyticsProperties
         {
             return false;
         }
+    }
+
+    private static void AddBlockerProperties(Dictionary<string, object?> properties,
+        IReadOnlyDictionary<string, string> settings, HashSet<string> allowedCategories, string customSetting,
+        string hasCustomProperty, string customCountProperty)
+    {
+        properties["blockingMode"] = Value(settings, "Mode") switch
+        {
+            "BlockList" => "block_list",
+            "AllowList" => "allow_list",
+            _ => null
+        };
+        var categories = Values(settings, "Categories").Where(allowedCategories.Contains).Distinct().Order().ToArray();
+        properties["categories"] = categories;
+        properties["categoryCount"] = categories.Length;
+        var customCount = CountEntries(Value(settings, customSetting));
+        properties[hasCustomProperty] = customCount > 0;
+        properties[customCountProperty] = customCount;
     }
 
     private static void AddLauncherProperties(Dictionary<string, object?> properties,
@@ -317,7 +324,7 @@ public static class ProductAnalyticsProperties
                 properties["hasCustomPlaybackUrl"] =
                     Value(settings, "PlaybackContext") == "custom" && HasValue(settings, "CustomUrl");
                 properties["volume"] = IntValue(settings, "Volume");
-                properties["shuffle"] = BoolStringValue(settings, "Shuffle");
+                properties["shuffle"] = BoolValue(settings, "Shuffle");
                 properties["repeatMode"] = Choice(Value(settings, "RepeatMode"),
                     ("off", "off"), ("context", "context"), ("track", "track"));
                 break;
@@ -346,12 +353,6 @@ public static class ProductAnalyticsProperties
         properties["hasEndEntity"] = HasValue(settings, "EndEntityId");
     }
 
-    private static string? BlockingMode(string? value) => value switch
-    {
-        "BlockList" => "block_list",
-        "AllowList" => "allow_list",
-        _ => null
-    };
 
     private static string BrowserFamily(string path)
     {
@@ -403,12 +404,6 @@ public static class ProductAnalyticsProperties
         _ => "unknown"
     };
 
-    private static int? RecurringMinute(SessionSchedule schedule)
-    {
-        if (schedule.Type is not (ScheduleType.Recurring or ScheduleType.StopRecurring) ||
-            schedule.RecurringTime is not { } time || time < TimeSpan.Zero || time >= TimeSpan.FromDays(1)) return null;
-        return time.Hours * 60 + time.Minutes;
-    }
 
     private static string[] DayKeys(IEnumerable<DayOfWeek>? days) =>
     [
@@ -443,7 +438,6 @@ public static class ProductAnalyticsProperties
     private static bool? BoolValue(IReadOnlyDictionary<string, string> settings, string key) =>
         bool.TryParse(Value(settings, key), out var value) ? value : null;
 
-    private static bool? BoolStringValue(IReadOnlyDictionary<string, string> settings, string key) => BoolValue(settings, key);
 
     private static int CountEntries(string? value) => string.IsNullOrWhiteSpace(value)
         ? 0
@@ -453,8 +447,5 @@ public static class ProductAnalyticsProperties
     private static string[] Values(IReadOnlyDictionary<string, string> settings, string key) =>
         (Value(settings, key) ?? string.Empty).Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private static string? Choice(string? value, params (string Input, string Output)[] choices)
-    {
-        return (from choice in choices where string.Equals(choice.Input, value, StringComparison.OrdinalIgnoreCase) select choice.Output).FirstOrDefault();
-    }
+    private static string? Choice(string? value, params (string Input, string Output)[] choices) => (from choice in choices where string.Equals(choice.Input, value, StringComparison.OrdinalIgnoreCase) select choice.Output).FirstOrDefault();
 }

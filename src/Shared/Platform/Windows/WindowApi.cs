@@ -3,32 +3,13 @@ using System.Management;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using Axorith.Shared.Platform;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows-specific window management API.
-/// </summary>
 [SupportedOSPlatform("windows")]
 internal static class WindowApi
 {
-    public delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild,
-        uint dwEventThread, uint dwmsEventTime);
-
-    [DllImport("user32.dll")]
-    public static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc,
-        WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
-
-    [DllImport("user32.dll")]
-    public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-    public const uint WINEVENT_OUTOFCONTEXT = 0;
-    public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
-    public const uint EVENT_OBJECT_CREATE = 0x8000;
-
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy,
         uint uFlags);
@@ -36,9 +17,6 @@ internal static class WindowApi
     [DllImport("user32.dll")]
     private static extern bool
         EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
-
-    [DllImport("user32.dll")]
-    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -68,15 +46,6 @@ internal static class WindowApi
         public int Top;
         public int Right;
         public int Bottom;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-    private struct MonitorInfo
-    {
-        public int Size;
-        public Rect Monitor;
-        public Rect WorkArea;
-        public uint Flags;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -111,47 +80,35 @@ internal static class WindowApi
 
     private const int DisplayDeviceActive = 0x00000001;
 
-    public static async Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
-        CancellationToken cancellationToken = default)
+    public static Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
+        CancellationToken cancellationToken = default) =>
+        WindowWaiter.WaitAsync(process, HasWindow, timeoutMs, cancellationToken);
+
+    private static bool HasWindow(Process process)
     {
-        var startTime = DateTime.Now;
-
-        while (process.MainWindowHandle == IntPtr.Zero)
-        {
-            if ((DateTime.Now - startTime).TotalMilliseconds > timeoutMs)
-            {
-                throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            process.Refresh();
-            await Task.Delay(100, cancellationToken);
-        }
+        process.Refresh();
+        return process.MainWindowHandle != IntPtr.Zero;
     }
 
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
-        var monitors = new List<Rect>();
-
-        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
-            (_, _, ref lprcMonitor, _) =>
-            {
-                monitors.Add(lprcMonitor);
-                return true;
-            }, IntPtr.Zero);
-
-        if (monitorIndex < 0 || monitorIndex >= monitors.Count)
-        {
-            throw new ArgumentOutOfRangeException(nameof(monitorIndex),
-                $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
-        }
-
-        var targetMonitor = monitors[monitorIndex];
+        var targetMonitor = GetMonitor(monitorIndex);
         var targetX = targetMonitor.Left + 50;
         var targetY = targetMonitor.Top + 50;
 
         SetWindowPos(windowHandle, IntPtr.Zero, targetX, targetY, 0, 0, SwpNosize | SwpNozorder);
+    }
+
+    private static List<Rect> GetMonitors()
+    {
+        var monitors = new List<Rect>();
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            (_, _, ref rect, _) =>
+            {
+                monitors.Add(rect);
+                return true;
+            }, IntPtr.Zero);
+        return monitors;
     }
 
     public static List<Process> FindProcesses(string processNameOrPath)
@@ -220,15 +177,9 @@ internal static class WindowApi
         return WindowState.Normal;
     }
 
-    public static void SetWindowSize(IntPtr windowHandle, int width, int height)
-    {
-        SetWindowPos(windowHandle, IntPtr.Zero, 0, 0, width, height, SwpNomove | SwpNozorder);
-    }
+    public static void SetWindowSize(IntPtr windowHandle, int width, int height) => SetWindowPos(windowHandle, IntPtr.Zero, 0, 0, width, height, SwpNomove | SwpNozorder);
 
-    public static void SetWindowPosition(IntPtr windowHandle, int x, int y)
-    {
-        SetWindowPos(windowHandle, IntPtr.Zero, x, y, 0, 0, SwpNosize | SwpNozorder);
-    }
+    public static void SetWindowPosition(IntPtr windowHandle, int x, int y) => SetWindowPos(windowHandle, IntPtr.Zero, x, y, 0, 0, SwpNosize | SwpNozorder);
 
     public static (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
     {
@@ -250,36 +201,22 @@ internal static class WindowApi
         SetForegroundWindow(windowHandle);
     }
 
-    public static int GetMonitorCount()
-    {
-        var monitors = new List<Rect>();
-        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
-            (_, _, ref lprcMonitor, _) =>
-            {
-                monitors.Add(lprcMonitor);
-                return true;
-            }, IntPtr.Zero);
-        return monitors.Count;
-    }
+    public static int GetMonitorCount() => GetMonitors().Count;
 
     public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
     {
-        var monitors = new List<Rect>();
-        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
-            (_, _, ref lprcMonitor, _) =>
-            {
-                monitors.Add(lprcMonitor);
-                return true;
-            }, IntPtr.Zero);
+        var target = GetMonitor(monitorIndex);
+        return (target.Left, target.Top, target.Right - target.Left, target.Bottom - target.Top);
+    }
 
+    private static Rect GetMonitor(int monitorIndex)
+    {
+        var monitors = GetMonitors();
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
-        {
             throw new ArgumentOutOfRangeException(nameof(monitorIndex),
                 $"Monitor index {monitorIndex} is out of range. Available monitors: {monitors.Count}");
-        }
 
-        var target = monitors[monitorIndex];
-        return (target.Left, target.Top, target.Right - target.Left, target.Bottom - target.Top);
+        return monitors[monitorIndex];
     }
 
     public static string GetMonitorName(int monitorIndex)
@@ -307,26 +244,11 @@ internal static class WindowApi
         using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM WmiMonitorID");
         foreach (var obj in searcher.Get())
         {
-            var userFriendlyName = obj["UserFriendlyName"] as ushort[];
-            if (userFriendlyName is { Length: > 0 })
+            var userFriendlyName = DecodeUshortArray(obj["UserFriendlyName"] as ushort[]);
+            if (!string.IsNullOrWhiteSpace(userFriendlyName))
             {
-                var name = new StringBuilder();
-                foreach (var c in userFriendlyName)
-                {
-                    if (c == 0)
-                    {
-                        break;
-                    }
-
-                    name.Append((char)c);
-                }
-
-                var result = name.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(result))
-                {
-                    names.Add(result);
-                    continue;
-                }
+                names.Add(userFriendlyName);
+                continue;
             }
 
             var manufacturerName = obj["ManufacturerName"] as ushort[];

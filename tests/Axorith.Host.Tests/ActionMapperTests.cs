@@ -10,7 +10,7 @@ public sealed class ActionMapperTests
     [Fact]
     public void SettingKeySurvivesActionMappingAndProtobufSerialization()
     {
-        using var action = SdkAction.Create("TestConnection", "Test Connection", settingKey: "BaseUrl");
+        using var action = new SdkAction("TestConnection", "Test Connection", settingKey: "BaseUrl");
 
         var message = ActionMapper.ToMessage(action);
         var roundTrip = Axorith.Contracts.Action.Parser.ParseFrom(message.ToByteArray());

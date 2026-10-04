@@ -1,4 +1,4 @@
-﻿namespace Axorith.Client.Services.Abstractions;
+namespace Axorith.Client.Services.Abstractions;
 
 public interface ITokenProvider
 {

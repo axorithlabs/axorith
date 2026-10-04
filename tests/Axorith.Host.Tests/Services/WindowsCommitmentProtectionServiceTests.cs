@@ -46,17 +46,13 @@ public sealed class WindowsCommitmentProtectionServiceTests
     }
 
     [Fact]
-    public void RecoveryStartupEntryCollisionIsPreservedAndCleanupOnlyTargetsTheHostEntry()
+    public void RecoveryCleanupOnlyTargetsTheHostEntry()
     {
         var type = typeof(WindowsCommitmentProtectionService);
-        var entryInUse = type.GetMethod("IsRecoveryStartupEntryInUse",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
         var isHostEntry = type.GetMethod("IsRecoveryStartupCommand",
             BindingFlags.NonPublic | BindingFlags.Static)!;
         var hostCommand = $"\"{Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Axorith.Host.exe"))}\"";
 
-        entryInUse.Invoke(null, [null]).Should().Be(false);
-        entryInUse.Invoke(null, ["user-owned startup command"]).Should().Be(true);
         isHostEntry.Invoke(null, [hostCommand]).Should().Be(true);
         isHostEntry.Invoke(null, ["user-owned startup command"]).Should().Be(false);
     }

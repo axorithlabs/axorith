@@ -12,53 +12,23 @@ internal class WindowsPlatformWindowService : IPlatformWindowService
         return WindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
     }
 
-    public void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
-    {
-        WindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
-    }
+    public void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex) => WindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
 
-    public void SetWindowState(IntPtr windowHandle, WindowState state)
-    {
-        WindowApi.SetWindowState(windowHandle, state);
-    }
+    public void SetWindowState(IntPtr windowHandle, WindowState state) => WindowApi.SetWindowState(windowHandle, state);
 
-    public WindowState GetWindowState(IntPtr windowHandle)
-    {
-        return WindowApi.GetWindowState(windowHandle);
-    }
+    public WindowState GetWindowState(IntPtr windowHandle) => WindowApi.GetWindowState(windowHandle);
 
-    public void SetWindowSize(IntPtr windowHandle, int width, int height)
-    {
-        WindowApi.SetWindowSize(windowHandle, width, height);
-    }
+    public void SetWindowSize(IntPtr windowHandle, int width, int height) => WindowApi.SetWindowSize(windowHandle, width, height);
 
-    public void SetWindowPosition(IntPtr windowHandle, int x, int y)
-    {
-        WindowApi.SetWindowPosition(windowHandle, x, y);
-    }
+    public void SetWindowPosition(IntPtr windowHandle, int x, int y) => WindowApi.SetWindowPosition(windowHandle, x, y);
 
-    public (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle)
-    {
-        return WindowApi.GetWindowBounds(windowHandle);
-    }
+    public (int X, int Y, int Width, int Height) GetWindowBounds(IntPtr windowHandle) => WindowApi.GetWindowBounds(windowHandle);
 
-    public void FocusWindow(IntPtr windowHandle)
-    {
-        WindowApi.FocusWindow(windowHandle);
-    }
+    public void FocusWindow(IntPtr windowHandle) => WindowApi.FocusWindow(windowHandle);
 
-    public int GetMonitorCount()
-    {
-        return WindowApi.GetMonitorCount();
-    }
+    public int GetMonitorCount() => WindowApi.GetMonitorCount();
 
-    public (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
-    {
-        return WindowApi.GetMonitorBounds(monitorIndex);
-    }
+    public (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex) => WindowApi.GetMonitorBounds(monitorIndex);
 
-    public string GetMonitorName(int monitorIndex)
-    {
-        return WindowApi.GetMonitorName(monitorIndex);
-    }
+    public string GetMonitorName(int monitorIndex) => WindowApi.GetMonitorName(monitorIndex);
 }

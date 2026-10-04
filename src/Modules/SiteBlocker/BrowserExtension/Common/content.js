@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file content.js
  * @description This script is injected into tabs that are designated for blocking.
  * Its primary responsibility is to immediately halt all page activity (scripts, media)
@@ -15,7 +15,7 @@
     window.stop();
 
     // Fetch the blocker page content from the extension's resources.
-    const blockerUrl = chrome.runtime.getURL('blocked.html');
+    const blockerUrl = (globalThis.browser ?? globalThis.chrome).runtime.getURL('blocked.html');
     let blockerHtml;
     try {
         const response = await fetch(blockerUrl);

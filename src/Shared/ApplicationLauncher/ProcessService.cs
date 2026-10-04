@@ -113,10 +113,7 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
         return Task.CompletedTask;
     }
 
-    public Task<Process?> AttachExistingOnlyAsync(string path)
-    {
-        return AttachToExistingAsync(path);
-    }
+    public Task<Process?> AttachExistingOnlyAsync(string path) => AttachToExistingAsync(path);
 
     private Task<Process?> LaunchNewAsync(string path, string args, string? workingDirectory)
     {
