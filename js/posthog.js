@@ -7,7 +7,7 @@ function normalizeWebsitePath(value) {
 
     try {
         const pathname = new URL(value, "https://axorith.com").pathname.replace(/\/+$/, "") || "/";
-        return ({
+        const fixed = {
             "/": "/",
             "/index.html": "/",
             "/privacy": "/privacy",
@@ -16,8 +16,17 @@ function normalizeWebsitePath(value) {
             "/download": "/download",
             "/download/index.html": "/download",
             "/download/windows": "/download/windows",
-            "/download/windows/index.html": "/download/windows"
-        })[pathname] || "/other";
+            "/download/windows/index.html": "/download/windows",
+            "/guides": "/guides",
+            "/guides/index.html": "/guides"
+        };
+
+        if (fixed[pathname]) return fixed[pathname];
+
+        const guideMatch = pathname.match(/^\/guides\/([a-z0-9-]+)(?:\/index\.html)?$/);
+        if (guideMatch) return `/guides/${guideMatch[1]}`;
+
+        return "/other";
     } catch {
         return "/other";
     }
@@ -60,7 +69,11 @@ function sanitizeWebsiteEvent(event) {
             "instagram.com": "instagram",
             "youtube.com": "youtube",
             "x.com": "x",
-            "twitter.com": "x"
+            "twitter.com": "x",
+            "chatgpt.com": "chatgpt",
+            "perplexity.ai": "perplexity",
+            "gemini.google.com": "gemini",
+            "copilot.microsoft.com": "copilot"
         };
         referrerSource = Object.entries(sources).find(([domain]) =>
             host === domain || host.endsWith(`.${domain}`))?.[1] || "other";

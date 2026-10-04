@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule apps, website blocking and work sessions on Windows | Axorith</title>
+<meta name="description" content="Schedule a Windows workspace that launches work apps, blocks distracting apps and websites, stops by time or duration, and can start the next preset.">
+<meta name="author" content="Axorith Labs">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<meta name="theme-color" content="#0b0c0e">
+<link rel="canonical" href="https://axorith.com/guides/schedule-apps-and-website-blocking-windows/">
+<meta property="og:title" content="Schedule apps, website blocking and work sessions on Windows | Axorith">
+<meta property="og:description" content="Schedule a Windows workspace that launches work apps, blocks distracting apps and websites, stops by time or duration, and can start the next preset.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://axorith.com/guides/schedule-apps-and-website-blocking-windows/">
+<meta property="og:image" content="https://axorith.com/assets/og_banner.jpg">
+<meta property="og:site_name" content="Axorith">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Schedule apps, website blocking and work sessions on Windows | Axorith">
+<meta name="twitter:description" content="Schedule a Windows workspace that launches work apps, blocks distracting apps and websites, stops by time or duration, and can start the next preset.">
+<meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg">
+<link rel="icon" href="/assets/icon.ico" type="image/x-icon">
+<link rel="stylesheet" href="/css/main.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Schedule app launching and distraction blocking on Windows","description":"Schedule a Windows workspace that launches work apps, blocks distracting apps and websites, stops by time or duration, and can start the next preset.","url":"https://axorith.com/guides/schedule-apps-and-website-blocking-windows/","mainEntityOfPage":"https://axorith.com/guides/schedule-apps-and-website-blocking-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-04","dateModified":"2026-10-04","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://axorith.com/guides/"},{"@type":"ListItem","position":3,"name":"Schedule app launching and distraction blocking on Windows","item":"https://axorith.com/guides/schedule-apps-and-website-blocking-windows/"}]}</script>
+</head>
+<body class="content-page" data-page-type="guide" data-content-slug="schedule-apps-and-website-blocking-windows">
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="/" aria-label="Axorith home">Axorith</a>
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      <a href="/#workflow">Workflow</a>
+      <a href="/#schedule">Schedules</a>
+      <a href="/guides/" class="is-current">Guides</a>
+      <a href="https://github.com/axorithlabs/axorith">GitHub</a>
+    </nav>
+    <a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" data-analytics-placement="header">Download</a>
+    <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </div>
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="/#workflow">Workflow</a>
+    <a href="/#schedule">Schedules</a>
+    <a href="/guides/">Guides</a>
+    <a href="https://github.com/axorithlabs/axorith">GitHub</a>
+    <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" data-analytics-placement="mobile-nav">Download for Windows</a>
+  </nav>
+</header>
+<main>
+  <section class="guide-hero">
+    <div class="guide-hero__inner">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Axorith</a><span>/</span><a href="/guides/">Guides</a>
+      </nav>
+      <p class="guide-kicker">Windows scheduling</p>
+      <h1>Schedule app launching and distraction blocking on Windows</h1>
+      <p class="guide-dek">Use one schedule for the whole work session instead of separate tasks for launchers and blockers.</p>
+      <div class="guide-hero__actions">
+        <a class="button button--primary" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" data-analytics-placement="article-hero">Download for Windows</a>
+        <a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <article class="guide-article">
+    <div class="guide-article__main">
+      
+<section class="guide-section guide-lead">
+  <p>Windows Task Scheduler can start a program at a specific time. A blocker can prevent access to distracting apps or sites. Axorith combines those actions into one scheduled workspace, so the start time, launchers, blockers and stop rule belong to the same session.</p>
+</section>
+
+<section class="guide-section">
+  <p class="guide-kicker">Example</p>
+  <h2>Start Programming at 09:00, stop at 18:00.</h2>
+  <div class="guide-timeline">
+    <div><time>09:00</time><strong>Programming starts</strong><p>Launch the IDE and browser, apply app and site blockers, start the configured session rules.</p></div>
+    <div><time>18:00</time><strong>Programming ends</strong><p>End the session at the fixed time and optionally start the next preset.</p></div>
+  </div>
+</section>
+
+<section class="guide-section">
+  <p class="guide-kicker">Recurring starts</p>
+  <h2>Attach the schedule to the preset.</h2>
+  <p>A recurring start can be limited to selected days such as Monday through Friday. That means the schedule describes when the whole workspace begins, not only when one EXE should be launched.</p>
+</section>
+
+<section class="guide-section">
+  <p class="guide-kicker">Stop rules</p>
+  <h2>End by time or by duration.</h2>
+  <p>For a fixed routine, use a specific stop time. For a session that should last a set amount of time regardless of when it begins, use a duration. The preset can also define the next workspace to start after a natural completion.</p>
+</section>
+
+<figure class="guide-figure reveal">
+  <img src="/assets/Axorith.Client_3.png" alt="Axorith session scheduling interface on Windows" loading="lazy" decoding="async">
+  <figcaption>Start and stop rules live alongside the rest of the preset.</figcaption>
+</figure>
+
+<section class="guide-section">
+  <p class="guide-kicker">Why not only Task Scheduler?</p>
+  <h2>Task Scheduler launches a process. It does not own the workspace state.</h2>
+  <p>Native Windows scheduling is useful when the whole job is “run this executable.” It becomes harder to maintain when a routine also needs blockers, multiple applications, project paths, session commitment and a handoff at the end. Axorith keeps those pieces under one preset instead of spreading them across scripts and utilities.</p>
+</section>
+
+      <section class="guide-cta reveal">
+  <div>
+    <p class="guide-kicker">Axorith for Windows</p>
+    <h2>Run the setup instead of rebuilding it.</h2>
+    <p>Create the workspace once, then start it manually or let the schedule do it.</p>
+  </div>
+  <div class="guide-cta__actions">
+    <a class="button button--primary" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe" data-analytics-placement="article-end">Download for Windows</a>
+    <a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">View source on GitHub</a>
+  </div>
+</section>
+    </div>
+    <aside class="guide-aside" aria-label="About Axorith">
+      <div class="guide-aside__card">
+        <span class="guide-aside__label">Axorith</span>
+        <p>Local Windows workspace orchestration: apps, blockers, schedules and session rules in one preset.</p>
+        <a href="/#workflow">See the workflow</a>
+        <a href="/#schedule">See scheduling</a>
+        <a href="/guides/">More guides</a>
+      </div>
+    </aside>
+  </article>
+</main>
+<footer class="footer">
+  <div class="footer__inner">
+    <div><a class="brand" href="/">Axorith</a><span>Source-available under BSL 1.1</span></div>
+    <nav aria-label="Footer navigation">
+      <a href="/download/">Download</a>
+      <a href="/guides/">Guides</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="https://github.com/axorithlabs/axorith">GitHub</a>
+    </nav>
+  </div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

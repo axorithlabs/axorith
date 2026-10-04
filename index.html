@@ -1,254 +1,261 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Axorith — Stop rebuilding your workspace every time you start</title>
-  <meta name="description" content="Save your apps, blockers, schedules and Focus Commitment rules in a preset. Start it yourself or let Axorith move your day from one workspace to the next.">
-  <meta name="author" content="Axorith Labs">
-  <link rel="canonical" href="https://axorith.com/">
-  <meta property="og:title" content="Axorith — Stop rebuilding your workspace every time you start">
-  <meta property="og:description" content="Save your work setup once. Axorith can open the right apps, apply blockers and run the session by your rules.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://axorith.com/">
-  <meta property="og:image" content="https://axorith.com/assets/og_banner.jpg">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Axorith — Stop rebuilding your workspace every time you start">
-  <meta name="twitter:description" content="Save your work setup once. Axorith can open the right apps, apply blockers and run the session by your rules.">
-  <meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg">
-  <link rel="icon" href="assets/icon.ico" type="image/x-icon">
-  <link rel="stylesheet" href="css/main.css">
-  <script src="js/posthog.js" defer></script>
-  <script src="js/main.js" defer></script>
-</head>
-<body class="home-page">
-  <header class="site-header">
-    <div class="site-header__inner">
-      <a class="brand" href="/" aria-label="Axorith home">Axorith</a>
-      <nav class="desktop-nav" aria-label="Primary navigation">
-        <a href="#workflow">Workflow</a>
-        <a href="#schedule">Schedules</a>
-        <a href="https://github.com/axorithlabs/axorith">GitHub</a>
-      </nav>
-      <a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download</a>
-      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">
-        <span></span><span></span>
-      </button>
-    </div>
-    <nav class="mobile-nav" aria-label="Mobile navigation">
-      <a href="#workflow">Workflow</a>
-      <a href="#schedule">Schedules</a>
-      <a href="https://github.com/axorithlabs/axorith">GitHub</a>
-      <a href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
-    </nav>
-  </header>
-
-  <main>
-    <section class="hero hero-v3">
-      <div class="hero-v3__copy reveal">
-        <h1>Stop rebuilding your workspace every time you start.</h1>
-        <p>Save your apps, blockers and session rules in a preset. Start it yourself or on a schedule.</p>
-        <div class="hero__actions">
-          <a class="button button--primary" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
-          <a class="button button--secondary" href="https://github.com/axorithlabs/axorith">View on GitHub</a>
-        </div>
-      </div>
-
-      <div class="hero-app reveal" aria-label="Axorith Presets interface preview">
-        <div class="ax-window">
-          <div class="ax-titlebar">
-            <span class="ax-titlebar__name">Axorith</span>
-            <span class="ax-titlebar__controls" aria-hidden="true"><i></i><i></i><i></i></span>
-          </div>
-          <div class="ax-shell">
-            <aside class="ax-sidebar" aria-hidden="true">
-              <div class="ax-navitem"><span class="ax-navicon ax-navicon--home"></span>Home</div>
-              <div class="ax-navitem is-active"><span class="ax-navicon ax-navicon--presets"></span>Presets</div>
-              <div class="ax-nav-spacer"></div>
-              <div class="ax-navitem"><span class="ax-navicon ax-navicon--settings"></span>Settings</div>
-            </aside>
-
-            <div class="ax-presets">
-              <div class="ax-presets__head">
-                <h2>Presets</h2>
-                <button type="button" tabindex="-1">New preset</button>
-              </div>
-
-              <article class="ax-preset ax-preset--primary">
-                <div class="ax-preset__content">
-                  <div class="ax-preset__name">Programming</div>
-                  <div class="ax-preset__summary">
-                    <span class="ax-chip">Locked</span>
-                    <span>Launch CLion, Browser, Block Distracting Sites +2</span>
-                    <span class="ax-dot">·</span>
-                    <span>Until 18:00</span>
-                  </div>
-                  <div class="ax-preset__schedule">Schedule: Mon, Tue, Wed, Thu, Fri at 09:00</div>
-                </div>
-                <div class="ax-preset__actions">
-                  <button class="ax-start" type="button" tabindex="-1">Start</button>
-                  <button class="ax-more" type="button" tabindex="-1" aria-label="More actions"><b></b><b></b><b></b></button>
-                </div>
-              </article>
-
-              <article class="ax-preset">
-                <div class="ax-preset__content">
-                  <div class="ax-preset__name">Relax</div>
-                  <div class="ax-preset__summary">
-                    <span class="ax-chip">Normal</span>
-                    <span>Launch Steam, Discord, Spotify</span>
-                    <span class="ax-dot">·</span>
-                    <span>Until stopped</span>
-                  </div>
-                </div>
-                <div class="ax-preset__actions">
-                  <button class="ax-start" type="button" tabindex="-1">Start</button>
-                  <button class="ax-more" type="button" tabindex="-1" aria-label="More actions"><b></b><b></b><b></b></button>
-                </div>
-              </article>
-
-              <article class="ax-preset">
-                <div class="ax-preset__content">
-                  <div class="ax-preset__name">Study</div>
-                  <div class="ax-preset__summary">
-                    <span class="ax-chip">Strict</span>
-                    <span>Browser, Site Blocker, App Blocker</span>
-                    <span class="ax-dot">·</span>
-                    <span>Session duration: 120 min</span>
-                  </div>
-                </div>
-                <div class="ax-preset__actions">
-                  <button class="ax-start" type="button" tabindex="-1">Start</button>
-                  <button class="ax-more" type="button" tabindex="-1" aria-label="More actions"><b></b><b></b><b></b></button>
-                </div>
-              </article>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="ritual" id="workflow">
-      <div class="ritual__intro reveal">
-        <h2>One preset replaces the setup ritual.</h2>
-        <p>Save the apps, blockers and session rules together once. After that, starting work means starting the preset.</p>
-      </div>
-
-      <div class="ritual-compress reveal" aria-label="Programming preset replaces a repeated setup ritual">
-        <div class="ritual-compress__source ritual-compress__source--v2" aria-hidden="true">
-          <div><span>Launch</span><strong>CLion</strong></div>
-          <div><span>Launch</span><strong>Browser</strong></div>
-          <div><span>Launch</span><strong>Spotify</strong></div>
-          <div><span>Block</span><strong>Distracting apps</strong></div>
-          <div><span>Block</span><strong>Distracting sites</strong></div>
-          <div><span>Session mode</span><strong>Locked</strong></div>
-        </div>
-        <div class="ritual-compress__bridge" aria-hidden="true"><i></i></div>
-        <article class="preset-light-card preset-light-card--v2">
-          <div class="preset-light-card__head">
-            <div><span>Preset</span><strong>Programming</strong></div>
-            <span class="preset-light-card__mode">Locked</span>
-          </div>
-          <div class="preset-light-card__chips">
-            <span>CLion</span><span>Browser</span><span>Spotify</span><span>App Blocker</span><span>Site Blocker</span>
-          </div>
-          <div class="preset-light-card__footer"><button type="button" tabindex="-1">Start</button></div>
-        </article>
-      </div>
-    </section>
-
-    <section class="editor-screenshot-section reveal" aria-label="Axorith preset editor">
-      <div class="editor-screenshot-section__copy">
-        <h2>Build the whole session in one editor.</h2>
-        <p>Set Focus Commitment, choose how the preset starts, add modules in order, define when it stops and what happens next.</p>
-      </div>
-      <img src="assets/preset-editor.png" alt="Axorith preset editor showing preset name, Focus Commitment, Start On, App Blocker, Stop On and Then sections">
-    </section>
-
-    <section class="blockers-chapter">
-      <div class="blockers-chapter__copy reveal">
-        <h2>Keep the workspace. Remove everything else.</h2>
-        <p>Block selected apps and sites, or let App Blocker allow only the applications configured in the current Workspace.</p>
-      </div>
-
-      <div class="blocker-visual reveal" aria-label="Blocker configuration preview">
-        <div class="blocker-column">
-          <span class="blocker-column__label">App Blocker</span>
-          <strong>Only allow Workspace apps</strong>
-          <div class="allowed-list">
-            <span>CLion</span><span>Browser</span><span>Spotify</span>
-          </div>
-          <div class="blocked-list"><span>Steam</span><span>Discord</span><span>Other apps</span></div>
-        </div>
-        <div class="blocker-column">
-          <span class="blocker-column__label">Site Blocker</span>
-          <strong>Block selected categories</strong>
-          <div class="category-list">
-            <span>Social</span><span>Video</span><span>Streaming</span><span>Gaming</span><span>News</span><span>Shopping</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="schedule-story" id="schedule">
-      <div class="schedule-story__copy reveal">
-        <h2>Programming at 09:00. Relax at 18:00.</h2>
-        <p>Axorith can start one preset on schedule, end it at a fixed time and hand off to the next preset automatically.</p>
-      </div>
-
-      <div class="preset-handoff reveal" aria-label="Programming preset changes to Relax preset at 18:00">
-        <article class="handoff-preset handoff-preset--work">
-          <div class="handoff-preset__time">09:00</div>
-          <div class="handoff-preset__head"><strong>Programming</strong><span>Locked</span></div>
-          <div class="handoff-preset__rule"><label>Starts</label><b>Time Schedule · Mon–Fri · 09:00</b></div>
-          <div class="handoff-preset__modules"><span>CLion</span><span>Browser</span><span>Spotify</span><span>App Blocker</span><span>Site Blocker</span></div>
-        </article>
-
-        <div class="handoff-transition" aria-hidden="true">
-          <i></i>
-        </div>
-
-        <article class="handoff-preset handoff-preset--relax">
-          <div class="handoff-preset__time">18:00</div>
-          <div class="handoff-preset__head"><strong>Relax</strong><span>Normal</span></div>
-          <div class="handoff-preset__rule"><label>Starts</label><b>Started by previous preset</b></div>
-          <div class="handoff-preset__modules"><span>Steam</span><span>Discord</span><span>Spotify</span></div>
-        </article>
-      </div>
-    </section>
-
-    <section class="modules-teaser-v3">
-      <div class="modules-teaser-v3__head reveal">
-        <h2>Extend the preset when you need more.</h2>
-      </div>
-      <div class="module-table reveal">
-        <div><strong>Application Launcher</strong><span>Applications, IDE projects, window placement and lifecycle.</span></div>
-        <div><strong>App Blocker</strong><span>Block selected apps or allow only Workspace apps.</span></div>
-        <div><strong>Site Blocker</strong><span>Block sites or categories while the session is active.</span></div>
-        <div><strong>Home Assistant</strong><span>Optional actions for devices around the Workspace.</span></div>
-      </div>
-    </section>
-
-    <section class="final-cta final-cta-v3">
-      <div class="final-cta__inner reveal">
-        <h2>Build the preset once. Run the setup when you need it.</h2>
-        <div class="final-cta__actions">
-          <a class="button button--light" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
-          <a class="button button--dark-outline" href="https://github.com/axorithlabs/axorith">GitHub</a>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="footer__inner">
-      <div><a class="brand" href="/">Axorith</a><span>Source-available under BSL 1.1</span></div>
-      <nav aria-label="Footer navigation">
-        <a href="/download/">Download</a>
-        <a href="/privacy/">Privacy</a>
-        <a href="https://github.com/axorithlabs/axorith">GitHub</a>
-      </nav>
-    </div>
-  </footer>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith — Windows workspace automation, app &amp; website blocking</title>
+<meta content="Launch work apps and projects, block distracting apps and websites, schedule sessions and keep the workflow local on Windows." name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<link href="https://axorith.com/" rel="canonical"/>
+<meta content="Axorith — Windows workspace automation, app &amp; website blocking" property="og:title"/>
+<meta content="Launch work apps and projects, block distracting apps and websites, schedule sessions and keep the workflow local on Windows." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith — Windows workspace automation, app &amp; website blocking" name="twitter:title"/>
+<meta content="Launch work apps and projects, block distracting apps and websites, schedule sessions and keep the workflow local on Windows." name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="css/main.css" rel="stylesheet"/>
+<script defer="" src="js/posthog.js"></script>
+<script defer="" src="js/main.js"></script>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/><meta content="#0b0c0e" name="theme-color"/><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/","downloadUrl":"https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe","image":"https://axorith.com/assets/og_banner.jpg","operatingSystem":"Windows","applicationCategory":"ProductivityApplication","applicationSubCategory":"Workspace automation and distraction blocking","description":"A local Windows workspace orchestrator that can launch work apps and projects, block distracting apps and websites, run scheduled sessions, and chain workspaces.","license":"https://github.com/axorithlabs/axorith/blob/main/LICENSE.md","sameAs":["https://github.com/axorithlabs/axorith"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"Free for personal and non-commercial use under BSL 1.1."},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/"}}</script></head>
+<body class="home-page" data-content-slug="home" data-page-type="home">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith home" class="brand" href="/">Axorith</a>
+<nav aria-label="Primary navigation" class="desktop-nav">
+<a href="#workflow">Workflow</a>
+<a href="#schedule">Schedules</a>
+<a href="/guides/">Guides</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download</a>
+<button aria-expanded="false" aria-label="Open navigation" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Mobile navigation" class="mobile-nav">
+<a href="#workflow">Workflow</a>
+<a href="#schedule">Schedules</a>
+<a href="/guides/">Guides</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
+</nav>
+</header>
+<main>
+<section class="hero hero-v3">
+<div class="hero-v3__copy reveal">
+<h1>Stop rebuilding your workspace every time you start.</h1>
+<p>Save your apps, blockers and session rules in a preset. Start it yourself or on a schedule.</p>
+<div class="hero__actions">
+<a class="button button--primary" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
+<a class="button button--secondary" href="https://github.com/axorithlabs/axorith">View on GitHub</a>
+</div>
+</div>
+<div aria-label="Axorith Presets interface preview" class="hero-app reveal">
+<div class="ax-window">
+<div class="ax-titlebar">
+<span class="ax-titlebar__name">Axorith</span>
+<span aria-hidden="true" class="ax-titlebar__controls"><i></i><i></i><i></i></span>
+</div>
+<div class="ax-shell">
+<aside aria-hidden="true" class="ax-sidebar">
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--home"></span>Home</div>
+<div class="ax-navitem is-active"><span class="ax-navicon ax-navicon--presets"></span>Presets</div>
+<div class="ax-nav-spacer"></div>
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--settings"></span>Settings</div>
+</aside>
+<div class="ax-presets">
+<div class="ax-presets__head">
+<h2>Presets</h2>
+<button tabindex="-1" type="button">New preset</button>
+</div>
+<article class="ax-preset ax-preset--primary">
+<div class="ax-preset__content">
+<div class="ax-preset__name">Programming</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">Locked</span>
+<span>Launch CLion, Browser, Block Distracting Sites +2</span>
+<span class="ax-dot">·</span>
+<span>Until 18:00</span>
+</div>
+<div class="ax-preset__schedule">Schedule: Mon, Tue, Wed, Thu, Fri at 09:00</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">Start</button>
+<button aria-label="More actions" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">Relax</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">Normal</span>
+<span>Launch Steam, Discord, Spotify</span>
+<span class="ax-dot">·</span>
+<span>Until stopped</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">Start</button>
+<button aria-label="More actions" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">Study</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">Strict</span>
+<span>Browser, Site Blocker, App Blocker</span>
+<span class="ax-dot">·</span>
+<span>Session duration: 120 min</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">Start</button>
+<button aria-label="More actions" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="ritual" id="workflow">
+<div class="ritual__intro reveal">
+<h2>One preset replaces the setup ritual.</h2>
+<p>Save the apps, blockers and session rules together once. After that, starting work means starting the preset.</p>
+</div>
+<div aria-label="Programming preset replaces a repeated setup ritual" class="ritual-compress reveal">
+<div aria-hidden="true" class="ritual-compress__source ritual-compress__source--v2">
+<div><span>Launch</span><strong>CLion</strong></div>
+<div><span>Launch</span><strong>Browser</strong></div>
+<div><span>Launch</span><strong>Spotify</strong></div>
+<div><span>Block</span><strong>Distracting apps</strong></div>
+<div><span>Block</span><strong>Distracting sites</strong></div>
+<div><span>Session mode</span><strong>Locked</strong></div>
+</div>
+<div aria-hidden="true" class="ritual-compress__bridge"><i></i></div>
+<article class="preset-light-card preset-light-card--v2">
+<div class="preset-light-card__head">
+<div><span>Preset</span><strong>Programming</strong></div>
+<span class="preset-light-card__mode">Locked</span>
+</div>
+<div class="preset-light-card__chips">
+<span>CLion</span><span>Browser</span><span>Spotify</span><span>App Blocker</span><span>Site Blocker</span>
+</div>
+<div class="preset-light-card__footer"><button tabindex="-1" type="button">Start</button></div>
+</article>
+</div>
+</section>
+<section aria-label="Axorith preset editor" class="editor-screenshot-section reveal">
+<div class="editor-screenshot-section__copy">
+<h2>Build the whole session in one editor.</h2>
+<p>Set Focus Commitment, choose how the preset starts, add modules in order, define when it stops and what happens next.</p>
+</div>
+<img alt="Axorith preset editor showing preset name, Focus Commitment, Start On, App Blocker, Stop On and Then sections" src="assets/preset-editor.png"/>
+</section>
+<section class="blockers-chapter">
+<div class="blockers-chapter__copy reveal">
+<h2>Keep the workspace. Remove everything else.</h2>
+<p>Block selected apps and sites, or let App Blocker allow only the applications configured in the current Workspace.</p>
+</div>
+<div aria-label="Blocker configuration preview" class="blocker-visual reveal">
+<div class="blocker-column">
+<span class="blocker-column__label">App Blocker</span>
+<strong>Only allow Workspace apps</strong>
+<div class="allowed-list">
+<span>CLion</span><span>Browser</span><span>Spotify</span>
+</div>
+<div class="blocked-list"><span>Steam</span><span>Discord</span><span>Other apps</span></div>
+</div>
+<div class="blocker-column">
+<span class="blocker-column__label">Site Blocker</span>
+<strong>Block selected categories</strong>
+<div class="category-list">
+<span>Social</span><span>Video</span><span>Streaming</span><span>Gaming</span><span>News</span><span>Shopping</span>
+</div>
+</div>
+</div>
+</section>
+<section class="schedule-story" id="schedule">
+<div class="schedule-story__copy reveal">
+<h2>Programming at 09:00. Relax at 18:00.</h2>
+<p>Axorith can start one preset on schedule, end it at a fixed time and hand off to the next preset automatically.</p>
+</div>
+<div aria-label="Programming preset changes to Relax preset at 18:00" class="preset-handoff reveal">
+<article class="handoff-preset handoff-preset--work">
+<div class="handoff-preset__time">09:00</div>
+<div class="handoff-preset__head"><strong>Programming</strong><span>Locked</span></div>
+<div class="handoff-preset__rule"><label>Starts</label><b>Time Schedule · Mon–Fri · 09:00</b></div>
+<div class="handoff-preset__modules"><span>CLion</span><span>Browser</span><span>Spotify</span><span>App Blocker</span><span>Site Blocker</span></div>
+</article>
+<div aria-hidden="true" class="handoff-transition">
+<i></i>
+</div>
+<article class="handoff-preset handoff-preset--relax">
+<div class="handoff-preset__time">18:00</div>
+<div class="handoff-preset__head"><strong>Relax</strong><span>Normal</span></div>
+<div class="handoff-preset__rule"><label>Starts</label><b>Started by previous preset</b></div>
+<div class="handoff-preset__modules"><span>Steam</span><span>Discord</span><span>Spotify</span></div>
+</article>
+</div>
+</section>
+<section class="modules-teaser-v3">
+<div class="modules-teaser-v3__head reveal">
+<h2>Extend the preset when you need more.</h2>
+</div>
+<div class="module-table reveal">
+<div><strong>Application Launcher</strong><span>Applications, IDE projects, window placement and lifecycle.</span></div>
+<div><strong>App Blocker</strong><span>Block selected apps or allow only Workspace apps.</span></div>
+<div><strong>Site Blocker</strong><span>Block sites or categories while the session is active.</span></div>
+<div><strong>Home Assistant</strong><span>Optional actions for devices around the Workspace.</span></div>
+</div>
+</section>
+<section class="guides-preview">
+<div class="guides-preview__head reveal">
+<div>
+<p class="section-kicker">Guides</p>
+<h2>Use cases people actually search for.</h2>
+</div>
+<a class="text-link text-link--dark" href="/guides/">View all guides</a>
+</div>
+<div class="guides-preview__grid">
+<a class="guides-preview__card reveal" href="/guides/block-apps-websites-and-launch-work-apps-windows/">
+<span>Windows focus setup</span>
+<h3>Block apps and websites, then launch your work setup.</h3>
+<p>One preset for both sides of the context switch.</p>
+</a>
+<a class="guides-preview__card reveal" href="/guides/automate-work-setup-windows/">
+<span>Workspace automation</span>
+<h3>Automate the Windows setup you rebuild every day.</h3>
+<p>Apps, projects, blockers, schedules and the handoff after work.</p>
+</a>
+<a class="guides-preview__card reveal" href="/guides/cold-turkey-alternative-windows/">
+<span>Comparison</span>
+<h3>Axorith vs Cold Turkey on Windows.</h3>
+<p>Where a blocker ends and workspace orchestration starts.</p>
+</a>
+</div>
+</section><section class="final-cta final-cta-v3">
+<div class="final-cta__inner reveal">
+<h2>Build the preset once. Run the setup when you need it.</h2>
+<div class="final-cta__actions">
+<a class="button button--light" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download for Windows</a>
+<a class="button button--dark-outline" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/">Axorith</a><span>Source-available under BSL 1.1</span></div>
+<nav aria-label="Footer navigation">
+<a href="/download/">Download</a>
+<a href="/guides/">Guides</a><a href="/privacy/">Privacy</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
 </body>
 </html>

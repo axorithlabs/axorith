@@ -17,14 +17,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const anchor = event.target instanceof Element ? event.target.closest('a') : null;
     if (!anchor || !window.posthog || typeof window.posthog.capture !== 'function') return;
 
+    const contentSlug = document.body?.dataset?.contentSlug || undefined;
+    const contentType = document.body?.dataset?.pageType || undefined;
+    const placement = anchor.dataset.analyticsPlacement || undefined;
+
     if (typeof isWindowsInstallerDownloadUrl === 'function' && isWindowsInstallerDownloadUrl(anchor.href)) {
-      window.posthog.capture('WebsiteDownloadClicked', { platform: 'windows' });
+      window.posthog.capture('WebsiteDownloadClicked', {
+        platform: 'windows',
+        contentSlug,
+        contentType,
+        placement
+      });
       return;
     }
 
     try {
       if (new URL(anchor.href, location.href).hostname.toLowerCase() === 'github.com') {
-        window.posthog.capture('WebsiteGitHubClicked');
+        window.posthog.capture('WebsiteGitHubClicked', { contentSlug, contentType, placement });
       }
     } catch { }
   });
