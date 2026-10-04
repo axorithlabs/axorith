@@ -1,4 +1,4 @@
-﻿using System.Reactive.Linq;
+using System.Reactive.Linq;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Axorith.Client.Services.Abstractions;
@@ -8,11 +8,6 @@ using ReactiveUI.Avalonia;
 
 namespace Axorith.Client.Services;
 
-/// <summary>
-///     Manages the display and stacking of desktop toast notifications (floating windows).
-///     Listens to the shared ToastNotificationService and shows a desktop window
-///     through the dedicated desktop toast window.
-/// </summary>
 public class DesktopNotificationManager(
     IToastNotificationService toastService,
     IClassicDesktopStyleApplicationLifetime desktop)
@@ -29,13 +24,9 @@ public class DesktopNotificationManager(
     {
         _subscription = toastService.Notifications
             .ObserveOn(AvaloniaScheduler.Instance)
-            .Subscribe(OnNotificationReceived);
+            .Subscribe(ShowDesktopToast);
     }
 
-    private void OnNotificationReceived(ToastNotification notification)
-    {
-        ShowDesktopToast(notification);
-    }
 
     private void ShowDesktopToast(ToastNotification notification)
     {

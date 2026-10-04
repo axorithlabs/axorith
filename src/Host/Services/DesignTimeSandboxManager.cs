@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Host.Services;
 
-public sealed class DesignTimeSandboxManager : IDesignTimeSandboxManager, IDisposable
+public sealed class DesignTimeSandboxManager : IDisposable
 {
     private sealed class Sandbox(IModule module, ILifetimeScope? scope)
     {
@@ -96,10 +96,6 @@ public sealed class DesignTimeSandboxManager : IDesignTimeSandboxManager, IDispo
         BroadcastAll(instanceId, sandbox);
     }
 
-    /// <summary>
-    ///     Gets the module instance associated with the given sandbox ID.
-    ///     Returns null if no sandbox exists.
-    /// </summary>
     public IModule? GetModule(Guid instanceId)
     {
         if (_sandboxes.TryGetValue(instanceId, out var sb))

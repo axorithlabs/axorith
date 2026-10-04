@@ -72,40 +72,22 @@ public class TestModule(
     ValidationResult validationResult)
     : IModule
 {
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return settings;
-    }
+    public IReadOnlyList<ISetting> GetSettings() => settings;
 
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return actions;
-    }
+    public IReadOnlyList<IAction> GetActions() => actions;
 
-    public Task InitializeAsync(CancellationToken cancellationToken = default)
-    {
-        return onInitialize?.Invoke(cancellationToken) ?? Task.CompletedTask;
-    }
+    public Task InitializeAsync(CancellationToken cancellationToken = default) => onInitialize?.Invoke(cancellationToken) ?? Task.CompletedTask;
 
     public object GetSettingsViewModel()
     {
         throw new NotImplementedException();
     }
 
-    public Task OnSessionStartAsync(CancellationToken cancellationToken = default)
-    {
-        return onSessionStart?.Invoke(cancellationToken) ?? Task.CompletedTask;
-    }
+    public Task OnSessionStartAsync(CancellationToken cancellationToken = default) => onSessionStart?.Invoke(cancellationToken) ?? Task.CompletedTask;
 
-    public Task OnSessionEndAsync(CancellationToken cancellationToken = default)
-    {
-        return onSessionEnd?.Invoke() ?? Task.CompletedTask;
-    }
+    public Task OnSessionEndAsync(CancellationToken cancellationToken = default) => onSessionEnd?.Invoke() ?? Task.CompletedTask;
 
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(validationResult);
-    }
+    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken = default) => Task.FromResult(validationResult);
 
     public Type? CustomSettingsViewType { get; }
 

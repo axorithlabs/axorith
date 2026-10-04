@@ -38,31 +38,20 @@ internal sealed class Settings : LauncherSettingsBase
             description: "Select a game to launch when session starts. Leave empty to just launch Steam."
         );
 
-        RefreshGamesAction = Action.Create("RefreshGames", "Refresh Game List");
+        RefreshGamesAction = new Action("RefreshGames", "Refresh Game List");
         RefreshGamesAction.OnInvokeAsync(RefreshGamesAsync);
 
         SetupBaseReactiveVisibility();
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield return SelectedGame;
-    }
+    protected override IEnumerable<ISetting> GetAdditionalSettings() => [SelectedGame];
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return RefreshGamesAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [RefreshGamesAction];
 
     protected override async Task InitializeAdditionalAsync()
     {
         await RefreshSteamPathAsync();
         await RefreshGamesAsync();
-    }
-
-    protected override Task<ValidationResult> ValidateAdditionalAsync()
-    {
-        return Task.FromResult(ValidationResult.Success);
     }
 
     private Task RefreshSteamPathAsync()
@@ -71,30 +60,11 @@ internal sealed class Settings : LauncherSettingsBase
         {
             var steamExe = _appDiscovery.FindKnownApp("steam.exe", "Steam");
 
-            var choices = new List<KeyValuePair<string, string>>();
+            if (!string.IsNullOrEmpty(steamExe) && !File.Exists(steamExe))
+                steamExe = null;
 
-            if (!string.IsNullOrEmpty(steamExe) && File.Exists(steamExe))
-            {
-                choices.Add(new KeyValuePair<string, string>(steamExe, "Steam (Auto-Detected)"));
-            }
-
-            if (choices.Count == 0)
-            {
-                choices.Add(new KeyValuePair<string, string>("", "Steam not found"));
-            }
-
-            var current = SteamPath.GetCurrentValue();
-            if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
-            {
-                choices.Insert(0, new KeyValuePair<string, string>(current, $"{Path.GetFileName(current)} (Custom)"));
-            }
-
-            SteamPath.SetChoices(choices);
-
-            if (string.IsNullOrEmpty(current) && choices.Count > 0 && !string.IsNullOrEmpty(choices[0].Key))
-            {
-                SteamPath.SetValue(choices[0].Key);
-            }
+            SetDetectedApplicationPath(steamExe, "Steam (Auto-Detected)", "Steam not found",
+                current => $"{Path.GetFileName(current)} (Custom)");
         });
     }
 
@@ -134,11 +104,4 @@ internal sealed class Settings : LauncherSettingsBase
         });
     }
 
-    public override void Dispose()
-    {
-        SteamPath.Dispose();
-        SelectedGame.Dispose();
-        RefreshGamesAction.Dispose();
-        base.Dispose();
-    }
 }

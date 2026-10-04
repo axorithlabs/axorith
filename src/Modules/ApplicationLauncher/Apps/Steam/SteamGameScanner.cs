@@ -2,9 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Steam;
 
-/// <summary>
-///     Scans Steam library folders for installed games.
-/// </summary>
 internal static class SteamGameScanner
 {
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
@@ -15,9 +12,6 @@ internal static class SteamGameScanner
         "Proton", "Steam Linux Runtime", "SteamVR"
     ];
 
-    /// <summary>
-    ///     Gets Steam installation directory from executable path.
-    /// </summary>
     public static string? GetSteamDirectory(string steamExePath)
     {
         if (string.IsNullOrEmpty(steamExePath))
@@ -29,9 +23,6 @@ internal static class SteamGameScanner
         return Directory.Exists(dir) ? dir : null;
     }
 
-    /// <summary>
-    ///     Gets all installed games from Steam directory.
-    /// </summary>
     public static List<SteamGame> GetInstalledGames(string steamDirectory)
     {
         var games = new List<SteamGame>();
@@ -120,7 +111,4 @@ internal static class SteamGameScanner
     }
 }
 
-/// <summary>
-///     Represents an installed Steam game.
-/// </summary>
 internal sealed record SteamGame(string AppId, string Name);

@@ -1,19 +1,23 @@
+using System.Collections.Concurrent;
+using System.Drawing.Imaging;
+using System.Runtime.Versioning;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Avalonia.Media.Imaging;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Sdk.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class SettingViewModel : INotifyPropertyChanged, IDisposable
+public partial class SettingViewModel : ReactiveObject, IDisposable
 {
     private readonly Guid _moduleInstanceId;
     private readonly Guid _moduleId;
@@ -21,7 +25,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     private readonly ILogger<SettingViewModel>? _logger;
     private readonly IClientUiSettingsStore? _uiSettingsStore;
     private readonly ClientUiConfiguration? _uiConfig;
-    private readonly IFilePickerService? _filePickerService;
+    private readonly FilePickerService? _filePickerService;
     private readonly SettingsInputConfiguration _inputConfig;
 
     private const int ChoiceThrottleMs = 50;
@@ -35,37 +39,30 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     private object? _pendingNumberValue;
 
     public ISetting Setting { get; }
+    public string PickerWatermark => Setting.ControlType == SettingControlType.DirectoryPicker
+        ? "Select a directory..."
+        : "Select a file...";
+    public string PickerHistoryToolTip => Setting.ControlType == SettingControlType.DirectoryPicker
+        ? "Recent Directories"
+        : "Recent Files";
 
-    private string _label = string.Empty;
+    [Reactive]
+    public partial string Label { get; private set; } = string.Empty;
 
-    public string Label
-    {
-        get => _label;
-        private set => SetProperty(ref _label, value);
-    }
-
-    private bool _isVisible = true;
-
-    public bool IsVisible
-    {
-        get => _isVisible;
-        private set => SetProperty(ref _isVisible, value);
-    }
-
-    private bool _isReadOnly;
+    [Reactive]
+    public partial bool IsVisible { get; private set; } = true;
 
     private string _searchText = string.Empty;
     private string _applicationInputText = string.Empty;
-    private bool _isSelectorOpen;
-    private SettingViewModel? _applicationPicker;
 
     public string SearchText
     {
         get => _searchText;
         set
         {
-            if (SetProperty(ref _searchText, value))
-                UpdateDisplayedChoices();
+            if (_searchText == value) return;
+            this.RaiseAndSetIfChanged(ref _searchText, value);
+            UpdateDisplayedChoices();
         }
     }
 
@@ -73,28 +70,21 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     public bool IsCustomAppsField => Setting.Key == "CustomProcessList";
     public string SelectorItemActionLabel => Setting.Key == "AppToAdd" ? "Add" : "Select";
     public bool ShowPopupSearch => Setting.Key == "AppToAdd";
-    public SettingViewModel? ApplicationPicker
-    {
-        get => _applicationPicker;
-        private set => SetProperty(ref _applicationPicker, value);
-    }
+    [Reactive]
+    public partial SettingViewModel? ApplicationPicker { get; internal set; }
 
-    private ActionViewModel? _inlineAction;
-
-    public ActionViewModel? InlineAction
-    {
-        get => _inlineAction;
-        set => SetProperty(ref _inlineAction, value);
-    }
+    [Reactive]
+    public partial ActionViewModel? InlineAction { get; set; }
 
     public string ApplicationInputText
     {
         get => _applicationInputText;
         set
         {
-            if (!SetProperty(ref _applicationInputText, value))
+            if (_applicationInputText == value)
                 return;
 
+            this.RaiseAndSetIfChanged(ref _applicationInputText, value);
             SearchText = value;
             IsSelectorOpen = true;
             if (Setting.Key == "ApplicationPath" && !string.IsNullOrEmpty(StringValue))
@@ -102,27 +92,15 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public bool IsSelectorOpen
-    {
-        get => _isSelectorOpen;
-        set => SetProperty(ref _isSelectorOpen, value);
-    }
+    [Reactive]
+    public partial bool IsSelectorOpen { get; set; }
 
-    public void AttachApplicationPicker(SettingViewModel picker) => ApplicationPicker = picker;
 
-    public bool IsReadOnly
-    {
-        get => _isReadOnly;
-        private set => SetProperty(ref _isReadOnly, value);
-    }
+    [Reactive]
+    public partial bool IsReadOnly { get; private set; }
 
-    private string? _error;
-
-    public string? Error
-    {
-        get => _error;
-        set => SetProperty(ref _error, value);
-    }
+    [Reactive]
+    public partial string? Error { get; set; }
 
     public event EventHandler? ValueChanged;
 
@@ -135,10 +113,9 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         get => _selectedHistoryItem;
         set
         {
-            if (SetProperty(ref _selectedHistoryItem, value) && !string.IsNullOrEmpty(value))
-            {
-                StringValue = value;
-            }
+            if (_selectedHistoryItem == value) return;
+            this.RaiseAndSetIfChanged(ref _selectedHistoryItem, value);
+            if (!string.IsNullOrEmpty(value)) StringValue = value;
         }
     }
 
@@ -159,7 +136,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             }
 
             Setting.SetValueFromString(value);
-            OnPropertyChanged();
+            this.RaisePropertyChanged();
 
             HandleStringUpdate(value);
             ValueChanged?.Invoke(this, EventArgs.Empty);
@@ -181,7 +158,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             }
 
             Setting.SetValueFromObject(value);
-            OnPropertyChanged();
+            this.RaisePropertyChanged();
 
             _ = SendSettingUpdateAsync(value);
             ValueChanged?.Invoke(this, EventArgs.Empty);
@@ -221,7 +198,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             }
 
             Setting.SetValueFromObject(boxedValue);
-            OnPropertyChanged();
+            this.RaisePropertyChanged();
 
             HandleNumberUpdate(boxedValue);
             ValueChanged?.Invoke(this, EventArgs.Empty);
@@ -261,8 +238,8 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             StringValue = value.Value.Key;
             if (IsApplicationSelector)
                 SearchText = string.Empty;
-            OnPropertyChanged(nameof(StringValue));
-            OnPropertyChanged();
+            this.RaisePropertyChanged(nameof(StringValue));
+            this.RaisePropertyChanged();
         }
     }
 
@@ -289,7 +266,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         if (serviceProvider != null)
         {
             _uiSettingsStore = serviceProvider.GetService<IClientUiSettingsStore>();
-            _filePickerService = serviceProvider.GetService<IFilePickerService>();
+            _filePickerService = serviceProvider.GetService<FilePickerService>();
             if (_uiSettingsStore != null)
             {
                 _uiConfig = _uiSettingsStore.LoadOrDefault();
@@ -297,76 +274,27 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             }
         }
 
-        ClickCommand = ReactiveCommand.Create(() => { BoolValue = true; });
+        ClickCommand = ReactiveCommand.Create(() => BoolValue = true);
         SelectChoiceCommand = ReactiveCommand.CreateFromTask<KeyValuePair<string, string>>(SelectChoiceAsync);
         OpenApplicationSelectorCommand = ReactiveCommand.Create(OpenApplicationSelector);
         RemoveHistoryItemCommand = ReactiveCommand.Create<string>(RemoveHistoryItem);
         BrowseCommand = ReactiveCommand.CreateFromTask(BrowseAsync);
 
-        Setting.Label.Subscribe(newLabel =>
-        {
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                Label = newLabel;
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() => Label = newLabel);
-            }
-        });
-
-        Setting.IsVisible.Subscribe(visible =>
-        {
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                IsVisible = visible;
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() => IsVisible = visible);
-            }
-        });
-
-        Setting.IsReadOnly.Subscribe(readOnly =>
-        {
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                IsReadOnly = readOnly;
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() => IsReadOnly = readOnly);
-            }
-        });
-
+        Setting.Label.Subscribe(value => RunOnUiThread(() => Label = value));
+        Setting.IsVisible.Subscribe(value => RunOnUiThread(() => IsVisible = value));
+        Setting.IsReadOnly.Subscribe(value => RunOnUiThread(() => IsReadOnly = value));
         Setting.ValueAsObject.Subscribe(_ =>
         {
-            if (ShouldIgnoreBroadcast())
+            if (_isUserEditing && IsTextBasedSetting()) return;
+            RunOnUiThread(() =>
             {
-                return;
-            }
-
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                OnPropertyChanged(nameof(StringValue));
-                OnPropertyChanged(nameof(BoolValue));
-                OnPropertyChanged(nameof(DecimalValue));
+                this.RaisePropertyChanged(nameof(StringValue));
+                this.RaisePropertyChanged(nameof(BoolValue));
+                this.RaisePropertyChanged(nameof(DecimalValue));
                 UpdateDisplayedChoices();
                 UpdateMultiChoices();
                 RefreshApplicationInputText();
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    OnPropertyChanged(nameof(StringValue));
-                    OnPropertyChanged(nameof(BoolValue));
-                    OnPropertyChanged(nameof(DecimalValue));
-                    UpdateDisplayedChoices();
-                    UpdateMultiChoices();
-                    RefreshApplicationInputText();
-                });
-            }
+            });
         });
 
         if (setting.GetCurrentChoices() is { } initialChoices)
@@ -391,23 +319,15 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             });
         }
 
-        Setting.Choices?.Subscribe(c =>
+        Setting.Choices?.Subscribe(choices =>
         {
-            _rawChoices = c;
-            if (Dispatcher.UIThread.CheckAccess())
+            _rawChoices = choices;
+            RunOnUiThread(() =>
             {
                 UpdateDisplayedChoices();
                 UpdateMultiChoices();
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() =>
-                {
-                    UpdateDisplayedChoices();
-                    UpdateMultiChoices();
-                    RefreshApplicationInputText();
-                });
-            }
+                RefreshApplicationInputText();
+            });
         });
     }
 
@@ -471,10 +391,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
 
     private static string GetChoiceName(string value) => value.Split('\n', 2)[0].TrimEnd('\r');
 
-    private void SetApplicationInputText(string value)
-    {
-        SetProperty(ref _applicationInputText, value, nameof(ApplicationInputText));
-    }
+    private void SetApplicationInputText(string value) => this.RaiseAndSetIfChanged(ref _applicationInputText, value, nameof(ApplicationInputText));
 
     private void RefreshApplicationInputText()
     {
@@ -563,15 +480,10 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             newDisplayList.RemoveAll(x => string.IsNullOrEmpty(x.Key));
         }
 
-        if (DisplayedChoices.Count == newDisplayList.Count)
+        if (DisplayedChoices.SequenceEqual(newDisplayList))
         {
-            var identical = !DisplayedChoices
-                .Where((t, i) => t.Key != newDisplayList[i].Key || t.Value != newDisplayList[i].Value).Any();
-            if (identical)
-            {
-                OnPropertyChanged(nameof(SelectedChoice));
-                return;
-            }
+            this.RaisePropertyChanged(nameof(SelectedChoice));
+            return;
         }
 
         DisplayedChoices.Clear();
@@ -582,7 +494,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             ApplicationChoices.Add(new ApplicationChoiceViewModel(item, SelectChoiceCommand, SelectorItemActionLabel));
         }
 
-        OnPropertyChanged(nameof(SelectedChoice));
+        this.RaisePropertyChanged(nameof(SelectedChoice));
     }
 
     private void UpdateMultiChoices()
@@ -598,21 +510,12 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        var currentList = new HashSet<string>();
-        if (Setting.GetCurrentValueAsObject() is List<string> list)
+        var currentList = Setting.GetCurrentValueAsObject() switch
         {
-            foreach (var item in list)
-            {
-                currentList.Add(item);
-            }
-        }
-        else if (Setting.GetCurrentValueAsObject() is string s && !string.IsNullOrEmpty(s))
-        {
-            foreach (var item in s.Split('|'))
-            {
-                currentList.Add(item);
-            }
-        }
+            List<string> list => list.ToHashSet(),
+            string value when value.Length > 0 => value.Split('|').ToHashSet(),
+            _ => []
+        };
 
         MultiChoices.Clear();
         foreach (var choice in _rawChoices)
@@ -685,12 +588,7 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
 
     private void RemoveHistoryItem(string item)
     {
-        if (!History.Contains(item))
-        {
-            return;
-        }
-
-        History.Remove(item);
+        if (!History.Remove(item)) return;
 
         if (_uiConfig == null || _uiSettingsStore == null)
         {
@@ -743,9 +641,12 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         _uiSettingsStore.Save(_uiConfig);
     }
 
-    /// <summary>
-    ///     Determines if this setting is a text-based input type that should use debounce.
-    /// </summary>
+    private static void RunOnUiThread(Action action)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) action();
+        else Dispatcher.UIThread.Post(action);
+    }
+
     private bool IsTextBasedSetting()
     {
         return Setting.ControlType is
@@ -754,11 +655,6 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
             SettingControlType.FilePicker or
             SettingControlType.DirectoryPicker or
             SettingControlType.Secret;
-    }
-
-    private bool ShouldIgnoreBroadcast()
-    {
-        return _isUserEditing && IsTextBasedSetting();
     }
 
     public void OnFocusGained()
@@ -785,8 +681,6 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         _isUserEditing = false;
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     private async Task SendSettingUpdateAsync(object? value)
     {
         try
@@ -799,22 +693,6 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return false;
-        }
-
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
 
     public void Dispose()
     {
@@ -823,44 +701,63 @@ public class SettingViewModel : INotifyPropertyChanged, IDisposable
     }
 }
 
-public sealed class ApplicationChoiceViewModel(
-    KeyValuePair<string, string> choice,
-    ICommand selectCommand,
-    string actionLabel)
+public sealed class ApplicationChoiceViewModel
 {
-    public KeyValuePair<string, string> Choice { get; } = choice;
-    public ICommand SelectCommand { get; } = selectCommand;
-    public string SelectorItemActionLabel { get; } = actionLabel;
-    public string Value => Choice.Value;
-}
+    private static readonly ConcurrentDictionary<string, Bitmap> Icons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string? _iconPath;
 
-// Helper VM for MultiChoice items
-public class MultiChoiceItemViewModel : INotifyPropertyChanged
-{
-    public string Key { get; }
-    public string Label { get; }
-
-    private bool _isSelected;
-
-    public bool IsSelected
+    public ApplicationChoiceViewModel(KeyValuePair<string, string> choice, ICommand selectCommand, string actionLabel)
     {
-        get => _isSelected;
-        set
+        Choice = choice;
+        SelectCommand = selectCommand;
+        SelectorItemActionLabel = actionLabel;
+
+        var lines = choice.Value.Split('\n');
+        Name = lines.ElementAtOrDefault(0)?.TrimEnd('\r') ?? string.Empty;
+        Path = lines.ElementAtOrDefault(1)?.TrimEnd('\r') ?? string.Empty;
+        _iconPath = (lines.Length > 2 ? lines[2] : lines.ElementAtOrDefault(1))?.TrimEnd('\r');
+    }
+
+    public KeyValuePair<string, string> Choice { get; }
+    public ICommand SelectCommand { get; }
+    public string SelectorItemActionLabel { get; }
+    public string Name { get; }
+    public string Path { get; }
+    public Bitmap? Icon => GetIcon(_iconPath);
+
+    private static Bitmap? GetIcon(string? path)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return null;
+
+        try
         {
-            if (_isSelected != value)
-            {
-                _isSelected = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
-            }
+            return Icons.GetOrAdd(path, ExtractIcon);
+        }
+        catch
+        {
+            return null;
         }
     }
 
-    public MultiChoiceItemViewModel(string key, string label, bool isSelected)
+    [SupportedOSPlatform("windows")]
+    private static Bitmap ExtractIcon(string path)
     {
-        Key = key;
-        Label = label;
-        _isSelected = isSelected;
+        using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path)
+                         ?? throw new InvalidOperationException("No associated icon.");
+        using var source = icon.ToBitmap();
+        using var stream = new MemoryStream();
+        source.Save(stream, ImageFormat.Png);
+        stream.Position = 0;
+        return new Bitmap(stream);
     }
+}
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+public partial class MultiChoiceItemViewModel(string key, string label, bool isSelected) : ReactiveObject
+{
+    public string Key { get; } = key;
+    public string Label { get; } = label;
+
+    [Reactive]
+    public partial bool IsSelected { get; set; } = isSelected;
 }

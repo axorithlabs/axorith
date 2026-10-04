@@ -3,9 +3,6 @@ using Google.Protobuf.WellKnownTypes;
 
 namespace Axorith.Host.Mappers;
 
-/// <summary>
-///     Maps session-related data to protobuf messages.
-/// </summary>
 public static class SessionMapper
 {
     public static SessionEvent CreateEvent(SessionEventType type, Guid? presetId, string? message = null)

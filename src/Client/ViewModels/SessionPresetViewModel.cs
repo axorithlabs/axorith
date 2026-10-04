@@ -5,10 +5,11 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using ReactiveUI;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class SessionPresetViewModel : ReactiveObject, IDisposable
+public partial class SessionPresetViewModel : ReactiveObject, IDisposable
 {
     private readonly IDisposable? _validationSubscription;
     private readonly IReadOnlyList<SessionSchedule> _schedules;
@@ -84,31 +85,19 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
     private static string FormatTime(TimeOnly time, bool use24HourFormat) =>
         time.ToString(use24HourFormat ? "HH:mm" : "h:mm tt", CultureInfo.CurrentCulture);
 
-    public bool IsActive
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool IsActive { get; set; }
 
-    public bool HasValidationErrors
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool HasValidationErrors { get; private set; }
 
     public bool IsValid => !HasValidationErrors;
 
-    public string? ValidationMessage
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial string? ValidationMessage { get; private set; }
 
-    public int ErrorCount
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial int ErrorCount { get; private set; }
 
     public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
 

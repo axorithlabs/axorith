@@ -6,9 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
 
-/// <summary>
-///     The concrete implementation for managing session presets using JSON files on disk.
-/// </summary>
 public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
 {
     private const int CurrentPresetVersion = 3;
@@ -39,9 +36,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         Directory.CreateDirectory(presetsDirectory);
 
         var presets = new List<SessionPreset>();
-        var presetFiles = Directory.EnumerateFiles(presetsDirectory, "*.json");
-
-        foreach (var filePath in presetFiles)
+        foreach (var filePath in Directory.EnumerateFiles(presetsDirectory, "*.json"))
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -51,34 +46,9 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
             try
             {
-                var fileInfo = new FileInfo(filePath);
-                if (fileInfo.Length > MaxPresetFileSizeBytes)
-                {
-                    logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)",
-                        TelemetryGuard.SafePath(filePath),
-                        fileInfo.Length);
-                    continue;
-                }
-
-                await using var stream = File.OpenRead(filePath);
-                // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
-                // File size and MaxDepth are validated to prevent DoS attacks
-                var preset = JsonSerializer.Deserialize<SessionPreset>(stream, _jsonOptions); //-V5611
-
+                var preset = await LoadPresetFileAsync(filePath, cancellationToken).ConfigureAwait(false);
                 if (preset != null)
                 {
-                    if (preset.Version < CurrentPresetVersion)
-                    {
-                        logger.LogInformation(
-                            "Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
-                            preset.Name, preset.Version, CurrentPresetVersion);
-
-                        MigratePreset(preset);
-                        preset.Version = CurrentPresetVersion;
-
-                        await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
-                    }
-
                     presets.Add(preset);
                 }
             }
@@ -96,7 +66,6 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
     public async Task<SessionPreset?> GetPresetByIdAsync(Guid presetId, CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
-
         if (!File.Exists(filePath))
         {
             logger.LogWarning("Preset file not found: {FilePath}", TelemetryGuard.SafePath(filePath));
@@ -105,34 +74,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
         try
         {
-            var fileInfo = new FileInfo(filePath);
-            if (fileInfo.Length > MaxPresetFileSizeBytes)
-            {
-                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)",
-                    TelemetryGuard.SafePath(filePath),
-                    fileInfo.Length);
-                return null;
-            }
-
-            await using var stream = File.OpenRead(filePath);
-            // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
-            // File size and MaxDepth are validated to prevent DoS attacks
-            var preset = await JsonSerializer
-                .DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken) //-V5611
-                .ConfigureAwait(false);
-
-            if (preset is not { Version: < CurrentPresetVersion })
-            {
-                return preset;
-            }
-
-            logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
-                preset.Name, preset.Version, CurrentPresetVersion);
-            MigratePreset(preset);
-            preset.Version = CurrentPresetVersion;
-            await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
-
-            return preset;
+            return await LoadPresetFileAsync(filePath, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -210,6 +152,32 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         }
 
         return Task.CompletedTask;
+    }
+
+    private async Task<SessionPreset?> LoadPresetFileAsync(string filePath, CancellationToken cancellationToken)
+    {
+        var fileInfo = new FileInfo(filePath);
+        if (fileInfo.Length > MaxPresetFileSizeBytes)
+        {
+            logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)",
+                TelemetryGuard.SafePath(filePath), fileInfo.Length);
+            return null;
+        }
+
+        await using var stream = File.OpenRead(filePath);
+        var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
+            .ConfigureAwait(false);
+        if (preset is not { Version: < CurrentPresetVersion })
+        {
+            return preset;
+        }
+
+        logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+            preset.Name, preset.Version, CurrentPresetVersion);
+        MigratePreset(preset);
+        preset.Version = CurrentPresetVersion;
+        await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
+        return preset;
     }
 
     private void MigratePreset(SessionPreset preset)

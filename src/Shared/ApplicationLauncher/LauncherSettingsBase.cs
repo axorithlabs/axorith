@@ -5,65 +5,29 @@ using Axorith.Shared.Platform;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
-/// <summary>
-///     Abstract base class for launcher module settings.
-///     Provides common settings for process mode, window state, lifecycle, and monitor selection.
-///     Derived classes must implement ApplicationPath and can add additional settings.
-/// </summary>
 public abstract class LauncherSettingsBase : IDisposable
 {
-    /// <summary>
-    ///     How to handle the application process (LaunchNew, AttachExisting, LaunchOrAttach).
-    /// </summary>
     public Setting<string> ProcessMode { get; }
 
-    /// <summary>
-    ///     Desired window state after application starts (Normal, Maximized, Minimized).
-    /// </summary>
     public Setting<string> WindowState { get; }
 
-    /// <summary>
-    ///     Enable custom window dimensions. Requires Normal window state.
-    /// </summary>
     public Setting<bool> UseCustomSize { get; }
 
-    /// <summary>
-    ///     Custom window width in pixels.
-    /// </summary>
     public Setting<int> WindowWidth { get; }
 
-    /// <summary>
-    ///     Custom window height in pixels.
-    /// </summary>
     public Setting<int> WindowHeight { get; }
 
-    /// <summary>
-    ///     If enabled, window will be moved to the selected monitor.
-    /// </summary>
     public Setting<bool> MoveToMonitor { get; }
 
-    /// <summary>
-    ///     Target monitor index for window placement.
-    /// </summary>
     public Setting<string> TargetMonitor { get; }
 
-    /// <summary>
-    ///     What happens to the process when session ends.
-    /// </summary>
     public Setting<string> LifecycleMode { get; }
 
-    /// <summary>
-    ///     Automatically bring the window to foreground after setup.
-    /// </summary>
     public Setting<bool> BringToForeground { get; }
 
-    /// <summary>
-    ///     Path to the application executable. Must be implemented by derived classes.
-    /// </summary>
     public abstract Setting<string> ApplicationPath { get; }
 
     private readonly List<ISetting> _baseSettings;
-    private readonly List<IAction> _baseActions = [];
 
     protected LauncherSettingsBase()
     {
@@ -171,40 +135,13 @@ public abstract class LauncherSettingsBase : IDisposable
         // It must be called explicitly by derived classes after their fields are initialized
     }
 
-    /// <summary>
-    ///     Gets all settings including base and additional settings from derived class.
-    /// </summary>
-    public IReadOnlyList<ISetting> GetAllSettings()
-    {
-        var result = new List<ISetting> { ApplicationPath };
-        result.AddRange(GetAdditionalSettingsBeforeBase());
-        result.AddRange(_baseSettings);
-        result.AddRange(GetAdditionalSettings());
-        return result;
-    }
+    public IReadOnlyList<ISetting> GetAllSettings() =>
+        [ApplicationPath, .. GetAdditionalSettingsBeforeBase(), .. _baseSettings, .. GetAdditionalSettings()];
 
-    /// <summary>
-    ///     Gets all actions including base and additional actions from derived class.
-    /// </summary>
-    public IReadOnlyList<IAction> GetAllActions()
-    {
-        var result = new List<IAction>(_baseActions);
-        result.AddRange(GetAdditionalActions());
-        return result;
-    }
+    public IReadOnlyList<IAction> GetAllActions() => GetAdditionalActions().ToArray();
 
+    public Task InitializeAsync() => InitializeAdditionalAsync();
 
-    /// <summary>
-    ///     Initializes settings. Called when module is created for editing.
-    /// </summary>
-    public async Task InitializeAsync()
-    {
-        await InitializeAdditionalAsync().ConfigureAwait(false);
-    }
-
-    /// <summary>
-    ///     Validates all settings including base and additional validation.
-    /// </summary>
     public async Task<ValidationResult> ValidateAsync()
     {
         var errors = new Dictionary<string, string>();
@@ -255,53 +192,13 @@ public abstract class LauncherSettingsBase : IDisposable
             : ValidationResult.Success;
     }
 
-    /// <summary>
-    ///     Override to provide additional settings that appear before base settings.
-    ///     Default returns empty list.
-    /// </summary>
-    protected virtual IEnumerable<ISetting> GetAdditionalSettingsBeforeBase()
-    {
-        return [];
-    }
+    protected virtual IEnumerable<ISetting> GetAdditionalSettingsBeforeBase() => [];
+    protected virtual IEnumerable<ISetting> GetAdditionalSettings() => [];
+    protected virtual IEnumerable<IAction> GetAdditionalActions() => [];
+    protected virtual Task InitializeAdditionalAsync() => Task.CompletedTask;
+    protected virtual Task<ValidationResult> ValidateAdditionalAsync() => Task.FromResult(ValidationResult.Success);
+    protected virtual void SetupAdditionalReactiveVisibility() { }
 
-    /// <summary>
-    ///     Override to provide additional settings that appear after base settings.
-    /// </summary>
-    protected abstract IEnumerable<ISetting> GetAdditionalSettings();
-
-    /// <summary>
-    ///     Override to provide additional actions.
-    /// </summary>
-    protected abstract IEnumerable<IAction> GetAdditionalActions();
-
-    /// <summary>
-    ///     Override to perform additional initialization.
-    /// </summary>
-    protected virtual Task InitializeAdditionalAsync()
-    {
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    ///     Override to perform additional validation.
-    /// </summary>
-    protected virtual Task<ValidationResult> ValidateAdditionalAsync()
-    {
-        return Task.FromResult(ValidationResult.Success);
-    }
-
-    /// <summary>
-    ///     Override to setup additional reactive visibility rules.
-    ///     Called after base visibility rules are set up.
-    /// </summary>
-    protected virtual void SetupAdditionalReactiveVisibility()
-    {
-    }
-
-    /// <summary>
-    ///     Sets up reactive visibility for base settings.
-    ///     MUST be called by derived classes after all their fields are initialized.
-    /// </summary>
     protected void SetupBaseReactiveVisibility()
     {
         UseCustomSize.Value.Subscribe(useCustom =>
@@ -330,42 +227,37 @@ public abstract class LauncherSettingsBase : IDisposable
         SetupAdditionalReactiveVisibility();
     }
 
-    private static IReadOnlyList<KeyValuePair<string, string>> BuildMonitorChoices()
+    protected void SetDetectedApplicationPath(string? path, string detectedLabel, string notFoundLabel,
+        Func<string, string>? customLabel = null)
     {
-        var choices = new List<KeyValuePair<string, string>>();
-
-        var windowService = PlatformServices.CreateWindowService();
-        var monitorCount = windowService.GetMonitorCount();
-        if (monitorCount <= 0)
+        var current = ApplicationPath.GetCurrentValue();
+        var choices = new List<KeyValuePair<string, string>>
         {
-            monitorCount = 1;
-        }
+            !string.IsNullOrEmpty(path) ? new(path, detectedLabel) : new("", notFoundLabel)
+        };
 
-        for (var i = 0; i < monitorCount; i++)
-        {
-            var monitorName = windowService.GetMonitorName(i);
-            var display = $"{i}: {monitorName}";
-            choices.Add(new KeyValuePair<string, string>(i.ToString(), display));
-        }
+        if (!string.IsNullOrEmpty(current) && choices.All(choice => !choice.Key.Equals(current, StringComparison.OrdinalIgnoreCase)))
+            choices.Insert(0, new(current, customLabel?.Invoke(current) ?? $"{current} (Custom)"));
 
-        return choices;
+        ApplicationPath.SetChoices(choices);
+        if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(path))
+            ApplicationPath.SetValue(path);
     }
 
-    /// <summary>
-    ///     Disposes all settings. Override in derived classes to dispose additional resources.
-    /// </summary>
+    private static IReadOnlyList<KeyValuePair<string, string>> BuildMonitorChoices()
+    {
+        var windowService = PlatformServices.CreateWindowService();
+        return Enumerable.Range(0, Math.Max(1, windowService.GetMonitorCount()))
+            .Select(i => new KeyValuePair<string, string>(i.ToString(), $"{i}: {windowService.GetMonitorName(i)}"))
+            .ToArray();
+    }
+
     public virtual void Dispose()
     {
-        ProcessMode.Dispose();
-        WindowState.Dispose();
-        UseCustomSize.Dispose();
-        WindowWidth.Dispose();
-        WindowHeight.Dispose();
-        MoveToMonitor.Dispose();
-        TargetMonitor.Dispose();
-        LifecycleMode.Dispose();
-        BringToForeground.Dispose();
-        ApplicationPath.Dispose();
+        foreach (var setting in GetAllSettings().OfType<IDisposable>().Distinct())
+            setting.Dispose();
+        foreach (var action in GetAllActions().OfType<IDisposable>().Distinct())
+            action.Dispose();
         GC.SuppressFinalize(this);
     }
 }

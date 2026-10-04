@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Reactive.Disposables;
 using System.Reflection;
 using System.Windows.Input;
@@ -11,10 +11,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public sealed class SettingsViewModel : ReactiveObject, IDisposable
+public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
     private readonly IClientUiSettingsStore _settingsStore;
@@ -24,29 +25,14 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
     private readonly ClientUiConfiguration _config;
-    private readonly IClientOnboardingService? _onboardingService;
+    private readonly ClientOnboardingService? _onboardingService;
     private readonly IToastNotificationService? _toastService;
-    private string _selectedSection = "General";
-
+    private readonly IObservable<bool> _canRunSetup;
     public MainViewModel? MainViewModel { get; }
     public bool CanCheckForUpdates => MainViewModel is not null;
 
-    public string SelectedSection
-    {
-        get => _selectedSection;
-        set
-        {
-            if (_selectedSection == value)
-            {
-                return;
-            }
-
-            this.RaiseAndSetIfChanged(ref _selectedSection, value);
-            this.RaisePropertyChanged(nameof(IsGeneralSection));
-            this.RaisePropertyChanged(nameof(IsPrivacySection));
-            this.RaisePropertyChanged(nameof(IsAboutSection));
-        }
-    }
+    [Reactive(nameof(IsGeneralSection), nameof(IsPrivacySection), nameof(IsAboutSection))]
+    public partial string SelectedSection { get; set; } = "General";
 
     public bool IsGeneralSection => SelectedSection == "General";
     public bool IsPrivacySection => SelectedSection == "Privacy";
@@ -60,48 +46,29 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     public bool TelemetryEnabled
     {
         get => _telemetryEnabled;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _telemetryEnabled, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _telemetryEnabled, value, nameof(TelemetryEnabled));
     }
 
     public bool AutoStartEnabled
     {
         get => _autoStartEnabled;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _autoStartEnabled, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _autoStartEnabled, value, nameof(AutoStartEnabled));
     }
 
     public bool AutoStartMinimized
     {
         get => _autoStartMinimized;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _autoStartMinimized, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _autoStartMinimized, value, nameof(AutoStartMinimized));
     }
 
     public bool MinimizeToTrayOnClose
     {
         get => _minimizeToTrayOnClose;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _minimizeToTrayOnClose, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _minimizeToTrayOnClose, value, nameof(MinimizeToTrayOnClose));
     }
 
-    public bool HasUnsavedChanges
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool HasUnsavedChanges { get; private set; }
 
     public string AppVersion { get; }
 
@@ -111,13 +78,9 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     public ICommand SelectSectionCommand { get; }
     public ICommand OpenPrivacyPolicyCommand { get; }
     public ICommand OpenGitHubCommand { get; }
-    public ICommand RunSetupWizardCommand { get; }
 
-    public bool IsRunningSetup
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool IsRunningSetup { get; private set; }
 
     public SettingsViewModel(
         ShellViewModel shell,
@@ -136,10 +99,11 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         _logger = logger;
         _serviceProvider = serviceProvider;
         _config = options.Value.Ui;
-        _onboardingService = serviceProvider.GetService<IClientOnboardingService>();
+        _onboardingService = serviceProvider.GetService<ClientOnboardingService>();
         _toastService = serviceProvider.GetService<IToastNotificationService>();
 
-        AppVersion = GetAppVersion();
+        var version = Assembly.GetEntryAssembly()?.GetName().Version;
+        AppVersion = version is null ? "v0.0.0" : $"v{version.Major}.{version.Minor}.{version.Build}";
 
         LoadSettings();
 
@@ -150,8 +114,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy/"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
 
-        var canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
-        RunSetupWizardCommand = ReactiveCommand.CreateFromTask(RunSetupWizardAsync, canRunSetup);
+        _canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
     }
 
     private void LoadSettings()
@@ -218,6 +181,12 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
     }
 
+    private void SetSetting(ref bool field, bool value, string propertyName)
+    {
+        this.RaiseAndSetIfChanged(ref field, value, propertyName);
+        HasUnsavedChanges = true;
+    }
+
     private async Task NavigateToMainAsync(bool showPresets)
     {
         if (HasUnsavedChanges)
@@ -250,14 +219,8 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private static string GetAppVersion()
-    {
-        var assembly = Assembly.GetEntryAssembly();
-        var version = assembly?.GetName().Version;
-        return version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "v0.0.0";
-    }
-
-    private async Task RunSetupWizardAsync()
+    [ReactiveCommand(CanExecute = nameof(_canRunSetup))]
+    private async Task RunSetupWizard()
     {
         if (_onboardingService == null)
         {
@@ -315,18 +278,5 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _disposables.Dispose();
-    }
-}
-
-internal static class SettingsViewModelExtensions
-{
-    public static T DisposeWith<T>(this T disposable, CompositeDisposable compositeDisposable)
-        where T : IDisposable
-    {
-        compositeDisposable.Add(disposable);
-        return disposable;
-    }
+    public void Dispose() => _disposables.Dispose();
 }

@@ -1,10 +1,10 @@
-using Axorith.Host.Mappers;
+using Axorith.Contracts;
 using FluentAssertions;
 using Xunit;
 
-namespace Axorith.Contracts.Tests.Mappers;
+namespace Axorith.Contracts.Tests.Codecs;
 
-public sealed class PresetMapperTests
+public sealed class PresetCodecTests
 {
     [Fact]
     public void PresetRoundTripPreservesModuleConfigurationAndCommitment()
@@ -42,8 +42,8 @@ public sealed class PresetMapperTests
             ]
         };
 
-        var message = PresetMapper.ToMessage(preset);
-        var result = PresetMapper.ToModel(message);
+        var message = PresetCodec.ToMessage(preset);
+        var result = PresetCodec.ToModel(message);
         var module = result.Modules.Should().ContainSingle().Which;
 
         result.Id.Should().Be(presetId);
@@ -57,7 +57,7 @@ public sealed class PresetMapperTests
         result.FocusCommitment.EndAtDaysOfWeek.Should().Equal(DayOfWeek.Monday, DayOfWeek.Friday);
         result.FocusCommitment.BreakDuration.Should().Be(TimeSpan.FromMinutes(10));
         result.FocusCommitment.NextWorkspaceId.Should().Be(nextPresetId);
-        PresetMapper.ToSummary(result).ModuleCount.Should().Be(1);
+        PresetCodec.ToSummary(result).ModuleCount.Should().Be(1);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class PresetMapperTests
         var message = new Axorith.Contracts.Preset { Id = Guid.NewGuid().ToString(), Name = "Invalid" };
         message.Modules.Add(new Axorith.Contracts.ConfiguredModule { ModuleId = "not-a-guid" });
 
-        var act = () => PresetMapper.ToModel(message);
+        var act = () => PresetCodec.ToModel(message);
 
         act.Should().Throw<ArgumentException>().WithMessage("*Invalid ModuleId*");
     }

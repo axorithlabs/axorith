@@ -1,183 +1,85 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
-using Axorith.Sdk.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.MacOS;
 
-/// <summary>
-///     macOS-specific secure storage implementation using Keychain Services.
-/// </summary>
 [SupportedOSPlatform("macos")]
-internal class MacOsSecureStorage : ISecureStorageService
+internal class MacOsSecureStorage : SecureStorageBase
 {
-    private readonly ILogger _logger;
     private const string ServiceName = "Axorith";
 
-    public MacOsSecureStorage(ILogger logger)
+    public MacOsSecureStorage(ILogger logger) : base(logger)
     {
-        _logger = logger;
-        _logger.LogInformation("Initialized macOS Keychain secure storage");
+        Logger.LogInformation("Initialized macOS Keychain secure storage");
     }
 
-    public void StoreSecret(string key, string secret)
-    {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
-        }
+    protected override void ValidateSecret(string secret) => ArgumentException.ThrowIfNullOrWhiteSpace(secret);
 
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            throw new ArgumentException("Secret cannot be null or whitespace", nameof(secret));
-        }
+    protected override void StoreSecretCore(string key, string secret)
+    {
+        DeleteSecretCore(key);
+
+        var secretBytes = Encoding.UTF8.GetBytes(secret);
+        var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
+        var accountBytes = Encoding.UTF8.GetBytes(key);
+        var status = SecKeychainAddGenericPassword(IntPtr.Zero, (uint)serviceBytes.Length, serviceBytes,
+            (uint)accountBytes.Length, accountBytes, (uint)secretBytes.Length, secretBytes, IntPtr.Zero);
+
+        if (status != 0)
+            throw new InvalidOperationException($"Failed to store secret in Keychain. Status: {status}");
+    }
+
+    protected override string? RetrieveSecretCore(string key)
+    {
+        var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
+        var accountBytes = Encoding.UTF8.GetBytes(key);
+        var status = SecKeychainFindGenericPassword(IntPtr.Zero, (uint)serviceBytes.Length, serviceBytes,
+            (uint)accountBytes.Length, accountBytes, out var passwordLength, out var passwordData, out _);
+
+        if (status == -25300)
+            return null;
+        if (status != 0)
+            throw new InvalidOperationException($"Failed to retrieve secret from Keychain. Status: {status}");
+        if (passwordData == IntPtr.Zero || passwordLength == 0)
+            return null;
 
         try
         {
-            DeleteSecret(key);
-
-            var secretBytes = Encoding.UTF8.GetBytes(secret);
-            var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
-            var accountBytes = Encoding.UTF8.GetBytes(key);
-
-            var status = SecKeychainAddGenericPassword(
-                IntPtr.Zero,
-                (uint)serviceBytes.Length,
-                serviceBytes,
-                (uint)accountBytes.Length,
-                accountBytes,
-                (uint)secretBytes.Length,
-                secretBytes,
-                IntPtr.Zero
-            );
-
-            if (status != 0)
-            {
-                throw new InvalidOperationException($"Failed to store secret in Keychain. Status: {status}");
-            }
-
-            _logger.LogDebug("Stored secret for key: {Key}", key);
+            var secretBytes = new byte[passwordLength];
+            Marshal.Copy(passwordData, secretBytes, 0, (int)passwordLength);
+            return Encoding.UTF8.GetString(secretBytes);
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Error storing secret for key: {Key}", key);
-            throw;
+            SecKeychainItemFreeContent(IntPtr.Zero, passwordData);
         }
     }
 
-    public string? RetrieveSecret(string key)
+    protected override void DeleteSecretCore(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
-        }
+        var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
+        var accountBytes = Encoding.UTF8.GetBytes(key);
+        var status = SecKeychainFindGenericPassword(IntPtr.Zero, (uint)serviceBytes.Length, serviceBytes,
+            (uint)accountBytes.Length, accountBytes, IntPtr.Zero, IntPtr.Zero, out var itemRef);
+
+        if (status == -25300)
+            return;
+        if (status != 0)
+            throw new InvalidOperationException($"Failed to find secret in Keychain. Status: {status}");
+        if (itemRef == IntPtr.Zero)
+            return;
 
         try
         {
-            var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
-            var accountBytes = Encoding.UTF8.GetBytes(key);
-
-            var status = SecKeychainFindGenericPassword(
-                IntPtr.Zero, // default keychain
-                (uint)serviceBytes.Length,
-                serviceBytes,
-                (uint)accountBytes.Length,
-                accountBytes,
-                out var passwordLength,
-                out var passwordData,
-                out _ // don't need item reference but must pass out
-            );
-
-            if (status == -25300) // errSecItemNotFound
-            {
-                _logger.LogDebug("No secret found for key: {Key}", key);
-                return null;
-            }
-
+            status = SecKeychainItemDelete(itemRef);
             if (status != 0)
-            {
-                throw new InvalidOperationException($"Failed to retrieve secret from Keychain. Status: {status}");
-            }
-
-            if (passwordData == IntPtr.Zero || passwordLength == 0)
-            {
-                return null;
-            }
-
-            try
-            {
-                var secretBytes = new byte[passwordLength];
-                Marshal.Copy(passwordData, secretBytes, 0, (int)passwordLength);
-                return Encoding.UTF8.GetString(secretBytes);
-            }
-            finally
-            {
-                // Free the password data
-                if (passwordData != IntPtr.Zero)
-                {
-                    SecKeychainItemFreeContent(IntPtr.Zero, passwordData);
-                }
-            }
+                throw new InvalidOperationException($"Failed to delete secret from Keychain. Status: {status}");
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(ex, "Error retrieving secret for key: {Key}", key);
-            throw;
-        }
-    }
-
-    public void DeleteSecret(string key)
-    {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
-        }
-
-        try
-        {
-            var serviceBytes = Encoding.UTF8.GetBytes(ServiceName);
-            var accountBytes = Encoding.UTF8.GetBytes(key);
-
-            var status = SecKeychainFindGenericPassword(
-                IntPtr.Zero,
-                (uint)serviceBytes.Length,
-                serviceBytes,
-                (uint)accountBytes.Length,
-                accountBytes,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                out var itemRef
-            );
-
-            if (status == -25300) // errSecItemNotFound
-            {
-                _logger.LogDebug("No secret to delete for key: {Key}", key);
-                return;
-            }
-
-            if (status != 0)
-            {
-                throw new InvalidOperationException($"Failed to find secret in Keychain. Status: {status}");
-            }
-
-            if (itemRef != IntPtr.Zero)
-            {
-                status = SecKeychainItemDelete(itemRef);
-                CFRelease(itemRef);
-
-                if (status != 0)
-                {
-                    throw new InvalidOperationException($"Failed to delete secret from Keychain. Status: {status}");
-                }
-            }
-
-            _logger.LogDebug("Deleted secret for key: {Key}", key);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting secret for key: {Key}", key);
-            throw;
+            CFRelease(itemRef);
         }
     }
 

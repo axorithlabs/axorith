@@ -1,4 +1,4 @@
-﻿namespace Axorith.Sdk;
+namespace Axorith.Sdk;
 
 /// <summary>
 ///     Defines the operating systems supported by Axorith modules.

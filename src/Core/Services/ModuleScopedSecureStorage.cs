@@ -3,11 +3,6 @@ using Axorith.Sdk.Services;
 
 namespace Axorith.Core.Services;
 
-/// <summary>
-///     An adapter that wraps an ISecureStorageService to provide an isolated,
-///     sandboxed view for a specific module. It automatically prefixes all keys
-///     with the module's unique ID to prevent data collisions.
-/// </summary>
 internal class ModuleScopedSecureStorage(ISecureStorageService underlyingStorage, ModuleDefinition moduleDefinition)
     : ISecureStorageService
 {
@@ -42,9 +37,6 @@ internal class ModuleScopedSecureStorage(ISecureStorageService underlyingStorage
             underlyingStorage.DeleteSecret($"{LegacySpotifyModuleId}:{key}");
     }
 
-    /// <summary>
-    ///     Creates a globally unique key by combining the module's GUID and the user-provided key.
-    /// </summary>
     private string CreateScopedKey(string key)
     {
         // Example: "5fd185cb-21d0-4c2b-9185-cb21d03c2b8e:AccessToken"

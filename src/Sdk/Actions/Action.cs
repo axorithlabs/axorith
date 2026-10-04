@@ -5,15 +5,11 @@ using System.Reactive.Subjects;
 namespace Axorith.Sdk.Actions;
 
 /// <summary>
-///     Default implementation and factory for module actions.
+///     Default implementation for module actions.
 /// </summary>
 /// <remarks>
 ///     Initializes a new instance of the <see cref="Action" /> class.
 /// </remarks>
-/// <param name="key">The unique identifier for this action.</param>
-/// <param name="label">The display label for the action button.</param>
-/// <param name="isEnabled">Whether the action is initially enabled.</param>
-/// <param name="settingKey">Optional setting key whose input should host the action.</param>
 public sealed class Action(string key, string label, bool isEnabled = true, string? settingKey = null) : IAction, IDisposable
 {
     private readonly BehaviorSubject<string> _label = new(label);
@@ -40,16 +36,10 @@ public sealed class Action(string key, string label, bool isEnabled = true, stri
     public IObservable<bool> IsEnabled => _isEnabled.AsObservable();
 
     /// <inheritdoc />
-    public string GetCurrentLabel()
-    {
-        return _label.Value;
-    }
+    public string GetCurrentLabel() => _label.Value;
 
     /// <inheritdoc />
-    public bool GetCurrentEnabled()
-    {
-        return _isEnabled.Value;
-    }
+    public bool GetCurrentEnabled() => _isEnabled.Value;
 
     /// <summary>
     ///     Gets an observable stream that emits a signal each time this action is invoked.
@@ -59,20 +49,12 @@ public sealed class Action(string key, string label, bool isEnabled = true, stri
     /// <summary>
     ///     Updates the action's display label dynamically.
     /// </summary>
-    /// <param name="label">The new label text to display.</param>
-    public void SetLabel(string label)
-    {
-        _label.OnNext(label);
-    }
+    public void SetLabel(string label) => _label.OnNext(label);
 
     /// <summary>
     ///     Updates the action's enabled state dynamically.
     /// </summary>
-    /// <param name="enabled">True to enable the action, false to disable it.</param>
-    public void SetEnabled(bool enabled)
-    {
-        _isEnabled.OnNext(enabled);
-    }
+    public void SetEnabled(bool enabled) => _isEnabled.OnNext(enabled);
 
     /// <inheritdoc />
     public void Invoke()
@@ -103,24 +85,7 @@ public sealed class Action(string key, string label, bool isEnabled = true, stri
     ///     Registers an async handler that will be executed when InvokeAsync() is called.
     ///     This is used for long-running operations like OAuth login.
     /// </summary>
-    /// <param name="handler">The async task to execute on invocation.</param>
-    public void OnInvokeAsync(Func<Task> handler)
-    {
-        _asyncHandler = handler;
-    }
-
-    /// <summary>
-    ///     Factory method to create a new action instance.
-    /// </summary>
-    /// <param name="key">The unique identifier for this action.</param>
-    /// <param name="label">The display label for the action button.</param>
-    /// <param name="isEnabled">Whether the action is initially enabled.</param>
-    /// <param name="settingKey">Optional setting key whose input should host the action.</param>
-    /// <returns>A new <see cref="Action" /> instance.</returns>
-    public static Action Create(string key, string label, bool isEnabled = true, string? settingKey = null)
-    {
-        return new Action(key, label, isEnabled, settingKey);
-    }
+    public void OnInvokeAsync(Func<Task> handler) => _asyncHandler = handler;
 
     /// <summary>
     ///     Disposes the action and releases all resources.

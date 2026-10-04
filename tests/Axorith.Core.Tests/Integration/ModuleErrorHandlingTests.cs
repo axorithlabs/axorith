@@ -1,214 +1,89 @@
-using Autofac;
 using Axorith.Core.Models;
-using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Tests.Services;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Exceptions;
-using Axorith.Telemetry;
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Axorith.Core.Tests.Integration;
 
-/// <summary>
-///     Integration tests for error handling scenarios across module lifecycle
-/// </summary>
 public class ModuleErrorHandlingTests
 {
     [Fact]
     public async Task ModuleLifecycle_WithValidationError_ShouldPreventSessionStart()
     {
-        // Arrange
-        var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns([]);
-        mockModule.Setup(m => m.GetActions()).Returns([]);
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
+        var module = SessionManagerTestFactory.CreateModule();
+        module.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(ValidationResult.Fail("Settings are invalid"));
 
-        var mockRegistry = new Mock<IModuleRegistry>();
-        var moduleId = Guid.NewGuid();
-        var definition = new ModuleDefinition
-        {
-            Id = moduleId,
-            Name = "Invalid Module",
-            Platforms = [Platform.Windows],
-            ModuleType = mockModule.Object.GetType()
-        };
-        var root = new ContainerBuilder().Build();
-        var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
-        mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
+        var registry = new Mock<IModuleRegistry>();
+        var moduleId = SessionManagerTestFactory.Register(registry, module, name: "Invalid Module");
+        var sessionManager = SessionManagerTestFactory.CreateManager(registry.Object);
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        // Act & Assert
-        await sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+        await sessionManager.Invoking(sm => sm.StartSessionAsync(SessionManagerTestFactory.CreatePreset(moduleId)))
             .Should()
             .ThrowAsync<SessionException>();
-
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
     [Fact]
     public async Task ModuleLifecycle_WithSettingConfigurationError_ShouldBeDetected()
     {
-        // Arrange
-        var textSetting = Setting.AsText("required", "Required", "");
+        var requiredSetting = Setting.AsText("required", "Required", "");
+        var module = SessionManagerTestFactory.CreateModule();
+        module.Setup(m => m.GetSettings()).Returns([requiredSetting]);
+        module.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(string.IsNullOrWhiteSpace(requiredSetting.GetCurrentValue())
+                ? ValidationResult.Fail("Required setting is empty")
+                : ValidationResult.Success));
 
-        var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns([textSetting]);
-        mockModule.Setup(m => m.GetActions()).Returns([]);
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .Returns<CancellationToken>(_ =>
-            {
-                var value = textSetting.GetCurrentValue();
-                return Task.FromResult(string.IsNullOrWhiteSpace(value)
-                    ? ValidationResult.Fail("Required setting is empty")
-                    : ValidationResult.Success);
-            });
+        var registry = new Mock<IModuleRegistry>();
+        var moduleId = SessionManagerTestFactory.Register(registry, module, name: "Config Module");
+        var sessionManager = SessionManagerTestFactory.CreateManager(registry.Object);
 
-        var mockRegistry = new Mock<IModuleRegistry>();
-        var moduleId = Guid.NewGuid();
-        var definition = new ModuleDefinition
-        {
-            Id = moduleId,
-            Name = "Config Module",
-            Platforms = [Platform.Windows],
-            ModuleType = mockModule.Object.GetType()
-        };
-        var root = new ContainerBuilder().Build();
-        var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
-        mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
-
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules =
-            [
-                new ConfiguredModule
-                {
-                    ModuleId = moduleId,
-                    Settings = [] // Empty - should fail validation
-                }
-            ]
-        };
-
-        // Act & Assert
-        await sessionManager.Invoking(sm => sm.StartSessionAsync(preset))
+        await sessionManager.Invoking(sm => sm.StartSessionAsync(SessionManagerTestFactory.CreatePreset(moduleId)))
             .Should()
             .ThrowAsync<SessionException>();
-
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
     [Fact]
     public async Task ModuleLifecycle_WithOnSessionEndException_ShouldStillCompleteStop()
     {
-        // Arrange
-        var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns([]);
-        mockModule.Setup(m => m.GetActions()).Returns([]);
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ValidationResult.Success);
-        mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
+        var module = SessionManagerTestFactory.CreateModule();
+        module.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Stop failed"));
 
-        var mockRegistry = new Mock<IModuleRegistry>();
-        var moduleId = Guid.NewGuid();
-        var definition = new ModuleDefinition
-        {
-            Id = moduleId,
-            Name = "Error Stop",
-            Platforms = [Platform.Windows],
-            ModuleType = mockModule.Object.GetType()
-        };
-        var root = new ContainerBuilder().Build();
-        var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
-        mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
+        var registry = new Mock<IModuleRegistry>();
+        var moduleId = SessionManagerTestFactory.Register(registry, module, name: "Error Stop");
+        var sessionManager = SessionManagerTestFactory.CreateManager(registry.Object);
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
-
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        await sessionManager.StartSessionAsync(preset);
-        // Act
+        await sessionManager.StartSessionAsync(SessionManagerTestFactory.CreatePreset(moduleId));
         await sessionManager.StopCurrentSessionAsync();
 
-        // Assert - session should be stopped despite exception
         sessionManager.IsSessionRunning.Should().BeFalse();
     }
 
     [Fact]
     public async Task ModuleLifecycle_WithDisposeException_ShouldStillCompleteCleanup()
     {
-        // Arrange
         var disposed = false;
-        var mockModule = new Mock<IModule>();
-
-        mockModule.Setup(m => m.GetSettings()).Returns([]);
-        mockModule.Setup(m => m.GetActions()).Returns([]);
-        mockModule.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ValidationResult.Success);
-        mockModule.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.OnSessionEndAsync(It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        mockModule.Setup(m => m.Dispose())
-            .Callback(() =>
-            {
-                disposed = true;
-                throw new InvalidOperationException("Dispose failed");
-            });
-
-        var mockRegistry = new Mock<IModuleRegistry>();
-        var moduleId = Guid.NewGuid();
-        var definition = new ModuleDefinition
+        var module = SessionManagerTestFactory.CreateModule();
+        module.Setup(m => m.Dispose()).Callback(() =>
         {
-            Id = moduleId,
-            Name = "Error Dispose",
-            Platforms = [Platform.Windows],
-            ModuleType = mockModule.Object.GetType()
-        };
-        var root = new ContainerBuilder().Build();
-        var scope = root.BeginLifetimeScope(b => b.RegisterInstance(definition).As<ModuleDefinition>());
-        mockRegistry.Setup(r => r.CreateInstance(moduleId)).Returns((mockModule.Object, scope));
+            disposed = true;
+            throw new InvalidOperationException("Dispose failed");
+        });
 
-        var sessionManager = new SessionManager(mockRegistry.Object, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10), new NoopTelemetryService());
+        var registry = new Mock<IModuleRegistry>();
+        var moduleId = SessionManagerTestFactory.Register(registry, module, name: "Error Dispose");
+        var sessionManager = SessionManagerTestFactory.CreateManager(registry.Object);
 
-        var preset = new SessionPreset
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test",
-            Modules = [new ConfiguredModule { ModuleId = moduleId }]
-        };
-
-        await sessionManager.StartSessionAsync(preset);
-        // Act
+        await sessionManager.StartSessionAsync(SessionManagerTestFactory.CreatePreset(moduleId));
         await sessionManager.StopCurrentSessionAsync();
 
-        // Assert
         disposed.Should().BeTrue("Dispose should have been called");
         sessionManager.IsSessionRunning.Should().BeFalse();
     }

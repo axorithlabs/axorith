@@ -55,7 +55,7 @@ internal sealed class Settings : IDisposable
             app => Path.GetFileNameWithoutExtension(app.ExecutablePath));
         _appToAdd = Setting.AsChoice("AppToAdd", "Select app", "", appChoices,
             "Choose an installed app to add to the block list.", isVisible: false);
-        _addAppAction = Action.Create("AddApp", "Add app");
+        _addAppAction = new Action("AddApp", "Add app");
         _addAppAction.OnInvokeAsync(() =>
         {
             var selected = _appToAdd.GetCurrentValue();
@@ -79,15 +79,9 @@ internal sealed class Settings : IDisposable
 
     public bool IsAllowList => _mode.GetCurrentValue() == "AllowList";
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _allSettings;
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _allSettings;
 
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _allActions;
-    }
+    public IReadOnlyList<IAction> GetActions() => _allActions;
 
     public Task<ValidationResult> ValidateAsync()
     {
@@ -114,29 +108,16 @@ internal sealed class Settings : IDisposable
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var cat in _categories.GetCurrentValue())
+        foreach (var category in _categories.GetCurrentValue())
         {
-            if (_categoryProcesses!.TryGetValue(cat, out var procs))
+            if (_categoryProcesses!.TryGetValue(category, out var processes))
             {
-                foreach (var p in procs)
-                {
-                    result.Add(p);
-                }
+                result.UnionWith(processes);
             }
         }
 
-        var custom = _customProcessList.GetCurrentValue();
-        if (!string.IsNullOrWhiteSpace(custom))
-        {
-            foreach (var p in custom.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
-            {
-                var trimmed = p.Trim();
-                if (!string.IsNullOrWhiteSpace(trimmed))
-                {
-                    result.Add(trimmed);
-                }
-            }
-        }
+        result.UnionWith(_customProcessList.GetCurrentValue()
+            .Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         return result;
     }
@@ -179,13 +160,6 @@ internal sealed class Settings : IDisposable
 
     private static List<KeyValuePair<string, string>> BuildCategoryChoices()
     {
-        var choices = new List<KeyValuePair<string, string>>();
-
-        if (_categoryProcesses == null)
-        {
-            return choices;
-        }
-
         var descriptions = new Dictionary<string, string>
         {
             ["Gaming"] = "Gaming (Steam, Epic, Battle.net, Riot...)",
@@ -199,13 +173,9 @@ internal sealed class Settings : IDisposable
             ["Office"] = "Office Apps (Word, Excel, LibreOffice...)"
         };
 
-        foreach (var category in _categoryProcesses.Keys)
-        {
-            var description = descriptions.TryGetValue(category, out var desc) ? desc : category;
-            choices.Add(new KeyValuePair<string, string>(category, description));
-        }
-
-        return choices;
+        return _categoryProcesses?.Keys
+            .Select(category => KeyValuePair.Create(category, descriptions.GetValueOrDefault(category, category)))
+            .ToList() ?? [];
     }
 
     public void Dispose()

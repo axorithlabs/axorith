@@ -31,13 +31,11 @@ public interface IAction
     /// <summary>
     ///     Gets the current label of the action.
     /// </summary>
-    /// <returns>The current label of the action.</returns>
     string GetCurrentLabel();
 
     /// <summary>
     ///     Gets the current enabled state of the action.
     /// </summary>
-    /// <returns>True if the action is enabled; otherwise, false.</returns>
     bool GetCurrentEnabled();
 
     /// <summary>

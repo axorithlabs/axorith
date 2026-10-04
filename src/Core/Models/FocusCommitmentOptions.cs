@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Axorith.Core.Models;
 
 public enum FocusCommitmentMode
@@ -34,7 +36,30 @@ public enum SessionEndReason
 
 public sealed class FocusCommitmentOptions
 {
+    public FocusCommitmentOptions() { }
+
+    public FocusCommitmentOptions(FocusCommitmentOptions source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        Mode = source.Mode;
+        EndCondition = source.EndCondition;
+        Duration = source.Duration;
+        EndAtLocalTime = source.EndAtLocalTime;
+        EndAtDaysOfWeek = [.. source.EndAtDaysOfWeek];
+        BreakCount = source.BreakCount;
+        BreakDuration = source.BreakDuration;
+        AfterEnd = source.AfterEnd;
+        NextWorkspaceId = source.NextWorkspaceId;
+        ScheduleLockMinutes = source.ScheduleLockMinutes;
+    }
+
     public FocusCommitmentMode Mode { get; set; }
+
+    [JsonIgnore]
+    public bool IsCommitted => Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict;
+
+    [JsonIgnore]
+    public bool IsStrict => Mode == FocusCommitmentMode.Strict;
     public FocusEndCondition EndCondition { get; set; }
     public TimeSpan? Duration { get; set; }
     public TimeOnly? EndAtLocalTime { get; set; }

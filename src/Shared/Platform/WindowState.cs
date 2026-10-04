@@ -1,8 +1,5 @@
-﻿namespace Axorith.Shared.Platform;
+namespace Axorith.Shared.Platform;
 
-/// <summary>
-///     Windows window states.
-/// </summary>
 public enum WindowState
 {
     Normal = 1,

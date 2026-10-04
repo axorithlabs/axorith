@@ -29,17 +29,7 @@ internal sealed class Settings : LauncherSettingsBase
         SetupBaseReactiveVisibility();
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield break;
-    }
-
-    protected override IEnumerable<IAction> GetAdditionalActions() => [];
-
-    protected override async Task InitializeAdditionalAsync()
-    {
-        await RefreshPathAsync();
-    }
+    protected override Task InitializeAdditionalAsync() => RefreshPathAsync();
 
     private Task RefreshPathAsync()
     {
@@ -79,31 +69,8 @@ internal sealed class Settings : LauncherSettingsBase
                 path = _appDiscovery.FindKnownApp("discord");
             }
 
-            var choices = new List<KeyValuePair<string, string>>
-            {
-                !string.IsNullOrEmpty(path)
-                    ? new KeyValuePair<string, string>(path, "Discord (Auto-Detected)")
-                    : new KeyValuePair<string, string>("", "Discord not found")
-            };
-
-            var current = DiscordPath.GetCurrentValue();
-            if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
-            {
-                choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
-            }
-
-            DiscordPath.SetChoices(choices);
-
-            if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(path))
-            {
-                DiscordPath.SetValue(path);
-            }
+            SetDetectedApplicationPath(path, "Discord (Auto-Detected)", "Discord not found");
         });
     }
 
-    public override void Dispose()
-    {
-        DiscordPath.Dispose();
-        base.Dispose();
-    }
 }

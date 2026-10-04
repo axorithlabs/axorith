@@ -2,12 +2,11 @@ using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
-using Axorith.Client.Services.Abstractions;
 using Axorith.Shared.Utils;
 
 namespace Axorith.Client.Services;
 
-public class WindowStateManager : IWindowStateManager
+public sealed class WindowStateManager
 {
     private readonly string _stateFilePath;
     private const long MaxStateFileSizeBytes = 1 * 1024 * 1024; // 1 MB max

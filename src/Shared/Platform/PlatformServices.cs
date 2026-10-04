@@ -75,9 +75,6 @@ public static class PlatformServices
         return new NoOpNotificationService();
     }
 
-    /// <summary>
-    ///     Creates a platform-specific instance of INativeMessagingManager.
-    /// </summary>
     public static INativeMessagingManager CreateNativeMessagingManager(ILoggerFactory loggerFactory)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -144,10 +141,7 @@ public static class PlatformServices
 // Simple fallback to avoid breaking Linux/Mac builds until implemented
 file class NoOpNotificationService : ISystemNotificationService
 {
-    public Task ShowNotificationAsync(string title, string message, TimeSpan? expiration = null)
-    {
-        return Task.CompletedTask;
-    }
+    public Task ShowNotificationAsync(string title, string message, TimeSpan? expiration = null) => Task.CompletedTask;
 }
 
 file class NoOpAutoStartManager : IAutoStartManager
@@ -155,39 +149,13 @@ file class NoOpAutoStartManager : IAutoStartManager
     public bool IsAutoStartEnabled => false;
     public bool IsStartMinimized => false;
 
-    public bool EnableAutoStart(bool startMinimized = true)
-    {
-        return false;
-    }
+    public bool EnableAutoStart(bool startMinimized = true) => false;
 
-    public bool DisableAutoStart()
-    {
-        return true;
-    }
+    public bool DisableAutoStart() => true;
 }
 
 file class FallbackPlatformProcessService : IPlatformProcessService
 {
-    public List<Process> FindProcesses(string processNameOrPath)
-    {
-        var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
-        return [.. Process.GetProcessesByName(processName)];
-    }
-
-    public bool IsProcessRunning(string processNameOrPath)
-    {
-        return FindProcesses(processNameOrPath).Count > 0;
-    }
-
-    public bool IsProcessRunningByName(string processName)
-    {
-        try
-        {
-            return Process.GetProcessesByName(processName).Length > 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
+    public List<Process> FindProcesses(string processNameOrPath) =>
+        [.. Process.GetProcessesByName(Path.GetFileNameWithoutExtension(processNameOrPath))];
 }

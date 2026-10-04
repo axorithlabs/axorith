@@ -4,54 +4,9 @@ using Microsoft.Extensions.Options;
 
 namespace Axorith.Client.Services;
 
-/// <summary>
-///     Monitors Host health and triggers reconnection if needed.
-/// </summary>
-public interface IHostHealthMonitor : IDisposable
-{
-    /// <summary>
-    ///     Starts health monitoring in background.
-    /// </summary>
-    void Start();
-
-    /// <summary>
-    ///     Stops health monitoring.
-    /// </summary>
-    void Stop();
-
-    /// <summary>
-    ///     Pauses health monitoring without stopping the task.
-    ///     Used when the host is intentionally stopped by the user to prevent error alerts.
-    /// </summary>
-    void Pause();
-
-    /// <summary>
-    ///     Resumes health monitoring.
-    /// </summary>
-    void Resume();
-
-    /// <summary>
-    ///     Checks if Host is healthy (single check).
-    /// </summary>
-    Task<bool> IsHostHealthyAsync();
-
-    void SetDiagnosticsApi(IDiagnosticsApi api);
-
-    /// <summary>
-    ///     Fires when Host becomes unhealthy.
-    /// </summary>
-    event Action? HostUnhealthy;
-
-    /// <summary>
-    ///     Fires when Host becomes healthy again.
-    /// </summary>
-    event Action? HostHealthy;
-}
-
-public class HostHealthMonitor(
-    IDiagnosticsApi diagnosticsApi,
+public sealed class HostHealthMonitor(
     IOptions<Configuration> config,
-    ILogger<HostHealthMonitor> logger) : IHostHealthMonitor
+    ILogger<HostHealthMonitor> logger)
 {
     private const int MaxRetries = 3;
     private const int RetryDelayMs = 500;
@@ -60,7 +15,7 @@ public class HostHealthMonitor(
     private Task? _monitoringTask;
     private bool _wasHealthy = true;
     private volatile bool _isPaused;
-    private IDiagnosticsApi _diagnosticsApi = diagnosticsApi;
+    private IDiagnosticsApi? _diagnosticsApi;
 
     public event Action? HostUnhealthy;
     public event Action? HostHealthy;
@@ -112,11 +67,17 @@ public class HostHealthMonitor(
 
     public async Task<bool> IsHostHealthyAsync()
     {
+        var diagnosticsApi = _diagnosticsApi;
+        if (diagnosticsApi is null)
+        {
+            return false;
+        }
+
         for (var i = 0; i < MaxRetries; i++)
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                var healthStatus = await _diagnosticsApi.GetHealthAsync(cts.Token);
+                var healthStatus = await diagnosticsApi.GetHealthAsync(cts.Token);
 
                 if (healthStatus.State == HealthState.Healthy)
                 {
@@ -194,10 +155,7 @@ public class HostHealthMonitor(
         logger.LogInformation("Health monitoring stopped");
     }
 
-    public void SetDiagnosticsApi(IDiagnosticsApi api)
-    {
-        _diagnosticsApi = api;
-    }
+    public void SetDiagnosticsApi(IDiagnosticsApi api) => _diagnosticsApi = api;
 
     public void Dispose()
     {

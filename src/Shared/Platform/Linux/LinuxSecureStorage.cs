@@ -1,8 +1,6 @@
-using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
-using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
@@ -10,27 +8,24 @@ using Microsoft.Extensions.Logging;
 namespace Axorith.Shared.Platform.Linux;
 
 [SupportedOSPlatform("linux")]
-internal class LinuxSecureStorage : ISecureStorageService
+internal class LinuxSecureStorage : SecureStorageBase
 {
-    private readonly ILogger _logger;
     private readonly string? _storageDir;
     private readonly bool _useSecretService;
     private const string SecretServiceLabel = "Axorith";
     private const string FileKeyName = "master.key";
 
-    public LinuxSecureStorage(ILogger logger)
+    public LinuxSecureStorage(ILogger logger) : base(logger)
     {
-        _logger = logger;
-
         _useSecretService = IsSecretServiceAvailable();
 
         if (_useSecretService)
         {
-            _logger.LogInformation("Using Linux Secret Service for secure storage");
+            Logger.LogInformation("Using Linux Secret Service for secure storage");
         }
         else
         {
-            _logger.LogWarning("Secret Service not available, falling back to encrypted file storage");
+            Logger.LogWarning("Secret Service not available, falling back to encrypted file storage");
             _storageDir = ApplicationPaths.EnsureDirectoryExists(ApplicationPaths.LocalSecrets);
 
             // Set restrictive permissions (owner only)
@@ -38,122 +33,44 @@ internal class LinuxSecureStorage : ISecureStorageService
             {
                 try
                 {
-                    var dirInfo = new UnixDirectoryInfo(_storageDir)
-                    {
-                        FileAccessPermissions =
-                            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-                    };
+                    File.SetUnixFileMode(_storageDir,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to set directory permissions");
+                    Logger.LogWarning(ex, "Failed to set directory permissions");
                 }
             }
         }
     }
 
-    public void StoreSecret(string key, string secret)
+    protected override void ValidateSecret(string secret) => ArgumentException.ThrowIfNullOrWhiteSpace(secret);
+
+    protected override void StoreSecretCore(string key, string secret)
     {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
-        }
-
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            throw new ArgumentException("Secret cannot be null or whitespace", nameof(secret));
-        }
-
-        try
-        {
-            if (_useSecretService)
-            {
-                StoreSecretViaSecretService(key, secret);
-            }
-            else
-            {
-                StoreSecretViaFile(key, secret);
-            }
-
-            _logger.LogDebug("Stored secret for key: {Key}", key);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error storing secret for key: {Key}", key);
-            throw;
-        }
+        if (_useSecretService)
+            StoreSecretViaSecretService(key, secret);
+        else
+            StoreSecretViaFile(key, secret);
     }
 
-    public string? RetrieveSecret(string key)
+    protected override string? RetrieveSecretCore(string key) => _useSecretService
+        ? RetrieveSecretViaSecretService(key)
+        : RetrieveSecretViaFile(key);
+
+    protected override void DeleteSecretCore(string key)
     {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
-        }
-
-        try
-        {
-            var result = _useSecretService
-                ? RetrieveSecretViaSecretService(key)
-                : RetrieveSecretViaFile(key);
-
-            if (result == null)
-            {
-                _logger.LogDebug("No secret found for key: {Key}", key);
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving secret for key: {Key}", key);
-            throw;
-        }
-    }
-
-    public void DeleteSecret(string key)
-    {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new ArgumentException("Key cannot be null or whitespace", nameof(key));
-        }
-
-        try
-        {
-            if (_useSecretService)
-            {
-                DeleteSecretViaSecretService(key);
-            }
-            else
-            {
-                DeleteSecretViaFile(key);
-            }
-
-            _logger.LogDebug("Deleted secret for key: {Key}", key);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting secret for key: {Key}", key);
-            throw;
-        }
+        if (_useSecretService)
+            DeleteSecretViaSecretService(key);
+        else
+            DeleteSecretViaFile(key);
     }
 
     private static bool IsSecretServiceAvailable()
     {
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "which",
-                Arguments = "secret-tool",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            process?.WaitForExit(1000);
-            return process?.ExitCode == 0;
+            return CommandRunner.Run("which", ["secret-tool"], timeoutMs: 1000).ExitCode == 0;
         }
         catch
         {
@@ -161,86 +78,26 @@ internal class LinuxSecureStorage : ISecureStorageService
         }
     }
 
-    private static void StoreSecretViaSecretService(string key, string secret)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "secret-tool",
-            Arguments = $"store --label=\"{SecretServiceLabel}\" application axorith key \"{key}\"",
-            RedirectStandardInput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi) ??
-                            throw new InvalidOperationException("Failed to start secret-tool process");
-        process.StandardInput.Write(secret);
-        process.StandardInput.Close();
-        process.WaitForExit(5000);
-
-        if (process.ExitCode != 0)
-        {
-            var error = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"secret-tool failed: {error}");
-        }
-    }
+    private static void StoreSecretViaSecretService(string key, string secret) =>
+        CommandRunner.RunChecked("secret-tool",
+            ["store", $"--label={SecretServiceLabel}", "application", "axorith", "key", key], secret);
 
     private static string? RetrieveSecretViaSecretService(string key)
     {
-        var psi = new ProcessStartInfo
+        var result = CommandRunner.Run("secret-tool", ["lookup", "application", "axorith", "key", key]);
+        return result.ExitCode switch
         {
-            FileName = "secret-tool",
-            Arguments = $"lookup application axorith key \"{key}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
+            0 => string.IsNullOrWhiteSpace(result.Output) ? null : result.Output.TrimEnd('\r', '\n'),
+            1 => null,
+            _ => throw new InvalidOperationException($"secret-tool failed: {result.Error}")
         };
-
-        using var process = Process.Start(psi) ??
-                            throw new InvalidOperationException("Failed to start secret-tool process");
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(5000);
-
-        switch (process.ExitCode)
-        {
-            // Exit code 1 means not found
-            case 1:
-                return null;
-            case 0:
-                return string.IsNullOrWhiteSpace(output) ? null : output.TrimEnd('\n');
-            default:
-            {
-                var error = process.StandardError.ReadToEnd();
-                throw new InvalidOperationException($"secret-tool failed: {error}");
-            }
-        }
     }
 
     private static void DeleteSecretViaSecretService(string key)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "secret-tool",
-            Arguments = $"clear application axorith key \"{key}\"",
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi) ??
-                            throw new InvalidOperationException("Failed to start secret-tool process");
-        process.WaitForExit(5000);
-
-        // Exit code 1 means not found (which is OK for delete)
-        if (process.ExitCode is 0 or 1)
-        {
-            return;
-        }
-
-        var error = process.StandardError.ReadToEnd();
-        throw new InvalidOperationException($"secret-tool failed: {error}");
+        var result = CommandRunner.Run("secret-tool", ["clear", "application", "axorith", "key", key]);
+        if (result.ExitCode is not (0 or 1))
+            throw new InvalidOperationException($"secret-tool failed: {result.Error}");
     }
 
     private void StoreSecretViaFile(string key, string secret)
@@ -255,7 +112,7 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         var encryptionKey = GetOrCreateFileEncryptionKey();
         var plaintextBytes = Encoding.UTF8.GetBytes(secret);
-        var encryptedData = EncryptWithAesGcm(plaintextBytes, encryptionKey);
+        var encryptedData = EncryptAesGcm(plaintextBytes, encryptionKey);
 
         File.WriteAllBytes(filePath, encryptedData);
 
@@ -264,14 +121,11 @@ internal class LinuxSecureStorage : ISecureStorageService
         {
             try
             {
-                var fileInfo = new UnixFileInfo(filePath)
-                {
-                    FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite
-                };
+                File.SetUnixFileMode(filePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to set file permissions for {File}", TelemetryGuard.SafePath(filePath));
+                Logger.LogWarning(ex, "Failed to set file permissions for {File}", TelemetryGuard.SafePath(filePath));
             }
         }
     }
@@ -296,7 +150,7 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         try
         {
-            var decryptedData = DecryptWithAesGcm(encryptedData, encryptionKey);
+            var decryptedData = DecryptAesGcm(encryptedData, encryptionKey, "Ciphertext too short");
             return Encoding.UTF8.GetString(decryptedData);
         }
         catch (CryptographicException)
@@ -354,11 +208,11 @@ internal class LinuxSecureStorage : ISecureStorageService
             {
                 var storedEncryptedKey = File.ReadAllBytes(keyPath);
                 var derivedMachineKey = GetMachineKey();
-                return DecryptKeyWithMachineKey(storedEncryptedKey, derivedMachineKey);
+                return DecryptAesGcm(storedEncryptedKey, derivedMachineKey, "Encrypted key too short");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
+                Logger.LogError(ex,
                     "Failed to decrypt master key. Regenerating new key. Previous secrets will be inaccessible.");
                 File.Delete(keyPath);
             }
@@ -366,7 +220,7 @@ internal class LinuxSecureStorage : ISecureStorageService
 
         var key = RandomNumberGenerator.GetBytes(32);
         var machineKey = GetMachineKey();
-        var encryptedKey = EncryptKeyWithMachineKey(key, machineKey);
+        var encryptedKey = EncryptAesGcm(key, machineKey);
 
         File.WriteAllBytes(keyPath, encryptedKey);
 
@@ -374,14 +228,11 @@ internal class LinuxSecureStorage : ISecureStorageService
         {
             try
             {
-                var keyFileInfo = new UnixFileInfo(keyPath)
-                {
-                    FileAccessPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite
-                };
+                File.SetUnixFileMode(keyPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to set file permissions for key file {File}",
+                Logger.LogWarning(ex, "Failed to set file permissions for key file {File}",
                     TelemetryGuard.SafePath(keyPath));
             }
         }
@@ -443,85 +294,35 @@ internal class LinuxSecureStorage : ISecureStorageService
         return key;
     }
 
-    private static byte[] EncryptKeyWithMachineKey(byte[] key, byte[] machineKey)
-    {
-        var nonce = RandomNumberGenerator.GetBytes(12);
-        var ciphertext = new byte[key.Length];
-        var tag = new byte[16];
-
-        using (var aes = new AesGcm(machineKey, tag.Length))
-        {
-            aes.Encrypt(nonce, key, ciphertext, tag);
-        }
-
-        var result = new byte[nonce.Length + ciphertext.Length + tag.Length];
-        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
-        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length, ciphertext.Length);
-        Buffer.BlockCopy(tag, 0, result, nonce.Length + ciphertext.Length, tag.Length);
-
-        return result;
-    }
-
-    private static byte[] DecryptKeyWithMachineKey(byte[] encryptedKey, byte[] machineKey)
-    {
-        if (encryptedKey.Length < 12 + 16)
-        {
-            throw new CryptographicException("Encrypted key too short");
-        }
-
-        var nonce = new byte[12];
-        var tag = new byte[16];
-        var ciphertext = new byte[encryptedKey.Length - nonce.Length - tag.Length];
-
-        Buffer.BlockCopy(encryptedKey, 0, nonce, 0, nonce.Length);
-        Buffer.BlockCopy(encryptedKey, nonce.Length, ciphertext, 0, ciphertext.Length);
-        Buffer.BlockCopy(encryptedKey, nonce.Length + ciphertext.Length, tag, 0, tag.Length);
-
-        var plaintext = new byte[ciphertext.Length];
-        using var aes = new AesGcm(machineKey, tag.Length);
-        aes.Decrypt(nonce, ciphertext, tag, plaintext);
-
-        return plaintext;
-    }
-
-    private static byte[] EncryptWithAesGcm(byte[] data, byte[] key)
+    private static byte[] EncryptAesGcm(byte[] data, byte[] key)
     {
         var nonce = RandomNumberGenerator.GetBytes(12);
         var ciphertext = new byte[data.Length];
         var tag = new byte[16];
 
-        using (var aes = new AesGcm(key, tag.Length))
-        {
-            aes.Encrypt(nonce, data, ciphertext, tag);
-        }
+        using var aes = new AesGcm(key, tag.Length);
+        aes.Encrypt(nonce, data, ciphertext, tag);
 
-        var result = new byte[nonce.Length + ciphertext.Length + tag.Length];
-        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
-        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length, ciphertext.Length);
-        Buffer.BlockCopy(tag, 0, result, nonce.Length + ciphertext.Length, tag.Length);
-
-        return result;
+        return [.. nonce, .. ciphertext, .. tag];
     }
 
-    private static byte[] DecryptWithAesGcm(byte[] data, byte[] key)
+    private static byte[] DecryptAesGcm(byte[] data, byte[] key, string invalidDataMessage)
     {
-        if (data.Length < 12 + 16)
+        const int nonceLength = 12;
+        const int tagLength = 16;
+        if (data.Length < nonceLength + tagLength)
         {
-            throw new CryptographicException("Ciphertext too short");
+            throw new CryptographicException(invalidDataMessage);
         }
 
-        var nonce = new byte[12];
-        var tag = new byte[16];
-        var ciphertext = new byte[data.Length - nonce.Length - tag.Length];
-
-        Buffer.BlockCopy(data, 0, nonce, 0, nonce.Length);
-        Buffer.BlockCopy(data, nonce.Length, ciphertext, 0, ciphertext.Length);
-        Buffer.BlockCopy(data, nonce.Length + ciphertext.Length, tag, 0, tag.Length);
-
-        var plaintext = new byte[ciphertext.Length];
-        using var aes = new AesGcm(key, tag.Length);
-        aes.Decrypt(nonce, ciphertext, tag, plaintext);
-
+        var ciphertextLength = data.Length - nonceLength - tagLength;
+        var plaintext = new byte[ciphertextLength];
+        using var aes = new AesGcm(key, tagLength);
+        aes.Decrypt(
+            data.AsSpan(0, nonceLength),
+            data.AsSpan(nonceLength, ciphertextLength),
+            data.AsSpan(nonceLength + ciphertextLength, tagLength),
+            plaintext);
         return plaintext;
     }
 
@@ -530,55 +331,5 @@ internal class LinuxSecureStorage : ISecureStorageService
         var result = new byte[data.Length];
         for (var i = 0; i < data.Length; i++) result[i] = (byte)(data[i] ^ key[i % key.Length]);
         return result;
-    }
-}
-
-/// <summary>
-///     Helper class for Unix file permissions
-/// </summary>
-file class UnixFileInfo(string path)
-{
-    private readonly FileInfo _fileInfo = new(path);
-
-    public UnixFileMode FileAccessPermissions
-    {
-        set
-        {
-            var octal = Convert.ToString((int)value, 8);
-            var psi = new ProcessStartInfo
-            {
-                FileName = "chmod",
-                Arguments = $"{octal} \"{_fileInfo.FullName}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var process = Process.Start(psi);
-            process?.WaitForExit(1000);
-        }
-    }
-}
-
-/// <summary>
-///     Helper class for Unix directory permissions
-/// </summary>
-file class UnixDirectoryInfo(string path)
-{
-    private readonly DirectoryInfo _dirInfo = new(path);
-
-    public UnixFileMode FileAccessPermissions
-    {
-        set
-        {
-            var octal = Convert.ToString((int)value, 8);
-            var psi = new ProcessStartInfo
-            {
-                FileName = "chmod",
-                Arguments = $"{octal} \"{_dirInfo.FullName}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var process = Process.Start(psi);
-            process?.WaitForExit(1000);
-        }
     }
 }

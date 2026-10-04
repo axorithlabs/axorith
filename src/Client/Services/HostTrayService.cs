@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
-using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,18 +10,12 @@ using ReactiveUI;
 
 namespace Axorith.Client.Services;
 
-public interface IHostTrayService : IDisposable
-{
-    void Initialize(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> logger);
-}
-
 public sealed class HostTrayService(
-    IHostController hostController,
-    IHostHealthMonitor healthMonitor,
+    HostController hostController,
+    HostHealthMonitor healthMonitor,
     IOptions<Configuration> config,
     ILogger<HostTrayService> logger,
     IServiceProvider services)
-    : IHostTrayService
 {
     private TrayIcon? _trayIcon;
     private NativeMenuItem? _hostStatusItem;
@@ -220,7 +213,7 @@ public sealed class HostTrayService(
                         throw new InvalidOperationException("Application.Current is not Axorith.Client.App");
                     }
 
-                    var initializer = services.GetRequiredService<IConnectionInitializer>();
+                    var initializer = services.GetRequiredService<ConnectionInitializer>();
                     var loggerFactory = services.GetRequiredService<ILoggerFactory>();
                     var appLogger = services.GetRequiredService<ILogger<App>>();
                     await initializer.InitializeAsync(app, config.Value, loggerFactory, appLogger);

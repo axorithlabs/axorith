@@ -1,207 +1,51 @@
-using System.Diagnostics;
-using Axorith.Sdk;
-using Axorith.Sdk.Actions;
 using Axorith.Sdk.Logging;
-using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Discord;
 
-/// <summary>
-///     Application service for launching and managing Discord application.
-/// </summary>
 internal sealed class DiscordApp(
     IModuleLogger logger,
     IAppDiscoveryService appDiscovery,
     IPlatformProcessService processService,
-    IPlatformWindowService windowService) : ILauncherApp
+    IPlatformWindowService windowService)
+    : LauncherAppBase(logger, processService, windowService)
 {
-    private const int MaxWindowWaitMs = 20000;
+    private const int MaxWindowWaitMs = 20_000;
     private const int WindowCheckIntervalMs = 500;
     private const int InitialPostWindowDelayMs = 200;
-    private const int MaxPostWindowDelayMs = 3000;
+    private const int MaxPostWindowDelayMs = 3_000;
     private const int PostWindowRetries = 5;
-
-    /// <summary>
-    ///     Window titles that indicate Discord is still loading/updating.
-    /// </summary>
     private static readonly string[] LoadingWindowTitles = ["Updating", "Starting", "Loading", "Checking"];
-
     private readonly Settings _settings = new(appDiscovery);
 
-    private readonly ProcessService _processService = new(logger, processService);
-    private readonly WindowService _windowService = new(logger, windowService);
-    private Process? _currentProcess;
-    private bool _attachedToExisting;
-
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _settings.GetAllSettings();
-    }
-
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _settings.GetAllActions();
-    }
-
-    public Task InitializeAsync(CancellationToken cancellationToken)
-    {
-        return _settings.InitializeAsync();
-    }
-
-    public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
-    {
-        return _settings.ValidateAsync();
-    }
-
-    public async Task OnSessionStartAsync(CancellationToken cancellationToken)
-    {
-        await LaunchDiscordAsync(cancellationToken);
-    }
-
-    public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
-    {
-        await TerminateDiscordAsync();
-    }
-
-    public void Dispose()
-    {
-        var process = _currentProcess;
-        try
-        {
-            if (process is { HasExited: false })
-            {
-                var lifecycle = _settings.LifecycleMode.GetCurrentValue() == "KeepRunning"
-                    ? ProcessLifecycleMode.KeepRunning
-                    : ProcessLifecycleMode.TerminateGraceful;
-
-                _processService.TerminateAsync(process, lifecycle, _attachedToExisting).GetAwaiter().GetResult();
-            }
-        }
-        catch
-        {
-            // ignored
-        }
-        finally
-        {
-            process?.Dispose();
-            _currentProcess = null;
-        }
-
-        GC.SuppressFinalize(this);
-    }
-
-    private async Task LaunchDiscordAsync(CancellationToken cancellationToken)
-    {
-        var processConfig = BuildProcessConfig();
-
-        logger.LogInfo("Starting Discord in {Mode} mode", processConfig.StartMode);
-
-        var startResult = await _processService.StartAsync(processConfig).ConfigureAwait(false);
-        _currentProcess = startResult.Process;
-        _attachedToExisting = startResult.AttachedToExisting;
-
-        if (_currentProcess == null)
-        {
-            logger.LogError(null, "Failed to obtain process handle");
-            return;
-        }
-
-        try
-        {
-            await WaitForDiscordMainWindowAsync(cancellationToken).ConfigureAwait(false);
-
-            var windowConfig = BuildWindowConfig();
-            await _windowService.ConfigureWindowAsync(_currentProcess, windowConfig, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (TimeoutException)
-        {
-            logger.LogWarning("Window did not appear in time");
-        }
-        catch (InvalidOperationException)
-        {
-            // Process exited during window configuration - ignore
-        }
-    }
-
-    private async Task TerminateDiscordAsync()
-    {
-        if (_currentProcess == null || _currentProcess.HasExited)
-        {
-            return;
-        }
-
-        var lifecycle = ParseLifecycleMode(_settings.LifecycleMode.GetCurrentValue());
-        await _processService.TerminateAsync(_currentProcess, lifecycle, _attachedToExisting).ConfigureAwait(false);
-    }
-
-    private ProcessConfig BuildProcessConfig()
-    {
-        var appPath = _settings.ApplicationPath.GetCurrentValue();
-        var startMode = _settings.ProcessMode.GetCurrentValue() switch
-        {
-            "AttachExisting" => ProcessStartMode.AttachExisting,
-            "LaunchOrAttach" => ProcessStartMode.LaunchOrAttach,
-            _ => ProcessStartMode.LaunchNew
-        };
-
-        return new ProcessConfig(appPath, string.Empty, startMode,
-            ParseLifecycleMode(_settings.LifecycleMode.GetCurrentValue()), null);
-    }
-
-    private WindowConfig BuildWindowConfig()
-    {
-        var state = _settings.WindowState.GetCurrentValue();
-        var useCustomSize = _settings.UseCustomSize.GetCurrentValue();
-        int? width = null, height = null;
-
-        if (useCustomSize && state == "Normal")
-        {
-            width = _settings.WindowWidth.GetCurrentValue();
-            height = _settings.WindowHeight.GetCurrentValue();
-        }
-
-        var moveToMonitor = _settings.MoveToMonitor.GetCurrentValue();
-        int? targetMonitorIndex = null;
-
-        if (moveToMonitor && int.TryParse(_settings.TargetMonitor.GetCurrentValue(), out var idx))
-        {
-            targetMonitorIndex = idx;
-        }
-
-        return new WindowConfig(state, useCustomSize, width, height, moveToMonitor, targetMonitorIndex,
-            _settings.BringToForeground.GetCurrentValue(), 20000, 500, 1000, 500);
-    }
+    protected override LauncherSettingsBase Settings => _settings;
+    protected override bool ReattachOnWindowTimeout => false;
+    protected override WindowConfigTimings GetWindowConfigTimings() => new(20_000, 500, 1_000, 500);
+    protected override Task OnBeforeWindowConfigurationAsync(CancellationToken cancellationToken) =>
+        WaitForDiscordMainWindowAsync(cancellationToken);
 
     private async Task WaitForDiscordMainWindowAsync(CancellationToken cancellationToken)
     {
-        if (_currentProcess == null || _currentProcess.HasExited)
+        if (CurrentProcess is null or { HasExited: true })
         {
             return;
         }
 
-        var startTime = DateTime.UtcNow;
-
-        while ((DateTime.UtcNow - startTime).TotalMilliseconds < MaxWindowWaitMs)
+        var deadline = DateTime.UtcNow.AddMilliseconds(MaxWindowWaitMs);
+        while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (_currentProcess.HasExited)
+            if (CurrentProcess.HasExited)
             {
                 return;
             }
 
-            _currentProcess.Refresh();
-
-            if (_currentProcess.MainWindowHandle != IntPtr.Zero)
+            CurrentProcess.Refresh();
+            if (CurrentProcess.MainWindowHandle != IntPtr.Zero && !IsLoadingTitle(CurrentProcess.MainWindowTitle))
             {
-                var title = _currentProcess.MainWindowTitle;
-                if (!string.IsNullOrWhiteSpace(title) && !IsLoadingTitle(title))
-                {
-                    await WaitForWindowStabilizationAsync(cancellationToken);
-                    return;
-                }
+                await WaitForWindowStabilizationAsync(cancellationToken).ConfigureAwait(false);
+                return;
             }
 
             await Task.Delay(WindowCheckIntervalMs, cancellationToken).ConfigureAwait(false);
@@ -211,44 +55,24 @@ internal sealed class DiscordApp(
     private async Task WaitForWindowStabilizationAsync(CancellationToken cancellationToken)
     {
         var delay = InitialPostWindowDelayMs;
-
         for (var attempt = 0; attempt < PostWindowRetries; attempt++)
         {
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-
-            if (_currentProcess == null || _currentProcess.HasExited)
+            if (CurrentProcess is null or { HasExited: true })
             {
                 return;
             }
 
-            _currentProcess.Refresh();
-
-            if (_currentProcess.MainWindowHandle != IntPtr.Zero)
+            CurrentProcess.Refresh();
+            if (CurrentProcess.MainWindowHandle != IntPtr.Zero && !IsLoadingTitle(CurrentProcess.MainWindowTitle))
             {
-                var title = _currentProcess.MainWindowTitle;
-                if (!string.IsNullOrWhiteSpace(title) && !IsLoadingTitle(title))
-                {
-                    return;
-                }
+                return;
             }
 
             delay = Math.Min(delay * 2, MaxPostWindowDelayMs);
         }
     }
 
-    private static bool IsLoadingTitle(string title)
-    {
-        return LoadingWindowTitles.Any(loading =>
-            title.Contains(loading, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static ProcessLifecycleMode ParseLifecycleMode(string setting)
-    {
-        return setting switch
-        {
-            "KeepRunning" => ProcessLifecycleMode.KeepRunning,
-            "TerminateForce" or "TerminateOnEnd" => ProcessLifecycleMode.TerminateForce,
-            _ => ProcessLifecycleMode.TerminateGraceful
-        };
-    }
+    private static bool IsLoadingTitle(string title) =>
+        string.IsNullOrWhiteSpace(title) || LoadingWindowTitles.Any(loading => title.Contains(loading, StringComparison.OrdinalIgnoreCase));
 }

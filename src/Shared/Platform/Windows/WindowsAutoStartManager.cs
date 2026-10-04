@@ -1,13 +1,10 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows implementation of auto-start management using registry.
-/// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsAutoStartManager : IAutoStartManager
 {

@@ -1,20 +1,8 @@
-﻿using Avalonia.Controls;
-using Axorith.Client.ViewModels;
+using Avalonia.Controls;
 
 namespace Axorith.Client.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
-    {
-        InitializeComponent();
-
-        DataContextChanged += (_, _) =>
-        {
-            if (DataContext is ShellViewModel shell)
-            {
-                shell.SetMainWindow(this);
-            }
-        };
-    }
+    public MainWindow() => InitializeComponent();
 }

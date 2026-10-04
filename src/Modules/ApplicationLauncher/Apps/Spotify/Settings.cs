@@ -122,8 +122,8 @@ internal sealed class Settings : LauncherSettingsBase
                 new KeyValuePair<string, string>("track", "Repeat Track")
             ]);
 
-        LoginAction = Action.Create(key: "Login", label: "Login to Spotify");
-        LogoutAction = Action.Create(key: "Logout", label: "Logout", isEnabled: false);
+        LoginAction = new Action(key: "Login", label: "Login to Spotify");
+        LogoutAction = new Action(key: "Logout", label: "Logout", isEnabled: false);
 
         DeviceSelectionMode.Value.Subscribe(mode => { SpecificDeviceName.SetVisibility(mode == ModeSpecificName); });
 
@@ -140,31 +140,13 @@ internal sealed class Settings : LauncherSettingsBase
         SetupBaseReactiveVisibility();
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield return EnablePlayback;
-        yield return AuthStatus;
-        yield return DeviceSelectionMode;
-        yield return SpecificDeviceName;
-        yield return PlaybackContext;
-        yield return CustomUrl;
-        yield return Volume;
-        yield return Shuffle;
-        yield return RepeatMode;
-    }
+    protected override IEnumerable<ISetting> GetAdditionalSettings() => [EnablePlayback, AuthStatus, DeviceSelectionMode, SpecificDeviceName, PlaybackContext, CustomUrl, Volume, Shuffle, RepeatMode];
 
-    protected override IEnumerable<IAction> GetAdditionalActions()
-    {
-        yield return LoginAction;
-        yield return LogoutAction;
-    }
+    protected override IEnumerable<IAction> GetAdditionalActions() => [LoginAction, LogoutAction];
 
-    protected override Task InitializeAdditionalAsync()
-    {
-        return RefreshSpotifyAsync();
-    }
+    protected override Task InitializeAdditionalAsync() => RefreshSpotifyAsync();
 
-    public new Task<ValidationResult> ValidateAsync()
+    protected override Task<ValidationResult> ValidateAdditionalAsync()
     {
         if (DeviceSelectionMode.GetCurrentValue() == ModeSpecificName &&
             string.IsNullOrWhiteSpace(SpecificDeviceName.GetCurrentValue()))
@@ -184,48 +166,14 @@ internal sealed class Settings : LauncherSettingsBase
                     "Please enter a Spotify URL (track, playlist, or album)."));
         }
 
-        return base.ValidateAsync();
+        return Task.FromResult(ValidationResult.Success);
     }
 
     private async Task RefreshSpotifyAsync()
     {
         var path = await Task.Run(() => _appDiscovery.FindKnownApp("Spotify", "Spotify.exe")).ConfigureAwait(false);
 
-        var choices = new List<KeyValuePair<string, string>>
-        {
-            !string.IsNullOrEmpty(path)
-                ? new KeyValuePair<string, string>(path, "Spotify (Auto-Detected)")
-                : new KeyValuePair<string, string>("", "Spotify not found")
-        };
-
-        var current = SpotifyPath.GetCurrentValue();
-        if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
-        {
-            choices.Insert(0, new KeyValuePair<string, string>(current, $"{current} (Custom)"));
-        }
-
-        SpotifyPath.SetChoices(choices);
-
-        if (string.IsNullOrEmpty(current) && !string.IsNullOrEmpty(path))
-        {
-            SpotifyPath.SetValue(path);
-        }
+        SetDetectedApplicationPath(path, "Spotify (Auto-Detected)", "Spotify not found");
     }
 
-    public override void Dispose()
-    {
-        SpotifyPath.Dispose();
-        AuthStatus.Dispose();
-        EnablePlayback.Dispose();
-        DeviceSelectionMode.Dispose();
-        SpecificDeviceName.Dispose();
-        PlaybackContext.Dispose();
-        CustomUrl.Dispose();
-        Volume.Dispose();
-        Shuffle.Dispose();
-        RepeatMode.Dispose();
-        LoginAction.Dispose();
-        LogoutAction.Dispose();
-        base.Dispose();
-    }
 }

@@ -1,14 +1,12 @@
-using System.Collections;
 using System.Diagnostics;
+using System.Collections;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Axorith.Shared.Utils;
-using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Parsing;
-using Serilog.Sinks.PeriodicBatching;
+using PostHog;
+using PostHog.Api;
 
 namespace Axorith.Telemetry;
 
@@ -37,14 +35,11 @@ public sealed partial class TelemetryService : ITelemetryService
         public bool PendingFatal { get; set; }
     }
 
-    private readonly Logger? _logger;
-    private readonly PeriodicBatchingSink? _batchingSink;
-    private readonly MessageTemplateParser _templateParser = new();
-    private readonly IReadOnlyCollection<LogEventProperty> _baseProperties;
-    private readonly HttpClient? _httpClient;
-    private readonly bool _ownsHttpClient;
+    private readonly PostHogClient? _client;
+    private readonly IReadOnlyDictionary<string, object?> _baseProperties;
     private readonly object _errorLock = new();
     private readonly object _flushLock = new();
+    private readonly object _consentLock = new();
     private readonly Dictionary<string, ErrorAggregate> _errors = new(StringComparer.Ordinal);
     private Task? _flushTask;
     private readonly string _distinctId = string.Empty;
@@ -57,12 +52,12 @@ public sealed partial class TelemetryService : ITelemetryService
     private int _acceptingEvents = 1;
     private volatile bool _disposed;
 
-    public bool IsEnabled => _logger is not null && Volatile.Read(ref _enabled) != 0 && !_disposed;
+    public bool IsEnabled => _client is not null && Volatile.Read(ref _enabled) != 0 && !_disposed;
 
     public TelemetryService(TelemetrySettings settings, IHttpClientFactory? httpClientFactory = null)
     {
         var resolved = (settings ?? throw new ArgumentNullException(nameof(settings))).WithEnvironmentOverrides();
-        _baseProperties = [];
+        _baseProperties = new Dictionary<string, object?>();
         if (!resolved.IsConfigured)
         {
             return;
@@ -85,65 +80,75 @@ public sealed partial class TelemetryService : ITelemetryService
         _appVersion = version;
         _osVersion = osVersion;
 
-        if (httpClientFactory is not null)
+        var flushAt = Math.Max(1, resolved.BatchSize);
+        var options = new PostHogOptions
         {
-            _httpClient = httpClientFactory.CreateClient(HttpClientName);
-        }
-        else
-        {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            _ownsHttpClient = true;
-        }
+            ProjectToken = resolved.PostHogApiKey,
+            HostUrl = new Uri(resolved.PostHogHost),
+            FlushAt = flushAt,
+            MaxBatchSize = flushAt,
+            MaxQueueSize = Math.Max(flushAt, resolved.QueueLimit),
+            FlushInterval = resolved.FlushInterval,
+            MaxRetries = Math.Max(0, resolved.MaxRetryAttempts),
+            InitialRetryDelay = resolved.InitialRetryDelay,
+            EnableCompression = false,
+            IsServer = !string.Equals(resolved.ApplicationName, "Axorith.Client", StringComparison.OrdinalIgnoreCase),
+            BeforeSend = FilterCapturedEvent
+        };
 
-        var postHogSink = new PostHogSink(
-            _httpClient,
-            resolved.PostHogApiKey,
-            resolved.PostHogHost,
-            _distinctId,
-            RetryPolicyOptions.FromSettings(resolved),
-            () => IsEnabled,
-            () => Volatile.Read(ref _preferenceGeneration));
-        _batchingSink = new PeriodicBatchingSink(postHogSink, new PeriodicBatchingSinkOptions
-        {
-            BatchSizeLimit = resolved.BatchSize,
-            QueueLimit = resolved.QueueLimit,
-            Period = resolved.FlushInterval
-        });
-        _logger = new LoggerConfiguration()
-            .MinimumLevel.Verbose()
-            .WriteTo.Sink(_batchingSink)
-            .CreateLogger();
+        _client = new PostHogClient(options, httpClientFactory: new NamedPostHogHttpClientFactory(httpClientFactory));
 
         SetEnabled(resolved.Enabled);
     }
 
     public void SetEnabled(bool enabled)
     {
-        if (_logger is null || _disposed || Volatile.Read(ref _acceptingEvents) == 0)
+        if (_client is null)
         {
             return;
         }
 
-        var wasEnabled = Interlocked.Exchange(ref _enabled, enabled ? 1 : 0) != 0;
-        if (wasEnabled != enabled)
+        bool wasEnabled;
+        bool identify;
+        lock (_consentLock)
         {
-            Interlocked.Increment(ref _preferenceGeneration);
-        }
-        if (!enabled)
-        {
-            lock (_errorLock)
+            if (_disposed || Volatile.Read(ref _acceptingEvents) == 0)
             {
-                foreach (var error in _errors.Values)
+                return;
+            }
+
+            wasEnabled = Volatile.Read(ref _enabled) != 0;
+            if (wasEnabled != enabled)
+            {
+                if (enabled)
                 {
-                    error.PendingCount = 0;
-                    error.PendingFatal = false;
+                    Interlocked.Increment(ref _preferenceGeneration);
+                    Volatile.Write(ref _enabled, 1);
+                }
+                else
+                {
+                    Volatile.Write(ref _enabled, 0);
+                    Interlocked.Increment(ref _preferenceGeneration);
+                    lock (_errorLock)
+                    {
+                        foreach (var error in _errors.Values)
+                        {
+                            error.PendingCount = 0;
+                            error.PendingFatal = false;
+                        }
+                    }
                 }
             }
 
+            identify = enabled && (!wasEnabled || Interlocked.Exchange(ref _identified, 1) == 0);
+        }
+
+        if (!enabled)
+        {
             return;
         }
 
-        if (!wasEnabled || Interlocked.Exchange(ref _identified, 1) == 0)
+        if (identify)
         {
             TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
             {
@@ -159,30 +164,40 @@ public sealed partial class TelemetryService : ITelemetryService
 
     public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null)
     {
-        lock (_flushLock)
+        try
         {
-            if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0)
+            lock (_flushLock)
             {
-                return;
-            }
+                if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0)
+                {
+                    return;
+                }
 
-            var name = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
-            if (!EventNameRegex().IsMatch(name))
-            {
-                return;
-            }
+                var name = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
+                if (!EventNameRegex().IsMatch(name))
+                {
+                    return;
+                }
 
-            var safeProperties = properties is null
-                ? new Dictionary<string, object?>()
-                : TelemetryEventSanitizer.SanitizeProperties(properties);
-            var logProperties = new List<LogEventProperty>(_baseProperties)
-            {
-                new(TelemetryConstants.Properties.EventName, new ScalarValue(name)),
-                new(TelemetryConstants.Properties.PreferenceGeneration,
-                    new ScalarValue(Volatile.Read(ref _preferenceGeneration)))
-            };
-            logProperties.AddRange(ConvertProperties(safeProperties));
-            _logger!.Write(CreateLogEvent(name, logProperties));
+                var safeProperties = properties is null
+                    ? new Dictionary<string, object?>()
+                    : TelemetryEventSanitizer.SanitizeProperties(properties);
+                var eventProperties = new Dictionary<string, object>(StringComparer.Ordinal);
+                if (!string.Equals(name, TelemetryConstants.IdentifyEvent, StringComparison.OrdinalIgnoreCase))
+                {
+                    AddProperties(eventProperties, _baseProperties);
+                }
+
+                AddProperties(eventProperties, safeProperties);
+                eventProperties[TelemetryConstants.Properties.PreferenceGeneration] =
+                    Volatile.Read(ref _preferenceGeneration);
+                _client!.Capture(_distinctId, name, eventProperties, groups: null, flags: null,
+                    timestamp: DateTimeOffset.UtcNow);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Telemetry event '{eventName}' was dropped: {ex.GetType().Name}");
         }
     }
 
@@ -246,7 +261,7 @@ public sealed partial class TelemetryService : ITelemetryService
 
     public async Task FlushAsync(CancellationToken ct = default)
     {
-        if (_batchingSink is null || _disposed)
+        if (_client is null || _disposed)
         {
             return;
         }
@@ -263,7 +278,7 @@ public sealed partial class TelemetryService : ITelemetryService
             if (_flushTask is null)
             {
                 Interlocked.Exchange(ref _acceptingEvents, 0);
-                _flushTask = DrainBatchingSinkAsync();
+                _flushTask = DrainClientAsync();
             }
 
             flushTask = _flushTask;
@@ -285,11 +300,11 @@ public sealed partial class TelemetryService : ITelemetryService
         await FlushAsync().ConfigureAwait(false);
     }
 
-    private async Task DrainBatchingSinkAsync()
+    private async Task DrainClientAsync()
     {
         try
         {
-            await _batchingSink!.DisposeAsync().ConfigureAwait(false);
+            await _client!.DisposeAsync().ConfigureAwait(false);
         }
         catch
         {
@@ -297,9 +312,6 @@ public sealed partial class TelemetryService : ITelemetryService
         }
         finally
         {
-            try { _logger?.Dispose(); }
-            catch { }
-            if (_ownsHttpClient) _httpClient?.Dispose();
             _disposed = true;
         }
     }
@@ -338,7 +350,58 @@ public sealed partial class TelemetryService : ITelemetryService
         return (fingerprint, productFrames.FirstOrDefault() ?? exception.GetType().Name);
     }
 
-    private static IReadOnlyCollection<LogEventProperty> BuildBaseProperties(TelemetrySettings settings,
+    private CapturedEvent? FilterCapturedEvent(CapturedEvent capturedEvent)
+    {
+        var properties = capturedEvent.Properties;
+        if (!IsEnabled ||
+            !properties.TryGetValue(TelemetryConstants.Properties.PreferenceGeneration, out var generationValue) ||
+            generationValue is not int generation || generation != Volatile.Read(ref _preferenceGeneration))
+        {
+            return null;
+        }
+
+        foreach (var key in properties.Keys.ToArray())
+        {
+            if (key == TelemetryConstants.Properties.PreferenceGeneration ||
+                SensitiveDataMasker.IsSensitiveKey(key) || SensitiveDataMasker.IsGeoKey(key))
+            {
+                properties.Remove(key);
+            }
+        }
+
+        return capturedEvent;
+    }
+
+    private static void AddProperties(Dictionary<string, object> destination,
+        IEnumerable<KeyValuePair<string, object?>> properties)
+    {
+        foreach (var (key, value) in properties)
+        {
+            if (value is not null)
+            {
+                destination[key] = ToPostHogValue(value);
+            }
+        }
+    }
+
+    private static object ToPostHogValue(object value) => value switch
+    {
+        IReadOnlyDictionary<string, object?> dictionary => JsonSerializer.SerializeToElement(
+            dictionary.ToDictionary(pair => pair.Key, pair => pair.Value is null ? null : ToPostHogValue(pair.Value))),
+        IDictionary<string, object?> dictionary => JsonSerializer.SerializeToElement(
+            dictionary.ToDictionary(pair => pair.Key, pair => pair.Value is null ? null : ToPostHogValue(pair.Value))),
+        IEnumerable sequence when value is not string => sequence.Cast<object?>()
+            .Select(item => item is null ? null : ToPostHogValue(item)).ToArray(),
+        _ => value
+    };
+
+    private sealed class NamedPostHogHttpClientFactory(IHttpClientFactory? inner) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => inner?.CreateClient(HttpClientName) ??
+            new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+    }
+
+    private static IReadOnlyDictionary<string, object?> BuildBaseProperties(TelemetrySettings settings,
         string appVersion, string osVersion)
     {
         var baseValues = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -349,37 +412,8 @@ public sealed partial class TelemetryService : ITelemetryService
             [TelemetryConstants.Properties.BuildChannel] = settings.BuildChannel,
             [TelemetryConstants.Properties.Environment] = settings.EnvironmentOverride
         };
-        return TelemetryEventSanitizer.SanitizeProperties(baseValues)
-            .Select(pair => new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value)))
-            .ToArray();
+        return TelemetryEventSanitizer.SanitizeProperties(baseValues);
     }
-
-    private IEnumerable<LogEventProperty> ConvertProperties(IReadOnlyDictionary<string, object?> properties)
-    {
-        foreach (var (key, value) in properties)
-        {
-            yield return new LogEventProperty(key, ConvertToPropertyValue(value));
-        }
-    }
-
-    private LogEvent CreateLogEvent(string name, IEnumerable<LogEventProperty> properties) =>
-        new(DateTimeOffset.UtcNow, LogEventLevel.Information, null, _templateParser.Parse(name), properties);
-
-    private static LogEventPropertyValue ConvertToPropertyValue(object? value) => value switch
-    {
-        null => new ScalarValue(null),
-        string text => new ScalarValue(text),
-        bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal =>
-            new ScalarValue(value),
-        Guid id => new ScalarValue(id.ToString()),
-        IReadOnlyDictionary<string, object?> dictionary => new StructureValue(
-            dictionary.Select(pair => new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value)))),
-        IDictionary<string, object?> dictionary => new StructureValue(
-            dictionary.Select(pair => new LogEventProperty(pair.Key, ConvertToPropertyValue(pair.Value)))),
-        IEnumerable sequence when value is not string =>
-            new SequenceValue(sequence.Cast<object?>().Select(ConvertToPropertyValue)),
-        _ => new ScalarValue(null)
-    };
 
     [System.Text.RegularExpressions.GeneratedRegex("^\\$?[A-Za-z][A-Za-z0-9]{0,79}$")]
     private static partial System.Text.RegularExpressions.Regex EventNameRegex();
@@ -387,6 +421,8 @@ public sealed partial class TelemetryService : ITelemetryService
 
 public sealed class NoopTelemetryService : ITelemetryService
 {
+    public static NoopTelemetryService Instance { get; } = new();
+
     public bool IsEnabled => false;
     public void SetEnabled(bool enabled) { }
     public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null) { }

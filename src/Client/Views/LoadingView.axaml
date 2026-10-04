@@ -26,7 +26,7 @@
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
-                           IsVisible="{Binding SubMessage, Converter={x:Static converters:AppConverters.IsNotNullOrEmpty}}"/>
+                           IsVisible="{Binding SubMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
         </StackPanel>
     </Grid>

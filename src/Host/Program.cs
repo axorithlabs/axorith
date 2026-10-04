@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using Autofac;
@@ -114,18 +114,14 @@ var hostInfoPath = ApplicationPaths.HostInfoFile;
 ITelemetryService? telemetry = null;
 FileSystemWatcher? telemetryPreferenceWatcher = null;
 
-// CRITICAL: Use global mutex to prevent multiple Host instances
-// This protects against race conditions when multiple Clients start simultaneously
 using var hostMutex = new Mutex(true, "Global\\AxorithHostInstanceMutex", out var createdNew);
 
 if (!createdNew)
 {
     Log.Warning("Another Axorith.Host instance is already running. Exiting.");
 
-    // Check if the other instance is actually responsive
     await Task.Delay(1000);
 
-    // Try to read existing host info
     if (File.Exists(hostInfoPath))
     {
         try
@@ -152,11 +148,7 @@ if (!string.Equals(hostInfoPath, legacyHostInfoPath, StringComparison.OrdinalIgn
     {
         File.Delete(legacyHostInfoPath);
     }
-    catch (IOException)
-    {
-        // The host writes runtime connection information to the machine-wide path now.
-    }
-    catch (UnauthorizedAccessException)
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
     {
         // The host writes runtime connection information to the machine-wide path now.
     }
@@ -167,7 +159,8 @@ try
     Log.Information("Starting Axorith.Host...");
 
     var builder = WebApplication.CreateBuilder(args);
-    var telemetryEnabled = TelemetryPreference.ReadOrDefault(true);
+    var isTestRun = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1";
+    var telemetryEnabled = !isTestRun && TelemetryPreference.ReadOrDefault(true);
     var telemetrySettings = new TelemetrySettings()
             .WithEnvironmentOverrides() with
         {
@@ -175,38 +168,21 @@ try
             Enabled = telemetryEnabled
         };
 
-    telemetry = new TelemetryService(telemetrySettings);
+    telemetry = isTestRun ? NoopTelemetryService.Instance : new TelemetryService(telemetrySettings);
     try
     {
-        telemetryPreferenceWatcher = TelemetryPreference.Watch(enabled => telemetry?.SetEnabled(enabled));
+        if (!isTestRun)
+            telemetryPreferenceWatcher = TelemetryPreference.Watch(enabled => telemetry?.SetEnabled(enabled));
     }
     catch (Exception ex)
     {
         Log.Warning(ex, "Could not watch the shared telemetry preference file");
     }
-    RegisterGlobalExceptionHandlers(telemetry);
+    TelemetryRuntime.RegisterGlobalExceptionHandlers(telemetry, "host");
 
-    Log.Information(
-        "Telemetry (Host): enabled={Enabled}, active={Active}, isEnabled={IsEnabled}, host={Host}, batch={Batch}, queue={Queue}, flushSec={Flush}",
-        telemetrySettings.Enabled,
-        telemetrySettings.IsActive,
-        telemetry?.IsEnabled,
-        telemetrySettings.PostHogHost,
-        telemetrySettings.BatchSize,
-        telemetrySettings.QueueLimit,
-        telemetrySettings.FlushInterval.TotalSeconds);
-
+    TelemetryRuntime.LogConfiguration("Host", telemetrySettings, telemetry?.IsEnabled == true);
     if (!telemetrySettings.IsActive)
-    {
-        Log.Warning(
-            "Telemetry is INACTIVE. Reasons: Enabled={Enabled}, ApiKeyIsPlaceholder={IsPlaceholder}, ApiKeyEmpty={IsEmpty}, HostEmpty={HostEmpty}",
-            telemetrySettings.Enabled,
-            !string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey) &&
-            telemetrySettings.PostHogApiKey.StartsWith("##", StringComparison.Ordinal),
-            string.IsNullOrWhiteSpace(telemetrySettings.PostHogApiKey),
-            string.IsNullOrWhiteSpace(telemetrySettings.PostHogHost));
         Log.Information("To enable telemetry, set AXORITH_TELEMETRY_API_KEY environment variable");
-    }
     builder.Host.UseSerilog((context, _, configuration) =>
     {
         var logsPath = context.Configuration.GetValue<string>("Persistence:LogsPath");
@@ -230,12 +206,11 @@ try
 
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
-    builder.Services.AddSingleton(_ => telemetry ?? new NoopTelemetryService());
-    builder.Services.AddSingleton<IUserRegistrationService, UserRegistrationService>();
+    builder.Services.AddSingleton(_ => telemetry ?? NoopTelemetryService.Instance);
+    builder.Services.AddSingleton<UserRegistrationService>();
     builder.Services.AddSingleton<UpdateService>();
     builder.Services.Configure<Configuration>(builder.Configuration);
 
-    // Determine actual port to use (check if configured port is available)
     var config = builder.Configuration.Get<Configuration>() ?? new Configuration();
     hostInfoPath = config.Persistence.ResolveHostInfoPath();
     var bindAddress = IPAddress.Parse(config.Grpc.BindAddress);
@@ -262,9 +237,10 @@ try
 
     builder.Services.AddSingleton(sp =>
         PlatformServices.CreateFilePermissionsService(sp.GetRequiredService<ILoggerFactory>()));
-    builder.Services.AddSingleton<IHostAuthenticationService, HostAuthenticationService>();
+    builder.Services.AddSingleton<HostAuthenticationService>();
 
-    builder.Services.AddHostedService<NativeMessagingRegistrar>();
+    if (!isTestRun)
+        builder.Services.AddHostedService<NativeMessagingRegistrar>();
 
     builder.Services.AddGrpc(options =>
     {
@@ -272,6 +248,7 @@ try
         options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 
         options.Interceptors.Add<AuthenticationInterceptor>();
+        options.Interceptors.Add<GrpcExceptionInterceptor>();
     });
 
     builder.Services.AddHttpClient("default");
@@ -294,7 +271,7 @@ try
 
     try
     {
-        var authService = app.Services.GetRequiredService<IHostAuthenticationService>();
+        var authService = app.Services.GetRequiredService<HostAuthenticationService>();
         authService.InitializeToken();
     }
     catch (Exception ex)
@@ -303,12 +280,11 @@ try
         return 1;
     }
 
-    // Initialize user registration (for future licensing)
     _ = Task.Run(async () =>
     {
         try
         {
-            var registrationService = app.Services.GetRequiredService<IUserRegistrationService>();
+            var registrationService = app.Services.GetRequiredService<UserRegistrationService>();
             var registration = await registrationService.GetOrCreateAsync(app.Lifetime.ApplicationStopping)
                 .ConfigureAwait(false);
 
@@ -336,7 +312,6 @@ try
         }
         catch (OperationCanceledException)
         {
-            // shutting down
         }
         catch (Exception initEx)
         {
@@ -381,12 +356,11 @@ try
         await sessionManager.RecoverCommittedSessionAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
         var recoveredSession = app.Services.GetRequiredService<ISessionManager>();
         var commitmentProtection = app.Services.GetRequiredService<ICommitmentProtectionService>();
-        var strictSessionActive = recoveredSession.ActiveSession?.FocusCommitment.Mode == FocusCommitmentMode.Strict;
+        var strictSessionActive = recoveredSession.ActiveSession?.FocusCommitment.IsStrict == true;
         await commitmentProtection.ReconcileAsync(strictSessionActive,
             app.Lifetime.ApplicationStopping).ConfigureAwait(false);
         await commitmentProtection.SetRecoveryStartupAsync(
-            recoveredSession.ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
-                FocusCommitmentMode.Strict,
+            recoveredSession.ActiveSession?.FocusCommitment.IsCommitted == true,
             app.Lifetime.ApplicationStopping).ConfigureAwait(false);
     }
     catch (Exception ex)
@@ -476,12 +450,11 @@ try
         config.Grpc.BindAddress,
         boundPort > 0 ? boundPort : "Unknown");
 
-    // Log telemetry status after Serilog is fully configured
     Log.Information(
         "Telemetry status: enabled={Enabled}, active={Active}, isEnabled={IsEnabled}",
-        telemetry!.IsEnabled,
-        telemetry.IsEnabled,
-        telemetry.IsEnabled);
+        telemetrySettings.Enabled,
+        telemetrySettings.IsActive,
+        telemetry!.IsEnabled);
 
     await app.WaitForShutdownAsync();
 
@@ -522,58 +495,14 @@ finally
     Log.Information("Host instance mutex will be released on disposal");
 }
 
-static void RegisterGlobalExceptionHandlers(ITelemetryService? telemetry)
-{
-    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-    {
-        var exception = e.ExceptionObject as Exception;
-        if (e.IsTerminating)
-        {
-            Log.Fatal(exception, "Unhandled exception in AppDomain (terminating)");
-            if (exception is not null)
-            {
-                telemetry?.TrackError(exception, "host", "startup", "fatal", handled: false, fatal: true);
-            }
-            try
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                Task.Run(() => telemetry?.FlushAsync(cts.Token), cts.Token).GetAwaiter().GetResult();
-            }
-            catch
-            {
-                // Ignore flush errors during crash - we're terminating anyway
-            }
-        }
-        else
-        {
-            Log.Error(exception, "Unhandled exception in AppDomain (non-terminating)");
-            if (exception is not null)
-            {
-                telemetry?.TrackError(exception, "host", "unknown", "error", handled: false, fatal: false);
-            }
-        }
-    };
-
-    TaskScheduler.UnobservedTaskException += (_, e) =>
-    {
-        Log.Error(e.Exception, "Unobserved task exception");
-        e.SetObserved();
-        telemetry?.TrackError(e.Exception, "host", "unknown", "warning", handled: true, fatal: false);
-    };
-}
-
 static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitmentState)
 {
-    builder.Register(ctx =>
-        {
-            var loggerFactory = ctx.Resolve<ILoggerFactory>();
-            return PlatformServices.CreateWindowService();
-        })
+    builder.Register(_ => PlatformServices.CreateWindowService())
         .As<IPlatformWindowService>()
         .SingleInstance()
         .PreserveExistingDefaults();
 
-    builder.Register(ctx => { return PlatformServices.CreateProcessService(); })
+    builder.Register(_ => PlatformServices.CreateProcessService())
         .As<IPlatformProcessService>()
         .SingleInstance()
         .PreserveExistingDefaults();
@@ -741,7 +670,6 @@ static void RegisterBroadcasters(ContainerBuilder builder)
         .PreserveExistingDefaults();
 
     builder.RegisterType<DesignTimeSandboxManager>()
-        .As<IDesignTimeSandboxManager>()
         .AsSelf()
         .SingleInstance()
         .PreserveExistingDefaults();

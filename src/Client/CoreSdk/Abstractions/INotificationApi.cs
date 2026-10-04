@@ -1,4 +1,4 @@
-﻿using Axorith.Sdk.Services;
+using Axorith.Sdk.Services;
 
 namespace Axorith.Client.CoreSdk.Abstractions;
 

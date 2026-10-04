@@ -7,72 +7,32 @@ using Axorith.Shared.Platform;
 
 namespace Axorith.Shared.ApplicationLauncher;
 
-/// <summary>
-///     Base class for launcher application services.
-///     Provides complete lifecycle management for launching applications and configuring windows.
-///     Derived classes must provide Settings and can override extension points for customization.
-/// </summary>
 public abstract class LauncherAppBase(
     IModuleLogger logger,
     IPlatformProcessService processService,
     IPlatformWindowService windowService) : IDisposable
 {
-    /// <summary>
-    ///     Logger instance for the application service.
-    /// </summary>
     protected IModuleLogger Logger { get; } = logger;
 
-    /// <summary>
-    ///     Service for process management (start, attach, terminate).
-    /// </summary>
     protected ProcessService ProcessService { get; } = new(logger, processService);
 
-    /// <summary>
-    ///     Service for window configuration (size, position, state).
-    /// </summary>
     protected WindowService WindowService { get; } = new(logger, windowService);
 
-    /// <summary>
-    ///     Current process handle. Null if not started.
-    /// </summary>
     protected Process? CurrentProcess { get; private set; }
 
-    /// <summary>
-    ///     True if the process was attached from an existing instance rather than launched.
-    /// </summary>
     protected bool AttachedToExisting { get; private set; }
 
-    /// <summary>
-    ///     Settings instance for this application service. Must be implemented by derived classes.
-    /// </summary>
     protected abstract LauncherSettingsBase Settings { get; }
 
-    /// <inheritdoc />
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return Settings.GetAllSettings();
-    }
+    public IReadOnlyList<ISetting> GetSettings() => Settings.GetAllSettings();
 
-    /// <inheritdoc />
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return Settings.GetAllActions();
-    }
+    public IReadOnlyList<IAction> GetActions() => Settings.GetAllActions();
 
-    /// <inheritdoc />
-    public virtual Task InitializeAsync(CancellationToken cancellationToken)
-    {
-        return Settings.InitializeAsync();
-    }
+    public virtual Task InitializeAsync(CancellationToken cancellationToken) => Settings.InitializeAsync();
 
-    /// <inheritdoc />
-    public virtual Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
-    {
-        return Settings.ValidateAsync();
-    }
+    public virtual Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) => Settings.ValidateAsync();
 
 
-    /// <inheritdoc />
     public virtual async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
         var processConfig = BuildProcessConfig();
@@ -102,9 +62,14 @@ public abstract class LauncherAppBase(
         }
         catch (TimeoutException)
         {
-            var fallback = await ProcessService.AttachExistingOnlyAsync(
-                processConfig.ApplicationPath).ConfigureAwait(false);
+            if (!ReattachOnWindowTimeout)
+            {
+                Logger.LogWarning("Window did not appear in time. Skipping window configuration.");
+                return;
+            }
 
+            var fallback = await ProcessService.AttachExistingOnlyAsync(processConfig.ApplicationPath)
+                .ConfigureAwait(false);
             if (fallback == null)
             {
                 Logger.LogWarning("Window did not appear in time. Skipping window configuration.");
@@ -113,16 +78,16 @@ public abstract class LauncherAppBase(
 
             CurrentProcess = fallback;
             AttachedToExisting = true;
-
-            var windowConfig = BuildWindowConfig();
-            await WindowService.ConfigureWindowAsync(CurrentProcess, windowConfig, cancellationToken)
+            await WindowService.ConfigureWindowAsync(CurrentProcess, BuildWindowConfig(), cancellationToken)
                 .ConfigureAwait(false);
-
             await OnAfterWindowConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException) when (CurrentProcess.HasExited)
+        {
+            Logger.LogDebug("Process exited before window configuration completed");
         }
     }
 
-    /// <inheritdoc />
     public virtual async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
         if (CurrentProcess == null || CurrentProcess.HasExited)
@@ -132,7 +97,7 @@ public abstract class LauncherAppBase(
         }
 
         var lifecycleSetting = Settings.LifecycleMode.GetCurrentValue();
-        var lifecycle = ParseLifecycleMode(lifecycleSetting);
+        var lifecycle = LauncherConfiguration.ParseLifecycleMode(lifecycleSetting);
 
         Logger.LogInfo("Session ending. Lifecycle mode: {Mode}, Attached to existing: {Attached}",
             lifecycleSetting, AttachedToExisting);
@@ -140,7 +105,6 @@ public abstract class LauncherAppBase(
         await ProcessService.TerminateAsync(CurrentProcess, lifecycle, AttachedToExisting).ConfigureAwait(false);
     }
 
-    /// <inheritdoc />
     public virtual void Dispose()
     {
         var process = CurrentProcess;
@@ -164,128 +128,29 @@ public abstract class LauncherAppBase(
         {
             process?.Dispose();
             CurrentProcess = null;
+            Settings.Dispose();
         }
 
         GC.SuppressFinalize(this);
     }
 
 
-    /// <summary>
-    ///     Builds the process configuration. Override to customize process startup.
-    /// </summary>
-    protected virtual ProcessConfig BuildProcessConfig()
-    {
-        var appPath = Settings.ApplicationPath.GetCurrentValue();
-        var args = GetLaunchArguments();
-        var workingDir = GetWorkingDirectory();
+    protected virtual ProcessConfig BuildProcessConfig() =>
+        LauncherConfiguration.BuildProcess(Settings, GetLaunchArguments(), GetWorkingDirectory());
 
-        var startMode = Settings.ProcessMode.GetCurrentValue() switch
-        {
-            "AttachExisting" => ProcessStartMode.AttachExisting,
-            "LaunchOrAttach" => ProcessStartMode.LaunchOrAttach,
-            _ => ProcessStartMode.LaunchNew
-        };
+    protected virtual WindowConfig BuildWindowConfig() =>
+        LauncherConfiguration.BuildWindow(Settings, GetWindowConfigTimings());
 
-        var lifecycleMode = ParseLifecycleMode(Settings.LifecycleMode.GetCurrentValue());
+    protected virtual string GetLaunchArguments() => string.Empty;
 
-        return new ProcessConfig(appPath, args, startMode, lifecycleMode, workingDir);
-    }
+    protected virtual string? GetWorkingDirectory() => null;
 
-    /// <summary>
-    ///     Builds the window configuration. Override to customize window setup.
-    /// </summary>
-    protected virtual WindowConfig BuildWindowConfig()
-    {
-        var state = Settings.WindowState.GetCurrentValue();
-        var useCustomSize = Settings.UseCustomSize.GetCurrentValue();
-        int? width = null;
-        int? height = null;
+    protected virtual WindowConfigTimings GetWindowConfigTimings() => new();
 
-        if (useCustomSize && state == "Normal")
-        {
-            width = Settings.WindowWidth.GetCurrentValue();
-            height = Settings.WindowHeight.GetCurrentValue();
-        }
+    protected virtual bool ReattachOnWindowTimeout => true;
 
-        var moveToMonitor = Settings.MoveToMonitor.GetCurrentValue();
-        int? targetMonitorIndex = null;
+    protected virtual Task OnBeforeWindowConfigurationAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        if (moveToMonitor)
-        {
-            var monitorKey = Settings.TargetMonitor.GetCurrentValue();
-            if (!string.IsNullOrWhiteSpace(monitorKey) && int.TryParse(monitorKey, out var parsedIndex))
-            {
-                targetMonitorIndex = parsedIndex;
-            }
-        }
+    protected virtual Task OnAfterWindowConfigurationAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        var bringToForeground = Settings.BringToForeground.GetCurrentValue();
-        var timings = GetWindowConfigTimings();
-
-        return new WindowConfig(
-            state,
-            useCustomSize,
-            width,
-            height,
-            moveToMonitor,
-            targetMonitorIndex,
-            bringToForeground,
-            timings.WaitForWindowTimeoutMs,
-            timings.MoveDelayMs,
-            timings.MaximizeSnapDelayMs,
-            timings.FinalFocusDelayMs,
-            timings.BannerDelayMs);
-    }
-
-    /// <summary>
-    ///     Gets launch arguments for the process. Override to add custom arguments.
-    /// </summary>
-    protected virtual string GetLaunchArguments()
-    {
-        return string.Empty;
-    }
-
-    /// <summary>
-    ///     Gets working directory for the process. Override to customize.
-    ///     Returns null to use default (executable's directory).
-    /// </summary>
-    protected virtual string? GetWorkingDirectory()
-    {
-        return null;
-    }
-
-    /// <summary>
-    ///     Gets timing configuration for window setup. Override for slow-starting applications.
-    /// </summary>
-    protected virtual WindowConfigTimings GetWindowConfigTimings()
-    {
-        return new WindowConfigTimings();
-    }
-
-    /// <summary>
-    ///     Called before window configuration. Override for pre-configuration logic (e.g., splash screen waiting).
-    /// </summary>
-    protected virtual Task OnBeforeWindowConfigurationAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    ///     Called after window configuration. Override for post-configuration logic.
-    /// </summary>
-    protected virtual Task OnAfterWindowConfigurationAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
-    private static ProcessLifecycleMode ParseLifecycleMode(string setting)
-    {
-        return setting switch
-        {
-            "KeepRunning" => ProcessLifecycleMode.KeepRunning,
-            "TerminateForce" => ProcessLifecycleMode.TerminateForce,
-            "TerminateOnEnd" => ProcessLifecycleMode.TerminateForce, // Backward compatibility
-            _ => ProcessLifecycleMode.TerminateGraceful
-        };
-    }
 }

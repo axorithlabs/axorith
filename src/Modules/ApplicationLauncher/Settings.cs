@@ -20,7 +20,7 @@ internal sealed class Settings : LauncherSettingsBase
     };
 
     private readonly IAppDiscoveryService _appDiscovery;
-    private readonly IReadOnlyDictionary<string, ILauncherApp> _modules;
+    private readonly IReadOnlyDictionary<string, LauncherAppBase> _modules;
     private readonly ConcurrentDictionary<string, Task> _moduleInitialization = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ISetting> _modulePaths = new(StringComparer.Ordinal);
     private readonly List<(string Module, SelectedAppSetting Setting)> _moduleSettings = [];
@@ -35,7 +35,7 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<bool> UseCustomWorkingDirectory { get; }
     public Setting<string> WorkingDirectory { get; }
 
-    public Settings(IAppDiscoveryService appDiscovery, IReadOnlyDictionary<string, ILauncherApp> modules)
+    public Settings(IAppDiscoveryService appDiscovery, IReadOnlyDictionary<string, LauncherAppBase> modules)
     {
         _appDiscovery = appDiscovery;
         _modules = modules;
@@ -69,7 +69,7 @@ internal sealed class Settings : LauncherSettingsBase
 
             foreach (var action in module.GetActions())
             {
-                var proxy = Action.Create($"{moduleKey}.{action.Key}", action.GetCurrentLabel(),
+                var proxy = new Action($"{moduleKey}.{action.Key}", action.GetCurrentLabel(),
                     action.GetCurrentEnabled() && _selectedModule == moduleKey, action.SettingKey);
                 proxy.OnInvokeAsync(action.InvokeAsync);
                 _subscriptions.Add(action.Label.Subscribe(proxy.SetLabel));
@@ -89,27 +89,19 @@ internal sealed class Settings : LauncherSettingsBase
         UpdateModuleVisibility(ApplicationPath.GetCurrentValue());
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings()
-    {
-        yield return CustomPath;
-        yield return ApplicationArgs;
-        yield return ProjectPath;
-        yield return UseCustomWorkingDirectory;
-        yield return WorkingDirectory;
-        foreach (var (_, setting) in _moduleSettings)
-            yield return setting;
-    }
+    protected override IEnumerable<ISetting> GetAdditionalSettings() =>
+        [CustomPath, ApplicationArgs, ProjectPath, UseCustomWorkingDirectory, WorkingDirectory,
+            .. _moduleSettings.Select(entry => entry.Setting)];
 
     protected override IEnumerable<IAction> GetAdditionalActions() => _moduleActions;
 
-    protected override async Task InitializeAdditionalAsync()
+    protected override Task InitializeAdditionalAsync()
     {
         var choices = ApplicationSelector.GetInstalledChoices(
-            _appDiscovery,
-            app => app.ExecutablePath,
-            ApplicationSelector.IsSupportedLauncherApp);
-        choices.Add(new KeyValuePair<string, string>(CustomApp, "Custom App"));
+            _appDiscovery, app => app.ExecutablePath, ApplicationSelector.IsSupportedLauncherApp);
+        choices.Add(new(CustomApp, "Custom App"));
         ApplicationPath.SetChoices(choices);
+        return Task.CompletedTask;
     }
 
     public Task EnsureModuleInitializedAsync(string moduleKey, CancellationToken cancellationToken = default)
@@ -201,16 +193,6 @@ internal sealed class Settings : LauncherSettingsBase
     {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
-        foreach (var (_, setting) in _moduleSettings)
-            setting.Dispose();
-        foreach (var action in _moduleActions)
-            action.Dispose();
-
-        CustomPath.Dispose();
-        ApplicationArgs.Dispose();
-        ProjectPath.Dispose();
-        UseCustomWorkingDirectory.Dispose();
-        WorkingDirectory.Dispose();
         base.Dispose();
     }
 }

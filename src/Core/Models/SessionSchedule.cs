@@ -1,4 +1,4 @@
-﻿namespace Axorith.Core.Models;
+namespace Axorith.Core.Models;
 
 public enum ScheduleType
 {
@@ -20,21 +20,10 @@ public class SessionSchedule
     public List<DayOfWeek> DaysOfWeek { get; set; } = [];
     public DateTimeOffset? LastRun { get; set; }
 
-    /// <summary>
-    ///     Duration after which the session should automatically stop.
-    ///     Null means no auto-stop.
-    /// </summary>
     public TimeSpan? AutoStopDuration { get; set; }
 
-    /// <summary>
-    ///     ID of the preset to automatically start after the current session ends.
-    ///     Null means just stop the session without starting another one.
-    /// </summary>
     public Guid? NextPresetId { get; set; }
 
-    /// <summary>
-    ///     Whether to display time in 24-hour format (true) or 12-hour AM/PM format (false).
-    /// </summary>
     public bool Use24HourFormat { get; set; } = true;
 
     public DateTimeOffset? GetNextRun(DateTimeOffset now)

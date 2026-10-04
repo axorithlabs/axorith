@@ -2,7 +2,6 @@ using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Telemetry;
-using Axorith.Host.Mappers;
 using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
@@ -11,14 +10,10 @@ using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 
 namespace Axorith.Host.Services;
 
-/// <summary>
-///     gRPC service implementation for preset management.
-///     Wraps Core IPresetManager and translates between protobuf and Core models.
-/// </summary>
 public class PresetsServiceImpl(
     IPresetManager presetManager,
     IScheduleManager scheduleManager,
-    IDesignTimeSandboxManager sandboxManager,
+    DesignTimeSandboxManager sandboxManager,
     IModuleRegistry moduleRegistry,
     ISessionManager sessionManager,
     ILogger<PresetsServiceImpl> logger,
@@ -26,236 +21,156 @@ public class PresetsServiceImpl(
     ISecureStorageService? secureStorage = null)
     : PresetsService.PresetsServiceBase
 {
-    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
+    private readonly ITelemetryService _telemetry = telemetry ?? NoopTelemetryService.Instance;
     private readonly ISecureStorageService? _secureStorage = secureStorage;
 
-    /// <summary>
-    ///     Retrieves all session presets from persistent storage.
-    /// </summary>
-    /// <param name="request">Request with optional search filter for preset names.</param>
-    /// <param name="context">Server call context with cancellation token.</param>
-    /// <returns>List of preset summaries with ID, name, and module count.</returns>
     public override async Task<ListPresetsResponse> ListPresets(ListPresetsRequest request, ServerCallContext context)
     {
-        try
+        var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
+            .ConfigureAwait(false);
+
+        var filteredPresets = presets;
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
-                .ConfigureAwait(false);
-
-            var filteredPresets = presets;
-            if (!string.IsNullOrWhiteSpace(request.Search))
-            {
-                var term = request.Search.Trim();
-                filteredPresets = presets
-                    .Where(p => !string.IsNullOrEmpty(p.Name) &&
-                                p.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
-            var response = new ListPresetsResponse();
-            response.Presets.AddRange(filteredPresets.Select(PresetMapper.ToSummary));
-
-            logger.LogInformation("Returned {Count} presets (filter: {Filter})",
-                filteredPresets.Count,
-                string.IsNullOrWhiteSpace(request.Search) ? "<none>" : request.Search);
-            return response;
+            var term = request.Search.Trim();
+            filteredPresets = presets
+                .Where(p => !string.IsNullOrEmpty(p.Name) &&
+                            p.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                .ToList();
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error listing presets");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to list presets", ex));
-        }
+
+        var response = new ListPresetsResponse();
+        response.Presets.AddRange(filteredPresets.Select(PresetCodec.ToSummary));
+
+        logger.LogInformation("Returned {Count} presets (filter: {Filter})",
+            filteredPresets.Count,
+            string.IsNullOrWhiteSpace(request.Search) ? "<none>" : request.Search);
+        return response;
     }
 
     public override async Task<Preset> GetPreset(GetPresetRequest request, ServerCallContext context)
     {
-        try
+        if (!Guid.TryParse(request.PresetId, out var presetId))
         {
-            if (!Guid.TryParse(request.PresetId, out var presetId))
-            {
-                throw new RpcException(new Status(StatusCode.InvalidArgument,
-                    $"Invalid preset ID: {request.PresetId}"));
-            }
-
-            logger.LogDebug("GetPreset called for {PresetId}", presetId);
-
-            var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
-                .ConfigureAwait(false);
-
-            var preset = presets.FirstOrDefault(p => p.Id == presetId) ?? throw new RpcException(new Status(
-                StatusCode.NotFound,
-                $"Preset not found: {presetId}"));
-            var message = PresetMapper.ToMessage(preset);
-            logger.LogInformation("Returned preset: {PresetName}", preset.Name);
-            return message;
+            throw new RpcException(new Status(StatusCode.InvalidArgument,
+                $"Invalid preset ID: {request.PresetId}"));
         }
-        catch (RpcException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error getting preset {PresetId}", request.PresetId);
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to get preset", ex));
-        }
+
+        logger.LogDebug("GetPreset called for {PresetId}", presetId);
+
+        var presets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
+            .ConfigureAwait(false);
+
+        var preset = presets.FirstOrDefault(p => p.Id == presetId) ?? throw new RpcException(new Status(
+            StatusCode.NotFound,
+            $"Preset not found: {presetId}"));
+        var message = PresetCodec.ToMessage(preset);
+        logger.LogInformation("Returned preset: {PresetName}", preset.Name);
+        return message;
     }
 
     public override async Task<Preset> CreatePreset(CreatePresetRequest request, ServerCallContext context)
     {
-        try
+        if (request.Preset == null)
         {
-            if (request.Preset == null)
-            {
-                throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
-            }
-
-            logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
-
-            var preset = PresetMapper.ToModel(request.Preset);
-
-            var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
-                .ConfigureAwait(false) ?? [];
-
-            var nameConflict = existingPresets.FirstOrDefault(p =>
-                string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
-
-            if (nameConflict != null)
-            {
-                throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
-            }
-
-            if (preset.Id == Guid.Empty)
-            {
-                preset.Id = Guid.NewGuid();
-            }
-
-            foreach (var module in preset.Modules.Where(module => module.InstanceId == Guid.Empty))
-            {
-                module.InstanceId = Guid.NewGuid();
-            }
-
-            await presetManager.SavePresetAsync(preset, context.CancellationToken)
-                .ConfigureAwait(false);
-
-            sandboxManager.DisposeSandboxesForPreset(preset.Modules.Select(m => m.InstanceId));
-
-            var response = PresetMapper.ToMessage(preset);
-            logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
-            TrackPresetTelemetry("PresetCreated", preset, "create");
-            return response;
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
         }
-        catch (RpcException)
+
+        logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
+
+        var preset = PresetCodec.ToModel(request.Preset);
+        await EnsurePresetNameAvailableAsync(preset, allowSameId: false, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (preset.Id == Guid.Empty)
         {
-            throw;
+            preset.Id = Guid.NewGuid();
         }
-        catch (Exception ex)
+
+        foreach (var module in preset.Modules.Where(module => module.InstanceId == Guid.Empty))
         {
-            logger.LogError(ex, "Error creating preset");
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to create preset", ex));
+            module.InstanceId = Guid.NewGuid();
         }
+
+        await presetManager.SavePresetAsync(preset, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        sandboxManager.DisposeSandboxesForPreset(preset.Modules.Select(m => m.InstanceId));
+
+        var response = PresetCodec.ToMessage(preset);
+        logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
+        TrackPresetTelemetry("PresetCreated", preset, "create");
+        return response;
     }
 
     public override async Task<Preset> UpdatePreset(UpdatePresetRequest request, ServerCallContext context)
     {
-        try
+        if (request.Preset == null)
         {
-            if (request.Preset == null)
-            {
-                throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
-            }
-
-            if (!Guid.TryParse(request.Preset.Id, out var presetId) || presetId == Guid.Empty)
-            {
-                throw new RpcException(new Status(StatusCode.InvalidArgument,
-                    $"Invalid preset ID: {request.Preset.Id}"));
-            }
-
-            logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
-
-            await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
-
-            var preset = PresetMapper.ToModel(request.Preset);
-
-            var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
-                .ConfigureAwait(false) ?? [];
-
-            var nameConflict = existingPresets.FirstOrDefault(p =>
-                string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase) && p.Id != preset.Id);
-
-            if (nameConflict != null)
-            {
-                throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
-            }
-
-            await presetManager.SavePresetAsync(preset, context.CancellationToken)
-                .ConfigureAwait(false);
-
-            sandboxManager.DisposeSandboxesForPreset(preset.Modules.Select(m => m.InstanceId));
-
-            var response = PresetMapper.ToMessage(preset);
-            logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
-            TrackPresetTelemetry("PresetUpdated", preset, "update");
-            return response;
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
         }
-        catch (RpcException)
+
+        if (!Guid.TryParse(request.Preset.Id, out var presetId) || presetId == Guid.Empty)
         {
-            throw;
+            throw new RpcException(new Status(StatusCode.InvalidArgument,
+                $"Invalid preset ID: {request.Preset.Id}"));
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error updating preset {PresetId}", request.Preset?.Id);
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to update preset", ex));
-        }
+
+        logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
+
+        await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
+
+        var preset = PresetCodec.ToModel(request.Preset);
+        await EnsurePresetNameAvailableAsync(preset, allowSameId: true, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        await presetManager.SavePresetAsync(preset, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        sandboxManager.DisposeSandboxesForPreset(preset.Modules.Select(m => m.InstanceId));
+
+        var response = PresetCodec.ToMessage(preset);
+        logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
+        TrackPresetTelemetry("PresetUpdated", preset, "update");
+        return response;
     }
 
     public override async Task<Empty> DeletePreset(DeletePresetRequest request, ServerCallContext context)
     {
-        try
+        if (!Guid.TryParse(request.PresetId, out var presetId))
         {
-            if (!Guid.TryParse(request.PresetId, out var presetId))
+            throw new RpcException(new Status(StatusCode.InvalidArgument,
+                $"Invalid preset ID: {request.PresetId}"));
+        }
+
+        logger.LogDebug("DeletePreset called for {PresetId}", presetId);
+
+        await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
+        var presetExisted = _telemetry.IsEnabled &&
+                            await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+                                .ConfigureAwait(false) is not null;
+
+        await presetManager.DeletePresetAsync(presetId, context.CancellationToken)
+            .ConfigureAwait(false);
+
+        logger.LogInformation("Deleted preset: {PresetId}", presetId);
+        var wasDeleted = presetExisted &&
+                         await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+                             .ConfigureAwait(false) is null;
+        if (wasDeleted)
+        {
+            _telemetry.TrackEvent("PresetDeleted", new Dictionary<string, object?>
             {
-                throw new RpcException(new Status(StatusCode.InvalidArgument,
-                    $"Invalid preset ID: {request.PresetId}"));
-            }
-
-            logger.LogDebug("DeletePreset called for {PresetId}", presetId);
-
-            await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
-            var presetExisted = _telemetry.IsEnabled &&
-                                await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
-                                    .ConfigureAwait(false) is not null;
-
-            await presetManager.DeletePresetAsync(presetId, context.CancellationToken)
-                .ConfigureAwait(false);
-
-            logger.LogInformation("Deleted preset: {PresetId}", presetId);
-            var wasDeleted = presetExisted &&
-                             await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
-                                 .ConfigureAwait(false) is null;
-            if (wasDeleted)
-            {
-                _telemetry.TrackEvent("PresetDeleted", new Dictionary<string, object?>
-                {
-                    ["presetId"] = presetId.ToString()
-                });
-            }
-            return new Empty();
+                ["presetId"] = presetId.ToString()
+            });
         }
-        catch (RpcException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error deleting preset {PresetId}", request.PresetId);
-            throw new RpcException(new Status(StatusCode.Internal, "Failed to delete preset", ex));
-        }
+        return new Empty();
     }
 
     private async Task EnsurePresetMutableAsync(Guid presetId, CancellationToken cancellationToken)
     {
         var activeSession = sessionManager.ActiveSession;
-        if (activeSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict &&
+        if (activeSession?.FocusCommitment.IsCommitted == true &&
             activeSession.FocusCommitment.NextWorkspaceId == presetId)
         {
             throw new RpcException(new Status(StatusCode.FailedPrecondition,
@@ -273,6 +188,18 @@ public class PresetsServiceImpl(
             ? $"Session starts in {(int)Math.Ceiling(remaining.TotalMinutes)} min"
             : "Session starts now";
         throw new RpcException(new Status(StatusCode.FailedPrecondition, $"Configuration locked · {time}."));
+    }
+
+    private async Task EnsurePresetNameAvailableAsync(SessionPreset preset, bool allowSameId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await presetManager.LoadAllPresetsAsync(cancellationToken).ConfigureAwait(false) ?? [];
+        if (existing.Any(candidate =>
+                string.Equals(candidate.Name, preset.Name, StringComparison.OrdinalIgnoreCase) &&
+                (!allowSameId || candidate.Id != preset.Id)))
+        {
+            throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
+        }
     }
 
     private void TrackPresetTelemetry(string eventName, SessionPreset preset, string changeType)

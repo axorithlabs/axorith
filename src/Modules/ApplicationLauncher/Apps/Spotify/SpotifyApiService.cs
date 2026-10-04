@@ -1,26 +1,30 @@
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using Axorith.Sdk.Logging;
+using SpotifyAPI.Web;
+using SpotifyAPI.Web.Http;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.Spotify;
 
-/// <summary>
-///     Service for communicating with Spotify Web API.
-///     Handles authentication, retries, and rate limiting.
-/// </summary>
 internal sealed class SpotifyApiService(
     IHttpClientFactory httpClientFactory,
     AuthService authService,
     IModuleLogger logger)
 {
-    private readonly HttpClient _apiClient = httpClientFactory.CreateClient("Spotify.Api");
-
     private const int MaxRetries = 3;
-    private const int BaseDelayMs = 500;
-    private const int MaxJitterMs = 100;
+    private const int RetryDelayMs = 500;
     private const int VolumeMin = 0;
     private const int VolumeMax = 100;
+
+    private readonly NetHttpClient _httpClient = new(httpClientFactory.CreateClient("Spotify.Api"));
+    private readonly SimpleRetryHandler _retryHandler = new()
+    {
+        RetryTimes = MaxRetries,
+        RetryAfter = TimeSpan.FromMilliseconds(RetryDelayMs),
+        TooManyRequestsConsumesARetry = true,
+        RetryErrorCodes = [HttpStatusCode.InternalServerError, HttpStatusCode.BadGateway,
+            HttpStatusCode.ServiceUnavailable, HttpStatusCode.GatewayTimeout]
+    };
 
     private async Task<string?> GetAccessTokenForRequestAsync()
     {
@@ -34,222 +38,111 @@ internal sealed class SpotifyApiService(
         return null;
     }
 
-    private static TimeSpan GetRetryDelay(int attempt)
+    private async Task<T?> ExecuteAsync<T>(Func<SpotifyClient, Task<T>> operation)
     {
-        var baseDelay = Math.Pow(2, attempt) * BaseDelayMs;
-        var jitter = Random.Shared.Next(0, MaxJitterMs);
-        return TimeSpan.FromMilliseconds(baseDelay + jitter);
-    }
-
-    private async Task<T?> ExecuteWithRetryAsync<T>(Func<string, Task<T>> operation, string operationName)
-        where T : class
-    {
-        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        var token = await GetAccessTokenForRequestAsync().ConfigureAwait(false);
+        if (token is null)
         {
-            var token = await GetAccessTokenForRequestAsync();
-            if (token == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                return await operation(token);
-            }
-            catch (HttpRequestException ex) when (attempt < MaxRetries)
-            {
-                var statusCode = ex.StatusCode;
-
-                if (statusCode == HttpStatusCode.TooManyRequests ||
-                    (statusCode.HasValue && (int)statusCode >= 500))
-                {
-                    var delay = GetRetryDelay(attempt);
-                    logger.LogWarning(
-                        "Spotify API {Operation} failed with {StatusCode}, retrying in {Delay}ms (attempt {Attempt}/{MaxRetries})",
-                        operationName, statusCode, delay.TotalMilliseconds, attempt + 1, MaxRetries);
-                    await Task.Delay(delay);
-                    continue;
-                }
-
-                throw;
-            }
+            return default;
         }
 
-        return null;
+        var config = SpotifyClientConfig.CreateDefault(token)
+            .WithHTTPClient(_httpClient)
+            .WithRetryHandler(_retryHandler);
+        return await operation(new SpotifyClient(config)).ConfigureAwait(false);
     }
 
     public async Task<List<SpotifyDevice>> GetDevicesAsync()
     {
-        var result = await ExecuteWithRetryAsync(async token =>
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/player/devices");
-            request.Headers.Add("Authorization", $"Bearer {token}");
-
-            using var response = await _apiClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-
-            return jsonDoc.RootElement.GetProperty("devices").EnumerateArray().Select(element =>
-                new SpotifyDevice(element.GetProperty("id").GetString() ?? string.Empty,
-                    element.GetProperty("name").GetString() ?? "Unknown Device",
-                    element.GetProperty("type").GetString() ?? "Unknown",
-                    element.GetProperty("is_active").GetBoolean())).ToList();
-        }, "GetDevices");
-
-        return result ?? [];
+        var response = await ExecuteAsync(client => client.Player.GetAvailableDevices()).ConfigureAwait(false);
+        return response?.Devices.Select(device => new SpotifyDevice(
+            device.Id,
+            device.Name,
+            device.Type,
+            device.IsActive)).ToList() ?? [];
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
     {
-        var result = await ExecuteWithRetryAsync(async token =>
-        {
-            using var request =
-                new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/playlists?limit=50");
-            request.Headers.Add("Authorization", $"Bearer {token}");
-
-            using var response = await _apiClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-
-            if (!jsonDoc.RootElement.TryGetProperty("items", out var itemsElement))
-            {
-                return new List<KeyValuePair<string, string>>();
-            }
-
-            return
-            [
-                .. itemsElement.EnumerateArray()
-                    .Select(p => new KeyValuePair<string, string>(
-                        p.GetProperty("uri").GetString() ?? string.Empty,
-                        $"{p.GetProperty("name").GetString() ?? "Unknown"} (Playlist)"))
-            ];
-        }, "GetPlaylists");
-
-        return result ?? [];
+        var response = await ExecuteAsync(client => client.Playlists.CurrentUsers(
+            new PlaylistCurrentUsersRequest { Limit = 50 })).ConfigureAwait(false);
+        return response?.Items?.Select(playlist => KeyValuePair.Create(
+            playlist.Uri ?? string.Empty,
+            $"{playlist.Name ?? "Unknown"} (Playlist)")).ToList() ?? [];
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetSavedAlbumsAsync()
     {
-        var result = await ExecuteWithRetryAsync<List<KeyValuePair<string, string>>>(async token =>
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/albums?limit=50");
-            request.Headers.Add("Authorization", $"Bearer {token}");
-
-            using var response = await _apiClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-
-            return
-            [
-                .. jsonDoc.RootElement.GetProperty("items").EnumerateArray()
-                    .Select(a => new KeyValuePair<string, string>(
-                        a.GetProperty("album").GetProperty("uri").GetString() ?? string.Empty,
-                        $"{a.GetProperty("album").GetProperty("name").GetString()} (Album)"))
-            ];
-        }, "GetSavedAlbums");
-
-        return result ?? [];
+        var response = await ExecuteAsync(client => client.Library.GetAlbums(
+            new LibraryAlbumsRequest { Limit = 50 })).ConfigureAwait(false);
+        return response?.Items?.Select(saved => KeyValuePair.Create(
+            saved.Album.Uri ?? string.Empty,
+            $"{saved.Album.Name ?? "Unknown"} (Album)")).ToList() ?? [];
     }
 
     public async Task<string> GetLikedSongsAsUriListAsync()
     {
-        var result = await ExecuteWithRetryAsync(async token =>
+        var response = await ExecuteAsync(client => client.Library.GetTracks(
+            new LibraryTracksRequest { Limit = 50 })).ConfigureAwait(false);
+        if (response is null)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.spotify.com/v1/me/tracks?limit=50");
-            request.Headers.Add("Authorization", $"Bearer {token}");
+            return string.Empty;
+        }
 
-            using var response = await _apiClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            using var jsonDoc = JsonDocument.Parse(responseJson);
-
-            var tracks = jsonDoc.RootElement.GetProperty("items").EnumerateArray().Select(t => t.GetProperty("track"));
-            return JsonSerializer.Serialize(new { uris = tracks.Select(t => t.GetProperty("uri").GetString()) });
-        }, "GetLikedSongs");
-
-        return result ?? string.Empty;
+        var uris = response.Items?.Select(saved => saved.Track.Uri).ToList() ?? [];
+        return JsonSerializer.Serialize(new { uris });
     }
 
     public async Task PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
     {
-        var jsonContent = trackUris != null
-            ? JsonSerializer.Serialize(new { uris = trackUris })
-            : JsonSerializer.Serialize(new { context_uri = contextUri });
+        var request = new PlayerResumePlaybackRequest { DeviceId = deviceId };
+        if (trackUris is null)
+        {
+            request.ContextUri = contextUri;
+        }
+        else
+        {
+            request.Uris = trackUris.ToList();
+        }
 
-        await PutWithTokenAsync($"https://api.spotify.com/v1/me/player/play?device_id={deviceId}", jsonContent);
+        await ExecuteAsync(client => client.Player.ResumePlayback(request)).ConfigureAwait(false);
     }
 
     public async Task PauseAsync()
     {
         try
         {
-            await PutWithTokenAsync("https://api.spotify.com/v1/me/player/pause");
+            await ExecuteAsync(client => client.Player.PausePlayback()).ConfigureAwait(false);
         }
-        catch (HttpRequestException ex)
+        catch (APIException ex) when (ex.Response?.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
         {
-            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
-            {
-                logger.LogDebug("Pause request ignored: Spotify reported no active playback or device.");
-            }
-            else
-            {
-                throw;
-            }
+            logger.LogDebug("Pause request ignored: Spotify reported no active playback or device.");
         }
     }
 
     public async Task SetVolumeAsync(string deviceId, int volume)
     {
-        volume = Math.Clamp(volume, VolumeMin, VolumeMax);
-        await PutWithTokenAsync(
-            $"https://api.spotify.com/v1/me/player/volume?volume_percent={volume}&device_id={deviceId}");
+        var request = new PlayerVolumeRequest(Math.Clamp(volume, VolumeMin, VolumeMax)) { DeviceId = deviceId };
+        await ExecuteAsync(client => client.Player.SetVolume(request)).ConfigureAwait(false);
     }
 
     public async Task SetShuffleAsync(string deviceId, bool shuffle)
     {
-        await PutWithTokenAsync(
-            $"https://api.spotify.com/v1/me/player/shuffle?state={shuffle.ToString().ToLowerInvariant()}&device_id={deviceId}");
+        var request = new PlayerShuffleRequest(shuffle) { DeviceId = deviceId };
+        await ExecuteAsync(client => client.Player.SetShuffle(request)).ConfigureAwait(false);
     }
 
     public async Task SetRepeatModeAsync(string deviceId, string repeatMode)
     {
-        await PutWithTokenAsync(
-            $"https://api.spotify.com/v1/me/player/repeat?state={repeatMode}&device_id={deviceId}");
-    }
-
-    private async Task PutWithTokenAsync(string uri, string? jsonContent = null)
-    {
-        var token = await GetAccessTokenForRequestAsync();
-        if (token == null)
+        var state = repeatMode.ToLowerInvariant() switch
         {
-            return;
-        }
-
-        using var request = new HttpRequestMessage(HttpMethod.Put, uri);
-        request.Headers.Add("Authorization", $"Bearer {token}");
-
-        if (jsonContent != null)
-        {
-            request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-        }
-
-        using var response = await _apiClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+            "track" => PlayerSetRepeatRequest.State.Track,
+            "context" => PlayerSetRepeatRequest.State.Context,
+            _ => PlayerSetRepeatRequest.State.Off
+        };
+        var request = new PlayerSetRepeatRequest(state) { DeviceId = deviceId };
+        await ExecuteAsync(client => client.Player.SetRepeat(request)).ConfigureAwait(false);
     }
 }
 
-/// <summary>
-///     Represents a Spotify playback device.
-/// </summary>
-/// <param name="Id">Unique device identifier.</param>
-/// <param name="Name">Human-readable device name.</param>
-/// <param name="Type">Device type (Computer, Smartphone, Speaker, etc.).</param>
-/// <param name="IsActive">Whether this device is currently active.</param>
 public record SpotifyDevice(string Id, string Name, string Type, bool IsActive);

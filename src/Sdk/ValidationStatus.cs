@@ -1,4 +1,4 @@
-﻿namespace Axorith.Sdk;
+namespace Axorith.Sdk;
 
 /// <summary>
 ///     Represents the severity of a validation result.

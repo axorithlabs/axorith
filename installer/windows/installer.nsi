@@ -441,38 +441,29 @@ Function CheckDotNetAspNetRuntime
     done_aspnet:
 FunctionEnd
 
-Function InstallDotNetDesktopRuntime
-    DetailPrint "Downloading .NET Desktop Runtime ${DOTNET_DESKTOP_RUNTIME_VERSION}..."
+!macro InstallDotNetRuntime RuntimeName RuntimeVersion RuntimeUrl InstallerFile
+    DetailPrint "Downloading ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_download"
     SetOutPath "$TEMP"
-    inetc::get /SILENT "${DOTNET_DESKTOP_RUNTIME_URL}" "$TEMP\dotnet-desktop-runtime.exe" /END
+    inetc::get /SILENT "${RuntimeUrl}" "$TEMP\${InstallerFile}" /END
     Pop $0
     StrCmp $0 "OK" +3
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download .NET Desktop Runtime. Please install it manually from https://dotnet.microsoft.com/download"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download ${RuntimeName}. Please install it manually from https://dotnet.microsoft.com/download"
     Return
-    DetailPrint "Installing .NET Desktop Runtime ${DOTNET_DESKTOP_RUNTIME_VERSION}..."
+    DetailPrint "Installing ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_install"
-    ExecWait '"$TEMP\dotnet-desktop-runtime.exe" /install /quiet /norestart' $0
+    ExecWait '"$TEMP\${InstallerFile}" /install /quiet /norestart' $0
     IntCmp $0 0 +2
-    ExecWait '"$TEMP\dotnet-desktop-runtime.exe" /install /passive /norestart' $0
-    Delete "$TEMP\dotnet-desktop-runtime.exe"
+    ExecWait '"$TEMP\${InstallerFile}" /install /passive /norestart' $0
+    Delete "$TEMP\${InstallerFile}"
+!macroend
+
+Function InstallDotNetDesktopRuntime
+    !insertmacro InstallDotNetRuntime ".NET Desktop Runtime" "${DOTNET_DESKTOP_RUNTIME_VERSION}" "${DOTNET_DESKTOP_RUNTIME_URL}" "dotnet-desktop-runtime.exe"
 FunctionEnd
 
 Function InstallDotNetAspNetRuntime
-    DetailPrint "Downloading ASP.NET Core Runtime ${DOTNET_ASPNET_RUNTIME_VERSION}..."
-    StrCpy $TelemetryFailureStage "prerequisite_download"
-    SetOutPath "$TEMP"
-    inetc::get /SILENT "${DOTNET_ASPNET_RUNTIME_URL}" "$TEMP\aspnetcore-runtime.exe" /END
-    Pop $0
-    StrCmp $0 "OK" +3
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download ASP.NET Core Runtime. Please install it manually from https://dotnet.microsoft.com/download"
-    Return
-    DetailPrint "Installing ASP.NET Core Runtime ${DOTNET_ASPNET_RUNTIME_VERSION}..."
-    StrCpy $TelemetryFailureStage "prerequisite_install"
-    ExecWait '"$TEMP\aspnetcore-runtime.exe" /install /quiet /norestart' $0
-    IntCmp $0 0 +2
-    ExecWait '"$TEMP\aspnetcore-runtime.exe" /install /passive /norestart' $0
-    Delete "$TEMP\aspnetcore-runtime.exe"
+    !insertmacro InstallDotNetRuntime "ASP.NET Core Runtime" "${DOTNET_ASPNET_RUNTIME_VERSION}" "${DOTNET_ASPNET_RUNTIME_URL}" "aspnetcore-runtime.exe"
 FunctionEnd
 
 Section "Prerequisites" SEC_PREREQ

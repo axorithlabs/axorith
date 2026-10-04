@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
@@ -175,20 +175,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 $"Auth token not found at {tokenPath}. Host failed to start or write token.");
         }
 
-        var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-        {
-            metadata.Add("x-axorith-auth-token", token);
-            return Task.CompletedTask;
-        });
-
-        var channelOptions = new GrpcChannelOptions
-        {
-            HttpClient = httpClient,
-            Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-            UnsafeUseInsecureChannelCallCredentials = true
-        };
-
-        var channel = GrpcChannel.ForAddress(httpClient.BaseAddress!, channelOptions);
+        var channel = TestGrpc.CreateAuthenticatedChannel(httpClient, token);
 
         return (
             new DiagnosticsService.DiagnosticsServiceClient(channel),
@@ -208,8 +195,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         {
             var response = await diagnostics.GetHealthAsync(new HealthCheckRequest());
 
-            response.Should().NotBeNull();
-            response.Status.Should().Be(HealthStatus.Healthy);
+                response.Status.Should().Be(HealthStatus.Healthy);
             response.Version.Should().NotBeNullOrEmpty();
             response.LoadedModules.Should().Be(2);
             response.ActiveSessions.Should().Be(0);
@@ -575,85 +561,16 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     }
 
     [WindowsFact]
-    public async Task OneTimeScheduleStartsItsPresetAtTheScheduledTime()
-    {
-        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
-        using (channel)
-        {
-            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
-            var preset = await CreateAppBlockerPresetAsync(presets, "OneTimeStart");
-            string? scheduleId = null;
-
-            try
-            {
-                var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
-                {
-                    Schedule = new Axorith.Contracts.Schedule
-                    {
-                        PresetId = preset.Id,
-                        Name = "Start in a few seconds",
-                        IsEnabled = true,
-                        Type = (int)ScheduleType.OneTime,
-                        OneTimeDate = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddSeconds(4))
-                    }
-                });
-                scheduleId = schedule.Id;
-
-                var state = await WaitForSessionStateAsync(sessions,
-                    value => value.IsActive && value.PresetId == preset.Id, TimeSpan.FromSeconds(10));
-                Assert.True(state.IsActive);
-                Assert.Equal(preset.Id, state.PresetId);
-            }
-            finally
-            {
-                await StopSessionForPresetIfRunningAsync(sessions, preset.Id);
-                if (scheduleId is not null)
-                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
-                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
-            }
-        }
-    }
+    public Task OneTimeScheduleStartsItsPresetAtTheScheduledTime() =>
+        AssertScheduleStartsPresetAsync("OneTimeStart", "Start in a few seconds", ScheduleType.OneTime,
+            schedule => schedule.OneTimeDate =
+                Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddSeconds(4)));
 
     [WindowsFact]
-    public async Task RecurringScheduleStartsItsPresetAtTheScheduledTime()
-    {
-        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
-        using (channel)
-        {
-            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
-            var preset = await CreateAppBlockerPresetAsync(presets, "RecurringStart");
-            string? scheduleId = null;
-
-            try
-            {
-                var runAt = DateTimeOffset.Now.AddSeconds(5).TimeOfDay;
-                var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
-                {
-                    Schedule = new Axorith.Contracts.Schedule
-                    {
-                        PresetId = preset.Id,
-                        Name = "Start at recurring time",
-                        IsEnabled = true,
-                        Type = (int)ScheduleType.Recurring,
-                        RecurringTime = runAt.ToString("c", System.Globalization.CultureInfo.InvariantCulture)
-                    }
-                });
-                scheduleId = schedule.Id;
-
-                var state = await WaitForSessionStateAsync(sessions,
-                    value => value.IsActive && value.PresetId == preset.Id, TimeSpan.FromSeconds(10));
-                Assert.True(state.IsActive);
-                Assert.Equal(preset.Id, state.PresetId);
-            }
-            finally
-            {
-                await StopSessionForPresetIfRunningAsync(sessions, preset.Id);
-                if (scheduleId is not null)
-                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
-                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
-            }
-        }
-    }
+    public Task RecurringScheduleStartsItsPresetAtTheScheduledTime() =>
+        AssertScheduleStartsPresetAsync("RecurringStart", "Start at recurring time", ScheduleType.Recurring,
+            schedule => schedule.RecurringTime = DateTimeOffset.Now.AddSeconds(5).TimeOfDay
+                .ToString("c", System.Globalization.CultureInfo.InvariantCulture));
 
     [WindowsFact]
     public async Task StopRecurringScheduleEndsItsActivePresetAtTheScheduledTime()
@@ -673,17 +590,9 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 started = true;
 
                 var runAt = DateTimeOffset.Now.AddSeconds(5).TimeOfDay;
-                var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
-                {
-                    Schedule = new Axorith.Contracts.Schedule
-                    {
-                        PresetId = preset.Id,
-                        Name = "Stop at recurring time",
-                        IsEnabled = true,
-                        Type = (int)ScheduleType.StopRecurring,
-                        RecurringTime = runAt.ToString("c", System.Globalization.CultureInfo.InvariantCulture)
-                    }
-                });
+                var schedule = await CreateScheduleAsync(scheduler, preset.Id, "Stop at recurring time",
+                    ScheduleType.StopRecurring, schedule =>
+                        schedule.RecurringTime = runAt.ToString("c", System.Globalization.CultureInfo.InvariantCulture));
                 scheduleId = schedule.Id;
 
                 var state = await WaitForSessionStateAsync(sessions, value => !value.IsActive,
@@ -722,17 +631,8 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             {
                 Preset = new Preset { Name = $"AutoStop-{Guid.NewGuid():N}", Modules = { module } }
             });
-            var schedule = await scheduler.CreateScheduleAsync(new CreateScheduleRequest
-            {
-                Schedule = new Axorith.Contracts.Schedule
-                {
-                    PresetId = preset.Id,
-                    Name = "Stop after two seconds",
-                    IsEnabled = true,
-                    Type = (int)Axorith.Core.Models.ScheduleType.StopDuration,
-                    AutoStopDurationSeconds = 2
-                }
-            });
+            var schedule = await CreateScheduleAsync(scheduler, preset.Id, "Stop after two seconds",
+                ScheduleType.StopDuration, value => value.AutoStopDurationSeconds = 2);
             Assert.True(schedule.IsEnabled);
             var started = false;
 
@@ -828,6 +728,51 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         return result;
     }
 
+    private async Task AssertScheduleStartsPresetAsync(string presetName, string scheduleName, ScheduleType type,
+        System.Action<Axorith.Contracts.Schedule> configure)
+    {
+        var (_, presets, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
+        using (channel)
+        {
+            var scheduler = new SchedulerService.SchedulerServiceClient(channel);
+            var preset = await CreateAppBlockerPresetAsync(presets, presetName);
+            string? scheduleId = null;
+
+            try
+            {
+                var schedule = await CreateScheduleAsync(scheduler, preset.Id, scheduleName, type, configure);
+                scheduleId = schedule.Id;
+
+                var state = await WaitForSessionStateAsync(sessions,
+                    value => value.IsActive && value.PresetId == preset.Id, TimeSpan.FromSeconds(10));
+                Assert.True(state.IsActive);
+                Assert.Equal(preset.Id, state.PresetId);
+            }
+            finally
+            {
+                await StopSessionForPresetIfRunningAsync(sessions, preset.Id);
+                if (scheduleId is not null)
+                    await scheduler.DeleteScheduleAsync(new DeleteScheduleRequest { ScheduleId = scheduleId });
+                await presets.DeletePresetAsync(new DeletePresetRequest { PresetId = preset.Id });
+            }
+        }
+    }
+
+    private static async Task<Axorith.Contracts.Schedule> CreateScheduleAsync(
+        SchedulerService.SchedulerServiceClient scheduler, string presetId, string name, ScheduleType type,
+        System.Action<Axorith.Contracts.Schedule>? configure = null)
+    {
+        var schedule = new Axorith.Contracts.Schedule
+        {
+            PresetId = presetId,
+            Name = name,
+            IsEnabled = true,
+            Type = (int)type
+        };
+        configure?.Invoke(schedule);
+        return await scheduler.CreateScheduleAsync(new CreateScheduleRequest { Schedule = schedule });
+    }
+
     private static async Task<SessionState> WaitForSessionStateAsync(
         SessionsService.SessionsServiceClient sessions, Func<SessionState, bool> condition, TimeSpan timeout)
     {
@@ -921,8 +866,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 PresetId = "invalid-guid"
             });
 
-            response.Should().NotBeNull();
-            response.Success.Should().BeFalse();
+                response.Success.Should().BeFalse();
             response.Message.Should().Contain("Invalid preset ID");
         }
     }
@@ -941,8 +885,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
                 PresetId = presetId
             });
 
-            response.Should().NotBeNull();
-            response.Success.Should().BeFalse();
+                response.Success.Should().BeFalse();
             response.Message.Should().Contain("Preset not found");
         }
     }
@@ -1190,15 +1133,12 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             Assert.Equal(1, actions.Opacity);
 
             var editor = new SessionEditorView();
-            foreach (var templateName in new[] { "FilePickerSettingTemplate", "DirectoryPickerSettingTemplate" })
-            {
-                var picker = ((IDataTemplate)editor.Resources[templateName]!).Build(null)!;
-                var history = picker.GetVisualDescendants().OfType<ComboBox>().Single();
-                var historyItem = history.ItemTemplate!.Build("Recent path")!;
-                var remove = historyItem.GetVisualDescendants().OfType<Button>().Single();
-                Assert.Equal(1, remove.Opacity);
-                Assert.True(remove.IsHitTestVisible);
-            }
+            var picker = ((IDataTemplate)editor.Resources["PathPickerSettingTemplate"]!).Build(null)!;
+            var history = picker.GetVisualDescendants().OfType<ComboBox>().Single();
+            var historyItem = history.ItemTemplate!.Build("Recent path")!;
+            var remove = historyItem.GetVisualDescendants().OfType<Button>().Single();
+            Assert.Equal(1, remove.Opacity);
+            Assert.True(remove.IsHitTestVisible);
 
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
                 .SetValue(viewModel, "Protection failed");

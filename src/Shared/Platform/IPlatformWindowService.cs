@@ -2,10 +2,6 @@ using System.Diagnostics;
 
 namespace Axorith.Shared.Platform;
 
-/// <summary>
-///     Cross-platform window management service.
-///     Implementations handle platform-specific window operations.
-/// </summary>
 public interface IPlatformWindowService
 {
     Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000, CancellationToken cancellationToken = default);

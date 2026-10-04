@@ -11,21 +11,16 @@ public interface ISecureStorageService
     ///     Encrypts and stores a secret value associated with a key.
     ///     The key is automatically scoped to the calling module to prevent collisions.
     /// </summary>
-    /// <param name="key">The unique key for the secret within the module (e.g., "AccessToken").</param>
-    /// <param name="secret">The secret value to store.</param>
     void StoreSecret(string key, string secret);
 
     /// <summary>
     ///     Retrieves and decrypts a secret value by its module-specific key.
     /// </summary>
-    /// <param name="key">The key of the secret to retrieve.</param>
-    /// <returns>The decrypted secret, or null if the key is not found.</returns>
     string? RetrieveSecret(string key);
 
     /// <summary>
     ///     Deletes a secret value by its module-specific key.
     ///     Useful for logout scenarios where tokens should be cleared.
     /// </summary>
-    /// <param name="key">The key of the secret to delete.</param>
     void DeleteSecret(string key);
 }

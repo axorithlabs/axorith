@@ -14,18 +14,7 @@ public sealed class TelemetryServiceTests
     {
         await using var server = new PostHogTestServer();
         var distinctId = Guid.NewGuid().ToString("D");
-        await using var telemetry = new TelemetryService(new TelemetrySettings
-        {
-            Enabled = true,
-            PostHogApiKey = "test-project-key",
-            PostHogHost = server.Host,
-            DistinctId = distinctId,
-            ApplicationName = "Axorith.Client",
-            AppVersion = "1.2.3",
-            OsVersion = "Windows 11",
-            BatchSize = 100,
-            FlushInterval = TimeSpan.FromHours(1)
-        });
+        await using var telemetry = CreateTelemetry(server, "Axorith.Client", distinctId);
 
         var installAttemptId = Guid.NewGuid();
         telemetry.TrackEvent("InstallationConfirmed", new Dictionary<string, object?>
@@ -40,13 +29,7 @@ public sealed class TelemetryServiceTests
         using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await telemetry.FlushAsync(flushCts.Token);
 
-        var sentEvent = server.Payloads
-            .SelectMany(body =>
-            {
-                using var payload = JsonDocument.Parse(body);
-                return payload.RootElement.GetProperty("batch").EnumerateArray()
-                    .Select(item => item.Clone()).ToArray();
-            })
+        var sentEvent = ReadEvents(server)
             .Single(item => item.GetProperty("event").GetString() == "InstallationConfirmed");
         var properties = sentEvent.GetProperty("properties");
 
@@ -67,18 +50,7 @@ public sealed class TelemetryServiceTests
             ProductAnalyticsProperties.FailureReason(new SessionException("Windows protection is unavailable.")));
 
         await using var server = new PostHogTestServer();
-        await using var telemetry = new TelemetryService(new TelemetrySettings
-        {
-            Enabled = true,
-            PostHogApiKey = "test-project-key",
-            PostHogHost = server.Host,
-            DistinctId = Guid.NewGuid().ToString("D"),
-            ApplicationName = "Axorith.Host",
-            AppVersion = "1.2.3",
-            OsVersion = "Windows 11",
-            BatchSize = 100,
-            FlushInterval = TimeSpan.FromHours(1)
-        });
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
 
         var presetId = Guid.NewGuid();
         var nextPresetId = Guid.NewGuid();
@@ -252,12 +224,7 @@ public sealed class TelemetryServiceTests
         using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await telemetry.FlushAsync(flushCts.Token);
 
-        var events = server.Payloads.SelectMany(body =>
-        {
-            using var payload = JsonDocument.Parse(body);
-            return payload.RootElement.GetProperty("batch").EnumerateArray()
-                .Select(item => item.Clone()).ToArray();
-        }).ToDictionary(item => item.GetProperty("event").GetString()!, item => item.GetProperty("properties"));
+        var events = ReadEvents(server).ToDictionary(item => item.GetProperty("event").GetString()!, item => item.GetProperty("properties"));
 
         var presetProperties = events["PresetCreated"];
         Assert.Equal(presetId.ToString("D"), presetProperties.GetProperty("presetId").GetString());
@@ -359,18 +326,7 @@ public sealed class TelemetryServiceTests
     public async Task LauncherAnalytics_UsesSafeTypesAndPresenceFlagsForEveryLauncher()
     {
         await using var server = new PostHogTestServer();
-        await using var telemetry = new TelemetryService(new TelemetrySettings
-        {
-            Enabled = true,
-            PostHogApiKey = "test-project-key",
-            PostHogHost = server.Host,
-            DistinctId = Guid.NewGuid().ToString("D"),
-            ApplicationName = "Axorith.Host",
-            AppVersion = "1.2.3",
-            OsVersion = "Windows 11",
-            BatchSize = 100,
-            FlushInterval = TimeSpan.FromHours(1)
-        });
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
 
         var launcherId = Guid.NewGuid();
         ConfiguredModule Launcher(string path, params (string Key, string Value)[] values)
@@ -413,11 +369,7 @@ public sealed class TelemetryServiceTests
         await telemetry.FlushAsync(flushCts.Token);
 
         var payloadText = string.Join("\n", server.Payloads);
-        var presetEvent = server.Payloads.SelectMany(body =>
-        {
-            using var payload = JsonDocument.Parse(body);
-            return payload.RootElement.GetProperty("batch").EnumerateArray().Select(item => item.Clone()).ToArray();
-        }).Single(item => item.GetProperty("event").GetString() == "PresetUpdated");
+        var presetEvent = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "PresetUpdated");
         var safeModules = presetEvent.GetProperty("properties").GetProperty("modules").EnumerateArray().ToArray();
         var browser = safeModules.Single(module => module.GetProperty("launcherAppType").GetString() == "browser");
         Assert.Equal("chromium", browser.GetProperty("browserFamily").GetString());
@@ -450,4 +402,24 @@ public sealed class TelemetryServiceTests
             Assert.DoesNotContain(sensitiveValue, payloadText, StringComparison.Ordinal);
         }
     }
+    private static TelemetryService CreateTelemetry(PostHogTestServer server, string applicationName,
+        string? distinctId = null) => new(new TelemetrySettings
+    {
+        Enabled = true,
+        PostHogApiKey = "test-project-key",
+        PostHogHost = server.Host,
+        DistinctId = distinctId ?? Guid.NewGuid().ToString("D"),
+        ApplicationName = applicationName,
+        AppVersion = "1.2.3",
+        OsVersion = "Windows 11",
+        BatchSize = 100,
+        FlushInterval = TimeSpan.FromHours(1)
+    });
+
+    private static IEnumerable<JsonElement> ReadEvents(PostHogTestServer server) => server.Payloads.SelectMany(body =>
+    {
+        using var payload = JsonDocument.Parse(body);
+        return payload.RootElement.GetProperty("batch").EnumerateArray().Select(item => item.Clone()).ToArray();
+    });
+
 }

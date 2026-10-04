@@ -1,35 +1,14 @@
-using Avalonia.Controls;
 using ReactiveUI;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-/// <summary>
-///     Holds the currently displayed ViewModel and the main window reference.
-/// </summary>
-public class ShellViewModel : ReactiveObject
+public partial class ShellViewModel : ReactiveObject
 {
     public IServiceProvider Services { get; set; } = null!;
 
-    public ReactiveObject? Content
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial ReactiveObject? Content { get; set; }
 
-    private Window? _mainWindow;
-
-    public void SetMainWindow(Window window)
-    {
-        _mainWindow = window;
-    }
-
-    public Window GetMainWindow()
-    {
-        return _mainWindow ?? throw new InvalidOperationException("Main window not set");
-    }
-
-    public void NavigateTo(ReactiveObject viewModel)
-    {
-        Content = viewModel;
-    }
+    public void NavigateTo(ReactiveObject viewModel) => Content = viewModel;
 }

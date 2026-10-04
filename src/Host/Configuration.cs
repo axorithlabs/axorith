@@ -39,11 +39,6 @@ public class ModulesConfiguration
     public List<string> SearchPaths { get; init; } = [];
     public bool EnableHotReload { get; init; }
 
-    /// <summary>
-    ///     Whitelist of allowed symlink paths for development.
-    ///     Only these symlinked directories will be scanned for modules.
-    ///     Empty list means no symlinks are allowed (production default).
-    /// </summary>
     public List<string> AllowedSymlinks { get; init; } = [];
 
     public IEnumerable<string> ResolveSearchPaths()
@@ -78,15 +73,6 @@ public class PersistenceConfiguration
         return ApplicationPaths.ExpandPath(PresetsPath);
     }
 
-    public string ResolveLogsPath()
-    {
-        if (string.IsNullOrWhiteSpace(LogsPath))
-        {
-            return ApplicationPaths.Logs;
-        }
-
-        return ApplicationPaths.ExpandPath(LogsPath);
-    }
 
     public string ResolveConfigPath()
     {
@@ -111,22 +97,9 @@ public class PersistenceConfiguration
 
 public class SessionConfiguration
 {
-    /// <summary>
-    ///     Timeout in seconds for module settings validation during session startup.
-    ///     Default: 5 seconds.
-    /// </summary>
     public int ValidationTimeoutSeconds { get; init; } = 5;
 
-    /// <summary>
-    ///     Timeout in seconds for module startup (OnSessionStartAsync) during session initialization.
-    ///     Increase this for modules with slow initialization (e.g., OAuth login).
-    ///     Default: 30 seconds.
-    /// </summary>
     public int StartupTimeoutSeconds { get; init; } = 30;
 
-    /// <summary>
-    ///     Timeout in seconds for module cleanup (OnSessionEndAsync) during session shutdown.
-    ///     Default: 10 seconds.
-    /// </summary>
     public int ShutdownTimeoutSeconds { get; init; } = 10;
 }

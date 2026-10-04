@@ -7,7 +7,7 @@ public sealed class ActionAsyncTests
     [Fact]
     public async Task InvokeAsyncEmitsOnlyWhenEnabled()
     {
-        using var action = Action.Create("login", "Login");
+        using var action = new Action("login", "Login");
         var invoked = 0;
         using var subscription = action.Invoked.Subscribe(_ => invoked++);
 
@@ -21,7 +21,7 @@ public sealed class ActionAsyncTests
     [Fact]
     public async Task InvokeAsyncWaitsUntilTheRegisteredHandlerCompletes()
     {
-        using var action = Action.Create("login", "Login");
+        using var action = new Action("login", "Login");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var completed = false;
@@ -44,7 +44,7 @@ public sealed class ActionAsyncTests
     [Fact]
     public async Task ReRegisteringHandlerUsesTheLatestHandler()
     {
-        using var action = Action.Create("login", "Login");
+        using var action = new Action("login", "Login");
         var oldHandlerCalled = false;
         var latestHandlerCalled = false;
         action.OnInvokeAsync(() =>
@@ -67,7 +67,7 @@ public sealed class ActionAsyncTests
     [Fact]
     public async Task HandlerExceptionsReachTheCaller()
     {
-        using var action = Action.Create("login", "Login");
+        using var action = new Action("login", "Login");
         action.OnInvokeAsync(() => Task.FromException(new InvalidOperationException("login failed")));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => action.InvokeAsync());
@@ -78,7 +78,7 @@ public sealed class ActionAsyncTests
     [Fact]
     public async Task ReplacingHandlerDuringAnInvocationDoesNotReplaceItsRunningCall()
     {
-        using var action = Action.Create("login", "Login");
+        using var action = new Action("login", "Login");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var firstCompleted = false;

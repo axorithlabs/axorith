@@ -5,29 +5,20 @@ using HealthStatus = Axorith.Client.CoreSdk.Abstractions.HealthStatus;
 
 namespace Axorith.Client.CoreSdk;
 
-/// <summary>
-///     gRPC implementation of IDiagnosticsApi.
-/// </summary>
 internal class GrpcDiagnosticsApi(
     DiagnosticsService.DiagnosticsServiceClient client,
     AsyncRetryPolicy retryPolicy)
     : IDiagnosticsApi
 {
-    public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default)
+    public Task<HealthStatus> GetHealthAsync(CancellationToken ct = default) => retryPolicy.ExecuteAsync(async () =>
     {
-        return await retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.GetHealthAsync(
-                    new HealthCheckRequest(),
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return new HealthStatus(
-                (HealthState)response.Status,
-                response.Version,
-                response.UptimeStarted.ToDateTimeOffset(),
-                response.ActiveSessions,
-                response.LoadedModules);
-        }).ConfigureAwait(false);
-    }
+        var response = await client.GetHealthAsync(new HealthCheckRequest(), cancellationToken: ct)
+            .ConfigureAwait(false);
+        return new HealthStatus(
+            (HealthState)response.Status,
+            response.Version,
+            response.UptimeStarted.ToDateTimeOffset(),
+            response.ActiveSessions,
+            response.LoadedModules);
+    });
 }

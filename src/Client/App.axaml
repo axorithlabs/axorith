@@ -31,7 +31,6 @@
             </ResourceDictionary.MergedDictionaries>
             
             <converters:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
-            <converters:NotificationTypeToIconConverter x:Key="NotificationTypeToIconConverter" />
             
             <SolidColorBrush x:Key="SystemRegionBrush" Color="{DynamicResource BackgroundPrimaryColor}" />
             <SolidColorBrush x:Key="CardBackgroundBrush" Color="{DynamicResource BackgroundSecondaryColor}" />

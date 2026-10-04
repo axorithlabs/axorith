@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
 using Grpc.Core;
@@ -19,22 +19,10 @@ internal class GrpcNotificationApi(
         {
             yield return new NotificationEvent(
                 evt.Message,
-                MapType(evt.Type),
+                (NotificationType)evt.Type,
                 evt.Timestamp.ToDateTimeOffset(),
                 evt.Source
             );
         }
-    }
-
-    private static NotificationType MapType(Contracts.NotificationType type)
-    {
-        return type switch
-        {
-            Contracts.NotificationType.Info => NotificationType.Info,
-            Contracts.NotificationType.Success => NotificationType.Success,
-            Contracts.NotificationType.Warning => NotificationType.Warning,
-            Contracts.NotificationType.Error => NotificationType.Error,
-            _ => NotificationType.Info
-        };
     }
 }

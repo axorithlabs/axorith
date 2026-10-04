@@ -1,14 +1,10 @@
-﻿using Avalonia.Controls;
+using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Axorith.Client.ViewModels;
 using Axorith.Sdk.Settings;
 
 namespace Axorith.Client.Selectors;
 
-/// <summary>
-///     A data template selector that chooses the correct UI control for a given SettingViewModel.
-///     This is the robust, code-based alternative to using style selectors.
-/// </summary>
 public class SettingTemplateSelector : IDataTemplate
 {
     public IDataTemplate? TextTemplate { get; set; }
@@ -18,13 +14,9 @@ public class SettingTemplateSelector : IDataTemplate
     public IDataTemplate? NumberTemplate { get; set; }
     public IDataTemplate? ChoiceTemplate { get; set; }
     public IDataTemplate? MultiChoiceTemplate { get; set; }
-    public IDataTemplate? FilePickerTemplate { get; set; }
-    public IDataTemplate? DirectoryPickerTemplate { get; set; }
+    public IDataTemplate? PathPickerTemplate { get; set; }
     public IDataTemplate? ButtonTemplate { get; set; }
 
-    /// <summary>
-    ///     This method is called by Avalonia to build the UI for an item.
-    /// </summary>
     public Control Build(object? data)
     {
         var vm = data as SettingViewModel;
@@ -38,8 +30,7 @@ public class SettingTemplateSelector : IDataTemplate
             SettingControlType.Number => NumberTemplate,
             SettingControlType.Choice => ChoiceTemplate,
             SettingControlType.MultiChoice => MultiChoiceTemplate,
-            SettingControlType.FilePicker => FilePickerTemplate,
-            SettingControlType.DirectoryPicker => DirectoryPickerTemplate,
+            SettingControlType.FilePicker or SettingControlType.DirectoryPicker => PathPickerTemplate,
             SettingControlType.Button => ButtonTemplate,
             _ => null
         };
@@ -47,11 +38,5 @@ public class SettingTemplateSelector : IDataTemplate
         return template?.Build(data) ?? new TextBlock { Text = $"ERROR: No template for {data?.GetType().Name}" };
     }
 
-    /// <summary>
-    ///     This method tells Avalonia if this selector can handle the given data.
-    /// </summary>
-    public bool Match(object? data)
-    {
-        return data is SettingViewModel;
-    }
+    public bool Match(object? data) => data is SettingViewModel;
 }

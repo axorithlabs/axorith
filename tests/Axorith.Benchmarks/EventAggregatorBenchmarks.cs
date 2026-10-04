@@ -35,10 +35,7 @@ public class EventAggregatorBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public void PublishWithNoSubscribers()
-    {
-        _aggregator.Publish(new TestEvent(1, "test"));
-    }
+    public void PublishWithNoSubscribers() => _aggregator.Publish(new TestEvent(1, "test"));
 
     [Benchmark]
     public void SubscribeAndUnsubscribe()

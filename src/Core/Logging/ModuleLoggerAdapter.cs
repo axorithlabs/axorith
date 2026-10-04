@@ -1,13 +1,10 @@
-﻿using Axorith.Sdk.Logging;
+using Axorith.Sdk.Logging;
 using Microsoft.Extensions.Logging;
 
 #pragma warning disable CA2254
 
 namespace Axorith.Core.Logging;
 
-/// <summary>
-///     An adapter that wraps a standard ILogger and exposes it as an IModuleLogger.
-/// </summary>
 internal class ModuleLoggerAdapter(ILogger logger, string moduleName) : IModuleLogger
 {
     private IDisposable BeginModuleScope()
@@ -48,13 +45,7 @@ internal class ModuleLoggerAdapter(ILogger logger, string moduleName) : IModuleL
         logger.LogCritical(exception, Sanitize(messageTemplate), SanitizeArguments(args));
     }
 
-    private static string Sanitize(string value)
-    {
-        return value.Replace("\r", "\\r").Replace("\n", "\\n");
-    }
+    private static string Sanitize(string value) => value.Replace("\r", "\\r").Replace("\n", "\\n");
 
-    private static object[] SanitizeArguments(object[] args)
-    {
-        return Array.ConvertAll(args, arg => arg is string value ? Sanitize(value) : arg);
-    }
+    private static object[] SanitizeArguments(object[] args) => Array.ConvertAll(args, arg => arg is string value ? Sanitize(value) : arg);
 }

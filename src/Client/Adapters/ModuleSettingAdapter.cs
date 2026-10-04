@@ -5,10 +5,6 @@ using Axorith.Sdk.Settings;
 
 namespace Axorith.Client.Adapters;
 
-/// <summary>
-///     Adapts a ModuleSetting from gRPC into an ISetting for UI binding.
-///     Provides reactive properties for the UI without requiring a live module instance.
-/// </summary>
 internal class ModuleSettingAdapter : ISetting, IDisposable
 {
     private readonly BehaviorSubject<string> _labelSubject;
@@ -68,10 +64,7 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
         Choices = controlType == SettingControlType.Choice ? _choicesSubject.AsObservable() : null;
     }
 
-    public object? GetCurrentValueAsObject()
-    {
-        return _valueSubject.Value;
-    }
+    public object? GetCurrentValueAsObject() => _valueSubject.Value;
 
     public string GetValueAsString()
     {
@@ -88,10 +81,7 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
         };
     }
 
-    public void SetValueFromObject(object? value)
-    {
-        _valueSubject.OnNext(value);
-    }
+    public void SetValueFromObject(object? value) => _valueSubject.OnNext(value);
 
     public void SetValueFromString(string? value)
     {
@@ -99,57 +89,21 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
         _valueSubject.OnNext(parsed);
     }
 
-    public string GetCurrentLabel()
-    {
-        return _labelSubject.Value;
-    }
+    public string GetCurrentLabel() => _labelSubject.Value;
 
-    public bool GetCurrentVisibility()
-    {
-        return _visibilitySubject.Value;
-    }
+    public bool GetCurrentVisibility() => _visibilitySubject.Value;
 
-    public bool GetCurrentReadOnly()
-    {
-        return _readOnlySubject.Value;
-    }
+    public bool GetCurrentReadOnly() => _readOnlySubject.Value;
 
-    public IReadOnlyList<KeyValuePair<string, string>> GetCurrentChoices()
-    {
-        return _choicesSubject.Value;
-    }
+    public IReadOnlyList<KeyValuePair<string, string>> GetCurrentChoices() => _choicesSubject.Value;
 
-    /// <summary>
-    ///     Updates the label of the setting (for reactive UI updates from host).
-    /// </summary>
-    public void SetLabel(string label)
-    {
-        _labelSubject.OnNext(label);
-    }
+    public void SetLabel(string label) => _labelSubject.OnNext(label);
 
-    /// <summary>
-    ///     Updates the visibility of the setting (for reactive UI updates from host).
-    /// </summary>
-    public void SetVisibility(bool isVisible)
-    {
-        _visibilitySubject.OnNext(isVisible);
-    }
+    public void SetVisibility(bool isVisible) => _visibilitySubject.OnNext(isVisible);
 
-    /// <summary>
-    ///     Updates the read-only state of the setting (for reactive UI updates from host).
-    /// </summary>
-    public void SetReadOnly(bool isReadOnly)
-    {
-        _readOnlySubject.OnNext(isReadOnly);
-    }
+    public void SetReadOnly(bool isReadOnly) => _readOnlySubject.OnNext(isReadOnly);
 
-    /// <summary>
-    ///     Updates the choices for choice-based settings (for reactive UI updates from host).
-    /// </summary>
-    public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> choices)
-    {
-        _choicesSubject.OnNext(choices);
-    }
+    public void SetChoices(IReadOnlyList<KeyValuePair<string, string>> choices) => _choicesSubject.OnNext(choices);
 
     public void Dispose()
     {

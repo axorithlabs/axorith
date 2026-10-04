@@ -1,11 +1,8 @@
-﻿using Serilog.Core;
+using Serilog.Core;
 using Serilog.Events;
 
 namespace Axorith.Core.Logging;
 
-/// <summary>
-///     Enriches log events with a formatted module context string, e.g., "[ModuleName]" or "[ModuleName | InstanceName]".
-/// </summary>
 public class ModuleContextEnricher : ILogEventEnricher
 {
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)

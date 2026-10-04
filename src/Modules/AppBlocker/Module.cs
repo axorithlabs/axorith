@@ -33,15 +33,9 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
         _blocker.ProcessBlocked += OnProcessBlocked;
     }
 
-    public IReadOnlyList<ISetting> GetSettings()
-    {
-        return _settings.GetSettings();
-    }
+    public IReadOnlyList<ISetting> GetSettings() => _settings.GetSettings();
 
-    public IReadOnlyList<IAction> GetActions()
-    {
-        return _settings.GetActions();
-    }
+    public IReadOnlyList<IAction> GetActions() => _settings.GetActions();
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {

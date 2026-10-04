@@ -1,4 +1,4 @@
-﻿*.zip
+*.zip
 build/
 
 # Created by https://www.toptal.com/developers/gitignore/api/jetbrains+all,csharp,visualstudio,visualstudiocode
@@ -685,3 +685,9 @@ fabric.properties
 # Additional files built by Visual Studio
 
 # End of https://www.toptal.com/developers/gitignore/api/jetbrains+all,csharp,visualstudio,visualstudiocode
+
+# Generated test/benchmark outputs
+TestResults/
+BenchmarkResults/
+*.trx
+*.log

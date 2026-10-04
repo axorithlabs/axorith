@@ -2,6 +2,7 @@ using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Core.Telemetry;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -10,9 +11,6 @@ using System.Runtime.InteropServices;
 
 namespace Axorith.Core.Services;
 
-/// <summary>
-///     Service for managing automatic session stop and transition to next preset.
-/// </summary>
 public class SessionAutoStopService(
     ISessionManager sessionManager,
     IPresetManager presetManager,
@@ -32,7 +30,7 @@ public class SessionAutoStopService(
     private DateTimeOffset? _stopAt;
     private long? _stopAtTimestamp;
     private SessionSchedule? _stopSchedule;
-    private readonly ITelemetryService _telemetry = telemetry ?? new NoopTelemetryService();
+    private readonly ITelemetryService _telemetry = telemetry ?? NoopTelemetryService.Instance;
     private Task? _loopTask;
     private CancellationTokenSource? _loopCts;
 
@@ -49,11 +47,7 @@ public class SessionAutoStopService(
     {
         lock (_stateLock)
         {
-            _loopCts?.Cancel();
-            _loopCts?.Dispose();
-            _loopCts = null;
-            _loopTask = null;
-
+            StopTrackingLoopLocked();
             _currentSessionId = sessionId;
             _nextPresetId = nextPresetId;
             _stopSchedule = schedule;
@@ -63,8 +57,7 @@ public class SessionAutoStopService(
             {
                 var duration = autoStopDuration.Value > TimeSpan.Zero ? autoStopDuration.Value : TimeSpan.Zero;
                 _stopAt = DateTimeOffset.UtcNow + duration;
-                _stopAtTimestamp = System.Diagnostics.Stopwatch.GetTimestamp() +
-                                   (long)(duration.TotalSeconds * System.Diagnostics.Stopwatch.Frequency);
+                _stopAtTimestamp = MonotonicTime.DeadlineAfter(duration);
                 _loopCts = new CancellationTokenSource();
                 _loopTask = RunTrackingLoopAsync(_loopCts.Token);
 
@@ -87,18 +80,8 @@ public class SessionAutoStopService(
     {
         lock (_stateLock)
         {
-            _loopCts?.Cancel();
-            _loopCts?.Dispose();
-            _loopCts = null;
-            _loopTask = null;
-
-            _currentSessionId = null;
-            _nextPresetId = null;
-            _stopAt = null;
-            _stopAtTimestamp = null;
-            _stopSchedule = null;
-            _sentNotificationKeys.Clear();
-
+            StopTrackingLoopLocked();
+            ClearTrackingStateLocked();
             logger.LogDebug("Stopped tracking session");
         }
 
@@ -166,10 +149,7 @@ public class SessionAutoStopService(
 
     private async Task CheckAndProcessAsync(CancellationToken ct)
     {
-        DateTimeOffset? stopAt;
-        long? stopAtTimestamp;
         Guid? nextPresetId;
-        Guid? currentSessionId;
         SessionSchedule? stopSchedule;
         SessionPreset? expectedSession;
 
@@ -180,10 +160,7 @@ public class SessionAutoStopService(
                 return;
             }
 
-            stopAt = _stopAt;
-            stopAtTimestamp = _stopAtTimestamp;
             nextPresetId = _nextPresetId;
-            currentSessionId = _currentSessionId;
             stopSchedule = _stopSchedule;
             expectedSession = sessionManager.ActiveSession;
         }
@@ -206,11 +183,6 @@ public class SessionAutoStopService(
             Interlocked.Exchange(ref _nextProtectionHealthCheck,
                 nowTimestamp + System.Diagnostics.Stopwatch.Frequency * 5);
             await sessionManager.RefreshProtectionHealthAsync(ct).ConfigureAwait(false);
-        }
-
-        if (!stopAt.HasValue || !stopAtTimestamp.HasValue)
-        {
-            return;
         }
 
         TimeSpan timeLeft;
@@ -330,23 +302,16 @@ public class SessionAutoStopService(
 
             var commitment = currentPreset.FocusCommitment;
             var afterEnd = commitment.AfterEnd;
-            var nextPresetId = fallbackNextPresetId;
-            if (afterEnd == AfterEndBehavior.StartNextWorkspace)
+            var nextPresetId = afterEnd switch
             {
-                nextPresetId = commitment.NextWorkspaceId ?? nextPresetId;
-            }
-            else if (afterEnd != AfterEndBehavior.DoNothing)
-            {
-                nextPresetId = null;
-            }
+                AfterEndBehavior.StartNextWorkspace => commitment.NextWorkspaceId ?? fallbackNextPresetId,
+                AfterEndBehavior.DoNothing => fallbackNextPresetId,
+                _ => null
+            };
 
             lock (_stateLock)
             {
-                _currentSessionId = null;
-                _nextPresetId = null;
-                _stopAt = null;
-                _stopAtTimestamp = null;
-                _sentNotificationKeys.Clear();
+                ClearTrackingStateLocked();
             }
 
             try
@@ -367,7 +332,7 @@ public class SessionAutoStopService(
                 logger.LogError(ex, "Failed to auto-stop session '{PresetName}'", currentPreset.Name);
                 await notifier.ShowSystemAsync("Auto-Stop Error",
                     $"Failed to stop session '{currentPreset.Name}': {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
-                TrackScheduleTriggered(schedule, "failed", failureReason: ScheduleFailureReason(ex));
+                TrackScheduleTriggered(schedule, "failed", failureReason: ProductAnalyticsProperties.FailureReason(ex));
                 return false;
             }
             finally
@@ -429,19 +394,11 @@ public class SessionAutoStopService(
     private void TrackScheduleTriggered(SessionSchedule? schedule, string result, string? failureReason = null,
         string? skipReason = null)
     {
-        if (schedule is null || !_telemetry.IsEnabled) return;
-        try
-        {
-            _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
-                "stop", result, failureReason: failureReason, skipReason: skipReason));
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not track duration stop schedule telemetry.");
-        }
+        if (schedule is null) return;
+        _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
+            "stop", result, failureReason: failureReason, skipReason: skipReason));
     }
 
-    private static string ScheduleFailureReason(Exception exception) => ProductAnalyticsProperties.FailureReason(exception);
 
     private void CleanupNotificationCache()
     {
@@ -512,18 +469,27 @@ public class SessionAutoStopService(
     [DllImport("PowrProf.dll", SetLastError = true)]
     private static extern bool SetSuspendState(bool hibernate, bool forceCritical, bool disableWakeEvent);
 
-    private TimeSpan GetRemainingTimeLocked()
+    private void StopTrackingLoopLocked()
     {
-        if (!_stopAtTimestamp.HasValue)
-        {
-            return TimeSpan.Zero;
-        }
-
-        var ticks = _stopAtTimestamp.Value - System.Diagnostics.Stopwatch.GetTimestamp();
-        return ticks <= 0
-            ? TimeSpan.Zero
-            : TimeSpan.FromSeconds((double)ticks / System.Diagnostics.Stopwatch.Frequency);
+        _loopCts?.Cancel();
+        _loopCts?.Dispose();
+        _loopCts = null;
+        _loopTask = null;
     }
+
+    private void ClearTrackingStateLocked()
+    {
+        _currentSessionId = null;
+        _nextPresetId = null;
+        _stopAt = null;
+        _stopAtTimestamp = null;
+        _stopSchedule = null;
+        _sentNotificationKeys.Clear();
+    }
+
+    private TimeSpan GetRemainingTimeLocked() => _stopAtTimestamp is { } deadline
+        ? MonotonicTime.RemainingUntil(deadline)
+        : TimeSpan.Zero;
 
     public async ValueTask DisposeAsync()
     {

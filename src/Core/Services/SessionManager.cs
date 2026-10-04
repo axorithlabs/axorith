@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Axorith.Core.Models;
@@ -7,16 +7,12 @@ using Axorith.Core.Telemetry;
 using Axorith.Sdk;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Exceptions;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
 
-/// <summary>
-///     The concrete implementation for managing the session lifecycle.
-///     This class orchestrates the startup and shutdown of modules based on a preset,
-///     managing their isolated lifetime scopes.
-/// </summary>
 public class SessionManager(
     IModuleRegistry moduleRegistry,
     ILogger<SessionManager> logger,
@@ -56,7 +52,6 @@ public class SessionManager(
     private bool _sessionTelemetryStarted;
     private string _protectionStatus = "Protection active";
 
-    // This private class holds the live instance of a module and its personal DI scope.
     private class ActiveModule : IDisposable
     {
         public required IModule Instance { get; init; }
@@ -90,8 +85,7 @@ public class SessionManager(
     public DateTimeOffset? BreakEndsAt { get; private set; }
     public int BreaksRemaining => Math.Max(0, (ActiveSession?.FocusCommitment.BreakCount ?? 0) - _breaksUsed);
     public TimeSpan? BreakTimeRemaining => _breakEndsAtTimestamp is { } deadline
-        ? TimeSpan.FromSeconds(Math.Max(0, (double)(deadline - System.Diagnostics.Stopwatch.GetTimestamp()) /
-                                         System.Diagnostics.Stopwatch.Frequency))
+        ? MonotonicTime.RemainingUntil(deadline)
         : null;
     public string ProtectionStatus
     {
@@ -136,13 +130,13 @@ public class SessionManager(
         }
 
         if (state?.Preset?.FocusCommitment == null ||
-            state.Preset.FocusCommitment.Mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
+            !state.Preset.FocusCommitment.IsCommitted)
         {
             throw new SessionException("Committed session recovery state is invalid and was retained.");
         }
 
         var strictStateVerified = false;
-        if (state.Preset.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+        if (state.Preset.FocusCommitment.IsStrict)
         {
             if (_commitmentProtection == null)
             {
@@ -208,9 +202,9 @@ public class SessionManager(
     {
         ArgumentNullException.ThrowIfNull(preset);
         preset.FocusCommitment ??= new FocusCommitmentOptions();
-        var snapshot = CreateSnapshot(preset);
+        var snapshot = new SessionPreset(preset);
         _ = GetSessionEnd(snapshot.FocusCommitment, DateTimeOffset.Now);
-        if (snapshot.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+        if (snapshot.FocusCommitment.IsStrict)
         {
             if (_commitmentProtection == null)
             {
@@ -227,7 +221,7 @@ public class SessionManager(
             }
         }
 
-        if (snapshot.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+        if (snapshot.FocusCommitment.IsCommitted)
         {
             CheckCommittedStateStorage();
             if (_commitmentProtection != null)
@@ -255,42 +249,9 @@ public class SessionManager(
 
             foreach (var configuredModule in snapshot.Modules)
             {
-                var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
-                if (instance == null || scope == null)
-                {
-                    instance?.Dispose();
-                    scope?.Dispose();
-                    throw new SessionException($"Module {configuredModule.ModuleId} could not be loaded.");
-                }
-
-                ModuleDefinition definition;
-                try
-                {
-                    definition = scope.Resolve<ModuleDefinition>();
-                }
-                catch
-                {
-                    try
-                    {
-                        instance.Dispose();
-                    }
-                    finally
-                    {
-                        scope.Dispose();
-                    }
-
-                    throw;
-                }
-
-                var module = new ActiveModule
-                {
-                    Instance = instance,
-                    Scope = scope,
-                    Configuration = configuredModule,
-                    Definition = definition
-                };
+                var module = CreateActiveModule(configuredModule) ??
+                             throw new SessionException($"Module {configuredModule.ModuleId} could not be loaded.");
                 modules.Add(module);
-                ApplySettings(module);
             }
 
             if (modules.Count == 0)
@@ -300,7 +261,7 @@ public class SessionManager(
 
             ConfigureWorkspaceApplications(modules);
             await ValidateAllModulesAsync(modules, cancellationToken).ConfigureAwait(false);
-            if (snapshot.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+            if (snapshot.FocusCommitment.IsCommitted)
             {
                 await ValidateCommittedModuleSetupAsync(modules, cancellationToken).ConfigureAwait(false);
             }
@@ -323,7 +284,6 @@ public class SessionManager(
         }
     }
 
-    /// <inheritdoc />
     public Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default,
         string startSource = "manual", Guid? sessionInstanceId = null, Guid? scheduleId = null)
     {
@@ -354,7 +314,7 @@ public class SessionManager(
                     ["sessionInstanceId"] = instanceId,
                     ["presetId"] = preset.Id,
                     ["stage"] = isPreflightFailure ? "preflight" : "session_initialization",
-                    ["failureReason"] = GetFailureReason(ex)
+                    ["failureReason"] = ProductAnalyticsProperties.FailureReason(ex)
                 });
             throw;
         }
@@ -366,11 +326,11 @@ public class SessionManager(
     {
         ArgumentNullException.ThrowIfNull(preset);
         preset.FocusCommitment ??= new FocusCommitmentOptions();
-        var snapshot = CreateSnapshot(preset);
+        var snapshot = new SessionPreset(preset);
         ValidateFocusCommitment(snapshot.FocusCommitment);
         var sessionEndsAt = endAtOverride ?? GetSessionEnd(snapshot.FocusCommitment, DateTimeOffset.Now);
 
-        if (snapshot.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+        if (snapshot.FocusCommitment.IsCommitted)
         {
             try
             {
@@ -380,7 +340,7 @@ public class SessionManager(
             catch (Exception ex)
             {
                 TrackSessionPreflightCompleted(sessionInstanceId, snapshot.Id, startSource, "failed",
-                    GetFailureReason(ex));
+                    ProductAnalyticsProperties.FailureReason(ex));
                 ex.Data[PreflightFailureDataKey] = true;
                 throw;
             }
@@ -409,16 +369,16 @@ public class SessionManager(
                 _breaksUsed = recoveryState?.BreaksUsed ?? 0;
                 BreakEndsAt = recoveryState?.BreakEndsAt > DateTimeOffset.UtcNow ? recoveryState.BreakEndsAt : null;
                 _breakEndsAtTimestamp = BreakEndsAt is { } breakEnd
-                    ? GetStopwatchDeadline(breakEnd - DateTimeOffset.UtcNow)
+                    ? MonotonicTime.DeadlineAfter(breakEnd - DateTimeOffset.UtcNow)
                     : null;
                 _sessionEndsAtTimestamp = sessionEndsAt is { } end
-                    ? GetStopwatchDeadline(end - DateTimeOffset.UtcNow)
+                    ? MonotonicTime.DeadlineAfter(end - DateTimeOffset.UtcNow)
                     : null;
                 ProtectionStatus = snapshot.FocusCommitment.Mode == FocusCommitmentMode.Normal
                     ? "Protection inactive"
                     : "Protection active";
                 _protectionWasUnavailable = false;
-                if (snapshot.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+                if (snapshot.FocusCommitment.IsCommitted)
                 {
                     if (_commitmentProtection != null)
                     {
@@ -436,7 +396,7 @@ public class SessionManager(
                     SaveCommittedSessionState(snapshot, SessionStartedAt.Value, SessionEndsAt!.Value);
                 }
 
-                if (snapshot.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+                if (snapshot.FocusCommitment.IsStrict)
                 {
                     if (_commitmentProtection == null)
                     {
@@ -467,48 +427,16 @@ public class SessionManager(
 
                 foreach (var configuredModule in snapshot.Modules)
                 {
-                    var (instance, scope) = moduleRegistry.CreateInstance(configuredModule.ModuleId);
-
-                    if (instance != null && scope != null)
+                    var activeModule = CreateActiveModule(configuredModule);
+                    if (activeModule is not null)
                     {
-                        ModuleDefinition definition;
-                        try
-                        {
-                            definition = scope.Resolve<ModuleDefinition>();
-                        }
-                        catch
-                        {
-                            try
-                            {
-                                instance.Dispose();
-                            }
-                            finally
-                            {
-                                scope.Dispose();
-                            }
-
-                            throw;
-                        }
-
-                        var activeModule = new ActiveModule
-                        {
-                            Instance = instance,
-                            Scope = scope,
-                            Configuration = configuredModule,
-                            Definition = definition
-                        };
-
                         _activeModules.Add(activeModule);
-                        ApplySettings(activeModule);
+                        continue;
                     }
-                    else
-                    {
-                        instance?.Dispose();
-                        scope?.Dispose();
-                        logger.LogWarning(
-                            "Failed to create instance for module {ModuleId} in preset '{PresetName}'. Skipping.",
-                            configuredModule.ModuleId, snapshot.Name);
-                    }
+
+                    logger.LogWarning(
+                        "Failed to create instance for module {ModuleId} in preset '{PresetName}'. Skipping.",
+                        configuredModule.ModuleId, snapshot.Name);
                 }
 
                 if (_activeModules.Count == 0)
@@ -522,19 +450,7 @@ public class SessionManager(
             {
                 _asyncLock.Release();
             }
-        }
-        catch
-        {
-            if (ReferenceEquals(ActiveSession, snapshot))
-            {
-                await StopSessionAsync(SessionEndReason.StartupFailure, CancellationToken.None).ConfigureAwait(false);
-            }
 
-            throw;
-        }
-
-        try
-        {
             await ValidateAllModulesAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
 
             await RunHybridStartupAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
@@ -550,23 +466,18 @@ public class SessionManager(
                 }
             }
 
-            if (snapshot.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+            if (snapshot.FocusCommitment.IsCommitted)
             {
                 await ValidateCommittedProtectionAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
-                if (snapshot.FocusCommitment.Mode == FocusCommitmentMode.Strict &&
+                if (snapshot.FocusCommitment.IsStrict &&
                     (_commitmentProtection == null ||
                      !await _commitmentProtection.IsEnabledAsync(_sessionCts.Token).ConfigureAwait(false)))
                 {
                     throw new SessionException("Strict Windows protection is not active.");
                 }
 
-                ProtectionStatus = BuildProtectionStatus("Protection active", _activeModules);
-                _protectionWasUnavailable = _activeModules.Any(module =>
-                    module.Instance is ICommittedSessionValidator { IsProtectionDegraded: true });
-                if (_protectionWasUnavailable)
-                {
-                    ProtectionStatus = BuildProtectionStatus("Protection degraded", _activeModules);
-                }
+                _protectionWasUnavailable = false;
+                UpdateHealthyProtectionStatus();
             }
 
             logger.LogInformation("Session '{PresetName}' started successfully with {Count} modules.",
@@ -577,8 +488,49 @@ public class SessionManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Session startup failed. Initiating rollback...");
-            await StopSessionAsync(SessionEndReason.StartupFailure, CancellationToken.None).ConfigureAwait(false);
+            if (ReferenceEquals(ActiveSession, snapshot))
+            {
+                logger.LogError(ex, "Session startup failed. Initiating rollback...");
+                await StopSessionAsync(SessionEndReason.StartupFailure, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            throw;
+        }
+    }
+
+    private ActiveModule? CreateActiveModule(ConfiguredModule configuration)
+    {
+        var (instance, scope) = moduleRegistry.CreateInstance(configuration.ModuleId);
+        if (instance is null || scope is null)
+        {
+            instance?.Dispose();
+            scope?.Dispose();
+            return null;
+        }
+
+        try
+        {
+            var module = new ActiveModule
+            {
+                Instance = instance,
+                Scope = scope,
+                Configuration = configuration,
+                Definition = scope.Resolve<ModuleDefinition>()
+            };
+            ApplySettings(module);
+            return module;
+        }
+        catch
+        {
+            try
+            {
+                instance.Dispose();
+            }
+            finally
+            {
+                scope.Dispose();
+            }
+
             throw;
         }
     }
@@ -638,7 +590,6 @@ public class SessionManager(
                     batch.Clear();
                 }
 
-                // Handle the delayed module
                 logger.LogInformation("Waiting {Delay}s before starting '{Name}'...",
                     currentModule.Configuration.StartDelay.TotalSeconds, currentModule.DisplayName);
 
@@ -717,11 +668,8 @@ public class SessionManager(
         }
     }
 
-    /// <inheritdoc />
-    public async Task StopCurrentSessionAsync(CancellationToken cancellationToken = default)
-    {
-        _ = await StopSessionAsync(SessionEndReason.UserStop, cancellationToken).ConfigureAwait(false);
-    }
+    public Task StopCurrentSessionAsync(CancellationToken cancellationToken = default) =>
+        StopSessionAsync(SessionEndReason.UserStop, cancellationToken);
 
     public Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default)
     {
@@ -739,7 +687,7 @@ public class SessionManager(
         try
         {
             var commitment = ActiveSession?.FocusCommitment;
-            if (commitment?.Mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
+            if (commitment?.IsCommitted != true)
             {
                 throw new SessionException("Breaks are only available during a committed session.");
             }
@@ -763,7 +711,7 @@ public class SessionManager(
             var nextBreakEnd = DateTimeOffset.UtcNow.Add(commitment.BreakDuration);
             _breaksUsed++;
             BreakEndsAt = nextBreakEnd;
-            _breakEndsAtTimestamp = GetStopwatchDeadline(commitment.BreakDuration);
+            _breakEndsAtTimestamp = MonotonicTime.DeadlineAfter(commitment.BreakDuration);
             try
             {
                 SaveCommittedSessionState(ActiveSession!, SessionStartedAt!.Value, SessionEndsAt!.Value);
@@ -900,23 +848,12 @@ public class SessionManager(
                 ProtectionStatus = "Protection failed";
                 _protectionWasUnavailable = true;
             }
-            else if (_activeModules.Any(module =>
-                         module.Instance is ICommittedSessionValidator { IsProtectionDegraded: true }))
-            {
-                ProtectionStatus = BuildProtectionStatus("Protection degraded", _activeModules);
-                _protectionWasUnavailable = true;
-            }
-            else if (_protectionWasUnavailable)
-            {
-                ProtectionStatus = BuildProtectionStatus("Protection recovered", _activeModules);
-                _protectionWasUnavailable = false;
-            }
             else
             {
-                ProtectionStatus = BuildProtectionStatus("Protection active", _activeModules);
+                UpdateHealthyProtectionStatus();
             }
 
-            if (ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+            if (ActiveSession?.FocusCommitment.IsCommitted == true)
             {
                 SaveCommittedSessionState(ActiveSession, SessionStartedAt!.Value, SessionEndsAt!.Value);
             }
@@ -945,7 +882,7 @@ public class SessionManager(
         await _asyncLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (ActiveSession?.FocusCommitment.Mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
+            if (ActiveSession?.FocusCommitment.IsCommitted != true)
             {
                 ProtectionStatus = "Protection inactive";
                 _protectionWasUnavailable = false;
@@ -955,7 +892,7 @@ public class SessionManager(
             try
             {
                 await ValidateCommittedProtectionAsync(_activeModules, cancellationToken).ConfigureAwait(false);
-                if (ActiveSession.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+                if (ActiveSession.FocusCommitment.IsStrict)
                 {
                     if (_commitmentProtection == null)
                     {
@@ -973,22 +910,7 @@ public class SessionManager(
                     }
                 }
 
-                var degraded = _activeModules.Any(module =>
-                    module.Instance is ICommittedSessionValidator { IsProtectionDegraded: true });
-                if (degraded)
-                {
-                    ProtectionStatus = BuildProtectionStatus("Protection degraded", _activeModules);
-                    _protectionWasUnavailable = true;
-                }
-                else if (_protectionWasUnavailable)
-                {
-                    ProtectionStatus = BuildProtectionStatus("Protection recovered", _activeModules);
-                    _protectionWasUnavailable = false;
-                }
-                else
-                {
-                    ProtectionStatus = BuildProtectionStatus("Protection active", _activeModules);
-                }
+                UpdateHealthyProtectionStatus();
             }
             catch (Exception ex)
             {
@@ -1003,36 +925,48 @@ public class SessionManager(
         }
     }
 
-    private static async Task ValidateCommittedProtectionAsync(List<ActiveModule> modules,
+    private static Task ValidateCommittedProtectionAsync(List<ActiveModule> modules, CancellationToken cancellationToken) =>
+        ValidateCommittedModulesAsync(modules,
+            static (validator, token) => validator.IsProtectionHealthyAsync(token),
+            "is disconnected or not protecting this session.", cancellationToken);
+
+    private static Task ValidateCommittedModuleSetupAsync(List<ActiveModule> modules, CancellationToken cancellationToken) =>
+        ValidateCommittedModulesAsync(modules,
+            static (validator, token) => validator.CanStartCommittedSessionAsync(token),
+            "is disconnected or unavailable for this session.", cancellationToken);
+
+    private static async Task ValidateCommittedModulesAsync(List<ActiveModule> modules,
+        Func<ICommittedSessionValidator, CancellationToken, Task<bool>> validate, string failureMessage,
         CancellationToken cancellationToken)
     {
         foreach (var module in modules)
         {
-            if (module.Instance is ICommittedSessionValidator validator &&
-                !await validator.IsProtectionHealthyAsync(cancellationToken).ConfigureAwait(false))
+            if (module.Instance is not ICommittedSessionValidator validator ||
+                await validate(validator, cancellationToken).ConfigureAwait(false))
             {
-                var details = validator.ProtectionStatusMessage;
-                throw new SessionException(string.IsNullOrWhiteSpace(details)
-                    ? $"{module.DisplayName} is disconnected or not protecting this session."
-                    : $"{module.DisplayName}: {details}");
+                continue;
             }
+
+            var details = validator.ProtectionStatusMessage;
+            throw new SessionException(string.IsNullOrWhiteSpace(details)
+                ? $"{module.DisplayName} {failureMessage}"
+                : $"{module.DisplayName}: {details}");
         }
     }
 
-    private static async Task ValidateCommittedModuleSetupAsync(List<ActiveModule> modules,
-        CancellationToken cancellationToken)
+    private void UpdateHealthyProtectionStatus()
     {
-        foreach (var module in modules)
+        if (_activeModules.Any(module =>
+                module.Instance is ICommittedSessionValidator { IsProtectionDegraded: true }))
         {
-            if (module.Instance is ICommittedSessionValidator validator &&
-                !await validator.CanStartCommittedSessionAsync(cancellationToken).ConfigureAwait(false))
-            {
-                var details = validator.ProtectionStatusMessage;
-                throw new SessionException(string.IsNullOrWhiteSpace(details)
-                    ? $"{module.DisplayName} is disconnected or unavailable for this session."
-                    : $"{module.DisplayName}: {details}");
-            }
+            ProtectionStatus = BuildProtectionStatus("Protection degraded", _activeModules);
+            _protectionWasUnavailable = true;
+            return;
         }
+
+        ProtectionStatus = BuildProtectionStatus(
+            _protectionWasUnavailable ? "Protection recovered" : "Protection active", _activeModules);
+        _protectionWasUnavailable = false;
     }
 
     private static string BuildProtectionStatus(string state, IEnumerable<ActiveModule> modules)
@@ -1043,18 +977,9 @@ public class SessionManager(
         return string.IsNullOrWhiteSpace(details) ? state : $"{state} · {details}";
     }
 
-    private TimeSpan GetRemainingSessionTime()
-    {
-        if (!_sessionEndsAtTimestamp.HasValue)
-        {
-            return TimeSpan.Zero;
-        }
-
-        var remainingTicks = _sessionEndsAtTimestamp.Value - System.Diagnostics.Stopwatch.GetTimestamp();
-        return remainingTicks <= 0
-            ? TimeSpan.Zero
-            : TimeSpan.FromSeconds((double)remainingTicks / System.Diagnostics.Stopwatch.Frequency);
-    }
+    private TimeSpan GetRemainingSessionTime() => _sessionEndsAtTimestamp is { } deadline
+        ? MonotonicTime.RemainingUntil(deadline)
+        : TimeSpan.Zero;
 
     private async Task<bool> StopSessionAsync(SessionEndReason reason, CancellationToken cancellationToken)
     {
@@ -1062,7 +987,7 @@ public class SessionManager(
         try
         {
             if (reason == SessionEndReason.UserStop &&
-                ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or FocusCommitmentMode.Strict)
+                ActiveSession?.FocusCommitment.IsCommitted == true)
             {
                 throw new SessionException("This committed session cannot be stopped. Use Emergency Unlock to end it early.");
             }
@@ -1075,9 +1000,8 @@ public class SessionManager(
 
             logger.LogInformation("Stopping current session...");
 
-            var wasCommittedSession = ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
-                FocusCommitmentMode.Strict;
-            if (ActiveSession?.FocusCommitment.Mode == FocusCommitmentMode.Strict)
+            var wasCommittedSession = ActiveSession?.FocusCommitment.IsCommitted == true;
+            if (ActiveSession?.FocusCommitment.IsStrict == true)
             {
                 if (_commitmentProtection == null)
                 {
@@ -1098,9 +1022,7 @@ public class SessionManager(
             // Signal cancellation to any running startup tasks immediately
             _sessionCts?.Cancel();
 
-            // Stop modules in reverse order (LIFO)
-            // We do this sequentially to ensure dependencies (if any implicit ones exist) are torn down correctly.
-            // Parallel stopping is risky as one module might depend on another being alive during shutdown.
+            // Stop in reverse order so dependencies stay alive during teardown.
             for (var i = _activeModules.Count - 1; i >= 0; i--)
             {
                 var activeModule = _activeModules[i];
@@ -1132,7 +1054,6 @@ public class SessionManager(
                 }
             }
 
-            // Dispose all scopes
             foreach (var activeModule in _activeModules)
             {
                 try
@@ -1240,20 +1161,17 @@ public class SessionManager(
 
     private void SaveCommittedSessionState(SessionPreset preset, DateTimeOffset startedAt, DateTimeOffset endDeadline)
     {
-        if (string.IsNullOrWhiteSpace(_committedSessionPath))
+        var path = _committedSessionPath;
+        if (string.IsNullOrWhiteSpace(path))
         {
-            throw new SessionException("Committed sessions cannot start because recovery storage is unavailable.");
+            throw new SessionException("Committed session recovery state path is not configured.");
         }
 
-        var directory = Path.GetDirectoryName(_committedSessionPath);
-        if (string.IsNullOrWhiteSpace(directory))
-        {
-            throw new SessionException("Committed session recovery storage path is invalid.");
-        }
+        _ = GetCommittedStateDirectory();
 
         try
         {
-            CommittedSessionStateFile.WritePayload(_committedSessionPath, JsonSerializer.Serialize(
+            CommittedSessionStateFile.WritePayload(path, JsonSerializer.Serialize(
                 new PersistedCommittedSession(preset, startedAt, endDeadline, _breaksUsed, BreakEndsAt),
                 CommittedSessionJsonOptions));
         }
@@ -1272,50 +1190,14 @@ public class SessionManager(
 
         try
         {
-            if (File.Exists(_committedSessionPath))
-            {
-                File.Delete(_committedSessionPath);
-            }
-
-            var tempPath = _committedSessionPath + ".tmp";
-            if (File.Exists(tempPath))
-            {
-                File.Delete(tempPath);
-            }
+            File.Delete(_committedSessionPath);
+            File.Delete(_committedSessionPath + ".tmp");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to clear committed session recovery state.");
         }
     }
-
-    private static SessionPreset CreateSnapshot(SessionPreset preset) => new()
-    {
-        Version = preset.Version,
-        Id = preset.Id,
-        Name = preset.Name,
-        FocusCommitment = new FocusCommitmentOptions
-        {
-            Mode = preset.FocusCommitment.Mode,
-            EndCondition = preset.FocusCommitment.EndCondition,
-            Duration = preset.FocusCommitment.Duration,
-            EndAtLocalTime = preset.FocusCommitment.EndAtLocalTime,
-            EndAtDaysOfWeek = [.. preset.FocusCommitment.EndAtDaysOfWeek ?? []],
-            BreakCount = preset.FocusCommitment.BreakCount,
-            BreakDuration = preset.FocusCommitment.BreakDuration,
-            AfterEnd = preset.FocusCommitment.AfterEnd,
-            NextWorkspaceId = preset.FocusCommitment.NextWorkspaceId,
-            ScheduleLockMinutes = preset.FocusCommitment.ScheduleLockMinutes
-        },
-        Modules = [.. preset.Modules.Select(module => new ConfiguredModule
-        {
-            InstanceId = module.InstanceId,
-            ModuleId = module.ModuleId,
-            CustomName = module.CustomName,
-            StartDelay = module.StartDelay,
-            Settings = new Dictionary<string, string>(module.Settings)
-        })]
-    };
 
     private static DateTimeOffset? GetSessionEnd(FocusCommitmentOptions options, DateTimeOffset localNow)
     {
@@ -1325,7 +1207,7 @@ public class SessionManager(
             return null;
         }
 
-        if (options.Mode is not (FocusCommitmentMode.Locked or FocusCommitmentMode.Strict))
+        if (!options.IsCommitted)
         {
             throw new SessionException("Invalid Focus commitment mode.");
         }
@@ -1335,7 +1217,7 @@ public class SessionManager(
             FocusEndCondition.Duration when options.Duration is { } duration && duration > TimeSpan.Zero =>
                 DateTimeOffset.UtcNow.Add(duration),
             FocusEndCondition.EndAt when options.EndAtLocalTime is { } endTime =>
-                ResolveEndAt(endTime, options.EndAtDaysOfWeek, localNow),
+                ResolveEndAt(endTime, options.EndAtDaysOfWeek, localNow, TimeZoneInfo.Local),
             _ => throw new SessionException("Locked and Strict sessions require a valid end condition.")
         };
     }
@@ -1376,19 +1258,19 @@ public class SessionManager(
         }
     }
 
-    private void CheckCommittedStateStorage()
+    private string GetCommittedStateDirectory()
     {
         if (string.IsNullOrWhiteSpace(_committedSessionPath))
-        {
             throw new SessionException("Committed sessions cannot start because recovery storage is unavailable.");
-        }
 
-        var directory = Path.GetDirectoryName(_committedSessionPath);
-        if (string.IsNullOrWhiteSpace(directory))
-        {
-            throw new SessionException("Committed session recovery storage path is invalid.");
-        }
+        return Path.GetDirectoryName(_committedSessionPath) is { Length: > 0 } directory
+            ? directory
+            : throw new SessionException("Committed session recovery storage path is invalid.");
+    }
 
+    private void CheckCommittedStateStorage()
+    {
+        var directory = GetCommittedStateDirectory();
         var probe = Path.Combine(directory, $".commitment-preflight-{Guid.NewGuid():N}");
         try
         {
@@ -1413,11 +1295,7 @@ public class SessionManager(
     }
 
     private static DateTimeOffset ResolveEndAt(TimeOnly endTime, IReadOnlyCollection<DayOfWeek> daysOfWeek,
-        DateTimeOffset localNow)
-        => ResolveEndAt(endTime, daysOfWeek, localNow, TimeZoneInfo.Local);
-
-    private static DateTimeOffset ResolveEndAt(TimeOnly endTime, IReadOnlyCollection<DayOfWeek> daysOfWeek,
-        DateTimeOffset localNow, TimeZoneInfo localTimeZone)
+        DateTimeOffset localNow, TimeZoneInfo timeZone)
     {
         for (var daysAhead = 0; daysAhead <= 7; daysAhead++)
         {
@@ -1428,14 +1306,14 @@ public class SessionManager(
             }
 
             var localEnd = DateTime.SpecifyKind(date.Add(endTime.ToTimeSpan()), DateTimeKind.Unspecified);
-            while (localTimeZone.IsInvalidTime(localEnd))
+            while (timeZone.IsInvalidTime(localEnd))
             {
                 localEnd = localEnd.AddMinutes(1);
             }
 
-            var offset = localTimeZone.IsAmbiguousTime(localEnd)
-                ? localTimeZone.GetAmbiguousTimeOffsets(localEnd).Max()
-                : localTimeZone.GetUtcOffset(localEnd);
+            var offset = timeZone.IsAmbiguousTime(localEnd)
+                ? timeZone.GetAmbiguousTimeOffsets(localEnd).Max()
+                : timeZone.GetUtcOffset(localEnd);
             var end = new DateTimeOffset(localEnd, offset);
             if (end > localNow)
             {
@@ -1446,25 +1324,6 @@ public class SessionManager(
         throw new SessionException("Fixed Time does not include a valid end day.");
     }
 
-    private static long GetStopwatchDeadline(TimeSpan remaining)
-    {
-        var ticks = (long)(Math.Max(0, remaining.TotalSeconds) * System.Diagnostics.Stopwatch.Frequency);
-        var now = System.Diagnostics.Stopwatch.GetTimestamp();
-        return ticks > long.MaxValue - now ? long.MaxValue : now + ticks;
-    }
-
-    /// <inheritdoc />
-    public IModule? GetActiveModuleInstance(Guid moduleId)
-    {
-        lock (_syncLock)
-        {
-            return _activeModules
-                .FirstOrDefault(m => m.Configuration.ModuleId == moduleId)
-                ?.Instance;
-        }
-    }
-
-    /// <inheritdoc />
     public IModule? GetActiveModuleInstanceByInstanceId(Guid instanceId)
     {
         lock (_syncLock)
@@ -1484,88 +1343,32 @@ public class SessionManager(
                 return null;
             }
 
-            var modules = new List<SessionModuleSnapshot>();
-
-            foreach (var active in _activeModules)
-            {
-                var settings = new List<SessionSettingSnapshot>();
-                foreach (var setting in active.Instance.GetSettings())
-                {
-                    settings.Add(new SessionSettingSnapshot(
-                        setting.Key,
-                        setting.GetCurrentLabel(),
-                        setting.Description,
-                        setting.ControlType,
-                        setting.Persistence,
-                        setting.GetCurrentReadOnly(),
-                        setting.GetCurrentVisibility(),
-                        setting.ValueType.Name,
-                        setting.GetValueAsString()));
-                }
-
-                var actions = new List<SessionActionSnapshot>();
-                foreach (var action in active.Instance.GetActions())
-                {
-                    actions.Add(new SessionActionSnapshot(
-                        action.Key,
-                        action.GetCurrentLabel(),
-                        action.GetCurrentEnabled()));
-                }
-
-                modules.Add(new SessionModuleSnapshot(
-                    active.Configuration.InstanceId,
-                    active.Configuration.ModuleId,
-                    active.Definition.Name,
-                    active.Configuration.CustomName,
-                    settings,
-                    actions));
-            }
-
-            return new SessionSnapshot(ActiveSession.Id, ActiveSession.Name, modules);
+            return new SessionSnapshot(
+                ActiveSession.Id,
+                ActiveSession.Name,
+                _activeModules.Select(CreateModuleSnapshot).ToList());
         }
     }
 
-    /// <inheritdoc />
-    public SessionModuleSnapshot? GetModuleSnapshotByInstanceId(Guid instanceId)
-    {
-        lock (_syncLock)
-        {
-            if (!IsSessionRunning || ActiveSession == null)
-            {
-                return null;
-            }
-
-            var active = _activeModules.FirstOrDefault(m => m.Configuration.InstanceId == instanceId);
-            if (active == null)
-            {
-                return null;
-            }
-
-            var settings = active.Instance.GetSettings().Select(setting => new SessionSettingSnapshot(
-                setting.Key,
-                setting.GetCurrentLabel(),
-                setting.Description,
-                setting.ControlType,
-                setting.Persistence,
-                setting.GetCurrentReadOnly(),
-                setting.GetCurrentVisibility(),
-                setting.ValueType.Name,
-                setting.GetValueAsString())).ToList();
-
-            var actions = active.Instance.GetActions().Select(action => new SessionActionSnapshot(
-                action.Key,
-                action.GetCurrentLabel(),
-                action.GetCurrentEnabled())).ToList();
-
-            return new SessionModuleSnapshot(
-                active.Configuration.InstanceId,
-                active.Configuration.ModuleId,
-                active.Definition.Name,
-                active.Configuration.CustomName,
-                settings,
-                actions);
-        }
-    }
+    private static SessionModuleSnapshot CreateModuleSnapshot(ActiveModule active) => new(
+        active.Configuration.InstanceId,
+        active.Configuration.ModuleId,
+        active.Definition.Name,
+        active.Configuration.CustomName,
+        active.Instance.GetSettings().Select(setting => new SessionSettingSnapshot(
+            setting.Key,
+            setting.GetCurrentLabel(),
+            setting.Description,
+            setting.ControlType,
+            setting.Persistence,
+            setting.GetCurrentReadOnly(),
+            setting.GetCurrentVisibility(),
+            setting.ValueType.Name,
+            setting.GetValueAsString())).ToList(),
+        active.Instance.GetActions().Select(action => new SessionActionSnapshot(
+            action.Key,
+            action.GetCurrentLabel(),
+            action.GetCurrentEnabled())).ToList());
 
     private void TrackModuleFailed(ActiveModule module, string failureReason, long latencyMs)
     {
@@ -1617,7 +1420,7 @@ public class SessionManager(
             ["presetId"] = presetId,
             ["startSource"] = startSource,
             ["stage"] = stage,
-            ["failureReason"] = GetFailureReason(exception),
+            ["failureReason"] = ProductAnalyticsProperties.FailureReason(exception),
             ["result"] = "failed"
         });
     }
@@ -1625,27 +1428,10 @@ public class SessionManager(
     private void TrackSessionStarted(SessionPreset preset, List<ActiveModule> modules)
     {
         if (!telemetry.IsEnabled) return;
-        var moduleSummaries = modules.Select(module => ProductAnalyticsProperties.Module(
-            module.Configuration, module.Definition.Name,
-            ProductAnalyticsProperties.HasHomeAssistantAccessToken(module.Configuration,
-                module.Definition.Name, _secureStorage))).ToArray();
 
-        var properties = new Dictionary<string, object?>
-        {
-            ["sessionInstanceId"] = _sessionInstanceId,
-            ["presetId"] = preset.Id,
-            ["startSource"] = _sessionStartSource,
-            ["moduleCount"] = modules.Count,
-            ["modules"] = moduleSummaries,
-            ["moduleIds"] = modules.Select(module => module.Configuration.ModuleId.ToString()).ToArray(),
-            ["moduleTypes"] = moduleSummaries.Select(module => (string)module["moduleName"]!).Distinct().ToArray(),
-            ["protectionState"] = GetProtectionState(ProtectionStatus)
-        };
-        foreach (var (key, value) in ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment))
-        {
-            properties[key] = value;
-        }
-        if (_sessionScheduleId.HasValue) properties["scheduleId"] = _sessionScheduleId.Value;
+        var properties = SessionTelemetryProperties(
+            preset, modules, _sessionInstanceId, _sessionStartSource, _sessionScheduleId);
+        properties["protectionState"] = GetProtectionState(ProtectionStatus);
         telemetry.TrackEvent("SessionStarted", properties);
     }
 
@@ -1654,9 +1440,28 @@ public class SessionManager(
         bool emergencyUnlockUsed, bool protectionDegraded, Guid? scheduleId)
     {
         if (!telemetry.IsEnabled) return;
-        var durationMs = startedAt.HasValue
+
+        var properties = SessionTelemetryProperties(preset, modules, sessionInstanceId, startSource, scheduleId);
+        properties["stopReason"] = reason switch
+        {
+            SessionEndReason.NaturalCompletion => "natural_completion",
+            SessionEndReason.EmergencyUnlock => "emergency_unlock",
+            SessionEndReason.StartupFailure => "startup_failure",
+            _ => "user_stop"
+        };
+        properties["completedAsPlanned"] = reason == SessionEndReason.NaturalCompletion;
+        properties["durationMs"] = startedAt.HasValue
             ? (long)(DateTimeOffset.UtcNow - startedAt.Value).TotalMilliseconds
-            : (long?)null;
+            : null;
+        properties["breaksUsed"] = breaksUsed;
+        properties["emergencyUnlockUsed"] = emergencyUnlockUsed;
+        properties["protectionDegraded"] = protectionDegraded;
+        telemetry.TrackEvent("SessionStopped", properties);
+    }
+
+    private Dictionary<string, object?> SessionTelemetryProperties(SessionPreset preset, List<ActiveModule> modules,
+        Guid? sessionInstanceId, string startSource, Guid? scheduleId)
+    {
         var moduleSummaries = modules.Select(module => ProductAnalyticsProperties.Module(
             module.Configuration, module.Definition.Name,
             ProductAnalyticsProperties.HasHomeAssistantAccessToken(module.Configuration,
@@ -1666,34 +1471,19 @@ public class SessionManager(
             ["sessionInstanceId"] = sessionInstanceId,
             ["presetId"] = preset.Id,
             ["startSource"] = startSource,
-            ["stopReason"] = StopReason(reason),
-            ["completedAsPlanned"] = reason == SessionEndReason.NaturalCompletion,
             ["moduleCount"] = modules.Count,
             ["modules"] = moduleSummaries,
             ["moduleIds"] = modules.Select(module => module.Configuration.ModuleId.ToString()).ToArray(),
-            ["moduleTypes"] = moduleSummaries.Select(module => (string)module["moduleName"]!).Distinct().ToArray(),
-            ["durationMs"] = durationMs,
-            ["breaksUsed"] = breaksUsed,
-            ["emergencyUnlockUsed"] = emergencyUnlockUsed,
-            ["protectionDegraded"] = protectionDegraded
+            ["moduleTypes"] = moduleSummaries.Select(module => (string)module["moduleName"]!).Distinct().ToArray()
         };
         foreach (var (key, value) in ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment))
         {
             properties[key] = value;
         }
         if (scheduleId.HasValue) properties["scheduleId"] = scheduleId.Value;
-        telemetry.TrackEvent("SessionStopped", properties);
+        return properties;
     }
 
-    private static string GetFailureReason(Exception exception) => ProductAnalyticsProperties.FailureReason(exception);
-
-    private static string StopReason(SessionEndReason reason) => reason switch
-    {
-        SessionEndReason.NaturalCompletion => "natural_completion",
-        SessionEndReason.EmergencyUnlock => "emergency_unlock",
-        SessionEndReason.StartupFailure => "startup_failure",
-        _ => "user_stop"
-    };
 
     private static string GetProtectionState(string status) => status switch
     {
@@ -1704,9 +1494,6 @@ public class SessionManager(
         _ => "inactive"
     };
 
-    /// <summary>
-    ///     Asynchronously disposes the SessionManager and ensures any active session is stopped cleanly.
-    /// </summary>
     public async ValueTask DisposeAsync()
     {
         if (IsSessionRunning && ActiveSession?.FocusCommitment.Mode == FocusCommitmentMode.Normal)

@@ -1,4 +1,4 @@
-﻿Business Source License 1.1
+Business Source License 1.1
 
 Licensor: Axorith Labs
 

@@ -49,17 +49,7 @@ public sealed class SessionDashboardRegressionTests
         {
             var client = CreateDefaultClient();
             var token = File.ReadAllText(Path.Combine(dataPath, "config", ".auth_token"));
-            var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-            {
-                metadata.Add("x-axorith-auth-token", token);
-                return Task.CompletedTask;
-            });
-            return GrpcChannel.ForAddress(client.BaseAddress!, new GrpcChannelOptions
-            {
-                HttpClient = client,
-                Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-                UnsafeUseInsecureChannelCallCredentials = true
-            });
+            return TestGrpc.CreateAuthenticatedChannel(client, token);
         }
     }
 
@@ -198,7 +188,7 @@ public sealed class SessionDashboardRegressionTests
         using var vm = new ConfiguredModuleViewModel((await api.ListModulesAsync()).Single(), model, api, services);
         await WaitUntil(() => !vm.IsLoading);
         var picker = vm.Settings.Single(setting => setting.Setting.Key == "AppToAdd");
-        var names = new[] { "axaudacity" + Guid.NewGuid().ToString("N")[..6], "axonenote" + Guid.NewGuid().ToString("N")[..6] };
+        var names = new[] { "waitfor", "axonenote" + Guid.NewGuid().ToString("N")[..6] };
         foreach (var name in names)
         {
             await ((ReactiveUI.ReactiveCommand<KeyValuePair<string, string>, System.Reactive.Unit>)picker.SelectChoiceCommand)
@@ -217,26 +207,24 @@ public sealed class SessionDashboardRegressionTests
         await manager.StartSessionAsync(loaded);
         try
         {
-            foreach (var name in names)
+            var waitFor = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "waitfor.exe");
+            using var process = Process.Start(new ProcessStartInfo(waitFor, $"/t 60 Axorith{Guid.NewGuid():N}")
+                { UseShellExecute = false, CreateNoWindow = true })!;
+            try
             {
-                // Unique copies of a real Windows executable avoid touching the user's applications.
-                var executable = Path.Combine(dataPath, name + ".exe");
-                File.Copy(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "ping.exe"), executable);
-                using var process = Process.Start(new ProcessStartInfo(executable, "-t 127.0.0.1")
-                    { UseShellExecute = false, CreateNoWindow = true })!;
-                try
-                {
-                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-                    await process.WaitForExitAsync(timeout.Token);
-                    Assert.NotEqual(0, process.ExitCode);
-                }
-                finally
-                {
-                    if (!process.HasExited) { process.Kill(); await process.WaitForExitAsync(); }
-                }
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                await process.WaitForExitAsync(timeout.Token);
+                Assert.NotEqual(0, process.ExitCode);
+            }
+            finally
+            {
+                if (!process.HasExited) { process.Kill(); await process.WaitForExitAsync(); }
             }
         }
-        finally { await manager.StopCurrentSessionAsync(); }
+        finally
+        {
+            await manager.StopCurrentSessionAsync();
+        }
     }
 
     [Fact]
@@ -287,4 +275,3 @@ public sealed class SessionDashboardRegressionTests
     private static Task RefreshState(MainViewModel vm) =>
         (Task)typeof(MainViewModel).GetMethod("RefreshSessionStateAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, null)!;
 }
-

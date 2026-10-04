@@ -1,7 +1,6 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
-using System.Threading.Channels;
 using System.Windows.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -10,16 +9,15 @@ using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk.Services;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-/// <summary>
-///     ViewModel for the main dashboard view. Manages the list of presets and session lifecycle commands.
-/// </summary>
-public class MainViewModel : ReactiveObject, IDisposable
+public partial class MainViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
     private readonly IPresetsApi _presetsApi;
@@ -28,47 +26,23 @@ public class MainViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
     private readonly ITelemetryService? _telemetry;
-    private readonly IClientOnboardingService? _onboardingService;
     private readonly IToastNotificationService? _toastService;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> TrackedUpdateVersions =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public SessionPresetViewModel? SelectedPreset
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial SessionPresetViewModel? SelectedPreset { get; set; }
 
-    public Guid? ActiveSessionPresetId
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial Guid? ActiveSessionPresetId { get; private set; }
 
     private bool _sessionStateFailureNotified;
 
-    public bool IsSessionActive
-    {
-        get;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(IsCommittedSession));
-            this.RaisePropertyChanged(nameof(CanStopSession));
-            this.RaisePropertyChanged(nameof(HasActiveSessionName));
-        }
-    }
+    [Reactive(nameof(IsCommittedSession), nameof(CanStopSession), nameof(HasActiveSessionName))]
+    public partial bool IsSessionActive { get; private set; }
 
-    public FocusCommitmentMode ActiveFocusCommitmentMode
-    {
-        get;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(IsCommittedSession));
-            this.RaisePropertyChanged(nameof(CanStopSession));
-        }
-    }
+    [Reactive(nameof(IsCommittedSession), nameof(CanStopSession))]
+    public partial FocusCommitmentMode ActiveFocusCommitmentMode { get; private set; }
 
     public bool IsCommittedSession => IsSessionActive && ActiveFocusCommitmentMode != FocusCommitmentMode.Normal;
     public bool CanStopSession => IsSessionActive && !IsCommittedSession;
@@ -80,50 +54,18 @@ public class MainViewModel : ReactiveObject, IDisposable
         _ => "Normal"
     };
 
-    private string _activeWorkspaceName = string.Empty;
-    public string ActiveWorkspaceName
-    {
-        get => _activeWorkspaceName;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _activeWorkspaceName, value);
-            this.RaisePropertyChanged(nameof(HasActiveSessionName));
-        }
-    }
+    [Reactive(nameof(HasActiveSessionName))]
+    public partial string ActiveWorkspaceName { get; private set; } = string.Empty;
     public bool HasActiveSessionName => IsSessionActive && !string.IsNullOrWhiteSpace(ActiveWorkspaceName);
-    private string _activeSessionRemaining = string.Empty;
-    public string ActiveSessionRemaining
-    {
-        get => _activeSessionRemaining;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _activeSessionRemaining, value);
-        }
-    }
-    private string _activeSessionEndTime = string.Empty;
-    public string ActiveSessionEndTime { get => _activeSessionEndTime; private set => this.RaiseAndSetIfChanged(ref _activeSessionEndTime, value); }
-    private string _activeBreakStatus = string.Empty;
-    public string ActiveBreakStatus
-    {
-        get => _activeBreakStatus;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _activeBreakStatus, value);
-            this.RaisePropertyChanged(nameof(HasActiveBreakStatus));
-        }
-    }
+    [Reactive]
+    public partial string ActiveSessionRemaining { get; private set; } = string.Empty;
+    [Reactive]
+    public partial string ActiveSessionEndTime { get; private set; } = string.Empty;
+    [Reactive(nameof(HasActiveBreakStatus))]
+    public partial string ActiveBreakStatus { get; private set; } = string.Empty;
     public bool HasActiveBreakStatus => !string.IsNullOrWhiteSpace(ActiveBreakStatus);
-    private string _activeProtectionStatus = "Protection inactive";
-    public string ActiveProtectionStatus
-    {
-        get => _activeProtectionStatus;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _activeProtectionStatus, value);
-            this.RaisePropertyChanged(nameof(ActiveProtectionBrush));
-            this.RaisePropertyChanged(nameof(IsProtectionAttentionVisible));
-        }
-    }
+    [Reactive(nameof(ActiveProtectionBrush), nameof(IsProtectionAttentionVisible))]
+    public partial string ActiveProtectionStatus { get; private set; } = "Protection inactive";
     public bool IsProtectionAttentionVisible =>
         ActiveProtectionStatus.StartsWith("Protection failed", StringComparison.Ordinal) ||
         ActiveProtectionStatus.StartsWith("Protection degraded", StringComparison.Ordinal);
@@ -135,98 +77,50 @@ public class MainViewModel : ReactiveObject, IDisposable
         var status when status.StartsWith("Protection active", StringComparison.Ordinal) => Brushes.LightGreen,
         _ => Brushes.Gray
     };
-    private bool _canStartBreak;
-    public bool CanStartBreak { get => _canStartBreak; private set => this.RaiseAndSetIfChanged(ref _canStartBreak, value); }
+    [Reactive]
+    public partial bool CanStartBreak { get; private set; }
     public ICommand StartBreakCommand { get; }
 
-    public bool IsEmergencyUnlockOpen
-    {
-        get;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(IsOverlayOpen));
-        }
-    }
+    [Reactive(nameof(IsOverlayOpen))]
+    public partial bool IsEmergencyUnlockOpen { get; private set; }
 
-    public double EmergencyUnlockProgress
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial double EmergencyUnlockProgress { get; private set; }
 
-    public string EmergencyUnlockError
-    {
-        get;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(HasEmergencyUnlockError));
-        }
-    } = string.Empty;
+    [Reactive(nameof(HasEmergencyUnlockError))]
+    public partial string EmergencyUnlockError { get; private set; } = string.Empty;
     public bool HasEmergencyUnlockError => !string.IsNullOrWhiteSpace(EmergencyUnlockError);
 
-    public bool IsStartConfirmationOpen
-    {
-        get;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(IsOverlayOpen));
-        }
-    }
+    [Reactive(nameof(IsOverlayOpen))]
+    public partial bool IsStartConfirmationOpen { get; private set; }
 
     public bool IsOverlayOpen => IsStartConfirmationOpen || IsEmergencyUnlockOpen;
 
-    public bool IsStartCountdownRunning
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool IsStartCountdownRunning { get; private set; }
 
-    public bool IsDestructiveStartReviewAfterEnd
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool IsDestructiveStartReviewAfterEnd { get; private set; }
 
-    public int StartCountdownSeconds
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial int StartCountdownSeconds { get; private set; }
 
-    public string StartReviewWorkspaceName
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string StartReviewWorkspaceName { get; private set; } = string.Empty;
 
-    public string StartReviewTitle
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string StartReviewTitle { get; private set; } = string.Empty;
 
-    public bool IsStrictStartReview => _pendingStartPreset?.Model.FocusCommitment.Mode == FocusCommitmentMode.Strict;
+    public bool IsStrictStartReview => _pendingStartPreset?.Model.FocusCommitment.IsStrict == true;
 
-    public string StartReviewEndTime
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string StartReviewEndTime { get; private set; } = string.Empty;
 
-    public string StartReviewBreakPolicy
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string StartReviewBreakPolicy { get; private set; } = string.Empty;
 
-    public string StartReviewAfterEnd
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string StartReviewAfterEnd { get; private set; } = string.Empty;
 
     private CancellationTokenSource? _emergencyUnlockCts;
     private CancellationTokenSource? _startCountdownCts;
@@ -245,29 +139,17 @@ public class MainViewModel : ReactiveObject, IDisposable
     private string _activeSessionName = string.Empty;
     private bool _isPresetsPage;
 
-    public bool UpdateAvailable
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool UpdateAvailable { get; private set; }
 
-    public string? UpdateVersion
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial string? UpdateVersion { get; private set; }
 
-    public bool IsDownloadingUpdate
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial bool IsDownloadingUpdate { get; private set; }
 
-    public double DownloadProgress
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial double DownloadProgress { get; private set; }
 
     private UpdateInfoDto? _availableUpdate;
 
@@ -278,115 +160,58 @@ public class MainViewModel : ReactiveObject, IDisposable
     public ObservableCollection<string> RecentSessions { get; } = [];
     public bool HasRecentSessions => RecentSessions.Count > 0;
 
-    public string FocusTodayLabel
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "0 min";
+    [Reactive]
+    public partial string FocusTodayLabel { get; private set; } = "0 min";
 
-    public int SessionsThisWeek
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
+    [Reactive]
+    public partial int SessionsThisWeek { get; private set; }
 
-    public string FocusThisWeekLabel
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "0 min";
+    [Reactive]
+    public partial string FocusThisWeekLabel { get; private set; } = "0 min";
 
-    public double[] FocusActivityValues
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = new double[7];
+    [Reactive]
+    public partial double[] FocusActivityValues { get; private set; } = new double[7];
 
     public bool HasSessionActivity => _sessionHistory.Count > 0 || _activeSessionStartedAt.HasValue;
 
-    public string NextScheduledPresetName
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string NextScheduledPresetName { get; private set; } = string.Empty;
 
-    public string NextScheduledTime
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string NextScheduledTime { get; private set; } = string.Empty;
 
-    public string UpcomingScheduleStatus
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "No scheduled preset.";
+    [Reactive]
+    public partial string UpcomingScheduleStatus { get; private set; } = "No scheduled preset.";
 
     public bool HasUpcomingSchedule => !string.IsNullOrWhiteSpace(NextScheduledPresetName);
 
-    public string ActiveBreakPolicy
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "No breaks available";
+    [Reactive]
+    public partial string ActiveBreakPolicy { get; private set; } = "No breaks available";
 
-    public string ActiveAfterEndBehavior
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
+    [Reactive]
+    public partial string ActiveAfterEndBehavior { get; private set; } = string.Empty;
 
-    /// <summary>
-    ///     Command to delete the currently selected preset.
-    /// </summary>
     public ICommand DeleteSelectedCommand { get; }
 
-    /// <summary>
-    ///     Command to open the editor for the currently selected preset.
-    /// </summary>
     public ICommand EditSelectedCommand { get; }
 
-    /// <summary>
-    ///     Command to start a session with the currently selected preset.
-    /// </summary>
     public ICommand StartSelectedCommand { get; }
 
-    /// <summary>
-    ///     Command to stop the currently active session.
-    /// </summary>
     public ICommand StopSessionCommand { get; }
 
-    /// <summary>
-    ///     Command to reload the list of presets from storage.
-    /// </summary>
     public ICommand LoadPresetsCommand { get; }
 
-    /// <summary>
-    ///     Command to open the editor to create a new preset.
-    /// </summary>
     public ICommand CreateSessionCommand { get; }
 
     public ICommand OpenSettingsCommand { get; }
-
-    public ICommand ShowHomeCommand { get; }
-
-    public ICommand ShowPresetsCommand { get; }
 
     public ICommand CheckForUpdatesCommand { get; }
 
     public ICommand InstallUpdateCommand { get; }
 
-    public ICommand RunSetupWizardCommand { get; }
     public ICommand OpenEmergencyUnlockCommand { get; }
     public ICommand CloseEmergencyUnlockCommand { get; }
-    public ICommand ConfirmStartCommand { get; }
-    public ICommand CancelStartCommand { get; }
 
-    public bool IsRunningSetup
-    {
-        get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
-    }
 
     public MainViewModel(ShellViewModel shell, IPresetsApi presetsApi, ISessionsApi sessionsApi,
         IUpdatesApi updatesApi, IServiceProvider serviceProvider)
@@ -397,7 +222,6 @@ public class MainViewModel : ReactiveObject, IDisposable
         _updatesApi = updatesApi;
         _serviceProvider = serviceProvider;
         _telemetry = serviceProvider.GetService<ITelemetryService>();
-        _onboardingService = serviceProvider.GetService<IClientOnboardingService>();
         _toastService = serviceProvider.GetService<IToastNotificationService>();
         _activeSessionClock.Tick += (_, _) =>
         {
@@ -431,9 +255,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                         _activeSessionStartedAt = null;
                         _activeSessionName = string.Empty;
                         _ = RefreshSessionStateAsync();
-                        SetActiveSessionPreset(null);
-                        ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
-                        IsSessionActive = false;
+                        ClearActiveSession();
                         IsEmergencyUnlockOpen = false;
                         ResetActiveSessionDetails();
                         break;
@@ -471,17 +293,20 @@ public class MainViewModel : ReactiveObject, IDisposable
                 (isActive, overlayOpen) => !isActive && !overlayOpen)
             .ObserveOn(RxApp.MainThreadScheduler);
         var canStopSession = this
-            .WhenAnyValue(vm => vm.IsSessionActive, vm => vm.ActiveFocusCommitmentMode, vm => vm.IsOverlayOpen,
-                (active, mode, overlayOpen) => active && mode == FocusCommitmentMode.Normal && !overlayOpen)
+            .WhenAnyValue(vm => vm.CanStopSession, vm => vm.IsOverlayOpen,
+                (canStop, overlayOpen) => canStop && !overlayOpen)
             .ObserveOn(RxApp.MainThreadScheduler);
 
         DeleteSelectedCommand =
             ReactiveCommand.CreateFromTask<SessionPresetViewModel>(DeletePresetAsync, canManipulatePreset);
-        EditSelectedCommand = ReactiveCommand.Create<SessionPresetViewModel>(EditPreset, canManipulatePreset);
+        EditSelectedCommand = ReactiveCommand.Create<SessionPresetViewModel>(preset =>
+        {
+            var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
+            editor.PresetToEdit = preset.Model;
+            _shell.NavigateTo(editor);
+        }, canManipulatePreset);
         StartSelectedCommand =
             ReactiveCommand.CreateFromTask<SessionPresetViewModel>(StartPresetAsync, canManipulatePreset);
-        ConfirmStartCommand = ReactiveCommand.CreateFromTask(ConfirmStartAsync);
-        CancelStartCommand = ReactiveCommand.Create(CancelStart);
         StopSessionCommand = ReactiveCommand.CreateFromTask(StopCurrentSessionAsync, canStopSession);
         OpenEmergencyUnlockCommand = ReactiveCommand.Create(() =>
         {
@@ -497,11 +322,16 @@ public class MainViewModel : ReactiveObject, IDisposable
             IsEmergencyUnlockOpen = false;
         });
         LoadPresetsCommand = ReactiveCommand.CreateFromTask(LoadPresetsAsync, canManipulatePreset);
-        CreateSessionCommand = ReactiveCommand.Create(CreateNewSession, canManipulatePreset);
-        OpenSettingsCommand = ReactiveCommand.Create(OpenSettings,
+        CreateSessionCommand = ReactiveCommand.Create(() =>
+        {
+            _telemetry?.TrackEvent("PresetCreationStarted");
+            var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
+            editor.PresetToEdit = null;
+            _shell.NavigateTo(editor);
+        }, canManipulatePreset);
+        OpenSettingsCommand = ReactiveCommand.Create(
+            () => _shell.NavigateTo(_serviceProvider.GetRequiredService<SettingsViewModel>()),
             this.WhenAnyValue(vm => vm.IsOverlayOpen, overlayOpen => !overlayOpen));
-        ShowHomeCommand = ReactiveCommand.Create(ShowHome);
-        ShowPresetsCommand = ReactiveCommand.Create(ShowPresets);
         CheckForUpdatesCommand = ReactiveCommand.CreateFromTask(CheckForUpdatesAsync);
 
         var canInstallUpdate = this
@@ -514,13 +344,8 @@ public class MainViewModel : ReactiveObject, IDisposable
             this.WhenAnyValue(vm => vm.CanStartBreak, vm => vm.IsOverlayOpen,
                 (canStart, overlayOpen) => canStart && !overlayOpen));
 
-        var canRunSetup = this.WhenAnyValue(vm => vm.IsRunningSetup, running => !running);
-        RunSetupWizardCommand = ReactiveCommand.CreateFromTask(RunSetupWizardAsync, canRunSetup);
     }
 
-    /// <summary>
-    ///     Asynchronously initializes the ViewModel by loading the initial list of presets.
-    /// </summary>
     public async Task InitializeAsync()
     {
         await LoadPresetsAsync();
@@ -528,15 +353,11 @@ public class MainViewModel : ReactiveObject, IDisposable
         await CheckForUpdatesAsync();
     }
 
-    public void ShowHome()
-    {
-        SetPage(false);
-    }
+    [ReactiveCommand]
+    public void ShowHome() => SetPage(false);
 
-    public void ShowPresets()
-    {
-        SetPage(true);
-    }
+    [ReactiveCommand]
+    public void ShowPresets() => SetPage(true);
 
     private void SetPage(bool showPresets)
     {
@@ -560,6 +381,13 @@ public class MainViewModel : ReactiveObject, IDisposable
         {
             preset.IsActive = preset.Id == presetId;
         }
+    }
+
+    private void ClearActiveSession()
+    {
+        SetActiveSessionPreset(null);
+        ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
+        IsSessionActive = false;
     }
 
     private async Task CheckForUpdatesAsync()
@@ -664,16 +492,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
-            TrackSessionStartFailed(presetVm, sessionInstanceId, "preflight", "unknown");
-            _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
-                properties: new Dictionary<string, object?>
-                {
-                    ["sessionInstanceId"] = sessionInstanceId,
-                    ["presetId"] = presetVm.Id,
-                    ["stage"] = "preflight"
-                });
-            var error = $"Session preflight failed: {ex.Message}";
-            _toastService?.Show(error, NotificationType.Error, "Sessions");
+            TrackSessionStartError(presetVm, sessionInstanceId, "unknown", ex);
+            _toastService?.Show($"Session preflight failed: {ex.Message}", NotificationType.Error, "Sessions");
         }
     }
 
@@ -687,6 +507,19 @@ public class MainViewModel : ReactiveObject, IDisposable
             ["failureReason"] = failureReason,
             ["result"] = "failed"
         });
+
+    private void TrackSessionStartError(SessionPresetViewModel preset, Guid sessionInstanceId,
+        string failureReason, Exception exception)
+    {
+        TrackSessionStartFailed(preset, sessionInstanceId, "preflight", failureReason);
+        _telemetry?.TrackError(exception, "session", "session_start", "error", handled: true, fatal: false,
+            properties: new Dictionary<string, object?>
+            {
+                ["sessionInstanceId"] = sessionInstanceId,
+                ["presetId"] = preset.Id,
+                ["stage"] = "preflight"
+            });
+    }
 
     private void PopulateStartReview(SessionPresetViewModel presetVm)
     {
@@ -742,7 +575,8 @@ public class MainViewModel : ReactiveObject, IDisposable
         return "No valid end day is selected.";
     }
 
-    private async Task ConfirmStartAsync()
+    [ReactiveCommand]
+    private async Task ConfirmStart()
     {
         if (_pendingStartPreset == null || IsStartCountdownRunning)
         {
@@ -789,14 +623,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
-            TrackSessionStartFailed(preset, sessionInstanceId, "preflight", "network_error");
-            _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
-                properties: new Dictionary<string, object?>
-                {
-                    ["sessionInstanceId"] = sessionInstanceId,
-                    ["presetId"] = preset.Id,
-                    ["stage"] = "preflight"
-                });
+            TrackSessionStartError(preset, sessionInstanceId, "network_error", ex);
             throw;
         }
         finally
@@ -811,6 +638,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
     }
 
+    [ReactiveCommand]
     private void CancelStart()
     {
         if (_pendingStartPreset is { } preset && _pendingStartSessionInstanceId is { } sessionInstanceId)
@@ -846,9 +674,7 @@ public class MainViewModel : ReactiveObject, IDisposable
             {
                 var error = $"Failed to start session: {result.Message}";
                 _toastService?.Show(error, NotificationType.Error, "Sessions");
-                SetActiveSessionPreset(null);
-                ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
-                IsSessionActive = false;
+                ClearActiveSession();
             }
             else
             {
@@ -871,9 +697,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                 });
             var error = $"Failed to start session: {ex.Message}";
             _toastService?.Show(error, NotificationType.Error, "Sessions");
-            SetActiveSessionPreset(null);
-            ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
-            IsSessionActive = false;
+            ClearActiveSession();
         }
     }
 
@@ -906,16 +730,10 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
 
         var cts = new CancellationTokenSource();
-        var channel = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
-        {
-            FullMode = BoundedChannelFullMode.DropOldest,
-            SingleReader = true,
-            SingleWriter = true
-        });
         _emergencyUnlockCts = cts;
         EmergencyUnlockProgress = 0;
         EmergencyUnlockError = string.Empty;
-        _ = RunEmergencyUnlockHoldAsync(channel, cts);
+        _ = RunEmergencyUnlockHoldAsync(cts);
     }
 
     public void EndEmergencyUnlockHold()
@@ -930,30 +748,14 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private async Task RunEmergencyUnlockHoldAsync(Channel<bool> signals, CancellationTokenSource cts)
+    private async Task RunEmergencyUnlockHoldAsync(CancellationTokenSource cts)
     {
         var token = cts.Token;
         var completed = false;
-        var producer = Task.Run(async () =>
-        {
-            try
-            {
-                using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
-                do
-                {
-                    await signals.Writer.WriteAsync(true, token).ConfigureAwait(false);
-                } while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false));
-            }
-            catch (OperationCanceledException)
-            {
-                // Releasing the input cancels the Host-controlled hold stream.
-            }
-        }, token);
-
         try
         {
             await foreach (var progress in _sessionsApi.HoldEmergencyUnlockAsync(
-                               signals.Reader.ReadAllAsync(token), token).ConfigureAwait(false))
+                               GenerateHeldSignals(token), token).ConfigureAwait(false))
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -985,16 +787,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
         finally
         {
-            signals.Writer.TryComplete();
             cts.Cancel();
-            try
-            {
-                await producer.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected when the hold ends.
-            }
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -1024,30 +817,16 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private void EditPreset(SessionPresetViewModel presetVm)
+    private static async IAsyncEnumerable<bool> GenerateHeldSignals(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
-        editor.PresetToEdit = presetVm.Model;
-        _shell.NavigateTo(editor);
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
+        do
+        {
+            yield return true;
+        } while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
     }
 
-    private void CreateNewSession()
-    {
-        _telemetry?.TrackEvent("PresetCreationStarted");
-        var editor = _serviceProvider.GetRequiredService<SessionEditorViewModel>();
-        editor.PresetToEdit = null;
-        _shell.NavigateTo(editor);
-    }
-
-    private void OpenSettings()
-    {
-        var settings = _serviceProvider.GetRequiredService<SettingsViewModel>();
-        _shell.NavigateTo(settings);
-    }
-
-    private async Task RunSetupWizardAsync()
-    {
-    }
 
     private async Task DeletePresetAsync(SessionPresetViewModel presetVm)
     {
@@ -1131,30 +910,26 @@ public class MainViewModel : ReactiveObject, IDisposable
     {
         NextScheduledPresetName = string.Empty;
         NextScheduledTime = string.Empty;
-        UpcomingScheduleStatus = schedulesAvailable ? "No scheduled preset." : "Unable to load schedules.";
+        UpcomingScheduleStatus = "Unable to load schedules.";
 
-        if (!schedulesAvailable)
+        if (schedulesAvailable)
         {
-            this.RaisePropertyChanged(nameof(HasUpcomingSchedule));
-            return;
+            UpcomingScheduleStatus = "No scheduled preset.";
+            var now = DateTimeOffset.Now;
+            var next = schedules
+                .Select(schedule => new { Schedule = schedule, NextRun = schedule.GetNextRun(now) })
+                .Where(item => item.NextRun.HasValue)
+                .OrderBy(item => item.NextRun)
+                .FirstOrDefault();
+
+            if (next is not null && presets.FirstOrDefault(preset => preset.Id == next.Schedule.PresetId) is { } preset)
+            {
+                NextScheduledPresetName = preset.Name;
+                NextScheduledTime = next.NextRun!.Value.ToLocalTime().ToString("ddd, HH:mm");
+                UpcomingScheduleStatus = string.Empty;
+            }
         }
 
-        var now = DateTimeOffset.Now;
-        var next = schedules
-            .Select(schedule => new { Schedule = schedule, NextRun = schedule.GetNextRun(now) })
-            .Where(item => item.NextRun.HasValue)
-            .OrderBy(item => item.NextRun)
-            .FirstOrDefault();
-
-        if (next is null || presets.FirstOrDefault(preset => preset.Id == next.Schedule.PresetId) is not { } preset)
-        {
-            this.RaisePropertyChanged(nameof(HasUpcomingSchedule));
-            return;
-        }
-
-        NextScheduledPresetName = preset.Name;
-        NextScheduledTime = next.NextRun!.Value.ToLocalTime().ToString("ddd, HH:mm");
-        UpcomingScheduleStatus = string.Empty;
         this.RaisePropertyChanged(nameof(HasUpcomingSchedule));
     }
 
@@ -1181,15 +956,17 @@ public class MainViewModel : ReactiveObject, IDisposable
                     _activeSessionEndsAt = state.EndsAt;
                     _activeBreakEndsAt = state.BreakEndsAt;
                     _activeSessionRemainingDeadline = state.Remaining is { } sessionRemaining
-                        ? GetStopwatchDeadline(sessionRemaining)
+                        ? MonotonicTime.DeadlineAfter(sessionRemaining)
                         : null;
                     _activeBreakRemainingDeadline = state.BreakRemaining is { } breakRemaining
-                        ? GetStopwatchDeadline(breakRemaining)
+                        ? MonotonicTime.DeadlineAfter(breakRemaining)
                         : null;
                     _activeBreaksRemaining = state.BreaksRemaining;
                     UpdateBreakPolicy(state.PresetId);
                     ActiveAfterEndBehavior = ToAfterEndLabel(state.AfterEnd);
-                    ActiveProtectionStatus = ToProtectionLabel(state.ProtectionStatus);
+                    ActiveProtectionStatus = state.ProtectionStatus.StartsWith("Protection ", StringComparison.Ordinal)
+                        ? state.ProtectionStatus
+                        : "Protection inactive";
                     this.RaisePropertyChanged(nameof(ActiveSessionMode));
                     UpdateCanStartBreak();
                     UpdateActiveSessionClock();
@@ -1199,9 +976,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                     _activeSessionStartedAt = null;
                     _activeSessionName = string.Empty;
                     UpdateDashboardActivity(DateTimeOffset.Now);
-                    SetActiveSessionPreset(null);
-                    ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
-                    IsSessionActive = false;
+                    ClearActiveSession();
                     IsEmergencyUnlockOpen = false;
                     ResetActiveSessionDetails();
                 }
@@ -1219,9 +994,7 @@ public class MainViewModel : ReactiveObject, IDisposable
                     _sessionStateFailureNotified = true;
                 }
 
-                SetActiveSessionPreset(null);
-                ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
-                IsSessionActive = false;
+                ClearActiveSession();
                 ResetActiveSessionDetails();
             });
         }
@@ -1271,10 +1044,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private void UpdateCanStartBreak()
-    {
-        CanStartBreak = IsCommittedSession && !_activeBreakEndsAt.HasValue && _activeBreaksRemaining > 0;
-    }
+    private void UpdateCanStartBreak() => CanStartBreak = IsCommittedSession && !_activeBreakEndsAt.HasValue && _activeBreaksRemaining > 0;
 
     private async Task RefreshSessionHistoryAsync()
     {
@@ -1352,7 +1122,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         else
         {
             var remaining = _activeSessionRemainingDeadline is { } deadline
-                ? GetRemainingFromStopwatch(deadline)
+                ? MonotonicTime.RemainingUntil(deadline)
                 : _activeSessionEndsAt.Value - DateTimeOffset.UtcNow;
             var seconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
             ActiveSessionRemaining = $"{seconds / 60:00}:{seconds % 60:00}";
@@ -1362,7 +1132,7 @@ public class MainViewModel : ReactiveObject, IDisposable
         if (_activeBreakEndsAt is { } breakEndsAt)
         {
             var remaining = _activeBreakRemainingDeadline is { } deadline
-                ? GetRemainingFromStopwatch(deadline)
+                ? MonotonicTime.RemainingUntil(deadline)
                 : breakEndsAt - DateTimeOffset.UtcNow;
             var seconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
             ActiveBreakStatus = $"Break in progress | {seconds / 60:00}:{seconds % 60:00} remaining";
@@ -1388,24 +1158,5 @@ public class MainViewModel : ReactiveObject, IDisposable
         ActiveProtectionStatus = "Protection inactive";
         UpdateCanStartBreak();
         UpdateActiveSessionClock();
-    }
-
-    private static string ToProtectionLabel(string status) =>
-        status.StartsWith("Protection ", StringComparison.Ordinal) ? status : "Protection inactive";
-
-    private static long GetStopwatchDeadline(TimeSpan remaining)
-    {
-        var now = System.Diagnostics.Stopwatch.GetTimestamp();
-        var seconds = Math.Max(0, remaining.TotalSeconds);
-        var available = long.MaxValue - now;
-        return seconds >= (double)available / System.Diagnostics.Stopwatch.Frequency
-            ? long.MaxValue
-            : now + (long)(seconds * System.Diagnostics.Stopwatch.Frequency);
-    }
-
-    private static TimeSpan GetRemainingFromStopwatch(long deadline)
-    {
-        var ticks = Math.Max(0, deadline - System.Diagnostics.Stopwatch.GetTimestamp());
-        return TimeSpan.FromSeconds((double)ticks / System.Diagnostics.Stopwatch.Frequency);
     }
 }

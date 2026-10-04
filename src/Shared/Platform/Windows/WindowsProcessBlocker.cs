@@ -7,10 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Axorith.Shared.Platform.Windows;
 
-/// <summary>
-///     Windows process blocker. Scans every 500ms regardless of elevation so process starts
-///     cannot escape protection when kernel event delivery is unavailable.
-/// </summary>
 [SupportedOSPlatform("windows")]
 internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
@@ -18,7 +14,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     private CancellationTokenSource? _pollingScanCts;
     private HashSet<string> _targetProcessNames = [];
     private bool _allowOnlyMode;
-    // ponytail: cache each image path for the blocker lifetime; cap this if sessions launch thousands of distinct executables.
     private readonly ConcurrentDictionary<string, string> _originalExecutableNames = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly HashSet<string> SafeList = new(StringComparer.OrdinalIgnoreCase)
@@ -82,38 +77,28 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         }
     }
 
-    public List<string> Block(IEnumerable<string> processNames)
+    public List<string> Block(IEnumerable<string> processNames) => ApplyRules(processNames, allowOnly: false);
+
+    public List<string> AllowOnly(IEnumerable<string> processNames) => ApplyRules(processNames, allowOnly: true);
+
+    private List<string> ApplyRules(IEnumerable<string> processNames, bool allowOnly)
     {
         lock (_lock)
         {
             StopMonitoring();
             _targetProcessNames = NormalizeNames(processNames);
-            _allowOnlyMode = false;
-            logger.LogInformation("Updating blocker rules. Targets: {Count}", _targetProcessNames.Count);
-
-            var killed = ScanAndKillByList(initialScan: true);
-            killed.AddRange(ScanAndKillRenamedProcesses(initialScan: true));
-
-            StartPollingMonitoring();
-
-            return killed;
-        }
-    }
-
-    public List<string> AllowOnly(IEnumerable<string> processNames)
-    {
-        lock (_lock)
-        {
-            StopMonitoring();
-            _targetProcessNames = NormalizeNames(processNames);
-            if (_targetProcessNames.Count == 0)
-            {
+            if (allowOnly && _targetProcessNames.Count == 0)
                 throw new ArgumentException("At least one workspace application must be allowed.", nameof(processNames));
-            }
 
-            _allowOnlyMode = true;
-            logger.LogInformation("Applying workspace allowlist with {Count} applications.", _targetProcessNames.Count);
-            var killed = ScanAndKillOutsideAllowlist(initialScan: true);
+            _allowOnlyMode = allowOnly;
+            logger.LogInformation(allowOnly
+                ? "Applying workspace allowlist with {Count} applications."
+                : "Updating blocker rules. Targets: {Count}", _targetProcessNames.Count);
+
+            var killed = allowOnly ? ScanAndKillOutsideAllowlist(initialScan: true) : ScanAndKillByList(initialScan: true);
+            if (!allowOnly)
+                killed.AddRange(ScanAndKillRenamedProcesses(initialScan: true));
+
             StartPollingMonitoring();
             return killed;
         }
@@ -256,10 +241,10 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private List<string> ScanAndKillRenamedProcesses(bool initialScan)
     {
-        List<string> targets;
+        HashSet<string> targets;
         lock (_lock)
         {
-            targets = [.. _targetProcessNames];
+            targets = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
         }
 
         if (targets.Count == 0)
@@ -273,7 +258,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             try
             {
                 var processName = NormalizeName(process.ProcessName);
-                if (SafeList.Contains(processName) || targets.Contains(processName, StringComparer.OrdinalIgnoreCase))
+                if (SafeList.Contains(processName) || targets.Contains(processName))
                 {
                     continue;
                 }
@@ -315,14 +300,13 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private List<string> ScanAndKillOutsideAllowlist(bool initialScan)
     {
-        string[] allowedNames;
+        HashSet<string> allowedNames;
         lock (_lock)
         {
-            allowedNames = [.. _targetProcessNames];
+            allowedNames = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
         }
 
-        // An empty allowlist must never be interpreted as permission to close the whole desktop.
-        if (allowedNames.Length == 0)
+        if (allowedNames.Count == 0)
         {
             return [];
         }
@@ -349,14 +333,14 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
                     sessionProcesses[process.Id] = process;
                     var processName = NormalizeName(process.ProcessName);
-                    if (allowedNames.Contains(processName, StringComparer.OrdinalIgnoreCase))
+                    if (allowedNames.Contains(processName))
                     {
                         allowedIds.Add(process.Id);
                         continue;
                     }
 
                     var originalName = GetOriginalExecutableName(process.MainModule?.FileName);
-                    if (allowedNames.Contains(originalName, StringComparer.OrdinalIgnoreCase))
+                    if (allowedNames.Contains(originalName))
                     {
                         allowedIds.Add(process.Id);
                     }
@@ -408,14 +392,13 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             {
                 try
                 {
-                    if (allowedIds.Contains(processId) || SafeList.Contains(NormalizeName(process.ProcessName)) ||
-                        AllowlistSupportProcesses.Contains(NormalizeName(process.ProcessName)) ||
-                        process.HasExited)
+                    var processName = NormalizeName(process.ProcessName);
+                    if (allowedIds.Contains(processId) || SafeList.Contains(processName) ||
+                        AllowlistSupportProcesses.Contains(processName) || process.HasExited)
                     {
                         continue;
                     }
 
-                    var processName = NormalizeName(process.ProcessName);
                     process.Kill();
                     logger.LogInformation("Blocked non-workspace process: {Name} (PID: {Pid})", processName, processId);
                     if (!initialScan)
@@ -494,7 +477,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             return null;
         }
 
-        string[] targets;
+        HashSet<string> targets;
         lock (_lock)
         {
             if (_targetProcessNames.Contains(normalizedName))
@@ -502,12 +485,12 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 return normalizedName;
             }
 
-            targets = [.. _targetProcessNames];
+            targets = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
         }
 
         var originalName = GetOriginalExecutableName(imagePath);
         return !string.IsNullOrEmpty(originalName) && !SafeList.Contains(originalName) &&
-               targets.Contains(originalName, StringComparer.OrdinalIgnoreCase)
+               targets.Contains(originalName)
             ? originalName
             : null;
     }
@@ -535,19 +518,10 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         });
     }
 
-    private static HashSet<string> NormalizeNames(IEnumerable<string> names)
-    {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var name in names)
-        {
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                set.Add(NormalizeName(name.Trim()));
-            }
-        }
-
-        return set;
-    }
+    private static HashSet<string> NormalizeNames(IEnumerable<string> names) => names
+        .Where(name => !string.IsNullOrWhiteSpace(name))
+        .Select(name => NormalizeName(name.Trim()))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private static string NormalizeName(string name)
     {
@@ -556,8 +530,5 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             : name;
     }
 
-    public void Dispose()
-    {
-        UnblockAll();
-    }
+    public void Dispose() => UnblockAll();
 }

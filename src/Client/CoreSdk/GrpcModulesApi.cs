@@ -17,9 +17,6 @@ using ValidationResult = Axorith.Sdk.ValidationResult;
 
 namespace Axorith.Client.CoreSdk;
 
-/// <summary>
-///     gRPC implementation of IModulesApi with setting update streaming.
-/// </summary>
 internal class GrpcModulesApi(
     ModulesService.ModulesServiceClient client,
     AsyncRetryPolicy retryPolicy,
@@ -117,10 +114,10 @@ internal class GrpcModulesApi(
         }
     }
 
-    public async Task<BeginEditResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
+    public Task<BeginEditResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
         IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default)
     {
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var request = new BeginEditRequest
             {
@@ -130,33 +127,7 @@ internal class GrpcModulesApi(
 
             foreach (var (key, val) in initialValues)
             {
-                var sv = new SettingValue { Key = key };
-                switch (val)
-                {
-                    case string s:
-                        sv.StringValue = s;
-                        break;
-                    case bool b:
-                        sv.BoolValue = b;
-                        break;
-                    case int i:
-                        sv.IntValue = i;
-                        break;
-                    case double d:
-                        sv.NumberValue = d;
-                        break;
-                    case decimal dec:
-                        sv.NumberValue = (double)dec;
-                        break;
-                    case null:
-                        sv.StringValue = string.Empty;
-                        break;
-                    default:
-                        sv.StringValue = val.ToString() ?? string.Empty;
-                        break;
-                }
-
-                request.InitialValues.Add(sv);
+                request.InitialValues.Add(SettingValueCodec.Create(key, val));
             }
 
             var response = await client.BeginEditAsync(request, cancellationToken: ct).ConfigureAwait(false);
@@ -164,45 +135,41 @@ internal class GrpcModulesApi(
 
             _settingsCache[moduleId] = settingsInfo;
 
-            var opResult = MapOperationResult(response.Result);
+            var opResult = GrpcResultMapper.ToModel(response.Result);
 
             return new BeginEditResult(settingsInfo, opResult);
-        }).ConfigureAwait(false);
+        });
     }
 
-    public async Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
+    public Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
     {
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var response = await client.EndEditAsync(new EndEditRequest
             {
                 ModuleInstanceId = moduleInstanceId.ToString()
             }, cancellationToken: ct).ConfigureAwait(false);
 
-            return new OperationResult(response.Success, response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
-    public async Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
+    public Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
     {
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var response = await client.SyncEditAsync(new SyncEditRequest
             {
                 ModuleInstanceId = moduleInstanceId.ToString()
             }, cancellationToken: ct).ConfigureAwait(false);
 
-            return new OperationResult(response.Success, response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
-    public async Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default)
+    public Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default)
     {
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var response = await client.GetModuleSettingsAsync(
                     new GetModuleSettingsRequest { ModuleId = moduleId.ToString() },
@@ -211,15 +178,15 @@ internal class GrpcModulesApi(
             var info = MapSettingsResponse(response.Settings, response.Actions);
             _settingsCache[moduleId] = info;
             return info;
-        }).ConfigureAwait(false);
+        });
     }
 
-    public async Task<OperationResult> InvokeActionAsync(Guid moduleInstanceId, string actionKey,
+    public Task<OperationResult> InvokeActionAsync(Guid moduleInstanceId, string actionKey,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
 
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var response = await client.InvokeActionAsync(
                     new InvokeActionRequest
@@ -230,21 +197,17 @@ internal class GrpcModulesApi(
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            return new OperationResult(
-                response.Success,
-                response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
-    public async Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId,
+    public Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId,
         string actionKey,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
 
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var response = await client.InvokeDesignTimeActionAsync(
                     new InvokeDesignTimeActionRequest
@@ -256,20 +219,16 @@ internal class GrpcModulesApi(
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            return new OperationResult(
-                response.Success,
-                response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
-    public async Task<OperationResult> UpdateSettingAsync(Guid moduleInstanceId, string settingKey,
+    public Task<OperationResult> UpdateSettingAsync(Guid moduleInstanceId, string settingKey,
         object? value, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
 
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var request = new UpdateSettingRequest
             {
@@ -277,46 +236,19 @@ internal class GrpcModulesApi(
                 SettingKey = settingKey
             };
 
-            switch (value)
-            {
-                case string s:
-                    request.StringValue = s;
-                    break;
-                case bool b:
-                    request.BoolValue = b;
-                    break;
-                case double d:
-                    request.NumberValue = d;
-                    break;
-                case int i:
-                    request.IntValue = i;
-                    break;
-                case decimal dec:
-                    request.NumberValue = (double)dec;
-                    break;
-                case null:
-                    request.StringValue = string.Empty;
-                    break;
-                default:
-                    request.StringValue = value.ToString() ?? string.Empty;
-                    break;
-            }
+            SettingValueCodec.Set(request, value);
 
             var response = await client.UpdateSettingAsync(request, cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            return new OperationResult(
-                response.Success,
-                response.Message,
-                response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-                response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-        }).ConfigureAwait(false);
+            return GrpcResultMapper.ToModel(response);
+        });
     }
 
-    public async Task<ValidationResult> ValidateSettingsAsync(Guid moduleId, Guid moduleInstanceId,
+    public Task<ValidationResult> ValidateSettingsAsync(Guid moduleId, Guid moduleInstanceId,
         IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
     {
-        return await retryPolicy.ExecuteAsync(async () =>
+        return retryPolicy.ExecuteAsync(async () =>
         {
             var request = new ValidateSettingsRequest
             {
@@ -326,33 +258,7 @@ internal class GrpcModulesApi(
 
             foreach (var (key, val) in values)
             {
-                var sv = new SettingValue { Key = key };
-                switch (val)
-                {
-                    case string s:
-                        sv.StringValue = s;
-                        break;
-                    case bool b:
-                        sv.BoolValue = b;
-                        break;
-                    case int i:
-                        sv.IntValue = i;
-                        break;
-                    case double d:
-                        sv.NumberValue = d;
-                        break;
-                    case decimal dec:
-                        sv.NumberValue = (double)dec;
-                        break;
-                    case null:
-                        sv.StringValue = string.Empty;
-                        break;
-                    default:
-                        sv.StringValue = val.ToString() ?? string.Empty;
-                        break;
-                }
-
-                request.Values.Add(sv);
+                request.Values.Add(SettingValueCodec.Create(key, val));
             }
 
             var response = await client.ValidateSettingsAsync(request, cancellationToken: ct).ConfigureAwait(false);
@@ -369,13 +275,11 @@ internal class GrpcModulesApi(
             }
 
             return ValidationResult.Fail(fieldErrors, response.Message);
-        }).ConfigureAwait(false);
+        });
     }
 
-    public ModuleSettingsInfo? GetCachedSettings(Guid moduleId)
-    {
-        return _settingsCache.TryGetValue(moduleId, out var cached) ? cached : null;
-    }
+    public ModuleSettingsInfo? GetCachedSettings(Guid moduleId) => _settingsCache.TryGetValue(moduleId, out var cached) ? cached : null;
+
 
     private static ModuleSettingsInfo MapSettingsResponse(
         IEnumerable<Setting> settings,
@@ -391,15 +295,7 @@ internal class GrpcModulesApi(
                 s.IsVisible,
                 s.IsReadOnly,
                 s.ValueType,
-                s.ValueCase switch
-                {
-                    Setting.ValueOneofCase.StringValue => s.StringValue,
-                    Setting.ValueOneofCase.BoolValue => s.BoolValue.ToString(),
-                    Setting.ValueOneofCase.NumberValue => s.NumberValue.ToString(),
-                    Setting.ValueOneofCase.IntValue => s.IntValue.ToString(),
-                    Setting.ValueOneofCase.DecimalString => s.DecimalString,
-                    _ => string.Empty
-                },
+                SettingValueCodec.GetString(s),
                 s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList(),
                 string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter,
                 s.HasHistory
@@ -419,96 +315,38 @@ internal class GrpcModulesApi(
         return new ModuleSettingsInfo(mappedSettings, mappedActions);
     }
 
-    private static OperationResult MapOperationResult(Contracts.OperationResult response)
-    {
-        return new OperationResult(response.Success, response.Message,
-            response.Errors?.Count > 0 ? response.Errors.ToList() : null,
-            response.Warnings?.Count > 0 ? response.Warnings.ToList() : null);
-    }
-
-    private async Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct,
+    private Task StartStreamingSettingUpdatesAsync(Guid moduleInstanceId, CancellationToken ct,
         TaskCompletionSource? readyTcs = null)
     {
         var hasSignaledReady = false;
+        return GrpcStreamRunner.RunAsync(async token =>
+        {
+            logger.LogDebug("Starting setting updates stream...");
+            using var call = client.StreamSettingUpdates(
+                new StreamSettingUpdatesRequest { ModuleInstanceId = moduleInstanceId.ToString() },
+                cancellationToken: token);
 
-        while (!ct.IsCancellationRequested)
-            try
+            await call.ResponseHeadersAsync.ConfigureAwait(false);
+            if (!hasSignaledReady)
             {
-                logger.LogDebug("Starting setting updates stream...");
-
-                using var call = client.StreamSettingUpdates(
-                    new StreamSettingUpdatesRequest { ModuleInstanceId = moduleInstanceId.ToString() },
-                    cancellationToken: ct);
-
-                await call.ResponseHeadersAsync.ConfigureAwait(false);
-
-                if (!hasSignaledReady)
-                {
-                    readyTcs?.TrySetResult();
-                    hasSignaledReady = true;
-                }
-
-                await foreach (var update in call.ResponseStream.ReadAllAsync(ct).ConfigureAwait(false))
-                {
-                    if (!Guid.TryParse(update.ModuleInstanceId, out var instanceId))
-                    {
-                        continue;
-                    }
-
-                    object? value = update.ValueCase switch
-                    {
-                        Contracts.SettingUpdate.ValueOneofCase.StringValue => update.StringValue,
-                        Contracts.SettingUpdate.ValueOneofCase.BoolValue => update.BoolValue,
-                        Contracts.SettingUpdate.ValueOneofCase.NumberValue => update.NumberValue,
-                        Contracts.SettingUpdate.ValueOneofCase.IntValue => update.IntValue,
-                        Contracts.SettingUpdate.ValueOneofCase.ChoiceList when update.ChoiceList != null => update
-                            .ChoiceList.Choices
-                            .Select(c => new KeyValuePair<string, string>(c.Key, c.Display))
-                            .ToList(),
-                        _ => null
-                    };
-
-                    var property = (SettingProperty)update.Property;
-
-                    var settingUpdate = new SettingUpdate(
-                        instanceId,
-                        update.SettingKey,
-                        property,
-                        value);
-
-                    _settingUpdatesSubject.OnNext(settingUpdate);
-                }
+                readyTcs?.TrySetResult();
+                hasSignaledReady = true;
             }
-            catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
+
+            await foreach (var update in call.ResponseStream.ReadAllAsync(token).ConfigureAwait(false))
             {
-                logger.LogDebug("Setting updates stream cancelled");
-                break;
-            }
-            catch (OperationCanceledException)
-            {
-                logger.LogDebug("Setting updates stream cancelled");
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Setting updates stream error, reconnecting in 5s...");
-
-                if (!hasSignaledReady)
+                if (!Guid.TryParse(update.ModuleInstanceId, out var instanceId))
                 {
-                    // Don't set result here, let the timeout handle it in Subscribe,
-                    // or set Exception.
-                    // readyTcs?.TrySetException(ex);
+                    continue;
                 }
 
-                try
-                {
-                    await Task.Delay(5000, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
+                _settingUpdatesSubject.OnNext(new SettingUpdate(
+                    instanceId,
+                    update.SettingKey,
+                    (SettingProperty)update.Property,
+                    SettingValueCodec.Get(update)));
             }
+        }, logger, "Setting updates", ct);
     }
 
     private static ModuleDefinition ToModel(Contracts.ModuleDefinition message)

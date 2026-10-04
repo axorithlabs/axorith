@@ -68,9 +68,9 @@ public class ClientColdStartBenchmarks
         _clientDirectory = Path.Combine(_installDirectory, "Axorith.Client");
         _hostDirectory = Path.Combine(_installDirectory, "Axorith.Host");
         _modulesDirectory = Path.Combine(_installDirectory, "Modules");
-        CopyDirectory(Path.Combine(buildDirectory, "Axorith.Client"), _clientDirectory);
-        CopyDirectory(Path.Combine(buildDirectory, "Axorith.Host"), _hostDirectory);
-        CopyDirectory(Path.Combine(buildDirectory, "Modules"), _modulesDirectory);
+        BenchmarkEnvironment.CopyDirectory(Path.Combine(buildDirectory, "Axorith.Client"), _clientDirectory);
+        BenchmarkEnvironment.CopyDirectory(Path.Combine(buildDirectory, "Axorith.Host"), _hostDirectory);
+        BenchmarkEnvironment.CopyDirectory(Path.Combine(buildDirectory, "Modules"), _modulesDirectory);
 
         _profileDirectory = Path.Combine(BenchmarkEnvironment.Root, "client-profile", Guid.NewGuid().ToString("N"));
         _roamingRoot = Path.Combine(_profileDirectory, "AppData", "Roaming", "Axorith");
@@ -263,16 +263,8 @@ public class ClientColdStartBenchmarks
                     using var info = JsonDocument.Parse(await File.ReadAllTextAsync(_hostInfoPath));
                     var port = info.RootElement.GetProperty("port").GetInt32();
                     var token = await File.ReadAllTextAsync(_tokenPath);
-                    var credentials = CallCredentials.FromInterceptor((_, metadata) =>
-                    {
-                        metadata.Add("x-axorith-auth-token", token);
-                        return Task.CompletedTask;
-                    });
-                    _hostChannel = GrpcChannel.ForAddress($"http://127.0.0.1:{port}", new GrpcChannelOptions
-                    {
-                        Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, credentials),
-                        UnsafeUseInsecureChannelCallCredentials = true
-                    });
+                    _hostChannel = BenchmarkEnvironment.CreateAuthenticatedChannel(
+                        new Uri($"http://127.0.0.1:{port}"), token);
 
                     var diagnostics = new DiagnosticsService.DiagnosticsServiceClient(_hostChannel);
                     var health = await diagnostics.GetHealthAsync(new HealthCheckRequest(),
@@ -401,18 +393,6 @@ public class ClientColdStartBenchmarks
         {
             // No Host process currently owns the global singleton mutex.
         }
-    }
-
-    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
-    {
-        if (!Directory.Exists(sourceDirectory))
-            throw new DirectoryNotFoundException($"Build output not found: {sourceDirectory}");
-
-        Directory.CreateDirectory(destinationDirectory);
-        foreach (var file in Directory.EnumerateFiles(sourceDirectory))
-            File.Copy(file, Path.Combine(destinationDirectory, Path.GetFileName(file)));
-        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory))
-            CopyDirectory(directory, Path.Combine(destinationDirectory, Path.GetFileName(directory)));
     }
 
     [DllImport("user32.dll")]

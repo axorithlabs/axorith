@@ -1,12 +1,8 @@
-﻿using Axorith.Shared.Platform;
+using Axorith.Shared.Platform;
 using Axorith.Telemetry;
 
 namespace Axorith.Host.Services;
 
-/// <summary>
-///     A hosted service that runs once at startup to ensure the Native Messaging Host
-///     is correctly registered with the browser.
-/// </summary>
 public class NativeMessagingRegistrar(
     INativeMessagingManager manager,
     ILogger<NativeMessagingRegistrar> logger,
@@ -27,10 +23,7 @@ public class NativeMessagingRegistrar(
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private void RegisterHost()
     {

@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using Axorith.Contracts;
 using Axorith.Sdk.Settings;
 using Setting = Axorith.Contracts.Setting;
@@ -8,19 +7,8 @@ using SettingPersistence = Axorith.Contracts.SettingPersistence;
 
 namespace Axorith.Host.Mappers;
 
-/// <summary>
-///     Maps between SDK ISetting and protobuf Setting messages.
-/// </summary>
 public static class SettingMapper
 {
-    private static readonly ConditionalWeakTable<ISetting, CachedChoices> ChoicesCache = [];
-
-    private sealed class CachedChoices
-    {
-        public IReadOnlyList<KeyValuePair<string, string>>? SourceChoices { get; set; }
-        public List<Choice> SerializedChoices { get; } = [];
-    }
-
     public static Setting ToMessage(ISetting setting)
     {
         ArgumentNullException.ThrowIfNull(setting);
@@ -31,10 +19,15 @@ public static class SettingMapper
             Label = setting.GetCurrentLabel(),
             Description = setting.Description ?? string.Empty,
             ControlType = ToMessageControlType(setting.ControlType),
-            Persistence = ToMessagePersistence(setting.Persistence),
+            Persistence = (SettingPersistence)setting.Persistence,
             IsVisible = setting.GetCurrentVisibility(),
             IsReadOnly = setting.GetCurrentReadOnly(),
-            ValueType = GetSimpleTypeName(setting.ValueType),
+            ValueType = setting.ValueType == typeof(List<string>) ? "List<String>" :
+                setting.ValueType == typeof(string) || setting.ValueType == typeof(bool) ||
+                setting.ValueType == typeof(int) || setting.ValueType == typeof(decimal) ||
+                setting.ValueType == typeof(double) || setting.ValueType == typeof(TimeSpan)
+                    ? setting.ValueType.Name
+                    : "String",
             Filter = setting.ControlType == Sdk.Settings.SettingControlType.FilePicker
                 ? setting.Filter ?? string.Empty
                 : string.Empty,
@@ -76,68 +69,10 @@ public static class SettingMapper
                 break;
         }
 
-        var currentChoices = setting.GetCurrentChoices();
-
-        if (currentChoices == null)
-        {
-            return message;
-        }
-
-        var cachedChoices = ChoicesCache.GetValue(setting, _ => new CachedChoices());
-
-        if (!ReferenceEquals(cachedChoices.SourceChoices, currentChoices))
-        {
-            cachedChoices.SourceChoices = currentChoices;
-            cachedChoices.SerializedChoices.Clear();
-            foreach (var (key, display) in currentChoices)
-            {
-                cachedChoices.SerializedChoices.Add(new Choice { Key = key, Display = display });
-            }
-        }
-
-        message.Choices.AddRange(cachedChoices.SerializedChoices);
+        if (setting.GetCurrentChoices() is { } choices)
+            message.Choices.AddRange(choices.Select(choice => new Choice { Key = choice.Key, Display = choice.Value }));
 
         return message;
-    }
-
-    private static string GetSimpleTypeName(Type type)
-    {
-        if (type == typeof(string))
-        {
-            return "String";
-        }
-
-        if (type == typeof(bool))
-        {
-            return "Boolean";
-        }
-
-        if (type == typeof(int))
-        {
-            return "Int32";
-        }
-
-        if (type == typeof(decimal))
-        {
-            return "Decimal";
-        }
-
-        if (type == typeof(double))
-        {
-            return "Double";
-        }
-
-        if (type == typeof(TimeSpan))
-        {
-            return "TimeSpan";
-        }
-
-        if (type == typeof(List<string>))
-        {
-            return "List<String>";
-        }
-
-        return "String"; // fallback
     }
 
     public static SettingUpdate CreateUpdate(Guid moduleInstanceId, string settingKey,
@@ -226,19 +161,8 @@ public static class SettingMapper
             Sdk.Settings.SettingControlType.Secret => SettingControlType.Secret,
             Sdk.Settings.SettingControlType.FilePicker => SettingControlType.FilePicker,
             Sdk.Settings.SettingControlType.DirectoryPicker => SettingControlType.DirectoryPicker,
-            Sdk.Settings.SettingControlType.Button => SettingControlType.Text, // Button maps to Text as fallback
+            Sdk.Settings.SettingControlType.Button => SettingControlType.Button,
             _ => SettingControlType.Text
-        };
-    }
-
-    private static SettingPersistence ToMessagePersistence(Sdk.Settings.SettingPersistence persistence)
-    {
-        return persistence switch
-        {
-            Sdk.Settings.SettingPersistence.Persisted => SettingPersistence.Persisted,
-            Sdk.Settings.SettingPersistence.Ephemeral => SettingPersistence.Ephemeral,
-            Sdk.Settings.SettingPersistence.Transient => SettingPersistence.Transient,
-            _ => SettingPersistence.Persisted
         };
     }
 }

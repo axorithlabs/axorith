@@ -1,14 +1,7 @@
 namespace Axorith.Module.ApplicationLauncher.Apps.Browser;
 
-/// <summary>
-///     Browser metadata for command-line argument generation.
-/// </summary>
 internal static class BrowserProfiles
 {
-    /// <summary>
-    ///     Known browser profiles with their command-line argument patterns.
-    ///     Key: lowercase executable name without extension.
-    /// </summary>
     public static readonly Dictionary<string, BrowserProfile> KnownBrowsers = new(StringComparer.OrdinalIgnoreCase)
     {
         // Chromium-based browsers
@@ -37,9 +30,6 @@ internal static class BrowserProfiles
         ["slimbrowser"] = new BrowserProfile(null, null)
     };
 
-    /// <summary>
-    ///     Gets browser profile by executable name.
-    /// </summary>
     public static BrowserProfile? GetProfile(string executablePath)
     {
         var fileName = Path.GetFileNameWithoutExtension(executablePath).ToLowerInvariant();
@@ -61,9 +51,4 @@ internal static class BrowserProfiles
     }
 }
 
-/// <summary>
-///     Browser profile with command-line argument patterns.
-/// </summary>
-/// <param name="ProfileArgument">Format string for profile selection (null if not supported).</param>
-/// <param name="IncognitoArgument">Argument for private/incognito mode (null if not supported).</param>
 internal sealed record BrowserProfile(string? ProfileArgument, string? IncognitoArgument);

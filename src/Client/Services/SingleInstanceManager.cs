@@ -1,14 +1,9 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Client.Services;
 
-/// <summary>
-///     Manages single instance enforcement for the Axorith Client.
-///     Uses a named mutex to detect if another instance is running,
-///     and named pipes for inter-process communication to activate the existing window.
-/// </summary>
 public sealed class SingleInstanceManager : IDisposable
 {
     private readonly string _mutexName;
@@ -32,29 +27,21 @@ public sealed class SingleInstanceManager : IDisposable
         _pipeName = $"AxorithClient_SingleInstance_Pipe_{suffix}";
     }
 
-    /// <summary>
-    ///     Attempts to acquire the single instance lock.
-    ///     Returns true if this is the first instance, false if another instance is already running.
-    /// </summary>
     public bool TryAcquireLock()
     {
         try
         {
-            // Try to create a new mutex - if it already exists, createdNew will be false
             bool createdNew;
             _mutex = new Mutex(true, _mutexName, out createdNew);
 
             if (createdNew)
             {
-                // We created a new mutex, so we're the first instance
                 _isFirstInstance = true;
                 _logger.LogInformation("Single instance lock acquired - this is the first instance");
                 StartPipeServer();
                 return true;
             }
 
-            // Mutex already exists, try to acquire it with zero timeout
-            // If we can acquire it, the previous instance crashed
             if (_mutex.WaitOne(TimeSpan.Zero, false))
             {
                 _logger.LogWarning("Acquired abandoned mutex - previous instance may have crashed");
@@ -63,7 +50,6 @@ public sealed class SingleInstanceManager : IDisposable
                 return true;
             }
 
-            // Another instance is running
             _logger.LogInformation("Another instance is already running");
             _mutex.Dispose();
             _mutex = null;
@@ -72,8 +58,6 @@ public sealed class SingleInstanceManager : IDisposable
         }
         catch (AbandonedMutexException)
         {
-            // Previous instance crashed without releasing the mutex
-            // We can safely take ownership
             _logger.LogWarning("Mutex was abandoned by previous instance - taking ownership");
             _isFirstInstance = true;
             StartPipeServer();
@@ -88,9 +72,6 @@ public sealed class SingleInstanceManager : IDisposable
         }
     }
 
-    /// <summary>
-    ///     Sends an activation request to the running instance.
-    /// </summary>
     public async Task<bool> SendActivationRequestAsync()
     {
         try

@@ -5,7 +5,6 @@ using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
-using Axorith.Host.Mappers;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk;
@@ -16,7 +15,6 @@ using Axorith.Shared.Exceptions;
 using Axorith.Telemetry;
 using FluentAssertions;
 using Grpc.Core;
-using Grpc.Core.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -37,24 +35,13 @@ public sealed class CommittedModuleMutationTests
     [Fact]
     public async Task FailedStrictProtectionRestoreKeepsSignInRecoveryEnabled()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-recovery-test-");
-        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
+        using var env = new TestEnvironment("axorith-recovery-test-");
         var protection = new TestCommitmentProtectionService
         {
             FailRestore = true,
-            RecoveryStatePath = recoveryPath
+            RecoveryStatePath = env.RecoveryPath
         };
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), recoveryPath, protection);
+        var sessionManager = env.CreateSessionManager(protection);
         TestBlockerModule.SessionEndCount = 0;
 
         try
@@ -69,10 +56,10 @@ public sealed class CommittedModuleMutationTests
                     EndCondition = FocusEndCondition.Duration,
                     Duration = TimeSpan.FromMinutes(10)
                 },
-                Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = definition.Id }]
+                Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = env.Definition.Id }]
             });
 
-            File.Exists(recoveryPath).Should().BeTrue();
+            File.Exists(env.RecoveryPath).Should().BeTrue();
             protection.RecoveryStateExistedWhenActivated.Should().BeFalse();
             protection.RecoveryStartupChanges.Should().Equal(true);
             protection.Calls.Should().Equal("startup:active", "enable");
@@ -84,47 +71,33 @@ public sealed class CommittedModuleMutationTests
             protection.RecoveryStartupChanges.Should().Equal(true);
             protection.Calls.Should().Equal("startup:active", "enable", "restore");
             sessionManager.IsSessionRunning.Should().BeTrue();
-            File.Exists(recoveryPath).Should().BeTrue();
+            File.Exists(env.RecoveryPath).Should().BeTrue();
             TestBlockerModule.SessionEndCount.Should().Be(0);
         }
         finally
         {
             await sessionManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
 
     [Fact]
     public async Task TamperedCommittedRecoveryIsRejectedAndRetained()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-tamper-test-");
-        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
-        var runningManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), recoveryPath);
-        var recoveringManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), recoveryPath);
+        using var env = new TestEnvironment("axorith-tamper-test-");
+        var runningManager = env.CreateSessionManager();
+        var recoveringManager = env.CreateSessionManager();
 
         try
         {
             await runningManager.StartSessionAsync(CreateCommittedPreset("Tamper test", TimeSpan.FromMinutes(10),
-                definition.Id));
-            var envelope = JsonNode.Parse(await File.ReadAllTextAsync(recoveryPath))!.AsObject();
+                env.Definition.Id));
+            var envelope = JsonNode.Parse(await File.ReadAllTextAsync(env.RecoveryPath))!.AsObject();
             envelope["Payload"] = envelope["Payload"]!.GetValue<string>() + " ";
-            await File.WriteAllTextAsync(recoveryPath, envelope.ToJsonString());
+            await File.WriteAllTextAsync(env.RecoveryPath, envelope.ToJsonString());
 
             await Assert.ThrowsAsync<SessionException>(() => recoveringManager.RecoverCommittedSessionAsync());
 
-            File.Exists(recoveryPath).Should().BeTrue();
+            File.Exists(env.RecoveryPath).Should().BeTrue();
             runningManager.IsSessionRunning.Should().BeTrue();
         }
         finally
@@ -132,39 +105,28 @@ public sealed class CommittedModuleMutationTests
             await runningManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
             await recoveringManager.DisposeAsync();
             await runningManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
 
     [Fact]
     public async Task NaturalCompletionStartsNextWorkspaceButEmergencyUnlockDoesNot()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-after-end-test-");
-        var presetManager = new PresetManager(Path.Combine(recoveryDirectory.FullName, "presets"),
+        using var env = new TestEnvironment("axorith-after-end-test-");
+        var presetManager = new PresetManager(Path.Combine(env.Directory.FullName, "presets"),
             NullLogger<PresetManager>.Instance);
         var nextWorkspaceId = Guid.NewGuid();
         await presetManager.SavePresetAsync(new SessionPreset
         {
             Id = nextWorkspaceId,
             Name = "Next Workspace",
-            Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = definition.Id }]
+            Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = env.Definition.Id }]
         }, CancellationToken.None);
 
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), Path.Combine(recoveryDirectory.FullName, "committed-session.json"));
+        var sessionManager = env.CreateSessionManager();
         var notifier = new TestNotifier();
         var autoStopService = new SessionAutoStopService(sessionManager, presetManager, notifier,
             NullLogger<SessionAutoStopService>.Instance);
-        var scheduleManager = new ScheduleManager(recoveryDirectory.FullName, sessionManager, presetManager,
+        var scheduleManager = new ScheduleManager(env.Directory.FullName, sessionManager, presetManager,
             autoStopService, notifier, NullLogger<ScheduleManager>.Instance);
 
         try
@@ -188,20 +150,10 @@ public sealed class CommittedModuleMutationTests
         }
         finally
         {
-            if (sessionManager.ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
-                FocusCommitmentMode.Strict)
-            {
-                await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
-            }
-            else if (sessionManager.IsSessionRunning)
-            {
-                await sessionManager.StopCurrentSessionAsync();
-            }
-
+            await StopIfRunningAsync(sessionManager);
             await scheduleManager.DisposeAsync();
             await autoStopService.DisposeAsync();
             await sessionManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
 
         SessionPreset CreateCommittedPreset(string name, TimeSpan duration) => new()
@@ -216,35 +168,25 @@ public sealed class CommittedModuleMutationTests
                 AfterEnd = AfterEndBehavior.StartNextWorkspace,
                 NextWorkspaceId = nextWorkspaceId
             },
-            Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = definition.Id }]
+            Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = env.Definition.Id }]
         };
     }
 
     [Fact]
     public async Task DuplicateNaturalCompletionOnlyTransitionsTheExpectedSessionOnce()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-natural-end-race-");
-        var presetManager = new PresetManager(Path.Combine(recoveryDirectory.FullName, "presets"),
+        using var env = new TestEnvironment("axorith-natural-end-race-");
+        var presetManager = new PresetManager(Path.Combine(env.Directory.FullName, "presets"),
             NullLogger<PresetManager>.Instance);
         var nextWorkspaceId = Guid.NewGuid();
         await presetManager.SavePresetAsync(new SessionPreset
         {
             Id = nextWorkspaceId,
             Name = "Next Workspace",
-            Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = definition.Id }]
+            Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = env.Definition.Id }]
         }, CancellationToken.None);
 
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), Path.Combine(recoveryDirectory.FullName, "committed-session.json"));
+        var sessionManager = env.CreateSessionManager();
         var autoStopService = new SessionAutoStopService(sessionManager, presetManager, new TestNotifier(),
             NullLogger<SessionAutoStopService>.Instance);
 
@@ -262,7 +204,7 @@ public sealed class CommittedModuleMutationTests
                     AfterEnd = AfterEndBehavior.StartNextWorkspace,
                     NextWorkspaceId = nextWorkspaceId
                 },
-                Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = definition.Id }]
+                Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = env.Definition.Id }]
             });
 
             var expectedSession = sessionManager.ActiveSession!;
@@ -275,38 +217,17 @@ public sealed class CommittedModuleMutationTests
         }
         finally
         {
-            if (sessionManager.ActiveSession?.FocusCommitment.Mode is FocusCommitmentMode.Locked or
-                FocusCommitmentMode.Strict)
-            {
-                await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
-            }
-            else if (sessionManager.IsSessionRunning)
-            {
-                await sessionManager.StopCurrentSessionAsync();
-            }
-
+            await StopIfRunningAsync(sessionManager);
             await autoStopService.DisposeAsync();
             await sessionManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
 
     [Fact]
     public async Task FailedBreakStartupDoesNotConsumeBreakBudget()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-break-rollback-test-");
-        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), recoveryPath);
+        using var env = new TestEnvironment("axorith-break-rollback-test-");
+        var sessionManager = env.CreateSessionManager();
 
         try
         {
@@ -323,7 +244,7 @@ public sealed class CommittedModuleMutationTests
                     BreakCount = 1,
                     BreakDuration = TimeSpan.FromMinutes(1)
                 },
-                Modules = [new ConfiguredModule { InstanceId = instanceId, ModuleId = definition.Id }]
+                Modules = [new ConfiguredModule { InstanceId = instanceId, ModuleId = env.Definition.Id }]
             });
             var module = (TestBlockerModule)sessionManager.GetActiveModuleInstanceByInstanceId(instanceId)!;
             module.FailPauseForBreak = true;
@@ -333,113 +254,72 @@ public sealed class CommittedModuleMutationTests
             sessionManager.BreaksRemaining.Should().Be(1);
             sessionManager.BreakEndsAt.Should().BeNull();
             module.ResumeAfterBreakCount.Should().Be(1);
-            using var state = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(recoveryPath));
+            using var state = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(env.RecoveryPath));
             state.RootElement.GetProperty("BreaksUsed").GetInt32().Should().Be(0);
             state.RootElement.GetProperty("BreakEndsAt").ValueKind.Should().Be(JsonValueKind.Null);
         }
         finally
         {
-            if (sessionManager.IsSessionRunning)
-            {
-                await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
-            }
-
+            await StopIfRunningAsync(sessionManager);
             await sessionManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
 
     [Fact]
     public async Task FailedRecoveryWriteKeepsPreviousCommittedSnapshot()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-recovery-write-test-");
-        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), recoveryPath);
+        using var env = new TestEnvironment("axorith-recovery-write-test-");
+        var sessionManager = env.CreateSessionManager();
 
         try
         {
             await sessionManager.StartSessionAsync(CreateCommittedPreset("Recovery write test", TimeSpan.FromMinutes(10),
-                definition.Id, breakCount: 1));
-            using (File.Open(recoveryPath, FileMode.Open, FileAccess.Read, FileShare.None))
+                env.Definition.Id, breakCount: 1));
+            using (File.Open(env.RecoveryPath, FileMode.Open, FileAccess.Read, FileShare.None))
             {
                 await Assert.ThrowsAsync<SessionException>(() => sessionManager.StartBreakAsync());
             }
 
             sessionManager.BreaksRemaining.Should().Be(1);
-            using var state = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(recoveryPath));
+            using var state = JsonDocument.Parse(CommittedSessionStateFile.ReadPayload(env.RecoveryPath));
             state.RootElement.GetProperty("BreaksUsed").GetInt32().Should().Be(0);
         }
         finally
         {
-            if (sessionManager.IsSessionRunning)
-            {
-                await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
-            }
-
+            await StopIfRunningAsync(sessionManager);
             await sessionManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
 
     [Fact]
     public async Task DirectCommittedStartRunsPreflightBeforeModuleSideEffects()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-committed-preflight-test-");
-        var recoveryPath = Path.Combine(recoveryDirectory.FullName, "committed-session.json");
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), recoveryPath);
+        using var env = new TestEnvironment("axorith-committed-preflight-test-");
+        var sessionManager = env.CreateSessionManager();
         TestBlockerModule.SessionStartCount = 0;
 
         try
         {
-            var preset = CreateCommittedPreset("Preflight test", TimeSpan.FromMinutes(10), definition.Id);
+            var preset = CreateCommittedPreset("Preflight test", TimeSpan.FromMinutes(10), env.Definition.Id);
             preset.Modules[0].Settings["BlockRule"] = "unavailable";
 
             await Assert.ThrowsAsync<SessionException>(() => sessionManager.StartSessionAsync(preset));
 
             TestBlockerModule.SessionStartCount.Should().Be(0);
             sessionManager.IsSessionRunning.Should().BeFalse();
-            File.Exists(recoveryPath).Should().BeFalse();
+            File.Exists(env.RecoveryPath).Should().BeFalse();
         }
         finally
         {
             await sessionManager.DisposeAsync();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
 
     [Fact]
     public async Task LockedSessionRejectsLiveSettingAndBlockerActionMutations()
     {
-        using var rootScope = new ContainerBuilder().Build();
-        var definition = new ModuleDefinition
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Blocker",
-            ModuleType = typeof(TestBlockerModule)
-        };
-        var registry = new TestModuleRegistry(rootScope, definition);
-        var recoveryDirectory = Directory.CreateTempSubdirectory("axorith-committed-test-");
-        var presetManager = new PresetManager(Path.Combine(recoveryDirectory.FullName, "presets"),
+        using var env = new TestEnvironment("axorith-committed-test-");
+        var presetManager = new PresetManager(Path.Combine(env.Directory.FullName, "presets"),
             NullLogger<PresetManager>.Instance);
         var nextWorkspaceId = Guid.NewGuid();
         await presetManager.SavePresetAsync(new SessionPreset
@@ -448,21 +328,19 @@ public sealed class CommittedModuleMutationTests
             Name = "Next Workspace"
         }, CancellationToken.None);
 
-        var sessionManager = new SessionManager(registry, NullLogger<SessionManager>.Instance,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10),
-            new NoopTelemetryService(), Path.Combine(recoveryDirectory.FullName, "committed-session.json"));
+        var sessionManager = env.CreateSessionManager();
         var broadcaster = new SettingUpdateBroadcaster(sessionManager,
             NullLogger<SettingUpdateBroadcaster>.Instance, Options.Create(new Configuration()));
-        var sandboxManager = new DesignTimeSandboxManager(registry, broadcaster,
+        var sandboxManager = new DesignTimeSandboxManager(env.Registry, broadcaster,
             NullLogger<DesignTimeSandboxManager>.Instance, Options.Create(new Configuration()), sessionManager);
         var notifier = new TestNotifier();
         var autoStopService = new SessionAutoStopService(sessionManager, presetManager, notifier,
             NullLogger<SessionAutoStopService>.Instance);
-        var scheduleManager = new ScheduleManager(recoveryDirectory.FullName, sessionManager, presetManager,
+        var scheduleManager = new ScheduleManager(env.Directory.FullName, sessionManager, presetManager,
             autoStopService, notifier, NullLogger<ScheduleManager>.Instance);
-        var presetsService = new PresetsServiceImpl(presetManager, scheduleManager, sandboxManager, registry,
+        var presetsService = new PresetsServiceImpl(presetManager, scheduleManager, sandboxManager, env.Registry,
             sessionManager, NullLogger<PresetsServiceImpl>.Instance);
-        var service = new ModulesServiceImpl(registry, sessionManager, broadcaster, sandboxManager,
+        var service = new ModulesServiceImpl(env.Registry, sessionManager, broadcaster, sandboxManager,
             NullLogger<ModulesServiceImpl>.Instance);
         var instanceId = Guid.NewGuid();
 
@@ -480,7 +358,7 @@ public sealed class CommittedModuleMutationTests
                     AfterEnd = AfterEndBehavior.StartNextWorkspace,
                     NextWorkspaceId = nextWorkspaceId
                 },
-                Modules = [new ConfiguredModule { InstanceId = instanceId, ModuleId = definition.Id }]
+                Modules = [new ConfiguredModule { InstanceId = instanceId, ModuleId = env.Definition.Id }]
             });
 
             var module = (TestBlockerModule)sessionManager.GetActiveModuleInstanceByInstanceId(instanceId)!;
@@ -489,12 +367,12 @@ public sealed class CommittedModuleMutationTests
                 ModuleInstanceId = instanceId.ToString(),
                 SettingKey = "BlockRule",
                 StringValue = "weakened"
-            }, CreateTestContext());
+            }, GrpcTestContext.Create());
             var actionResult = await service.InvokeAction(new InvokeActionRequest
             {
                 ModuleInstanceId = instanceId.ToString(),
                 ActionKey = "WeakenRule"
-            }, CreateTestContext());
+            }, GrpcTestContext.Create());
 
             settingResult.Success.Should().BeFalse();
             actionResult.Success.Should().BeFalse();
@@ -515,16 +393,16 @@ public sealed class CommittedModuleMutationTests
             var updateException = await Assert.ThrowsAsync<RpcException>(() => presetsService.UpdatePreset(
                 new UpdatePresetRequest
                 {
-                    Preset = PresetMapper.ToMessage(new SessionPreset
+                    Preset = PresetCodec.ToMessage(new SessionPreset
                     {
                         Id = nextWorkspaceId,
                         Name = "Changed next Workspace"
                     })
-                }, CreateTestContext()));
+                }, GrpcTestContext.Create()));
             updateException.StatusCode.Should().Be(StatusCode.FailedPrecondition);
 
             var deleteException = await Assert.ThrowsAsync<RpcException>(() => presetsService.DeletePreset(
-                new DeletePresetRequest { PresetId = nextWorkspaceId.ToString() }, CreateTestContext()));
+                new DeletePresetRequest { PresetId = nextWorkspaceId.ToString() }, GrpcTestContext.Create()));
             deleteException.StatusCode.Should().Be(StatusCode.FailedPrecondition);
             (await presetManager.GetPresetByIdAsync(nextWorkspaceId, CancellationToken.None))!.Name
                 .Should().Be("Next Workspace");
@@ -535,22 +413,18 @@ public sealed class CommittedModuleMutationTests
             await sessionManager.DisposeAsync();
             broadcaster.Dispose();
             sandboxManager.Dispose();
-            recoveryDirectory.Delete(recursive: true);
         }
     }
+    private static async Task StopIfRunningAsync(SessionManager sessionManager)
+    {
+        if (!sessionManager.IsSessionRunning)
+            return;
 
-    private static ServerCallContext CreateTestContext() => TestServerCallContext.Create(
-        method: "TestMethod",
-        host: "localhost",
-        deadline: DateTime.UtcNow.AddMinutes(5),
-        requestHeaders: [],
-        cancellationToken: CancellationToken.None,
-        peer: "127.0.0.1",
-        authContext: null,
-        contextPropagationToken: null,
-        writeHeadersFunc: _ => Task.CompletedTask,
-        writeOptionsGetter: () => new WriteOptions(),
-        writeOptionsSetter: _ => { });
+        if (sessionManager.ActiveSession?.FocusCommitment.IsCommitted == true)
+            await sessionManager.EndCommittedSessionAsync(SessionEndReason.EmergencyUnlock);
+        else
+            await sessionManager.StopCurrentSessionAsync();
+    }
 
     private static SessionPreset CreateCommittedPreset(string name, TimeSpan duration, Guid moduleId,
         int breakCount = 0) => new()
@@ -567,6 +441,38 @@ public sealed class CommittedModuleMutationTests
         },
         Modules = [new ConfiguredModule { InstanceId = Guid.NewGuid(), ModuleId = moduleId }]
     };
+
+    private sealed class TestEnvironment : IDisposable
+    {
+        private readonly ILifetimeScope _rootScope = new ContainerBuilder().Build();
+
+        public TestEnvironment(string prefix)
+        {
+            Definition = new ModuleDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Blocker",
+                ModuleType = typeof(TestBlockerModule)
+            };
+            Registry = new TestModuleRegistry(_rootScope, Definition);
+            Directory = System.IO.Directory.CreateTempSubdirectory(prefix);
+        }
+
+        public ModuleDefinition Definition { get; }
+        public TestModuleRegistry Registry { get; }
+        public DirectoryInfo Directory { get; }
+        public string RecoveryPath => Path.Combine(Directory.FullName, "committed-session.json");
+
+        public SessionManager CreateSessionManager(ICommitmentProtectionService? protection = null) =>
+            new(Registry, NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30),
+                TimeSpan.FromSeconds(10), NoopTelemetryService.Instance, RecoveryPath, protection);
+
+        public void Dispose()
+        {
+            _rootScope.Dispose();
+            Directory.Delete(recursive: true);
+        }
+    }
 
     private sealed class TestModuleRegistry(ILifetimeScope rootScope, ModuleDefinition definition) : IModuleRegistry
     {
@@ -606,7 +512,7 @@ public sealed class CommittedModuleMutationTests
 
         public TestBlockerModule()
         {
-            _weakenAction = Action.Create("WeakenRule", "Weaken rule");
+            _weakenAction = new Action("WeakenRule", "Weaken rule");
             _weakenAction.OnInvokeAsync(() =>
             {
                 WeakenActionInvoked = true;

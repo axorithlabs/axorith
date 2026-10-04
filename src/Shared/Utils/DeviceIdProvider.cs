@@ -2,12 +2,10 @@ using System.Text;
 
 namespace Axorith.Shared.Utils;
 
-/// <summary>Provides the anonymous ID shared by Axorith processes for one installation.</summary>
 public static class DeviceIdProvider
 {
     private const string MutexName = "Axorith.DeviceInstallationIdentity";
 
-    /// <summary>Gets the stable, randomly generated ID for this Axorith installation.</summary>
     public static string GetDeviceId()
     {
         if (OperatingSystem.IsWindows())

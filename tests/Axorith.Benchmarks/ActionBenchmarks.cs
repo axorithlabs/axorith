@@ -17,22 +17,16 @@ public class ActionBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _action = Action.Create("test", "Test Action", isEnabled: true);
-        _actionWithHandler = Action.Create("test-handler", "Test Action Handler", isEnabled: true);
+        _action = new Action("test", "Test Action", isEnabled: true);
+        _actionWithHandler = new Action("test-handler", "Test Action Handler", isEnabled: true);
         _actionWithHandler.OnInvokeAsync(async () => await Task.Delay(1));
     }
 
     [Benchmark(Baseline = true)]
-    public void CreateAction()
-    {
-        var action = Action.Create("key", "Label", isEnabled: true);
-    }
+    public void CreateAction() => _ = new Action("key", "Label", isEnabled: true);
 
     [Benchmark]
-    public void Invoke()
-    {
-        _action.Invoke();
-    }
+    public void Invoke() => _action.Invoke();
 
     [Benchmark]
     public async Task InvokeAsync()
@@ -47,10 +41,7 @@ public class ActionBenchmarks
     }
 
     [Benchmark]
-    public void SetLabel()
-    {
-        _action.SetLabel("New Label");
-    }
+    public void SetLabel() => _action.SetLabel("New Label");
 
     [Benchmark]
     public void SetEnabled()
@@ -60,16 +51,10 @@ public class ActionBenchmarks
     }
 
     [Benchmark]
-    public string GetCurrentLabel()
-    {
-        return _action.GetCurrentLabel();
-    }
+    public string GetCurrentLabel() => _action.GetCurrentLabel();
 
     [Benchmark]
-    public bool GetCurrentEnabled()
-    {
-        return _action.GetCurrentEnabled();
-    }
+    public bool GetCurrentEnabled() => _action.GetCurrentEnabled();
 
     [Benchmark]
     public void SubscribeToInvoked()
@@ -103,7 +88,7 @@ public class ActionBenchmarks
     [Benchmark]
     public void InvokeWithMultipleSubscribers()
     {
-        var action = Action.Create("multi", "Label", isEnabled: true);
+        var action = new Action("multi", "Label", isEnabled: true);
         var subs = new List<IDisposable>();
 
         for (var i = 0; i < 10; i++)
@@ -122,14 +107,14 @@ public class ActionBenchmarks
     [Benchmark]
     public void DisabledInvoke()
     {
-        var action = Action.Create("disabled", "Label", isEnabled: false);
+        var action = new Action("disabled", "Label", isEnabled: false);
         action.Invoke(); // Should be no-op
     }
 
     [Benchmark]
     public async Task DisabledAsyncInvoke()
     {
-        var action = Action.Create("disabled", "Label", isEnabled: false);
+        var action = new Action("disabled", "Label", isEnabled: false);
         await action.InvokeAsync(); // Should be no-op
     }
 }
