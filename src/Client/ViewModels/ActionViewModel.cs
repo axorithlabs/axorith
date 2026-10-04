@@ -3,11 +3,11 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Axorith.Sdk.Actions;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public sealed class ActionViewModel : ReactiveObject, IDisposable
+public sealed partial class ActionViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
 
@@ -15,7 +15,7 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
     public IAction SourceAction { get; }
 
     [Reactive]
-    public string Label { get; private set; } = string.Empty;
+    public partial string Label { get; private set; } = string.Empty;
 
     public bool IsSuccess => Label == "Connected OK";
 
@@ -23,7 +23,7 @@ public sealed class ActionViewModel : ReactiveObject, IDisposable
                              Label.Contains("Error", StringComparison.OrdinalIgnoreCase);
 
     [Reactive]
-    public bool IsVisible { get; private set; } = true;
+    public partial bool IsVisible { get; private set; } = true;
 
     private bool _isInline;
 

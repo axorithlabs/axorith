@@ -14,6 +14,10 @@
         <ProjectReference Include="..\..\Shared\ApplicationLauncher\Axorith.Shared.ApplicationLauncher.csproj" />
     </ItemGroup>
     <ItemGroup>
+        <PackageReference Include="SpotifyAPI.Web" />
+        <PackageReference Include="obs-websocket-dotnet" />
+    </ItemGroup>
+    <ItemGroup>
         <InternalsVisibleTo Include="Axorith.Integrations.Tests" />
     </ItemGroup>
 </Project>

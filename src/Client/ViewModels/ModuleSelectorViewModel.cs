@@ -3,24 +3,24 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Axorith.Sdk;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class ModuleDefinitionViewModel(ModuleDefinition definition) : ReactiveObject
+public partial class ModuleDefinitionViewModel(ModuleDefinition definition) : ReactiveObject
 {
     public ModuleDefinition Definition { get; } = definition;
 
     [Reactive]
-    public bool IsJustAdded { get; set; }
+    public partial bool IsJustAdded { get; set; }
 }
 
-public class CategoryViewModel : ReactiveObject
+public partial class CategoryViewModel : ReactiveObject
 {
     public string Name { get; }
 
     [Reactive]
-    public bool IsSelected { get; set; }
+    public partial bool IsSelected { get; set; }
 
     public CategoryViewModel(string name, bool isSelected = false)
     {
@@ -29,23 +29,21 @@ public class CategoryViewModel : ReactiveObject
     }
 }
 
-public class ModuleSelectorViewModel : ReactiveObject
+public partial class ModuleSelectorViewModel : ReactiveObject
 {
     private readonly IReadOnlyList<ModuleDefinition> _allModules;
     private readonly Action<ModuleDefinition> _onModuleSelected;
 
     [Reactive]
-    public string SearchText { get; set; } = string.Empty;
+    public partial string SearchText { get; set; } = string.Empty;
 
     [Reactive]
-    public string SelectedCategory { get; set; } = "All";
+    public partial string SelectedCategory { get; set; } = "All";
 
     public ObservableCollection<CategoryViewModel> Categories { get; } = [];
 
     public ObservableCollection<ModuleDefinitionViewModel> FilteredModules { get; } = [];
 
-    public ICommand SelectModuleCommand { get; }
-    public ICommand SelectCategoryCommand { get; }
     public ICommand CloseCommand { get; }
 
     public ModuleSelectorViewModel(
@@ -56,8 +54,6 @@ public class ModuleSelectorViewModel : ReactiveObject
         _allModules = allModules;
         _onModuleSelected = onModuleSelected;
 
-        SelectModuleCommand = ReactiveCommand.Create<ModuleDefinitionViewModel>(SelectModule);
-        SelectCategoryCommand = ReactiveCommand.Create<CategoryViewModel>(SelectCategory);
         CloseCommand = ReactiveCommand.Create(onCancel);
 
         InitializeCategories();
@@ -86,6 +82,7 @@ public class ModuleSelectorViewModel : ReactiveObject
         }
     }
 
+    [ReactiveCommand]
     private void SelectCategory(CategoryViewModel category)
     {
         foreach (var cat in Categories)
@@ -121,7 +118,8 @@ public class ModuleSelectorViewModel : ReactiveObject
         }
     }
 
-    private async void SelectModule(ModuleDefinitionViewModel vm)
+    [ReactiveCommand]
+    private async Task SelectModule(ModuleDefinitionViewModel vm)
     {
         if (vm.IsJustAdded)
         {

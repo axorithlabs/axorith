@@ -13,11 +13,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class SettingViewModel : ReactiveObject, IDisposable
+public partial class SettingViewModel : ReactiveObject, IDisposable
 {
     private readonly Guid _moduleInstanceId;
     private readonly Guid _moduleId;
@@ -39,12 +39,18 @@ public class SettingViewModel : ReactiveObject, IDisposable
     private object? _pendingNumberValue;
 
     public ISetting Setting { get; }
+    public string PickerWatermark => Setting.ControlType == SettingControlType.DirectoryPicker
+        ? "Select a directory..."
+        : "Select a file...";
+    public string PickerHistoryToolTip => Setting.ControlType == SettingControlType.DirectoryPicker
+        ? "Recent Directories"
+        : "Recent Files";
 
     [Reactive]
-    public string Label { get; private set; } = string.Empty;
+    public partial string Label { get; private set; } = string.Empty;
 
     [Reactive]
-    public bool IsVisible { get; private set; } = true;
+    public partial bool IsVisible { get; private set; } = true;
 
     private string _searchText = string.Empty;
     private string _applicationInputText = string.Empty;
@@ -65,10 +71,10 @@ public class SettingViewModel : ReactiveObject, IDisposable
     public string SelectorItemActionLabel => Setting.Key == "AppToAdd" ? "Add" : "Select";
     public bool ShowPopupSearch => Setting.Key == "AppToAdd";
     [Reactive]
-    public SettingViewModel? ApplicationPicker { get; internal set; }
+    public partial SettingViewModel? ApplicationPicker { get; internal set; }
 
     [Reactive]
-    public ActionViewModel? InlineAction { get; set; }
+    public partial ActionViewModel? InlineAction { get; set; }
 
     public string ApplicationInputText
     {
@@ -87,14 +93,14 @@ public class SettingViewModel : ReactiveObject, IDisposable
     }
 
     [Reactive]
-    public bool IsSelectorOpen { get; set; }
+    public partial bool IsSelectorOpen { get; set; }
 
 
     [Reactive]
-    public bool IsReadOnly { get; private set; }
+    public partial bool IsReadOnly { get; private set; }
 
     [Reactive]
-    public string? Error { get; set; }
+    public partial string? Error { get; set; }
 
     public event EventHandler? ValueChanged;
 
@@ -747,11 +753,11 @@ public sealed class ApplicationChoiceViewModel
     }
 }
 
-public class MultiChoiceItemViewModel(string key, string label, bool isSelected) : ReactiveObject
+public partial class MultiChoiceItemViewModel(string key, string label, bool isSelected) : ReactiveObject
 {
     public string Key { get; } = key;
     public string Label { get; } = label;
 
     [Reactive]
-    public bool IsSelected { get; set; } = isSelected;
+    public partial bool IsSelected { get; set; } = isSelected;
 }

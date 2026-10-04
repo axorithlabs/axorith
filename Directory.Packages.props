@@ -1,6 +1,7 @@
 <Project>
     <PropertyGroup>
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,18 +23,19 @@
         <PackageVersion Include="Grpc.Net.Client" Version="2.71.0" />
         <PackageVersion Include="Grpc.Tools" Version="2.76.0" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Configuration.CommandLine" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.Extensions.Configuration.CommandLine" Version="10.0.12" />
+        <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
+        <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+        <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
+        <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
         <PackageVersion Include="Microsoft.Reactive.Testing" Version="6.1.0" />
         <PackageVersion Include="Moq" Version="4.20.72" />
         <PackageVersion Include="Polly" Version="8.6.5" />
+        <PackageVersion Include="PostHog" Version="2.15.7" />
         <PackageVersion Include="ReactiveUI.Avalonia" Version="11.3.8" />
-        <PackageVersion Include="ReactiveUI.Fody" Version="11.3.8" />
+        <PackageVersion Include="ReactiveUI.SourceGenerators" Version="2.6.1" />
         <PackageVersion Include="Serilog" Version="4.3.0" />
         <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
         <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
@@ -41,12 +43,13 @@
         <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.0" />
         <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
         <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
-        <PackageVersion Include="Serilog.Sinks.PeriodicBatching" Version="4.0.0" />
+        <PackageVersion Include="SpotifyAPI.Web" Version="7.4.2" />
         <PackageVersion Include="System.Drawing.Common" Version="10.0.0" />
         <PackageVersion Include="System.Management" Version="10.0.0" />
         <PackageVersion Include="System.Reactive" Version="6.1.0" />
         <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
         <PackageVersion Include="Tmds.DBus.Protocol" Version="0.21.3" />
+        <PackageVersion Include="obs-websocket-dotnet" Version="5.7.0" />
         <PackageVersion Include="xunit" Version="2.9.3" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     </ItemGroup>

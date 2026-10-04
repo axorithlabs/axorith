@@ -14,8 +14,7 @@ public class SettingTemplateSelector : IDataTemplate
     public IDataTemplate? NumberTemplate { get; set; }
     public IDataTemplate? ChoiceTemplate { get; set; }
     public IDataTemplate? MultiChoiceTemplate { get; set; }
-    public IDataTemplate? FilePickerTemplate { get; set; }
-    public IDataTemplate? DirectoryPickerTemplate { get; set; }
+    public IDataTemplate? PathPickerTemplate { get; set; }
     public IDataTemplate? ButtonTemplate { get; set; }
 
     public Control Build(object? data)
@@ -31,8 +30,7 @@ public class SettingTemplateSelector : IDataTemplate
             SettingControlType.Number => NumberTemplate,
             SettingControlType.Choice => ChoiceTemplate,
             SettingControlType.MultiChoice => MultiChoiceTemplate,
-            SettingControlType.FilePicker => FilePickerTemplate,
-            SettingControlType.DirectoryPicker => DirectoryPickerTemplate,
+            SettingControlType.FilePicker or SettingControlType.DirectoryPicker => PathPickerTemplate,
             SettingControlType.Button => ButtonTemplate,
             _ => null
         };

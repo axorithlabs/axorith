@@ -450,19 +450,7 @@ public class SessionManager(
             {
                 _asyncLock.Release();
             }
-        }
-        catch
-        {
-            if (ReferenceEquals(ActiveSession, snapshot))
-            {
-                await StopSessionAsync(SessionEndReason.StartupFailure, CancellationToken.None).ConfigureAwait(false);
-            }
 
-            throw;
-        }
-
-        try
-        {
             await ValidateAllModulesAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
 
             await RunHybridStartupAsync(_activeModules, _sessionCts.Token).ConfigureAwait(false);
@@ -500,8 +488,12 @@ public class SessionManager(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Session startup failed. Initiating rollback...");
-            await StopSessionAsync(SessionEndReason.StartupFailure, CancellationToken.None).ConfigureAwait(false);
+            if (ReferenceEquals(ActiveSession, snapshot))
+            {
+                logger.LogError(ex, "Session startup failed. Initiating rollback...");
+                await StopSessionAsync(SessionEndReason.StartupFailure, CancellationToken.None).ConfigureAwait(false);
+            }
+
             throw;
         }
     }
@@ -676,10 +668,8 @@ public class SessionManager(
         }
     }
 
-    public async Task StopCurrentSessionAsync(CancellationToken cancellationToken = default)
-    {
-        _ = await StopSessionAsync(SessionEndReason.UserStop, cancellationToken).ConfigureAwait(false);
-    }
+    public Task StopCurrentSessionAsync(CancellationToken cancellationToken = default) =>
+        StopSessionAsync(SessionEndReason.UserStop, cancellationToken);
 
     public Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default)
     {

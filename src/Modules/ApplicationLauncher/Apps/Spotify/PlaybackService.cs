@@ -153,13 +153,10 @@ internal sealed class PlaybackService : IDisposable
 
         try
         {
-            var setupTasks = new List<Task>
-            {
+            await Task.WhenAll(
                 _apiService.SetVolumeAsync(targetDeviceId, _settings.Volume.GetCurrentValue()),
                 _apiService.SetShuffleAsync(targetDeviceId, _settings.Shuffle.GetCurrentValue() == "true"),
-                _apiService.SetRepeatModeAsync(targetDeviceId, _settings.RepeatMode.GetCurrentValue())
-            };
-            await Task.WhenAll(setupTasks);
+                _apiService.SetRepeatModeAsync(targetDeviceId, _settings.RepeatMode.GetCurrentValue()));
         }
         catch (Exception ex)
         {

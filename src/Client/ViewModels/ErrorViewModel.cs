@@ -1,30 +1,27 @@
-using System.Windows.Input;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class ErrorViewModel : ReactiveObject
+public partial class ErrorViewModel : ReactiveObject
 {
     private Func<Task>? _retryCallback;
 
     [Reactive]
-    public string ErrorMessage { get; set; } = string.Empty;
+    public partial string ErrorMessage { get; set; } = string.Empty;
 
     [Reactive]
-    public bool IsRetrying { get; set; }
-
-    public ICommand? RetryCommand { get; private set; }
+    public partial bool IsRetrying { get; set; }
 
     public void Configure(string errorMessage, Func<Task> retryCallback)
     {
         ErrorMessage = errorMessage;
         _retryCallback = retryCallback;
 
-        RetryCommand = ReactiveCommand.CreateFromTask(RetryConnectionAsync);
     }
 
-    private async Task RetryConnectionAsync()
+    [ReactiveCommand]
+    private async Task Retry()
     {
         try
         {

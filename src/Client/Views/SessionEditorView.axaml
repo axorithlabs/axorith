@@ -33,6 +33,18 @@
             <Setter Property="BorderBrush" Value="#FF4444"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
+        <Style Selector="TextBox.setting-input">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="#050505"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,8"/>
+        </Style>
+        <Style Selector="TransitioningContentControl">
+            <Setter Property="PageTransition">
+                <CrossFade Duration="0:0:0.15"/>
+            </Setter>
+        </Style>
         <Style Selector="ComboBox.error /template/ Border#Border">
             <Setter Property="BorderBrush" Value="#FF4444"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -50,7 +62,7 @@
             <Setter Property="BorderBrush" Value="#A84848"/>
             <Setter Property="Foreground" Value="#FF9A9A"/>
         </Style>
-        
+
         <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ RepeatButton">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -60,14 +72,14 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Opacity" Value="0.3"/>
         </Style>
-        
+
         <Style Selector="NumericUpDown.error /template/ TextBox">
             <Setter Property="BorderBrush" Value="#FF4444"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
     </UserControl.Styles>
-    
-        
+
+
 <UserControl.Resources>
 
         <DataTemplate x:Key="InlineActionTemplate" x:DataType="vm:ActionViewModel">
@@ -117,7 +129,7 @@
                 <StackPanel Spacing="6">
                     <TextBox Text="{Binding SearchText, Mode=TwoWay}"
                              IsVisible="{Binding ShowPopupSearch}" Watermark="Search apps..."
-                             Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+                             Classes="setting-input"/>
                     <ListBox ItemsSource="{Binding ApplicationChoices}" MaxHeight="320"
                              Background="Transparent" BorderThickness="0" Padding="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -126,7 +138,7 @@
                 </StackPanel>
             </Border>
         </DataTemplate>
-        
+
         <StreamGeometry x:Key="TimerIcon">M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</StreamGeometry>
         <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
         <StreamGeometry x:Key="ArrowDownIcon">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
@@ -141,13 +153,9 @@
         <StreamGeometry x:Key="PowerIcon">M13,3H11V13H13V3M17.83,6.17L16.41,7.59A8,8 0 1,1 7.59,7.59L6.17,6.17A10,10 0 1,0 17.83,6.17Z</StreamGeometry>
 
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
-                     IsEnabled="{Binding !IsReadOnly}" 
-                     HorizontalAlignment="Stretch" 
-                     Background="#050505" 
-                     BorderBrush="#333" 
-                     CornerRadius="6" 
-                     Padding="10,8"
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}"
+                     IsEnabled="{Binding !IsReadOnly}"
+                     Classes="setting-input"
                      Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBox.InnerRightContent>
                     <ContentControl Content="{Binding InlineAction}"
@@ -161,8 +169,8 @@
                 <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch" MinWidth="0">
                     <TextBox Grid.Column="0" Text="{Binding StringValue, Mode=TwoWay}"
                              AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
-                             IsEnabled="{Binding !IsReadOnly}" HorizontalAlignment="Stretch" MinWidth="0"
-                             Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"
+                             IsEnabled="{Binding !IsReadOnly}" MinWidth="0"
+                             Classes="setting-input"
                              Classes.appPicker="{Binding IsCustomAppsField}"
                              Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     </TextBox>
@@ -181,34 +189,30 @@
         </DataTemplate>
 
         <DataTemplate x:Key="SecretSettingTemplate" x:DataType="vm:SettingViewModel">
-            <TextBox Text="{Binding StringValue, Mode=TwoWay}" 
-                     PasswordChar="•" 
-                     Watermark="Enter secret value..." 
-                     IsEnabled="{Binding !IsReadOnly}" 
-                     HorizontalAlignment="Stretch" 
-                     Background="#050505" 
-                     BorderBrush="#333" 
-                     CornerRadius="6" 
-                     Padding="10,8"
+            <TextBox Text="{Binding StringValue, Mode=TwoWay}"
+                     PasswordChar="•"
+                     Watermark="Enter secret value..."
+                     IsEnabled="{Binding !IsReadOnly}"
+                     Classes="setting-input"
                      Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             </TextBox>
         </DataTemplate>
 
         <DataTemplate x:Key="CheckboxSettingTemplate" x:DataType="vm:SettingViewModel">
-            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}" 
-                      Content="{Binding Label}" 
+            <CheckBox IsChecked="{Binding BoolValue, Mode=TwoWay}"
+                      Content="{Binding Label}"
                       IsEnabled="{Binding !IsReadOnly}"/>
         </DataTemplate>
 
         <DataTemplate x:Key="NumberSettingTemplate" x:DataType="vm:SettingViewModel">
-            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}" 
-                           Increment="{Binding NumberIncrement}" 
-                           FormatString="{Binding NumberFormatString}" 
-                           IsEnabled="{Binding !IsReadOnly}" 
-                           HorizontalAlignment="Stretch" 
-                           Background="#050505" 
-                           BorderBrush="#333" 
-                           CornerRadius="6" 
+            <NumericUpDown Value="{Binding DecimalValue, Mode=TwoWay}"
+                           Increment="{Binding NumberIncrement}"
+                           FormatString="{Binding NumberFormatString}"
+                           IsEnabled="{Binding !IsReadOnly}"
+                           HorizontalAlignment="Stretch"
+                           Background="#050505"
+                           BorderBrush="#333"
+                           CornerRadius="6"
                            Padding="10,8"
                            Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             </NumericUpDown>
@@ -222,8 +226,7 @@
                              Grid.Column="0"
                              Text="{Binding ApplicationInputText, Mode=TwoWay}"
                              Watermark="Select application..."
-                             HorizontalAlignment="Stretch"
-                             Background="#050505" BorderBrush="#333" CornerRadius="6,0,0,6" Padding="10,8"/>
+                             Classes="setting-input" CornerRadius="6,0,0,6"/>
                     <Button Grid.Column="1"
                             Command="{Binding OpenApplicationSelectorCommand}"
                             Background="#111" BorderBrush="#333" BorderThickness="1,1,1,1"
@@ -252,8 +255,8 @@
                 </ComboBox.ItemsPanel>
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Value}" 
-                                   TextTrimming="CharacterEllipsis" 
+                        <TextBlock Text="{Binding Value}"
+                                   TextTrimming="CharacterEllipsis"
                                    ToolTip.Tip="{Binding Value}"/>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
@@ -261,84 +264,35 @@
             </StackPanel>
         </DataTemplate>
 
-        <DataTemplate x:Key="FilePickerSettingTemplate" x:DataType="vm:SettingViewModel">
+        <DataTemplate x:Key="PathPickerSettingTemplate" x:DataType="vm:SettingViewModel">
             <Grid ColumnDefinitions="*,Auto,Auto">
-                <TextBox Grid.Column="0" 
-                         Text="{Binding StringValue, Mode=TwoWay}" 
-                         Watermark="Select a file..." 
-                         HorizontalAlignment="Stretch" 
-                         Background="#050505" 
-                         BorderBrush="#333" 
-                         CornerRadius="6" 
-                         Padding="10,8"
+                <TextBox Grid.Column="0"
+                         Text="{Binding StringValue, Mode=TwoWay}"
+                         Watermark="{Binding PickerWatermark}"
+                         Classes="setting-input"
                          IsEnabled="{Binding !IsReadOnly}"
                          Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 </TextBox>
-                
-                <ComboBox Grid.Column="1" 
-                          Classes="history"
-                          ItemsSource="{Binding History}"
-                          SelectedItem="{Binding SelectedHistoryItem}" 
-                          Margin="4,0,0,0"
-                          IsVisible="{Binding History.Count}"
-                          ToolTip.Tip="Recent Files">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid ColumnDefinitions="*,Auto" Background="Transparent">
-                                <TextBlock Grid.Column="0" Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="350" VerticalAlignment="Center"/>
-                                
-                                <Button Grid.Column="1" 
-                                        Classes="icon" 
-                                        Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}" 
-                                        CommandParameter="{Binding}"
-                                        Width="24" Height="24" Padding="4" Margin="8,0,0,0" 
-                                        ToolTip.Tip="Remove from history">
-                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
-                                              Width="12" Height="12"
-                                              Foreground="#FF5555"/>
-                                </Button>
-                            </Grid>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
 
-                <Button Grid.Column="2" Content="..." Margin="4,0,0,0" Command="{Binding BrowseCommand}" IsEnabled="{Binding !IsReadOnly}"/>
-            </Grid>
-        </DataTemplate>
-
-        <DataTemplate x:Key="DirectoryPickerSettingTemplate" x:DataType="vm:SettingViewModel">
-            <Grid ColumnDefinitions="*,Auto,Auto">
-                <TextBox Grid.Column="0" 
-                         Text="{Binding StringValue, Mode=TwoWay}" 
-                         Watermark="Select a directory..." 
-                         HorizontalAlignment="Stretch" 
-                         Background="#050505" 
-                         BorderBrush="#333" 
-                         CornerRadius="6" 
-                         Padding="10,8"
-                         IsEnabled="{Binding !IsReadOnly}"
-                         Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                </TextBox>
-                
-                <ComboBox Grid.Column="1" 
+                <ComboBox Grid.Column="1"
                           Classes="history"
                           ItemsSource="{Binding History}"
                           SelectedItem="{Binding SelectedHistoryItem}"
                           Margin="4,0,0,0"
                           IsVisible="{Binding History.Count}"
-                          ToolTip.Tip="Recent Directories">
+                          ToolTip.Tip="{Binding PickerHistoryToolTip}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <Grid ColumnDefinitions="*,Auto" Background="Transparent">
                                 <TextBlock Grid.Column="0" Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="350" VerticalAlignment="Center"/>
-                                
-                                <Button Grid.Column="1" 
-                                        Classes="icon" 
-                                        Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}" 
+
+                                <Button Grid.Column="1"
+                                        Classes="icon"
+                                        Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}"
                                         CommandParameter="{Binding}"
-                                        Width="24" Height="24" Padding="4" Margin="8,0,0,0" 
+                                        Width="24" Height="24" Padding="4" Margin="8,0,0,0"
                                         ToolTip.Tip="Remove from history">
-                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
+                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
                                               Width="12" Height="12"
                                               Foreground="#FF5555"/>
                                 </Button>
@@ -350,14 +304,159 @@
                 <Button Grid.Column="2" Content="..." Margin="4,0,0,0" Command="{Binding BrowseCommand}" IsEnabled="{Binding !IsReadOnly}"/>
             </Grid>
         </DataTemplate>
-        
+
+                <DataTemplate x:Key="TimeTriggerEditorTemplate" x:DataType="vm:TimeTriggerViewModel">
+            <Panel>
+                <Border Background="#000000" Opacity="0.85"/>
+
+                <Border Background="#0A0A0A"
+                        BorderBrush="#333"
+                        BorderThickness="1"
+                        Width="520"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        CornerRadius="12"
+                        BoxShadow="0 25 80 0 #80000000">
+
+                    <Grid RowDefinitions="Auto, *">
+                        <Border Grid.Row="0"
+                                Padding="20,16"
+                                BorderThickness="0,0,0,1"
+                                BorderBrush="#222"
+                                Background="#0F0F0F"
+                                CornerRadius="12,12,0,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right"
+                                        Content="✕"
+                                        Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}"
+                                        Classes="link"
+                                        FontSize="18"
+                                        Padding="8"
+                                        Margin="10,-5,-10,-5"
+                                        Foreground="#666"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="{Binding EditorAccentBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding EditorTitle}" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <Border Padding="24">
+                                <StackPanel Spacing="24">
+                                    <StackPanel Spacing="20">
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="{Binding TimeLabel}" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                                <NumericUpDown Value="{Binding Hours}"
+                                                               Minimum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMinHour}}"
+                                                               Maximum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMaxHour}}"
+                                                               FormatString="0"
+                                                               Width="70"
+                                                               Height="32"
+                                                               Padding="8,0"
+                                                               ShowButtonSpinner="False"
+                                                               HorizontalContentAlignment="Center"
+                                                               VerticalContentAlignment="Center"
+                                                               Classes.error="{Binding HasTimeError}"/>
+                                                <TextBlock Text=":" VerticalAlignment="Center" Foreground="#888" FontSize="16" FontWeight="Bold"/>
+                                                <NumericUpDown Value="{Binding Minutes}"
+                                                               Minimum="0" Maximum="59"
+                                                               FormatString="00"
+                                                               Width="70"
+                                                               Height="32"
+                                                               Padding="8,0"
+                                                               ShowButtonSpinner="False"
+                                                               HorizontalContentAlignment="Center"
+                                                               VerticalContentAlignment="Center"
+                                                               Classes.error="{Binding HasTimeError}"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !Use24HourFormat}" Margin="8,0,0,0">
+                                                    <RadioButton Content="AM"
+                                                                 IsChecked="{Binding IsAm}"
+                                                                 GroupName="{Binding EditorTitle}"
+                                                                 Padding="8,4"
+                                                                 Foreground="#E0E0E0"/>
+                                                    <RadioButton Content="PM"
+                                                                 IsChecked="{Binding !IsAm}"
+                                                                 GroupName="{Binding EditorTitle}"
+                                                                 Padding="8,4"
+                                                                 Foreground="#E0E0E0"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
+                                            <CheckBox Grid.Column="1"
+                                                      IsChecked="{Binding Use24HourFormat}"
+                                                      Content="Use 24-hour format"
+                                                      Foreground="#AAA"/>
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="120, *">
+                                            <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="#AAA" FontWeight="Medium"/>
+                                            <Border Grid.Column="1"
+                                                    Background="#050505"
+                                                    BorderBrush="#333"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    Padding="8,12">
+                                                <UniformGrid Rows="1" Columns="7">
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Mon" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnMonday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Tue" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnTuesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Wed" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnWednesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Thu" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnThursday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Fri" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnFriday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Sat" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnSaturday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                                        <TextBlock Text="Sun" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <CheckBox IsChecked="{Binding RunOnSunday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
+                                                    </StackPanel>
+                                                </UniformGrid>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <Button Content="Done"
+                                            Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}"
+                                            Classes="accent"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Center"
+                                            Padding="10"
+                                            FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Panel>
+        </DataTemplate>
+
         <DataTemplate x:Key="MultiChoiceSettingTemplate" DataType="vm:SettingViewModel">
             <Border Background="#050505" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="10">
                 <ItemsControl ItemsSource="{Binding MultiChoices}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="vm:MultiChoiceItemViewModel">
-                            <CheckBox IsChecked="{Binding IsSelected}" 
-                                      Content="{Binding Label}" 
+                            <CheckBox IsChecked="{Binding IsSelected}"
+                                      Content="{Binding Label}"
                                       Margin="0,2"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -375,8 +474,7 @@
                                            CheckboxTemplate="{StaticResource CheckboxSettingTemplate}"
                                            NumberTemplate="{StaticResource NumberSettingTemplate}"
                                            ChoiceTemplate="{StaticResource ChoiceSettingTemplate}"
-                                           FilePickerTemplate="{StaticResource FilePickerSettingTemplate}"
-                                           DirectoryPickerTemplate="{StaticResource DirectoryPickerSettingTemplate}"
+                                           PathPickerTemplate="{StaticResource PathPickerSettingTemplate}"
                                            MultiChoiceTemplate="{StaticResource MultiChoiceSettingTemplate}"
                                            ButtonTemplate="{StaticResource ButtonSettingTemplate}"/>
 
@@ -402,39 +500,39 @@
     </UserControl.Resources>
 
     <Panel>
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" 
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Hidden">
             <Panel MaxWidth="800" HorizontalAlignment="Center">
                 <StackPanel Margin="20,30" Spacing="0">
-                    
+
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
                         <StackPanel Spacing="8">
                             <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
                             <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
                             <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                            
-                            <Border Background="#2A0505" 
-                                    BorderBrush="#FF4444" 
-                                    BorderThickness="1" 
-                                    CornerRadius="6" 
-                                    Padding="12" 
+
+                            <Border Background="#2A0505"
+                                    BorderBrush="#FF4444"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="12"
                                     Margin="0,15,0,0"
                                     IsVisible="{Binding HasValidationErrors}">
                                 <Grid ColumnDefinitions="Auto, *">
-                                    <PathIcon Grid.Column="0" Data="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" 
-                                              Foreground="#FF4444" 
-                                              Width="20" Height="20" 
-                                              VerticalAlignment="Top" 
+                                    <PathIcon Grid.Column="0" Data="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"
+                                              Foreground="#FF4444"
+                                              Width="20" Height="20"
+                                              VerticalAlignment="Top"
                                               Margin="0,2,10,0"/>
-                                    
+
                                     <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="Configuration Error" 
-                                                   Foreground="#FF4444" 
-                                                   FontWeight="Bold" 
+                                        <TextBlock Text="Configuration Error"
+                                                   Foreground="#FF4444"
+                                                   FontWeight="Bold"
                                                    FontSize="14"/>
                                         <TextBlock Text="Please fix the highlighted configuration errors before saving."
-                                                   Foreground="#FFCCCC" 
-                                                   FontSize="13" 
+                                                   Foreground="#FFCCCC"
+                                                   FontSize="13"
                                                    TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Grid>
@@ -493,12 +591,12 @@
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
                         <StackPanel Spacing="15">
                             <TextBlock Text="Start On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
-                            
+
                             <ItemsControl ItemsSource="{Binding Triggers}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:TriggerViewModel">
-                                        <Button Classes="ItemCard" 
-                                                Command="{Binding $parent[ItemsControl].DataContext.EditTriggerCommand}" 
+                                        <Button Classes="ItemCard"
+                                                Command="{Binding $parent[ItemsControl].DataContext.EditTriggerCommand}"
                                                 CommandParameter="{Binding}"
                                                 Margin="0,0,0,10">
                                             <Border>
@@ -506,16 +604,16 @@
                                                     <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
                                                         <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="#00AAFF"/>
                                                     </Border>
-                                                    
+
                                                     <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
                                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
                                                         <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
                                                     </StackPanel>
-                                                    
+
                                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                        <Button Classes="delete-btn" 
-                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveTriggerCommand}" 
-                                                                CommandParameter="{Binding}" 
+                                                        <Button Classes="delete-btn"
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveTriggerCommand}"
+                                                                CommandParameter="{Binding}"
                                                                 ToolTip.Tip="Remove">
                                                             <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
                                                         </Button>
@@ -528,10 +626,10 @@
                             </ItemsControl>
 
                             <Button HorizontalAlignment="Stretch"
-                                    Background="Transparent" 
-                                    BorderBrush="#333" 
-                                    BorderThickness="1" 
-                                    CornerRadius="8" 
+                                    Background="Transparent"
+                                    BorderBrush="#333"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
                                     Padding="10"
                                     Cursor="Hand"
                                     IsEnabled="{Binding CanAddAnyTrigger}">
@@ -549,18 +647,18 @@
                                     <TextBlock Text="Add Trigger" Foreground="#888" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
-                            
-                            <TextBlock Text="If empty, start manually via button." 
-                                       HorizontalAlignment="Center" 
-                                       Foreground="#666" 
-                                       FontSize="12" 
+
+                            <TextBlock Text="If empty, start manually via button."
+                                       HorizontalAlignment="Center"
+                                       Foreground="#666"
+                                       FontSize="12"
                                        Margin="0,5,0,0"
                                        IsVisible="{Binding !Triggers.Count}"/>
                         </StackPanel>
                     </Border>
-                    
+
                     <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
-                    
+
                     <ListBox ItemsSource="{Binding ConfiguredModules}"
                              Background="Transparent"
                              BorderThickness="0"
@@ -590,8 +688,8 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                                 <StackPanel Spacing="0" HorizontalAlignment="Center">
-                                    <Button Classes="ItemCard" 
-                                            Command="{Binding $parent[ListBox].DataContext.OpenModuleSettingsCommand}" 
+                                    <Button Classes="ItemCard"
+                                            Command="{Binding $parent[ListBox].DataContext.OpenModuleSettingsCommand}"
                                             CommandParameter="{Binding}"
                                             Width="500">
                                         <Border Classes.error="{Binding HasErrors}"
@@ -602,7 +700,7 @@
                                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                     <TextBlock Text="{Binding Definition.Description}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="Wrap" MaxWidth="400" Margin="0,6,0,0"/>
                                                 </StackPanel>
-                                                
+
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="15,0,0,0">
                                                     <Button Classes="move-btn" Command="{Binding $parent[ListBox].DataContext.MoveUpCommand}" CommandParameter="{Binding}" IsEnabled="{Binding !IsFirst}" ToolTip.Tip="Move Up">
                                                         <PathIcon Data="{StaticResource ArrowUpIcon}" Width="16" Height="16"/>
@@ -617,18 +715,18 @@
                                             </Grid>
                                         </Border>
                                     </Button>
-                                    
+
                                     <Grid Height="60" IsVisible="{Binding !IsLast}" HorizontalAlignment="Center">
                                         <Rectangle Width="1" Fill="{DynamicResource BorderPrimaryBrush}" VerticalAlignment="Stretch" HorizontalAlignment="Center"/>
-                                        
-                                        <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" CornerRadius="12" Padding="8,2" 
+
+                                        <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" CornerRadius="12" Padding="8,2"
                                                 VerticalAlignment="Center" HorizontalAlignment="Center"
                                                 IsVisible="{Binding NextModule.HasDelay}">
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                 <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentInfoBrush}"/>
                                                 <TextBlock Text="Wait" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
-                                                    
-                                                <TextBox Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}" 
+
+                                                <TextBox Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}"
                                                          Width="36" Height="22" Padding="0" FontSize="13"
                                                          TextAlignment="Center"
                                                          VerticalContentAlignment="Center"
@@ -643,8 +741,8 @@
                                                     </TextBox.Styles>
                                                 </TextBox>
                                                 <TextBlock Text="s" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
-                                                
-                                                <Button Classes="RemoveDelay" 
+
+                                                <Button Classes="RemoveDelay"
                                                         Command="{Binding RemoveDelayCommand}"
                                                         ToolTip.Tip="Remove Delay"
                                                         Margin="4,0,0,0">
@@ -653,7 +751,7 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <Button Classes="ConnectorNode" 
+                                        <Button Classes="ConnectorNode"
                                                 IsVisible="{Binding !NextModule.HasDelay}"
                                                 ToolTip.Tip="Add Action">
                                             <Button.Flyout>
@@ -675,8 +773,8 @@
 
                     <StackPanel MinWidth="500" Margin="0,0,0,0" Spacing="0">
                         <Path Data="M 0 0 L 0 30" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
-                        
-                        <Button Command="{Binding OpenAddModuleCommand}" 
+
+                        <Button Command="{Binding OpenAddModuleCommand}"
                                 Classes="CardButton"
                                 HorizontalAlignment="Center"
                                 Cursor="Hand">
@@ -698,8 +796,8 @@
                             <ItemsControl ItemsSource="{Binding StopTriggers}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:TriggerViewModel">
-                                        <Button Classes="ItemCard" 
-                                                Command="{Binding $parent[ItemsControl].DataContext.EditStopTriggerCommand}" 
+                                        <Button Classes="ItemCard"
+                                                Command="{Binding $parent[ItemsControl].DataContext.EditStopTriggerCommand}"
                                                 CommandParameter="{Binding}"
                                                 Margin="0,0,0,10"
                                                 Classes.error="{Binding HasError}">
@@ -708,16 +806,16 @@
                                                     <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
                                                         <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="#FF6B6B"/>
                                                     </Border>
-                                                    
+
                                                     <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
                                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
                                                         <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
                                                     </StackPanel>
-                                                    
+
                                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                        <Button Classes="delete-btn" 
-                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveStopTriggerCommand}" 
-                                                                CommandParameter="{Binding}" 
+                                                        <Button Classes="delete-btn"
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveStopTriggerCommand}"
+                                                                CommandParameter="{Binding}"
                                                                 ToolTip.Tip="Remove">
                                                             <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
                                                         </Button>
@@ -730,22 +828,22 @@
                             </ItemsControl>
 
                             <Button x:Name="AddStopTriggerButton" HorizontalAlignment="Stretch"
-                                    Background="Transparent" 
-                                    BorderBrush="#333" 
-                                    BorderThickness="1" 
-                                    CornerRadius="8" 
+                                    Background="Transparent"
+                                    BorderBrush="#333"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
                                     Padding="10"
                                     Cursor="Hand">
                                 <Button.Flyout>
                                     <MenuFlyout Placement="Bottom">
-                                        <MenuItem Header="Fixed Time" 
+                                        <MenuItem Header="Fixed Time"
                                                   Command="{Binding AddStopAtTimeTriggerCommand}"
                                                   IsEnabled="{Binding CanAddStopAtTimeTrigger}">
                                             <MenuItem.Icon>
                                                 <PathIcon Data="{StaticResource TimerIcon}" Width="14" Height="14"/>
                                             </MenuItem.Icon>
                                         </MenuItem>
-                                        <MenuItem Header="Session Duration" 
+                                        <MenuItem Header="Session Duration"
                                                   Command="{Binding AddStopAfterDurationTriggerCommand}"
                                                   IsEnabled="{Binding CanAddStopAfterDurationTrigger}">
                                             <MenuItem.Icon>
@@ -759,11 +857,11 @@
                                     <TextBlock Text="Add Stop Trigger" Foreground="#888" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
-                            
+
                             <TextBlock Text="If empty, stop manually via button."
-                                       HorizontalAlignment="Center" 
-                                       Foreground="#666" 
-                                       FontSize="12" 
+                                       HorizontalAlignment="Center"
+                                       Foreground="#666"
+                                       FontSize="12"
                                        Margin="0,5,0,0"
                                        IsVisible="{Binding !StopTriggers.Count}"/>
                         </StackPanel>
@@ -820,10 +918,10 @@
                             </ItemsControl>
 
                             <Button x:Name="AddThenTriggerButton" HorizontalAlignment="Stretch"
-                                    Background="Transparent" 
-                                    BorderBrush="#333" 
-                                    BorderThickness="1" 
-                                    CornerRadius="8" 
+                                    Background="Transparent"
+                                    BorderBrush="#333"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
                                     Padding="10"
                                     Cursor="Hand">
                                 <Button.Flyout>
@@ -871,10 +969,10 @@
                                     <TextBlock Text="Add Then Trigger" Foreground="#888" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
-                            
+
                             <TextBlock Text="Triggers next session after stop. Does not apply when stopped manually."
-                                       HorizontalAlignment="Center" 
-                                       Foreground="#666" 
+                                       HorizontalAlignment="Center"
+                                       Foreground="#666"
                                        FontSize="12"
                                        TextWrapping="Wrap"
                                        TextAlignment="Center"
@@ -886,9 +984,6 @@
         </ScrollViewer>
 
         <TransitioningContentControl Content="{Binding ModuleSelector}" IsVisible="{Binding !!ModuleSelector}">
-            <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.15"/>
-            </TransitioningContentControl.PageTransition>
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:ModuleSelectorViewModel">
                     <Panel>
@@ -915,7 +1010,7 @@
                                             <PathIcon Data="{StaticResource SearchIcon}" Width="14" Height="14" Foreground="#666" Margin="0,0,10,0"/>
                                         </TextBox.InnerRightContent>
                                     </TextBox>
-                                    
+
                                     <ItemsControl Grid.Column="1" ItemsSource="{Binding Categories}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -924,9 +1019,9 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate DataType="vm:CategoryViewModel">
-                                                <RadioButton Content="{Binding Name}" 
+                                                <RadioButton Content="{Binding Name}"
                                                              GroupName="CategoryGroup"
-                                                             Command="{Binding $parent[ItemsControl].DataContext.SelectCategoryCommand}" 
+                                                             Command="{Binding $parent[ItemsControl].DataContext.SelectCategoryCommand}"
                                                              CommandParameter="{Binding}"
                                                              IsChecked="{Binding IsSelected}"
                                                              Theme="{StaticResource ButtonRadioButton}"/>
@@ -952,20 +1047,20 @@
                                                             </Border>
                                                             <TextBlock Text="{Binding Definition.Name}" FontWeight="Bold" FontSize="15" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis"/>
                                                         </DockPanel>
-                                                        
+
                                                         <TextBlock Grid.Row="1" Text="{Binding Definition.Description}" Foreground="#999" FontSize="13" TextWrapping="Wrap" Height="40" TextTrimming="CharacterEllipsis" Margin="0,0,0,15"/>
-                                                        
+
                                                         <Panel Grid.Row="2">
-                                                            <Button Content="Add" Classes="accent" HorizontalAlignment="Stretch" 
-                                                                    Command="{Binding $parent[ItemsControl].DataContext.SelectModuleCommand}" 
+                                                            <Button Content="Add" Classes="accent" HorizontalAlignment="Stretch"
+                                                                    Command="{Binding $parent[ItemsControl].DataContext.SelectModuleCommand}"
                                                                     CommandParameter="{Binding}"
                                                                     IsVisible="{Binding !IsJustAdded}"/>
-                                                            
-                                                            <Border IsVisible="{Binding IsJustAdded}" 
-                                                                    Background="Transparent" 
-                                                                    BorderBrush="#10B981" 
-                                                                    BorderThickness="1" 
-                                                                    CornerRadius="6" 
+
+                                                            <Border IsVisible="{Binding IsJustAdded}"
+                                                                    Background="Transparent"
+                                                                    BorderBrush="#10B981"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="6"
                                                                     Height="32">
                                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
                                                                     <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" Width="12" Height="12" Foreground="#10B981"/>
@@ -986,227 +1081,11 @@
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <TransitioningContentControl Content="{Binding SelectedTrigger}" IsVisible="{Binding !!SelectedTrigger}">
-            <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.15"/>
-            </TransitioningContentControl.PageTransition>
-            <TransitioningContentControl.ContentTemplate>
-                <DataTemplate x:DataType="vm:ScheduleTriggerViewModel">
-            <Panel>
-                <Border Background="#000000" Opacity="0.85"/>
-                
-                <Border Background="#0A0A0A" 
-                        BorderBrush="#333" 
-                        BorderThickness="1" 
-                        Width="520" 
-                        VerticalAlignment="Center" 
-                        HorizontalAlignment="Center" 
-                        CornerRadius="12" 
-                        BoxShadow="0 25 80 0 #80000000">
-                    
-                    <Grid RowDefinitions="Auto, *">
-                        <Border Grid.Row="0" 
-                                Padding="20,16" 
-                                BorderThickness="0,0,0,1" 
-                                BorderBrush="#222" 
-                                Background="#0F0F0F" 
-                                CornerRadius="12,12,0,0">
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" 
-                                        Content="✕" 
-                                        Command="{Binding $parent[UserControl].DataContext.CloseTriggerSettingsCommand}" 
-                                        Classes="link" 
-                                        FontSize="18" 
-                                        Padding="8" 
-                                        Margin="10,-5,-10,-5" 
-                                        Foreground="#666"/>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="#00AAFF" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Edit Schedule" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                        
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                            <Border Padding="24">
-                                <StackPanel Spacing="24">
-                                    <StackPanel Spacing="20">
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Start Time" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                                <NumericUpDown Value="{Binding Hours}" 
-                                                               Minimum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMinHour}}"
-                                                               Maximum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMaxHour}}"
-                                                               FormatString="0"
-                                                               Width="70"
-                                                               Height="32"
-                                                               Padding="8,0"
-                                                               ShowButtonSpinner="False"
-                                                               HorizontalContentAlignment="Center"
-                                                               VerticalContentAlignment="Center"
-                                                               Classes.error="{Binding HasTimeError}"/>
-                                                <TextBlock Text=":" VerticalAlignment="Center" Foreground="#888" FontSize="16" FontWeight="Bold"/>
-                                                <NumericUpDown Value="{Binding Minutes}" 
-                                                               Minimum="0" Maximum="59" 
-                                                               FormatString="00"
-                                                               Width="70"
-                                                               Height="32"
-                                                               Padding="8,0"
-                                                               ShowButtonSpinner="False"
-                                                               HorizontalContentAlignment="Center"
-                                                               VerticalContentAlignment="Center"
-                                                               Classes.error="{Binding HasTimeError}"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !Use24HourFormat}" Margin="8,0,0,0">
-                                                    <RadioButton Content="AM" 
-                                                                 IsChecked="{Binding IsAm}" 
-                                                                 GroupName="AmPm"
-                                                                 Padding="8,4"
-                                                                 Foreground="#E0E0E0"/>
-                                                    <RadioButton Content="PM" 
-                                                                 IsChecked="{Binding !IsAm}" 
-                                                                 GroupName="AmPm"
-                                                                 Padding="8,4"
-                                                                 Foreground="#E0E0E0"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Grid>
-                                        
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
-                                            <CheckBox Grid.Column="1" 
-                                                      IsChecked="{Binding Use24HourFormat}" 
-                                                      Content="Use 24-hour format" 
-                                                      Foreground="#AAA"/>
-                                        </Grid>
+        <TransitioningContentControl Content="{Binding SelectedTrigger}" ContentTemplate="{StaticResource TimeTriggerEditorTemplate}" IsVisible="{Binding !!SelectedTrigger}" />
 
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="#AAA" FontWeight="Medium"/>
-                                            <Border Grid.Column="1" 
-                                                    Background="#050505" 
-                                                    BorderBrush="#333" 
-                                                    BorderThickness="1" 
-                                                    CornerRadius="8" 
-                                                    Padding="8,12">
-                                                <UniformGrid Rows="1" Columns="7">
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Mon" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnMonday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Tue" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnTuesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Wed" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnWednesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Thu" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnThursday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Fri" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnFriday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Sat" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnSaturday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Sun" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
-                                                        <CheckBox IsChecked="{Binding RunOnSunday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
-                                                    </StackPanel>
-                                                </UniformGrid>
-                                            </Border>
-                                        </Grid>
-                                    </StackPanel>
-
-                                    <Button Content="Done" 
-                                            Command="{Binding $parent[UserControl].DataContext.CloseTriggerSettingsCommand}" 
-                                            Classes="accent" 
-                                            HorizontalAlignment="Stretch" 
-                                            HorizontalContentAlignment="Center"
-                                            Padding="10"
-                                            FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </ScrollViewer>
-                    </Grid>
-                </Border>
-            </Panel>
-        </DataTemplate>
-            </TransitioningContentControl.ContentTemplate>
-        </TransitioningContentControl>
-
-        <TransitioningContentControl Content="{Binding SelectedStopTrigger}" IsVisible="{Binding SelectedStopTrigger, Converter={x:Static converters:AppConverters.IsStopAtTimeTrigger}}">
-            <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.15"/>
-            </TransitioningContentControl.PageTransition>
-            <TransitioningContentControl.ContentTemplate>
-                <DataTemplate x:DataType="vm:StopAtTimeTriggerViewModel">
-            <Panel>
-                <Border Background="#000000" Opacity="0.85"/>
-                <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
-                    <Grid RowDefinitions="Auto, *">
-                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="#FF6B6B" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Edit Fixed Time Stop" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                            <Border Padding="24">
-                                <StackPanel Spacing="24">
-                                    <StackPanel Spacing="20">
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Stop Time" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                                <NumericUpDown Value="{Binding Hours}" Minimum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMinHour}}" Maximum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMaxHour}}" FormatString="0" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasTimeError}"/>
-                                                <TextBlock Text=":" VerticalAlignment="Center" Foreground="#888" FontSize="16" FontWeight="Bold"/>
-                                                <NumericUpDown Value="{Binding Minutes}" Minimum="0" Maximum="59" FormatString="00" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasTimeError}"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !Use24HourFormat}" Margin="8,0,0,0">
-                                                    <RadioButton Content="AM" IsChecked="{Binding IsAm}" GroupName="StopAtTimeAmPm" Padding="8,4" Foreground="#E0E0E0"/>
-                                                    <RadioButton Content="PM" IsChecked="{Binding !IsAm}" GroupName="StopAtTimeAmPm" Padding="8,4" Foreground="#E0E0E0"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Grid>
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
-                                            <CheckBox Grid.Column="1" IsChecked="{Binding Use24HourFormat}" Content="Use 24-hour format" Foreground="#AAA"/>
-                                        </Grid>
-                                        <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="#AAA" FontWeight="Medium"/>
-                                            <Border Grid.Column="1" Background="#050505" BorderBrush="#333" BorderThickness="1" CornerRadius="8" Padding="8,12">
-                                                <UniformGrid Rows="1" Columns="7">
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Mon" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnMonday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Tue" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnTuesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Wed" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnWednesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Thu" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnThursday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Fri" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnFriday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Sat" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnSaturday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                    <StackPanel Spacing="6" HorizontalAlignment="Center"><TextBlock Text="Sun" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/><CheckBox IsChecked="{Binding RunOnSunday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/></StackPanel>
-                                                </UniformGrid>
-                                            </Border>
-                                        </Grid>
-                                    </StackPanel>
-                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Border>
-                        </ScrollViewer>
-                    </Grid>
-                </Border>
-            </Panel>
-        </DataTemplate>
-            </TransitioningContentControl.ContentTemplate>
-        </TransitioningContentControl>
+        <TransitioningContentControl Content="{Binding SelectedStopTrigger}" ContentTemplate="{StaticResource TimeTriggerEditorTemplate}" IsVisible="{Binding SelectedStopTrigger, Converter={x:Static converters:AppConverters.IsStopAtTimeTrigger}}" />
 
         <TransitioningContentControl Content="{Binding SelectedStopTrigger}" IsVisible="{Binding SelectedStopTrigger, Converter={x:Static converters:AppConverters.IsStopAfterDurationTrigger}}">
-            <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.15"/>
-            </TransitioningContentControl.PageTransition>
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:StopAfterDurationTriggerViewModel">
             <Panel>
@@ -1215,7 +1094,7 @@
                     <Grid RowDefinitions="Auto, *">
                         <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
                             <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
+                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="#FF6B6B" VerticalAlignment="Center"/>
                                     <TextBlock Text="Edit Session Duration" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
@@ -1237,7 +1116,7 @@
                                         </Grid>
                                         <TextBlock Text="Session will automatically stop after this duration from start." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
                                     </StackPanel>
-                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseStopTriggerSettingsCommand}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
+                                    <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </Border>
                         </ScrollViewer>
@@ -1249,9 +1128,6 @@
         </TransitioningContentControl>
 
         <TransitioningContentControl Content="{Binding SelectedModule}" IsVisible="{Binding !!SelectedModule}">
-            <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.15"/>
-            </TransitioningContentControl.PageTransition>
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                     <Panel>
@@ -1279,7 +1155,7 @@
                                     <StackPanel Spacing="0">
                                         <StackPanel Spacing="8" Margin="30,24,30,24">
                                             <TextBlock Text="Instance Name" Foreground="#E0E0E0" FontSize="14" FontWeight="Medium"/>
-                                            <TextBox Text="{Binding CustomName, Mode=TwoWay}" Watermark="{Binding Definition.Name}" HorizontalAlignment="Stretch" Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8"/>
+                                            <TextBox Text="{Binding CustomName, Mode=TwoWay}" Watermark="{Binding Definition.Name}" Classes="setting-input"/>
                                         </StackPanel>
                                         <Separator Background="#333" Height="1" Margin="0"/>
                                         <StackPanel Margin="30,24,30,24">
@@ -1312,7 +1188,7 @@
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <Border VerticalAlignment="Bottom" Background="#0A0A0A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="20" 
+        <Border VerticalAlignment="Bottom" Background="#0A0A0A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="20"
                 IsVisible="{Binding IsFooterVisible}">
             <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Right">
                 <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary"/>

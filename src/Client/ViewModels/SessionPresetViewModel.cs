@@ -5,11 +5,11 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Core.Models;
 using Axorith.Sdk;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class SessionPresetViewModel : ReactiveObject, IDisposable
+public partial class SessionPresetViewModel : ReactiveObject, IDisposable
 {
     private readonly IDisposable? _validationSubscription;
     private readonly IReadOnlyList<SessionSchedule> _schedules;
@@ -86,18 +86,18 @@ public class SessionPresetViewModel : ReactiveObject, IDisposable
         time.ToString(use24HourFormat ? "HH:mm" : "h:mm tt", CultureInfo.CurrentCulture);
 
     [Reactive]
-    public bool IsActive { get; set; }
+    public partial bool IsActive { get; set; }
 
     [Reactive]
-    public bool HasValidationErrors { get; private set; }
+    public partial bool HasValidationErrors { get; private set; }
 
     public bool IsValid => !HasValidationErrors;
 
     [Reactive]
-    public string? ValidationMessage { get; private set; }
+    public partial string? ValidationMessage { get; private set; }
 
     [Reactive]
-    public int ErrorCount { get; private set; }
+    public partial int ErrorCount { get; private set; }
 
     public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
 

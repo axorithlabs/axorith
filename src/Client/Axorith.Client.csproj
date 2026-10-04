@@ -44,9 +44,8 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
         <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" />
         <PackageReference Include="ReactiveUI.Avalonia"  />
-        <PackageReference Include="ReactiveUI.Fody"  PrivateAssets="all" />
+        <PackageReference Include="ReactiveUI.SourceGenerators" PrivateAssets="all" />
         <PackageReference Include="System.Reactive"  />
-        <PackageReference Include="Tmds.DBus.Protocol" />
         <PackageReference Include="System.Drawing.Common"  />
         <PackageReference Include="Grpc.Net.Client"  />
         <PackageReference Include="Polly"  />

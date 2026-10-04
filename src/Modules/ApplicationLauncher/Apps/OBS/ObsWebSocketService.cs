@@ -1,219 +1,122 @@
-using System.Net.WebSockets;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Axorith.Sdk.Logging;
+using OBSWebsocketDotNet;
+using System.Diagnostics;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.OBS;
 
-internal sealed class ObsWebSocketService(IModuleLogger logger, Settings settings)
+internal sealed class ObsWebSocketService : IDisposable
 {
-    private ClientWebSocket? _webSocket;
-    private int _messageId;
-    private bool _isConnected;
+    private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(5);
+    private readonly IModuleLogger _logger;
+    private readonly Settings _settings;
+    private readonly OBSWebsocket _client = new() { WSTimeout = TimeSpan.FromSeconds(10) };
 
-    private const int ConnectionTimeoutMs = 5000;
+    public ObsWebSocketService(IModuleLogger logger, Settings settings)
+    {
+        _logger = logger;
+        _settings = settings;
+    }
 
     public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
     {
-        if (_isConnected && _webSocket?.State == WebSocketState.Open)
+        if (_client.IsIdentified)
         {
             return true;
         }
 
-        _isConnected = false;
-
-        var port = settings.GetPort();
-        var password = settings.GetPassword();
-        var uri = new Uri($"ws://127.0.0.1:{port}");
-
+        var uri = $"ws://127.0.0.1:{_settings.GetPort()}";
         try
         {
-            _webSocket?.Dispose();
-            _webSocket = new ClientWebSocket();
-
-            logger.LogInfo("Connecting to OBS WebSocket at {Uri}...", uri);
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(ConnectionTimeoutMs);
-
-            await _webSocket.ConnectAsync(uri, cts.Token).ConfigureAwait(false);
-
-            var helloResponse = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
-            if (helloResponse == null)
+            _logger.LogInfo("Connecting to OBS WebSocket at {Uri}...", uri);
+            _client.ConnectAsync(uri, _settings.GetPassword() ?? string.Empty);
+            var timer = Stopwatch.StartNew();
+            while (timer.Elapsed < ConnectionTimeout)
             {
-                return false;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_client.IsIdentified)
+                {
+                    _logger.LogInfo("Connected to OBS WebSocket");
+                    return true;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken).ConfigureAwait(false);
             }
 
-            using var helloDoc = JsonDocument.Parse(helloResponse);
-            if (helloDoc.RootElement.GetProperty("op").GetInt32() != 0)
-            {
-                return false;
-            }
-
-            var data = helloDoc.RootElement.GetProperty("d");
-            string identifyJson;
-
-            if (data.TryGetProperty("authentication", out var authElement))
-            {
-                var challenge = authElement.GetProperty("challenge").GetString()!;
-                var salt = authElement.GetProperty("salt").GetString()!;
-                var authString = GenerateAuthString(password ?? string.Empty, challenge, salt);
-
-                identifyJson = JsonSerializer.Serialize(new
-                    { op = 1, d = new { rpcVersion = 1, authentication = authString } });
-            }
-            else
-            {
-                identifyJson = JsonSerializer.Serialize(new { op = 1, d = new { rpcVersion = 1 } });
-            }
-
-            await SendMessageAsync(identifyJson, cancellationToken).ConfigureAwait(false);
-
-            var identifiedResponse = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
-            if (identifiedResponse == null)
-            {
-                return false;
-            }
-
-            using var identifiedDoc = JsonDocument.Parse(identifiedResponse);
-            if (identifiedDoc.RootElement.GetProperty("op").GetInt32() != 2)
-            {
-                return false;
-            }
-
-            _isConnected = true;
-            logger.LogInfo("Connected to OBS WebSocket");
-            return true;
+            DisconnectClient();
+            return false;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            DisconnectClient();
+            throw;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to connect to OBS WebSocket");
+            _logger.LogError(ex, "Failed to connect to OBS WebSocket");
+            DisconnectClient();
             return false;
         }
     }
 
-    public async Task DisconnectAsync()
+    public Task DisconnectAsync()
     {
-        if (_webSocket?.State == WebSocketState.Open)
-        {
-            try
-            {
-                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-
-        _isConnected = false;
+        DisconnectClient();
+        return Task.CompletedTask;
     }
 
-    public Task<bool> StartStreamingAsync(CancellationToken ct = default) => SendRequestAsync("StartStream", null, ct);
+    public Task<bool> StartStreamingAsync(CancellationToken ct = default) =>
+        SendRequestAsync("StartStream", _client.StartStream, ct);
 
-    public Task<bool> StopStreamingAsync(CancellationToken ct = default) => SendRequestAsync("StopStream", null, ct);
+    public Task<bool> StopStreamingAsync(CancellationToken ct = default) =>
+        SendRequestAsync("StopStream", _client.StopStream, ct);
 
-    public Task<bool> StartRecordingAsync(CancellationToken ct = default) => SendRequestAsync("StartRecord", null, ct);
+    public Task<bool> StartRecordingAsync(CancellationToken ct = default) =>
+        SendRequestAsync("StartRecord", _client.StartRecord, ct);
 
-    public Task<bool> StopRecordingAsync(CancellationToken ct = default) => SendRequestAsync("StopRecord", null, ct);
+    public Task<bool> StopRecordingAsync(CancellationToken ct = default) =>
+        SendRequestAsync("StopRecord", () => _client.StopRecord(), ct);
 
-    public Task<bool> StartVirtualCameraAsync(CancellationToken ct = default) => SendRequestAsync("StartVirtualCam", null, ct);
+    public Task<bool> StartVirtualCameraAsync(CancellationToken ct = default) =>
+        SendRequestAsync("StartVirtualCam", _client.StartVirtualCam, ct);
 
-    public Task<bool> StopVirtualCameraAsync(CancellationToken ct = default) => SendRequestAsync("StopVirtualCam", null, ct);
+    public Task<bool> StopVirtualCameraAsync(CancellationToken ct = default) =>
+        SendRequestAsync("StopVirtualCam", _client.StopVirtualCam, ct);
 
-    private async Task<bool> SendRequestAsync(string requestType, object? requestData,
-        CancellationToken cancellationToken)
+    private async Task<bool> SendRequestAsync(string requestType, Action sendRequest, CancellationToken ct)
     {
-        if (!_isConnected || _webSocket?.State != WebSocketState.Open)
+        if (!_client.IsIdentified)
         {
             return false;
         }
-
-        var requestId = Interlocked.Increment(ref _messageId).ToString();
-        var message = new { op = 6, d = new { requestType, requestId, requestData } };
 
         try
         {
-            await SendMessageAsync(JsonSerializer.Serialize(message), cancellationToken).ConfigureAwait(false);
-            logger.LogInfo("Sent OBS request: {RequestType}", requestType);
-
-            var response = await ReceiveMessageAsync(cancellationToken).ConfigureAwait(false);
-            if (response != null)
-            {
-                using var doc = JsonDocument.Parse(response);
-                if (doc.RootElement.GetProperty("op").GetInt32() == 7)
-                {
-                    var result = doc.RootElement.GetProperty("d").GetProperty("requestStatus").GetProperty("result")
-                        .GetBoolean();
-                    return result;
-                }
-            }
-
+            await Task.Run(sendRequest, ct).ConfigureAwait(false);
+            _logger.LogInfo("Sent OBS request: {RequestType}", requestType);
             return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to send OBS request: {RequestType}", requestType);
+            _logger.LogError(ex, "Failed to send OBS request: {RequestType}", requestType);
             return false;
         }
     }
 
-    private async Task SendMessageAsync(string message, CancellationToken cancellationToken)
+    public void Dispose() => DisconnectClient();
+
+    private void DisconnectClient()
     {
-        if (_webSocket == null)
-        {
-            return;
-        }
-
-        var bytes = Encoding.UTF8.GetBytes(message);
-        await _webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellationToken);
-    }
-
-    private async Task<string?> ReceiveMessageAsync(CancellationToken cancellationToken)
-    {
-        if (_webSocket == null)
-        {
-            return null;
-        }
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(10000);
-
         try
         {
-            using var ms = new MemoryStream();
-            var buffer = new byte[4096];
-            WebSocketReceiveResult result;
-
-            do
-            {
-                result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    _isConnected = false;
-                    return null;
-                }
-
-                ms.Write(buffer, 0, result.Count);
-            } while (!result.EndOfMessage);
-
-            return Encoding.UTF8.GetString(ms.ToArray());
+            _client.Disconnect();
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            _logger.LogDebug("Failed to disconnect from OBS WebSocket: {Error}", ex.Message);
         }
     }
-
-    private static string GenerateAuthString(string password, string challenge, string salt)
-    {
-        using var sha256 = SHA256.Create();
-        var passwordSaltHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(password + salt));
-        var base64Secret = Convert.ToBase64String(passwordSaltHash);
-        var authHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(base64Secret + challenge));
-        return Convert.ToBase64String(authHash);
-    }
-
-    public void Dispose() => _webSocket?.Dispose();
 }

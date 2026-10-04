@@ -11,11 +11,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public sealed class SettingsViewModel : ReactiveObject, IDisposable
+public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
     private readonly IClientUiSettingsStore _settingsStore;
@@ -27,27 +27,12 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     private readonly ClientUiConfiguration _config;
     private readonly ClientOnboardingService? _onboardingService;
     private readonly IToastNotificationService? _toastService;
-    private string _selectedSection = "General";
-
+    private readonly IObservable<bool> _canRunSetup;
     public MainViewModel? MainViewModel { get; }
     public bool CanCheckForUpdates => MainViewModel is not null;
 
-    public string SelectedSection
-    {
-        get => _selectedSection;
-        set
-        {
-            if (_selectedSection == value)
-            {
-                return;
-            }
-
-            this.RaiseAndSetIfChanged(ref _selectedSection, value);
-            this.RaisePropertyChanged(nameof(IsGeneralSection));
-            this.RaisePropertyChanged(nameof(IsPrivacySection));
-            this.RaisePropertyChanged(nameof(IsAboutSection));
-        }
-    }
+    [Reactive(nameof(IsGeneralSection), nameof(IsPrivacySection), nameof(IsAboutSection))]
+    public partial string SelectedSection { get; set; } = "General";
 
     public bool IsGeneralSection => SelectedSection == "General";
     public bool IsPrivacySection => SelectedSection == "Privacy";
@@ -61,45 +46,29 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     public bool TelemetryEnabled
     {
         get => _telemetryEnabled;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _telemetryEnabled, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _telemetryEnabled, value, nameof(TelemetryEnabled));
     }
 
     public bool AutoStartEnabled
     {
         get => _autoStartEnabled;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _autoStartEnabled, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _autoStartEnabled, value, nameof(AutoStartEnabled));
     }
 
     public bool AutoStartMinimized
     {
         get => _autoStartMinimized;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _autoStartMinimized, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _autoStartMinimized, value, nameof(AutoStartMinimized));
     }
 
     public bool MinimizeToTrayOnClose
     {
         get => _minimizeToTrayOnClose;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _minimizeToTrayOnClose, value);
-            HasUnsavedChanges = true;
-        }
+        set => SetSetting(ref _minimizeToTrayOnClose, value, nameof(MinimizeToTrayOnClose));
     }
 
     [Reactive]
-    public bool HasUnsavedChanges { get; private set; }
+    public partial bool HasUnsavedChanges { get; private set; }
 
     public string AppVersion { get; }
 
@@ -109,10 +78,9 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
     public ICommand SelectSectionCommand { get; }
     public ICommand OpenPrivacyPolicyCommand { get; }
     public ICommand OpenGitHubCommand { get; }
-    public ICommand RunSetupWizardCommand { get; }
 
     [Reactive]
-    public bool IsRunningSetup { get; private set; }
+    public partial bool IsRunningSetup { get; private set; }
 
     public SettingsViewModel(
         ShellViewModel shell,
@@ -146,8 +114,7 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy/"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
 
-        var canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
-        RunSetupWizardCommand = ReactiveCommand.CreateFromTask(RunSetupWizardAsync, canRunSetup);
+        _canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
     }
 
     private void LoadSettings()
@@ -214,6 +181,12 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
     }
 
+    private void SetSetting(ref bool field, bool value, string propertyName)
+    {
+        this.RaiseAndSetIfChanged(ref field, value, propertyName);
+        HasUnsavedChanges = true;
+    }
+
     private async Task NavigateToMainAsync(bool showPresets)
     {
         if (HasUnsavedChanges)
@@ -246,7 +219,8 @@ public sealed class SettingsViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private async Task RunSetupWizardAsync()
+    [ReactiveCommand(CanExecute = nameof(_canRunSetup))]
+    private async Task RunSetupWizard()
     {
         if (_onboardingService == null)
         {

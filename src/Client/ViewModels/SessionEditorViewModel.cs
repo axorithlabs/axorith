@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
@@ -14,7 +15,7 @@ using DynamicData.Binding;
 using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 using PresetSummary = Axorith.Client.CoreSdk.Abstractions.PresetSummary;
 
 namespace Axorith.Client.ViewModels;
@@ -32,7 +33,7 @@ public abstract class ScheduledTriggerViewModel : TriggerViewModel
     public Guid? ExistingScheduleId { get; set; }
 }
 
-public abstract class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTriggerViewModel
+public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTriggerViewModel
 {
     private TimeSpan _time = defaultTime;
     private decimal? _hours = defaultTime.Hours;
@@ -40,15 +41,11 @@ public abstract class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTrig
     private bool _isAm = defaultTime.Hours < 12;
     private bool _use24HourFormat = true;
     private bool _isUpdatingTime;
-    private bool _runOnMonday = true;
-    private bool _runOnTuesday = true;
-    private bool _runOnWednesday = true;
-    private bool _runOnThursday = true;
-    private bool _runOnFriday = true;
-    private bool _runOnSaturday;
-    private bool _runOnSunday;
 
     public override string IconKey => "TimerIcon";
+    public abstract string EditorTitle { get; }
+    public abstract string TimeLabel { get; }
+    public abstract IBrush EditorAccentBrush { get; }
 
     public override string Description
     {
@@ -111,13 +108,26 @@ public abstract class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTrig
         }
     }
 
-    public bool RunOnMonday { get => _runOnMonday; set => SetDay(ref _runOnMonday, value); }
-    public bool RunOnTuesday { get => _runOnTuesday; set => SetDay(ref _runOnTuesday, value); }
-    public bool RunOnWednesday { get => _runOnWednesday; set => SetDay(ref _runOnWednesday, value); }
-    public bool RunOnThursday { get => _runOnThursday; set => SetDay(ref _runOnThursday, value); }
-    public bool RunOnFriday { get => _runOnFriday; set => SetDay(ref _runOnFriday, value); }
-    public bool RunOnSaturday { get => _runOnSaturday; set => SetDay(ref _runOnSaturday, value); }
-    public bool RunOnSunday { get => _runOnSunday; set => SetDay(ref _runOnSunday, value); }
+    [Reactive(nameof(Description))]
+    public partial bool RunOnMonday { get; set; } = true;
+
+    [Reactive(nameof(Description))]
+    public partial bool RunOnTuesday { get; set; } = true;
+
+    [Reactive(nameof(Description))]
+    public partial bool RunOnWednesday { get; set; } = true;
+
+    [Reactive(nameof(Description))]
+    public partial bool RunOnThursday { get; set; } = true;
+
+    [Reactive(nameof(Description))]
+    public partial bool RunOnFriday { get; set; } = true;
+
+    [Reactive(nameof(Description))]
+    public partial bool RunOnSaturday { get; set; }
+
+    [Reactive(nameof(Description))]
+    public partial bool RunOnSunday { get; set; }
 
     public void LoadSchedule(SessionSchedule schedule)
     {
@@ -156,12 +166,6 @@ public abstract class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTrig
         this.RaisePropertyChanged(nameof(HasTimeError));
         if (value.HasValue)
             UpdateTimeFromInputs();
-    }
-
-    private void SetDay(ref bool field, bool value)
-    {
-        this.RaiseAndSetIfChanged(ref field, value);
-        this.RaisePropertyChanged(nameof(Description));
     }
 
     private void UpdateTimeInputs()
@@ -229,14 +233,24 @@ public abstract class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTrig
 
 public sealed class ScheduleTriggerViewModel() : TimeTriggerViewModel(new TimeSpan(9, 0, 0))
 {
+    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#00AAFF"));
+
     public override string Title => "Time Schedule";
+    public override string EditorTitle => "Edit Schedule";
+    public override string TimeLabel => "Start Time";
+    public override IBrush EditorAccentBrush => Accent;
 }
 
 public sealed record NextPresetOption(Guid? PresetId, string Name);
 
 public sealed class StopAtTimeTriggerViewModel() : TimeTriggerViewModel(new TimeSpan(17, 0, 0))
 {
+    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#FF6B6B"));
+
     public override string Title => "Fixed Time";
+    public override string EditorTitle => "Edit Fixed Time Stop";
+    public override string TimeLabel => "Stop Time";
+    public override IBrush EditorAccentBrush => Accent;
 }
 
 public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
@@ -282,7 +296,7 @@ public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
     }
 }
 
-public class ThenActionTriggerViewModel(SessionEditorViewModel parent, AfterEndBehavior behavior) : TriggerViewModel
+public partial class ThenActionTriggerViewModel(SessionEditorViewModel parent, AfterEndBehavior behavior) : TriggerViewModel
 {
     public AfterEndBehavior Behavior { get; } = behavior;
 
@@ -317,26 +331,11 @@ public class ThenActionTriggerViewModel(SessionEditorViewModel parent, AfterEndB
         }
     }
 
-    public Guid? NextPresetId
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-            this.RaisePropertyChanged(nameof(HasError));
-        }
-    }
+    [Reactive(nameof(Description), nameof(HasError))]
+    public partial Guid? NextPresetId { get; set; }
 
-    public string? NextPresetName
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(Description));
-        }
-    }
+    [Reactive(nameof(Description))]
+    public partial string? NextPresetName { get; set; }
 
     public bool IsNextPresetSelectionVisible => Behavior == AfterEndBehavior.StartNextWorkspace &&
                                                 parent.AvailablePresetsForNext.Count > 0;
@@ -366,7 +365,7 @@ public class ThenActionTriggerViewModel(SessionEditorViewModel parent, AfterEndB
     }
 }
 
-public class SessionEditorViewModel : ReactiveObject, IDisposable
+public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 {
     private readonly ShellViewModel _shell;
     private readonly IModulesApi _modulesApi;
@@ -415,10 +414,10 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     } = string.Empty;
 
     [Reactive]
-    public string? ErrorMessage { get; private set; }
+    public partial string? ErrorMessage { get; private set; }
 
     [Reactive]
-    public string? FocusCommitmentError { get; private set; }
+    public partial string? FocusCommitmentError { get; private set; }
 
     public IReadOnlyList<string> FocusCommitmentModes { get; } = ["Normal", "Locked", "Strict"];
     public IReadOnlyList<string> BreakOptions { get; } = ["No breaks", "One 5-minute break", "Custom break budget"];
@@ -502,7 +501,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     }
 
     [Reactive]
-    public string ScheduledConfigurationLockStatus { get; private set; } = "Configuration unlocked";
+    public partial string ScheduledConfigurationLockStatus { get; private set; } = "Configuration unlocked";
 
     public ObservableCollection<TriggerViewModel> Triggers { get; } = [];
     public bool HasScheduledStart => Triggers.Any(trigger => trigger is ScheduleTriggerViewModel);
@@ -511,19 +510,18 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     public ObservableCollection<ConfiguredModuleViewModel> ConfiguredModules { get; } = [];
 
     [Reactive]
-    public ConfiguredModuleViewModel? SelectedModule { get; set; }
+    public partial ConfiguredModuleViewModel? SelectedModule { get; set; }
 
     [Reactive]
-    public TriggerViewModel? SelectedTrigger { get; set; }
+    public partial TriggerViewModel? SelectedTrigger { get; set; }
 
     [Reactive]
-    public TriggerViewModel? SelectedStopTrigger { get; set; }
+    public partial TriggerViewModel? SelectedStopTrigger { get; set; }
 
     [Reactive]
-    public ModuleSelectorViewModel? ModuleSelector { get; set; }
+    public partial ModuleSelectorViewModel? ModuleSelector { get; set; }
 
     public ICommand SaveAndCloseCommand { get; }
-    public ICommand CancelCommand { get; }
     public ICommand RemoveModuleCommand { get; }
     public ICommand OpenModuleSettingsCommand { get; }
     public ICommand CloseModuleSettingsCommand { get; }
@@ -534,13 +532,11 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<Unit, Unit> AddScheduleTriggerCommand { get; }
     public ICommand RemoveTriggerCommand { get; }
     public ICommand EditTriggerCommand { get; }
-    public ICommand CloseTriggerSettingsCommand { get; }
 
     public ReactiveCommand<Unit, Unit> AddStopAtTimeTriggerCommand { get; }
     public ReactiveCommand<Unit, Unit> AddStopAfterDurationTriggerCommand { get; }
     public ICommand RemoveStopTriggerCommand { get; }
     public ICommand EditStopTriggerCommand { get; }
-    public ICommand CloseStopTriggerSettingsCommand { get; }
 
     private readonly ObservableAsPropertyHelper<bool> _canAddStopAtTimeTrigger;
     public bool CanAddStopAtTimeTrigger => _canAddStopAtTimeTrigger.Value;
@@ -615,7 +611,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                 !string.IsNullOrWhiteSpace(name) && !hasModuleErrors && !hasThenErrors && !hasStopErrors);
 
         SaveAndCloseCommand = ReactiveCommand.CreateFromTask(SaveAndCloseAsync, canSave);
-        CancelCommand = ReactiveCommand.Create(Cancel);
 
         OpenAddModuleCommand = ReactiveCommand.Create(() =>
             ModuleSelector = new ModuleSelectorViewModel(_availableModules, OnModuleAdded, () => ModuleSelector = null));
@@ -659,7 +654,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         });
 
         EditTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedTrigger = t);
-        CloseTriggerSettingsCommand = ReactiveCommand.Create(() => SelectedTrigger = null);
 
         var canAddStopAtTime = CanAddTrigger<StopAtTimeTriggerViewModel>(StopTriggers);
 
@@ -687,7 +681,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         });
 
         EditStopTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedStopTrigger = t);
-        CloseStopTriggerSettingsCommand = ReactiveCommand.Create(() => SelectedStopTrigger = null);
 
         var canAddThenAction = ThenTriggers
             .ToObservableChangeSet()
@@ -730,6 +723,15 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         StopTriggers.Add(trigger);
         ValidateFocusCommitment();
         SelectedStopTrigger = trigger;
+    }
+
+    [ReactiveCommand]
+    private void CloseTrigger(TriggerViewModel trigger)
+    {
+        if (ReferenceEquals(SelectedTrigger, trigger))
+            SelectedTrigger = null;
+        if (ReferenceEquals(SelectedStopTrigger, trigger))
+            SelectedStopTrigger = null;
     }
 
     private async Task InitializeAsync()
@@ -905,7 +907,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
             if (AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == id) is { } preset)
             {
                 trigger.SelectedNextPreset = preset;
-                trigger.NextPresetName = preset.Name;
             }
             else
             {
@@ -932,7 +933,6 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
                     }
 
                     trigger.SelectedNextPreset = AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == presetId);
-                    trigger.NextPresetName = preset.Name;
                 });
             }
         }
@@ -1204,6 +1204,7 @@ public class SessionEditorViewModel : ReactiveObject, IDisposable
         this.RaisePropertyChanged(nameof(ScheduleLockIndex));
     }
 
+    [ReactiveCommand]
     private void Cancel()
     {
         foreach (var vm in ConfiguredModules)

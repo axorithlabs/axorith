@@ -33,8 +33,8 @@ public abstract class Setting
     public static Setting<bool> AsCheckbox(string key, string label, bool defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<bool>(key, label, description, defaultValue, SettingControlType.Checkbox, isVisible,
-            isReadOnly, SettingPersistence.Persisted, b => b.ToString(), s => bool.TryParse(s, out var b) && b);
+        return Create(key, label, description, defaultValue, SettingControlType.Checkbox, isVisible, isReadOnly,
+            SettingPersistence.Persisted, b => b.ToString(), s => bool.TryParse(s, out var b) && b);
     }
 
     /// <summary>
@@ -43,8 +43,8 @@ public abstract class Setting
     public static Setting<decimal> AsNumber(string key, string label, decimal defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<decimal>(key, label, description, defaultValue, SettingControlType.Number, isVisible,
-            isReadOnly, SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
+        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+            SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
             s => decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : defaultValue);
     }
 
@@ -54,8 +54,8 @@ public abstract class Setting
     public static Setting<int> AsInt(string key, string label, int defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<int>(key, label, description, defaultValue, SettingControlType.Number, isVisible,
-            isReadOnly, SettingPersistence.Persisted, i => i.ToString(CultureInfo.InvariantCulture),
+        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+            SettingPersistence.Persisted, i => i.ToString(CultureInfo.InvariantCulture),
             s => int.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : defaultValue);
     }
 
@@ -65,8 +65,8 @@ public abstract class Setting
     public static Setting<double> AsDouble(string key, string label, double defaultValue, string? description = null,
         bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<double>(key, label, description, defaultValue, SettingControlType.Number, isVisible,
-            isReadOnly, SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
+        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+            SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
             s => double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : defaultValue);
     }
 
@@ -76,8 +76,8 @@ public abstract class Setting
     public static Setting<TimeSpan> AsTimeSpan(string key, string label, TimeSpan defaultValue,
         string? description = null, bool isVisible = true, bool isReadOnly = false)
     {
-        return new Setting<TimeSpan>(key, label, description, defaultValue, SettingControlType.Number, isVisible,
-            isReadOnly, SettingPersistence.Persisted, ts => ts.TotalSeconds.ToString(CultureInfo.InvariantCulture), s =>
+        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+            SettingPersistence.Persisted, ts => ts.TotalSeconds.ToString(CultureInfo.InvariantCulture), s =>
                 double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var sec)
                     ? TimeSpan.FromSeconds(sec)
                     : defaultValue);
@@ -109,7 +109,7 @@ public abstract class Setting
         IReadOnlyList<KeyValuePair<string, string>> initialChoices, string? description = null, bool isVisible = true,
         bool isReadOnly = false)
     {
-        var setting = new Setting<List<string>>(
+        var setting = Create(
             key,
             label,
             description,
@@ -162,8 +162,14 @@ public abstract class Setting
     private static Setting<string> CreateString(string key, string label, string defaultValue,
         SettingControlType controlType, string? description, bool isVisible, bool isReadOnly,
         SettingPersistence persistence = SettingPersistence.Persisted, string? filter = null, bool hasHistory = false) =>
-        new(key, label, description, defaultValue, controlType, isVisible, isReadOnly, persistence, s => s,
-            s => s ?? defaultValue) { Filter = filter, HasHistory = hasHistory };
+        Create(key, label, description, defaultValue, controlType, isVisible, isReadOnly, persistence, s => s,
+            s => s ?? defaultValue, filter, hasHistory);
+
+    private static Setting<T> Create<T>(string key, string label, string? description, T defaultValue,
+        SettingControlType controlType, bool isVisible, bool isReadOnly, SettingPersistence persistence,
+        Func<T, string> serializer, Func<string?, T> deserializer, string? filter = null, bool hasHistory = false) =>
+        new(key, label, description, defaultValue, controlType, isVisible, isReadOnly, persistence, serializer,
+            deserializer) { Filter = filter, HasHistory = hasHistory };
 }
 
 /// <summary>

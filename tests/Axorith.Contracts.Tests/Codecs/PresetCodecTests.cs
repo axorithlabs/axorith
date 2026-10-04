@@ -2,9 +2,9 @@ using Axorith.Contracts;
 using FluentAssertions;
 using Xunit;
 
-namespace Axorith.Contracts.Tests.Mappers;
+namespace Axorith.Contracts.Tests.Codecs;
 
-public sealed class PresetMapperTests
+public sealed class PresetCodecTests
 {
     [Fact]
     public void PresetRoundTripPreservesModuleConfigurationAndCommitment()

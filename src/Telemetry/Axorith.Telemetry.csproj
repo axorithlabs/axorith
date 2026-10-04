@@ -6,9 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Serilog"  />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="PostHog" />
     <PackageReference Include="Microsoft.Extensions.Http" />
-    <PackageReference Include="Serilog.Sinks.PeriodicBatching"  />
   </ItemGroup>
 
   <ItemGroup>

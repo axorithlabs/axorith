@@ -1,13 +1,13 @@
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class LoadingViewModel : ReactiveObject
+public partial class LoadingViewModel : ReactiveObject
 {
     [Reactive]
-    public string Message { get; set; } = "Connecting to Axorith Host...";
+    public partial string Message { get; set; } = "Connecting to Axorith Host...";
 
     [Reactive]
-    public string? SubMessage { get; set; }
+    public partial string? SubMessage { get; set; }
 }

@@ -16,6 +16,7 @@ namespace Axorith.Client;
 internal static class Program
 {
     internal static ITelemetryService? Telemetry { get; private set; }
+    internal static IConfigurationRoot? RuntimeConfiguration { get; private set; }
     private static readonly string PendingInstallationPath = Path.Combine(ApplicationPaths.Config, "pending-install.json");
     private static PendingInstallation? _pendingInstallation;
     private static SingleInstanceManager? _singleInstanceManager;
@@ -61,6 +62,7 @@ internal static class Program
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
+        RuntimeConfiguration = configuration;
 
         var telemetryEnabled = TelemetryPreference.ReadOrDefault(LoadLegacyTelemetryEnabledSetting());
         TelemetryPreference.Save(telemetryEnabled);

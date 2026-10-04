@@ -1133,15 +1133,12 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             Assert.Equal(1, actions.Opacity);
 
             var editor = new SessionEditorView();
-            foreach (var templateName in new[] { "FilePickerSettingTemplate", "DirectoryPickerSettingTemplate" })
-            {
-                var picker = ((IDataTemplate)editor.Resources[templateName]!).Build(null)!;
-                var history = picker.GetVisualDescendants().OfType<ComboBox>().Single();
-                var historyItem = history.ItemTemplate!.Build("Recent path")!;
-                var remove = historyItem.GetVisualDescendants().OfType<Button>().Single();
-                Assert.Equal(1, remove.Opacity);
-                Assert.True(remove.IsHitTestVisible);
-            }
+            var picker = ((IDataTemplate)editor.Resources["PathPickerSettingTemplate"]!).Build(null)!;
+            var history = picker.GetVisualDescendants().OfType<ComboBox>().Single();
+            var historyItem = history.ItemTemplate!.Build("Recent path")!;
+            var remove = historyItem.GetVisualDescendants().OfType<Button>().Single();
+            Assert.Equal(1, remove.Opacity);
+            Assert.True(remove.IsHitTestVisible);
 
             typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
                 .SetValue(viewModel, "Protection failed");

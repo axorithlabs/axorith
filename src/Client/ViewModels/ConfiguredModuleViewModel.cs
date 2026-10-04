@@ -12,11 +12,11 @@ using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+using ReactiveUI.SourceGenerators;
 
 namespace Axorith.Client.ViewModels;
 
-public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
+public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
     private readonly IModulesApi _modulesApi;
     private readonly IServiceProvider _serviceProvider;
@@ -62,25 +62,25 @@ public class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     public bool HasDelay => Model.StartDelay > TimeSpan.Zero;
 
     [Reactive]
-    public ConfiguredModuleViewModel? NextModule { get; set; }
+    public partial ConfiguredModuleViewModel? NextModule { get; set; }
 
     [Reactive]
-    public bool IsFirst { get; set; }
+    public partial bool IsFirst { get; set; }
 
     [Reactive]
-    public bool IsLast { get; set; }
+    public partial bool IsLast { get; set; }
 
     [Reactive]
-    public bool IsLoading { get; private set; }
+    public partial bool IsLoading { get; private set; }
 
     [Reactive]
-    public bool HasErrors { get; private set; }
+    public partial bool HasErrors { get; private set; }
 
     [Reactive]
-    public bool HasWarnings { get; private set; }
+    public partial bool HasWarnings { get; private set; }
 
     [Reactive]
-    public string? WarningMessage { get; private set; }
+    public partial string? WarningMessage { get; private set; }
 
     public bool IsApplicationLauncher => Definition.Name == "Application Launcher";
     public bool IsSiteBlocker => Definition.Name == "Site Blocker";

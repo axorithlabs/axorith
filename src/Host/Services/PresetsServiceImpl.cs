@@ -79,17 +79,8 @@ public class PresetsServiceImpl(
         logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
 
         var preset = PresetCodec.ToModel(request.Preset);
-
-        var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
-            .ConfigureAwait(false) ?? [];
-
-        var nameConflict = existingPresets.FirstOrDefault(p =>
-            string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
-
-        if (nameConflict != null)
-        {
-            throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
-        }
+        await EnsurePresetNameAvailableAsync(preset, allowSameId: false, context.CancellationToken)
+            .ConfigureAwait(false);
 
         if (preset.Id == Guid.Empty)
         {
@@ -130,17 +121,8 @@ public class PresetsServiceImpl(
         await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
 
         var preset = PresetCodec.ToModel(request.Preset);
-
-        var existingPresets = await presetManager.LoadAllPresetsAsync(context.CancellationToken)
-            .ConfigureAwait(false) ?? [];
-
-        var nameConflict = existingPresets.FirstOrDefault(p =>
-            string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase) && p.Id != preset.Id);
-
-        if (nameConflict != null)
-        {
-            throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
-        }
+        await EnsurePresetNameAvailableAsync(preset, allowSameId: true, context.CancellationToken)
+            .ConfigureAwait(false);
 
         await presetManager.SavePresetAsync(preset, context.CancellationToken)
             .ConfigureAwait(false);
@@ -206,6 +188,18 @@ public class PresetsServiceImpl(
             ? $"Session starts in {(int)Math.Ceiling(remaining.TotalMinutes)} min"
             : "Session starts now";
         throw new RpcException(new Status(StatusCode.FailedPrecondition, $"Configuration locked · {time}."));
+    }
+
+    private async Task EnsurePresetNameAvailableAsync(SessionPreset preset, bool allowSameId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await presetManager.LoadAllPresetsAsync(cancellationToken).ConfigureAwait(false) ?? [];
+        if (existing.Any(candidate =>
+                string.Equals(candidate.Name, preset.Name, StringComparison.OrdinalIgnoreCase) &&
+                (!allowSameId || candidate.Id != preset.Id)))
+        {
+            throw new RpcException(new Status(StatusCode.AlreadyExists, "Preset with this name already exists"));
+        }
     }
 
     private void TrackPresetTelemetry(string eventName, SessionPreset preset, string changeType)

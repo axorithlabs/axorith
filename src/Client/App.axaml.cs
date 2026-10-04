@@ -38,11 +38,8 @@ public class App : Application
 
         _isTrayMode = Environment.GetCommandLineArgs().Contains("--tray");
 
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true, reloadOnChange: true)
-            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.development.json"), optional: true, reloadOnChange: true)
-            .Build();
-
+        var configuration = Program.RuntimeConfiguration
+            ?? throw new InvalidOperationException("Client configuration has not been loaded.");
         var clientConfig = configuration.Get<Configuration>() ?? new Configuration();
 
         var loggerFactory = LoggerFactory.Create(builder =>
