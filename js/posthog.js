@@ -17,14 +17,14 @@ function normalizeWebsitePath(value) {
             "/download/index.html": "/download",
             "/download/windows": "/download/windows",
             "/download/windows/index.html": "/download/windows",
-            "/guides": "/guides",
-            "/guides/index.html": "/guides"
+            "/blog": "/blog",
+            "/blog/index.html": "/blog"
         };
 
         if (fixed[pathname]) return fixed[pathname];
 
-        const guideMatch = pathname.match(/^\/guides\/([a-z0-9-]+)(?:\/index\.html)?$/);
-        if (guideMatch) return `/guides/${guideMatch[1]}`;
+        const blogMatch = pathname.match(/^\/blog\/([a-z0-9-]+)(?:\/index\.html)?$/);
+        if (guideMatch) return `/blog/${guideMatch[1]}`;
 
         return "/other";
     } catch {
