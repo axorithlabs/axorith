@@ -162,8 +162,50 @@ public class PresetManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAllPresetsAsync_MigratesLegacyLauncherConfiguration()
+    {
+        var applicationLauncherId = Guid.Parse("9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd");
+        var preset = new SessionPreset
+        {
+            Id = Guid.NewGuid(),
+            Name = "Legacy launchers",
+            Version = 1,
+            Modules =
+            [
+                new ConfiguredModule
+                {
+                    ModuleId = Guid.Parse("4f083ec9-518f-460a-883e-c9518fc60a28"),
+                    Settings = new Dictionary<string, string> { ["ObsPath"] = @"C:\Apps\obs64.exe" }
+                },
+                new ConfiguredModule
+                {
+                    ModuleId = applicationLauncherId,
+                    Settings = new Dictionary<string, string> { ["ApplicationPath"] = @"C:\Apps\my-editor.exe" }
+                }
+            ]
+        };
+        await _manager.SavePresetAsync(preset, CancellationToken.None);
+
+        var migrated = Assert.Single(await _manager.LoadAllPresetsAsync(CancellationToken.None));
+
+        Assert.Equal(3, migrated.Version);
+        Assert.Equal(applicationLauncherId, migrated.Modules[0].ModuleId);
+        Assert.Equal(@"C:\Apps\obs64.exe", migrated.Modules[0].Settings["ApplicationPath"]);
+        Assert.Equal("OBS", migrated.Modules[0].Settings["LegacyLauncherModuleKey"]);
+        Assert.False(migrated.Modules[0].Settings.ContainsKey("ObsPath"));
+        Assert.Equal("custom-app", migrated.Modules[1].Settings["ApplicationPath"]);
+        Assert.Equal(@"C:\Apps\my-editor.exe", migrated.Modules[1].Settings["CustomPath"]);
+
+        var persisted = Assert.Single(await _manager.LoadAllPresetsAsync(CancellationToken.None));
+        Assert.Equal(3, persisted.Version);
+        Assert.Equal("OBS", persisted.Modules[0].Settings["LegacyLauncherModuleKey"]);
+    }
+
+    [Fact]
     public async Task Cancellation_ShouldRespectCancellationToken()
     {
+        await _manager.SavePresetAsync(new SessionPreset { Id = Guid.NewGuid(), Name = "Cancelled load" },
+            CancellationToken.None);
         var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 

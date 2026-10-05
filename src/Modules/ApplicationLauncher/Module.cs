@@ -62,7 +62,7 @@ public sealed class Module : LauncherAppBase, IModule
 
     public override async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        var moduleKey = ApplicationSelector.GetLauncherModuleKey(_settings.ApplicationPath.GetCurrentValue());
+        var moduleKey = _settings.GetSelectedModuleKey();
         if (moduleKey == null || !_modules.TryGetValue(moduleKey, out _activeModule))
         {
             await base.OnSessionStartAsync(cancellationToken).ConfigureAwait(false);

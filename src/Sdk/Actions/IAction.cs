@@ -16,7 +16,7 @@ public interface IAction
     /// <summary>
     ///     Optional key of the setting whose input should host this action.
     /// </summary>
-    string? SettingKey { get; }
+    string? SettingKey => null;
 
     /// <summary>
     ///     Reactive label displayed in the UI.

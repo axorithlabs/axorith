@@ -9,7 +9,7 @@ namespace Axorith.Integrations.Tests;
 public sealed class SessionEditorBreakTests
 {
     [AvaloniaFact]
-    public async Task SelectingCustomBreakBudgetKeepsCustomControlsVisible()
+    public async Task SelectingCustomBreakBudgetShowsControlsAndInitializesABudget()
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         using var editor = new SessionEditorViewModel(null!, null!, null!, null!, null!, services);
@@ -18,7 +18,8 @@ public sealed class SessionEditorBreakTests
 
         editor.BreakPresetIndex = 2;
 
-        Assert.Equal(2, editor.BreakPresetIndex);
         Assert.True(editor.IsCustomBreakBudget);
+        Assert.Equal(1, editor.BreakCount);
+        Assert.Equal(5, editor.BreakDurationMinutes);
     }
 }

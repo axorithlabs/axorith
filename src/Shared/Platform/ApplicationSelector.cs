@@ -2,6 +2,11 @@ namespace Axorith.Shared.Platform;
 
 public static class ApplicationSelector
 {
+    public const string LegacyModuleKeySetting = "LegacyLauncherModuleKey";
+
+    private static readonly HashSet<string> LauncherModuleKeys =
+        ["Browser", "OBS", "Discord", "VSCode", "JetBrainsIDE", "Steam", "Spotify"];
+
     private static readonly Dictionary<string, string> LauncherModules = new(StringComparer.OrdinalIgnoreCase)
     {
         ["chrome.exe"] = "Browser", ["firefox.exe"] = "Browser", ["msedge.exe"] = "Browser",
@@ -35,12 +40,21 @@ public static class ApplicationSelector
     public static bool IsBrowserApp(AppInfo app) =>
         LauncherModules.TryGetValue(Path.GetFileName(app.ExecutablePath), out var module) && module == "Browser";
 
-    public static string? GetLauncherModuleKey(string applicationPath)
+    public static string? GetLauncherModuleKey(string applicationPath) =>
+        GetLauncherModuleKey(applicationPath, null);
+
+    public static string? GetLauncherModuleKey(string applicationPath, string? legacyModuleKey)
     {
         var executable = Path.GetFileName(applicationPath);
-        return LauncherModules.TryGetValue(executable, out var module)
-            ? module
-            : IsJetBrainsExecutable(executable) ? "JetBrainsIDE" : null;
+        if (LauncherModules.TryGetValue(executable, out var module))
+            return module;
+        if (IsJetBrainsExecutable(executable))
+            return "JetBrainsIDE";
+        if (string.IsNullOrWhiteSpace(applicationPath) || applicationPath == "custom-app")
+            return null;
+        return legacyModuleKey != null && LauncherModuleKeys.Contains(legacyModuleKey)
+            ? legacyModuleKey
+            : null;
     }
 
     private static bool IsJetBrainsExecutable(string path) => Path.GetFileName(path).ToLowerInvariant() is

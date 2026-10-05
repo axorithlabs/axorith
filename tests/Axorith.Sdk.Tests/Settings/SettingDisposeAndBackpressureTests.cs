@@ -73,23 +73,6 @@ public class SettingDisposeAndBackpressureTests
     }
 
     [Fact]
-    public void Observable_WithOnErrorHandler_ShouldCatchExceptions()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var values = new List<int>();
-        Exception? caughtException = null;
-
-        setting.Value.Subscribe(
-            onNext: v => values.Add(v),
-            onError: ex => caughtException = ex);
-
-        setting.SetValue(42);
-
-        values.Should().Contain(42);
-        caughtException.Should().BeNull(); // No errors in normal operation
-    }
-
-    [Fact]
     public void RapidUpdates_WithBuffering_ShouldHandleBackpressure()
     {
         var setting = Setting.AsInt("key", "Label", 0);

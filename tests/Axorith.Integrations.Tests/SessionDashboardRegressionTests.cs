@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Reactive.Linq;
-using System.Reflection;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk;
@@ -142,7 +141,7 @@ public sealed class SessionDashboardRegressionTests
         Assert.Matches(@"^\d+:\d{2}$", vm.ActiveSessionRemaining);
         Assert.Equal("Elapsed", vm.ActiveSessionEndTime);
         await Task.Run(() => host.Services.GetRequiredService<ISessionAutoStopService>()
-            .StartTrackingAsync(manager.ActiveSession!.Id, TimeSpan.FromMinutes(3), null));
+            .StartTrackingAsync(manager.CurrentSessionInstanceId!.Value, TimeSpan.FromMinutes(3), null));
         await RefreshState(vm);
         Assert.Contains(vm.ActiveSessionRemaining, new[] { "03:00", "02:59", "02:58" });
         Assert.StartsWith("Ends at", vm.ActiveSessionEndTime);
@@ -158,10 +157,7 @@ public sealed class SessionDashboardRegressionTests
         Assert.Contains(vm.ActiveSessionRemaining, new[] { "02:00", "01:59", "01:58" });
         Assert.StartsWith("Ends at", vm.ActiveSessionEndTime);
         await manager.StopCurrentSessionAsync();
-        // Exercise the timer's real fallback, including a missed stream event.
-        var refresh = (Task)typeof(MainViewModel).GetMethod("RefreshSessionStateForClockAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, null)!;
-        await refresh;
+        await WaitUntil(() => !vm.IsSessionActive && vm.SessionsThisWeek == 2 && vm.RecentSessions.Count == 2);
         Assert.False(vm.IsSessionActive);
         Assert.Equal(2, vm.SessionsThisWeek);
         Assert.Equal(2, vm.RecentSessions.Count);
@@ -272,6 +268,6 @@ public sealed class SessionDashboardRegressionTests
         Assert.True(ready());
     }
 
-    private static Task RefreshState(MainViewModel vm) =>
-        (Task)typeof(MainViewModel).GetMethod("RefreshSessionStateAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, null)!;
+    private static Task RefreshState(MainViewModel vm) => vm.InitializeAsync();
+
 }

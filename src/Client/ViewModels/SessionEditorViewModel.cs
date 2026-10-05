@@ -376,6 +376,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
     private SessionPreset _preset = new(id: Guid.NewGuid());
+    private bool _isExistingPreset;
     private FocusCommitmentOptions _focusCommitment = new();
     private bool _disposed;
 
@@ -393,6 +394,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         get => _preset;
         set
         {
+            _isExistingPreset = value is not null;
             _preset = value ?? new SessionPreset { Id = Guid.NewGuid() };
             if (AvailablePresetsForNext.Count > 0)
             {
@@ -818,7 +820,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             if (moduleDef != null)
             {
                 ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _modulesApi,
-                    _serviceProvider));
+                    _serviceProvider, _isExistingPreset ? _preset.Id : null));
             }
         }
 
@@ -945,7 +947,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
     private void OnModuleAdded(ModuleDefinition defToAdd)
     {
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
-        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi, _serviceProvider);
+        var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi, _serviceProvider,
+            _isExistingPreset ? _preset.Id : null);
         ConfiguredModules.Add(newVm);
         UpdateModuleLinks();
     }

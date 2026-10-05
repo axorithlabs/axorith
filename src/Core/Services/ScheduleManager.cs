@@ -67,6 +67,14 @@ public class ScheduleManager(
     {
         try
         {
+            var sessionInstanceId = sessionManager.CurrentSessionInstanceId;
+            if (sessionInstanceId is null)
+            {
+                logger.LogWarning("Started session {PresetId} had no session instance ID for auto-stop tracking.",
+                    presetId);
+                return;
+            }
+
             var activePreset = sessionManager.ActiveSession;
             if (activePreset?.FocusCommitment.IsCommitted == true)
             {
@@ -94,7 +102,7 @@ public class ScheduleManager(
 
                 var remaining = sessionManager.SessionEndsAt - DateTimeOffset.UtcNow;
                 await autoStopService.StartTrackingAsync(
-                    presetId,
+                    sessionInstanceId.Value,
                     remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero,
                     activePreset.FocusCommitment.NextWorkspaceId,
                     CancellationToken.None).ConfigureAwait(false);
@@ -117,7 +125,7 @@ public class ScheduleManager(
                 presetId, durationSchedule.AutoStopDuration, durationSchedule.NextPresetId);
 
             await autoStopService.StartTrackingAsync(
-                presetId,
+                sessionInstanceId.Value,
                 durationSchedule.AutoStopDuration,
                 durationSchedule.NextPresetId,
                     CancellationToken.None,
@@ -341,6 +349,7 @@ public class ScheduleManager(
 
         foreach (var (schedule, runTime) in toStop)
         {
+            var sessionInstanceId = sessionManager.CurrentSessionInstanceId;
             if (!sessionManager.IsSessionRunning)
             {
                 TrackScheduleTriggered(schedule, "stop", "skipped", skipReason: "session_not_running");
@@ -382,6 +391,7 @@ public class ScheduleManager(
                 if (!triggerReported)
                 {
                     TrackScheduleTriggered(schedule, "stop", "failed",
+                        sessionInstanceId: sessionInstanceId,
                         failureReason: ProductAnalyticsProperties.FailureReason(ex));
                 }
                 logger.LogError(ex, "Failed to execute stop schedule '{Name}'", schedule.Name);
@@ -472,7 +482,9 @@ public class ScheduleManager(
     private void TrackScheduleTriggered(SessionSchedule schedule, string triggerAction, string result,
         Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null) =>
         _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
-            triggerAction, result, sessionInstanceId, failureReason, skipReason));
+            triggerAction, result,
+            sessionInstanceId ?? (triggerAction == "stop" ? sessionManager.CurrentSessionInstanceId : null),
+            failureReason, skipReason));
 
     private void TrackScheduleSkipOnce(SessionSchedule schedule, DateTimeOffset runTime,
         string triggerAction, string skipReason)

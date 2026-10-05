@@ -9,6 +9,8 @@ public interface ISessionManager : IAsyncDisposable
 
     SessionPreset? ActiveSession { get; }
 
+    Guid? CurrentSessionInstanceId { get; }
+
     DateTimeOffset? SessionStartedAt { get; }
 
     DateTimeOffset? SessionEndsAt { get; }
@@ -32,7 +34,8 @@ public interface ISessionManager : IAsyncDisposable
     event Action<Guid>? SessionStopped;
 
     Task StartSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default,
-        string startSource = "manual", Guid? sessionInstanceId = null, Guid? scheduleId = null);
+        string startSource = "manual", Guid? sessionInstanceId = null, Guid? scheduleId = null,
+        Guid? previousSessionInstanceId = null);
 
     Task PreflightSessionAsync(SessionPreset preset, CancellationToken cancellationToken = default);
 

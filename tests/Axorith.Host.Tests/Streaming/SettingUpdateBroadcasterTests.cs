@@ -58,8 +58,10 @@ public class SettingUpdateBroadcasterTests : IDisposable
     [Fact]
     public async Task SubscribeAsync_DuplicateSubscriber_ShouldReplace()
     {
-        var stream1 = new Mock<IServerStreamWriter<SettingUpdate>>();
-        var stream2 = new Mock<IServerStreamWriter<SettingUpdate>>();
+        var updates1 = new List<SettingUpdate>();
+        var updates2 = new List<SettingUpdate>();
+        var stream1 = CreateMockStream(updates1);
+        var stream2 = CreateMockStream(updates2);
         using var cts1 = new CancellationTokenSource();
         using var cts2 = new CancellationTokenSource();
 
@@ -67,10 +69,15 @@ public class SettingUpdateBroadcasterTests : IDisposable
         await Task.Delay(50);
         var second = _broadcaster.SubscribeAsync("same-id", null, stream2.Object, cts2.Token);
         await Task.Delay(50);
+        await _broadcaster.BroadcastUpdateAsync(Guid.NewGuid(), "key", SettingProperty.Value, "new-stream");
+        await Task.Delay(50);
 
         await cts1.CancelAsync();
         await cts2.CancelAsync();
         await Task.WhenAll(first, second);
+
+        updates1.Should().BeEmpty();
+        updates2.Should().ContainSingle(update => update.StringValue == "new-stream");
     }
 
     [Fact]

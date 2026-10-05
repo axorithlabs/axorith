@@ -7,11 +7,13 @@ internal static partial class TelemetryEventSanitizer
 {
     private static readonly HashSet<string> GuidProperties = [
         "installAttemptId", "presetId", "sessionInstanceId", "moduleId", "instanceId", "scheduleId",
-        "nextWorkspaceId", "nextPresetId"];
+        "nextWorkspaceId", "nextPresetId", "previousSessionInstanceId"];
     private static readonly HashSet<string> NumberProperties = [
         "durationMs", "plannedDurationMs", "breakDurationMs", "latencyMs", "moduleCount", "breakCount", "breaksUsed",
         "occurrenceCount", "blockedAttemptCount", "configuredEntryCount", "reconnectCount", "createdCount",
-        "releaseVersionNumber", "presetVersion", "endAtMinuteOfDay", "scheduleLockMinutes", "startDelayMs",
+        "presetCount", "scheduleCount", "enabledScheduleCount", "releaseVersionNumber", "presetVersion",
+        "endAtMinuteOfDay", "scheduleLockMinutes", "startDelayMs", "targetMonitorIndex", "webSocketPort",
+        "selectedSteamAppId",
         "windowWidth", "windowHeight", "categoryCount", "customProcessCount", "customSiteCount", "volume",
         "daysCount",
         "scheduledMinuteOfDay", "oneTimeMinuteOfDay", "oneTimeLeadTimeMs", "autoStopDurationMs"];
@@ -23,7 +25,8 @@ internal static partial class TelemetryEventSanitizer
         "hasStartUrl", "hasProfileName", "incognitoMode", "hasAdditionalArgs", "webSocketEnabled",
         "webSocketPortIsDefault", "playbackEnabled", "hasSpecificDeviceName", "hasCustomPlaybackUrl", "shuffle",
         "hasSelectedGame", "hasBaseUrl", "usesHttps", "hasAccessToken", "hasStartEntity", "hasEndEntity",
-        "hasCustomProcesses", "hasCustomSites", "use24HourFormat"];
+        "hasCustomProcesses", "hasCustomSites", "use24HourFormat", "moduleConfigurationChanged", "hasScheduler",
+        "hasCommittedPreset", "hasWebSocketPassword"];
     private static readonly Dictionary<string, HashSet<string>> EnumValues = new(StringComparer.Ordinal)
     {
         ["application"] = ["Axorith.Client", "Axorith.Host", "Axorith.Installer"],
@@ -36,7 +39,7 @@ internal static partial class TelemetryEventSanitizer
         ["stopReason"] = ["user_stop", "natural_completion", "emergency_unlock", "startup_failure"],
         ["changeType"] = ["create", "update", "delete"],
         ["presetChangeType"] = ["create", "update"],
-        ["result"] = ["success", "failed", "started", "completed", "cancelled", "degraded", "recovered", "skipped"],
+        ["result"] = ["success", "failed", "started", "completed", "cancelled", "degraded", "recovered", "skipped", "warning"],
         ["source"] = ["client", "host", "installer"],
         ["stage"] = [
             "prerequisite_download", "prerequisite_install", "existing_version_removal", "files_copy", "registration",
@@ -46,7 +49,8 @@ internal static partial class TelemetryEventSanitizer
             "schedule_save", "preset_save", "onboarding"],
         ["failureReason"] = [
             "validation_failed", "protection_unavailable", "module_unavailable", "timeout", "cancelled",
-            "session_already_running", "invalid_settings", "network_error", "preset_not_found", "unknown"],
+            "session_already_running", "invalid_settings", "network_error", "preset_not_found", "validation_warning",
+            "unknown"],
         ["skipReason"] = ["session_already_running", "session_not_running", "committed_session",
             "session_ended_before_stop", "session_changed", "concurrent_stop"],
         ["scheduleType"] = ["one_time", "recurring_start", "recurring_stop", "duration_stop", "unknown"],
@@ -90,7 +94,10 @@ internal static partial class TelemetryEventSanitizer
         "platform", "architecture", "moduleName", "actionKey", "category", "presetChangeType",
         "skipReason", "scheduleType", "triggerAction", "blockingMode", "launcherAppType", "processMode",
         "windowState", "lifecycleMode", "browserFamily", "ideFamily", "sessionStartAction", "sessionEndAction",
-        "deviceSelectionMode", "playbackContextKind", "repeatMode", "oneTimeDayOfWeek"];
+        "deviceSelectionMode", "playbackContextKind", "repeatMode", "oneTimeDayOfWeek", "customApplicationExecutable",
+        "startUrlDomain", "startEntityDomain", "endEntityDomain"];
+    private static readonly HashSet<string> HashProperties = [
+        "projectPathHash", "workingDirectoryHash", "customApplicationPathHash", "browserProfileHash"];
 
     public static IReadOnlyDictionary<string, object?> SanitizeProperties(
         IReadOnlyDictionary<string, object?> properties)
@@ -138,13 +145,18 @@ internal static partial class TelemetryEventSanitizer
             return value is bool flag ? flag : null;
         }
 
+        if (HashProperties.Contains(key))
+        {
+            return value is string hash && FingerprintRegex().IsMatch(hash) ? hash : null;
+        }
+
         if (key == "modules")
         {
             return SanitizeModules(value);
         }
 
         if (key is "moduleIds" or "moduleTypes" or "createdModuleTypes" or "changedCategories" or
-            "categories" or "daysOfWeek" or "endAtDaysOfWeek")
+            "categories" or "daysOfWeek" or "endAtDaysOfWeek" or "customProcessNames" or "customSiteDomains")
         {
             return SanitizeStringList(key, value);
         }
@@ -169,6 +181,9 @@ internal static partial class TelemetryEventSanitizer
             "fingerprint" => FingerprintRegex().IsMatch(text) ? text : null,
             "diagnostic" => SafeIdentifier(text, 160),
             "os_version" => OsVersionRegex().IsMatch(text) ? text : null,
+            "customApplicationExecutable" => ProcessNameRegex().IsMatch(text) ? text : null,
+            "startUrlDomain" => DomainRegex().IsMatch(text) ? text : null,
+            "startEntityDomain" or "endEntityDomain" => EntityDomainRegex().IsMatch(text) ? text : null,
             _ => null
         };
     }
@@ -207,6 +222,8 @@ internal static partial class TelemetryEventSanitizer
                 "changedCategories" => EnumValues["category"].Contains(text) ? text : null,
                 "categories" => CategoryValues.Contains(text) ? text : null,
                 "daysOfWeek" or "endAtDaysOfWeek" => DayValues.Contains(text) ? text : null,
+                "customProcessNames" => ProcessNameRegex().IsMatch(text) ? text : null,
+                "customSiteDomains" => DomainRegex().IsMatch(text) ? text : null,
                 _ => null
             };
             if (safe is not null) result.Add(safe);
@@ -234,4 +251,14 @@ internal static partial class TelemetryEventSanitizer
 
     [GeneratedRegex("^[0-9a-f]{64}$")]
     private static partial Regex FingerprintRegex();
+
+    [GeneratedRegex("^[a-z0-9._+-]{1,100}$")]
+    private static partial Regex ProcessNameRegex();
+
+    [GeneratedRegex("^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")]
+    private static partial Regex DomainRegex();
+
+    [GeneratedRegex("^[a-z][a-z0-9_]{0,63}$")]
+    private static partial Regex EntityDomainRegex();
+
 }

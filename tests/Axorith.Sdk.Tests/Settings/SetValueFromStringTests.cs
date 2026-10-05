@@ -186,14 +186,14 @@ public class SetValueFromStringTests
     }
 
     [Theory]
-    [InlineData("  42  ")]
-    [InlineData("\n123\n")]
-    [InlineData("\t456\t")]
-    public void IntSetting_AllowsWhitespace(string input)
+    [InlineData("  42  ", 42)]
+    [InlineData("\n123\n", 123)]
+    [InlineData("\t456\t", 456)]
+    public void IntSetting_AllowsWhitespace(string input, int expected)
     {
         ISetting setting = Setting.AsInt("key", "Label", 0);
         setting.SetValueFromString(input);
-        setting.GetCurrentValueAsObject().Should().NotBeNull();
+        setting.GetCurrentValueAsObject().Should().Be(expected);
     }
 
     [Fact]

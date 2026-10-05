@@ -6,7 +6,7 @@ public interface ISessionAutoStopService : IAsyncDisposable
 {
     Task StartAsync(CancellationToken cancellationToken = default);
 
-    Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
+    Task StartTrackingAsync(Guid sessionInstanceId, TimeSpan? autoStopDuration, Guid? nextPresetId,
         CancellationToken cancellationToken = default, SessionSchedule? schedule = null);
 
     Task StopTrackingAsync(CancellationToken cancellationToken = default);

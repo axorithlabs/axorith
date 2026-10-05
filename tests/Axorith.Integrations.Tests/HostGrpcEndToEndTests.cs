@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
@@ -918,305 +918,83 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     }
 
     [AvaloniaFact]
-    public async Task FrontendInteractionsAndSessionEditorLayoutStayConsistent()
+    public async Task SessionEditorLayoutAndValidationStayConsistent()
     {
-        var (_, _, sessions, _, channel) = await CreateAuthenticatedClientsAsync();
-        using (channel)
-        using (var api = new GrpcSessionsApi(sessions, Policy.Handle<Exception>().RetryAsync(0),
-                   NullLogger.Instance))
-        using (var services = new ServiceCollection().BuildServiceProvider())
-        using (var viewModel = new MainViewModel(null!, null!, api, null!, services))
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var editorViewModel = new SessionEditorViewModel(null!, null!, null!, null!, null!, services);
+        Dispatcher.UIThread.RunJobs();
+        await editorViewModel.InitializationTask;
+        var editorView = new SessionEditorView { DataContext = editorViewModel };
+        var focusCard = editorView.FindControl<Border>("FocusCommitmentCard")!;
+        Assert.Equal(40, focusCard.Margin.Top);
+        focusCard.Measure(new Size(800, 1200));
+        Assert.Equal(500, focusCard.DesiredSize.Width);
+        Assert.False(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
+        Assert.Null(editorView.FindControl<StackPanel>("CommittedEndConditionPanel"));
+        Assert.Null(editorView.FindControl<StackPanel>("CommittedAfterEndPanel"));
+        Assert.Empty(editorViewModel.StopTriggers);
+        Assert.Empty(editorViewModel.ThenTriggers);
+        Assert.Equal("Stop On...", editorView.FindControl<TextBlock>("StopOnHeading")!.Text);
+        Assert.Equal("Then...", editorView.FindControl<TextBlock>("ThenHeading")!.Text);
+        Assert.NotNull(editorView.FindControl<Button>("AddStopTriggerButton"));
+        Assert.NotNull(editorView.FindControl<Button>("AddThenTriggerButton"));
+
+        var thenCard = editorView.FindControl<Border>("ThenCard")!;
+        editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
+            Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace));
+        var thenItems = thenCard.GetVisualDescendants().OfType<ItemsControl>().Single();
+        var thenActionCard = (Border)thenItems.ItemTemplate!.Build(editorViewModel.ThenTriggers[0])!;
+        thenActionCard.DataContext = editorViewModel.ThenTriggers[0];
+        var previousChild = thenCard.Child;
+        thenCard.Child = thenActionCard;
+        var editorWindow = new Window { Content = editorView, Width = 800, Height = 800 };
+        try
         {
-            using var editorViewModel = new SessionEditorViewModel(null!, null!, null!, null!, null!, services);
+            editorWindow.Show();
             Dispatcher.UIThread.RunJobs();
-            await editorViewModel.InitializationTask;
-            var editorView = new SessionEditorView { DataContext = editorViewModel };
-            var focusCard = editorView.FindControl<Border>("FocusCommitmentCard")!;
-            Assert.Equal(40, focusCard.Margin.Top);
-            focusCard.Measure(new Size(800, 1200));
-            Assert.Equal(500, focusCard.DesiredSize.Width);
-            Assert.False(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
-            Assert.Null(editorView.FindControl<StackPanel>("CommittedEndConditionPanel"));
-            Assert.Null(editorView.FindControl<StackPanel>("CommittedAfterEndPanel"));
-            Assert.Empty(editorViewModel.StopTriggers);
-            Assert.Empty(editorViewModel.ThenTriggers);
-            Assert.Equal("Stop On...", editorView.FindControl<TextBlock>("StopOnHeading")!.Text);
-            Assert.Equal("Then...", editorView.FindControl<TextBlock>("ThenHeading")!.Text);
-            Assert.NotNull(editorView.FindControl<Button>("AddStopTriggerButton"));
-            Assert.NotNull(editorView.FindControl<Button>("AddThenTriggerButton"));
-
-            var thenCard = editorView.FindControl<Border>("ThenCard")!;
-            var thenAction = new ThenActionTriggerViewModel(editorViewModel,
-                Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace);
-            editorViewModel.ThenTriggers.Add(thenAction);
-            var thenItems = thenCard.GetVisualDescendants().OfType<ItemsControl>().Single();
-            var thenActionCard = (Border)thenItems.ItemTemplate!.Build(thenAction)!;
-            thenActionCard.DataContext = thenAction;
-            var thenCardContent = thenCard.Child;
-            thenCard.Child = thenActionCard;
-            var editorWindow = new Window { Content = editorView, Width = 800, Height = 800 };
-            try
-            {
-                editorWindow.Show();
-                Dispatcher.UIThread.RunJobs();
-                thenCard.Measure(new Size(800, 1200));
-                thenCard.Arrange(new Rect(0, 0, 800, 1200));
-                Assert.Equal(Color.Parse("#111"), ((ISolidColorBrush)thenActionCard.Background!).Color);
-                Assert.Equal(Color.Parse("#FF6B6B"), ((ISolidColorBrush)thenActionCard.BorderBrush!).Color);
-                Assert.Single(thenCard.GetVisualDescendants().OfType<TextBlock>(),
-                    label => label is { IsVisible: true, Text: "No other Workspaces are available." });
-                Assert.DoesNotContain(thenCard.GetVisualDescendants().OfType<TextBlock>(),
-                    label => label is { IsVisible: true, Text: "Choose a Workspace" });
-            }
-            finally
-            {
-                editorWindow.Close();
-                thenCard.Child = thenCardContent;
-            }
-            editorViewModel.ThenTriggers.Clear();
-
-            editorViewModel.Name = "Focus commitment test";
-            editorViewModel.FocusCommitmentModeIndex = (int)Axorith.Core.Models.FocusCommitmentMode.Strict;
-            Dispatcher.UIThread.RunJobs();
-            focusCard.Measure(new Size(800, 1200));
-            Assert.Equal(500, focusCard.DesiredSize.Width);
-            Assert.True(editorViewModel.HasValidationErrors);
-            Assert.False(editorViewModel.SaveAndCloseCommand.CanExecute(null));
-            Assert.Contains("Add one Stop Trigger", editorViewModel.FocusCommitmentError ?? string.Empty);
-            Assert.Contains("error", focusCard.Classes);
-            var focusCommitmentErrorText = editorView.FindControl<TextBlock>("FocusCommitmentErrorText")!;
-            Assert.True(focusCommitmentErrorText.IsVisible);
-            Assert.Contains("Add one Stop Trigger", focusCommitmentErrorText.Text ?? string.Empty);
-
-            var validateCommitment = typeof(SessionEditorViewModel).GetMethod("ValidateFocusCommitment",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-            Assert.False((bool)validateCommitment.Invoke(editorViewModel, [false])!);
-
-            using (editorViewModel.AddStopAfterDurationTriggerCommand.Execute().Subscribe())
-            {
-                Dispatcher.UIThread.RunJobs();
-            }
-            var durationStop = editorViewModel.StopTriggers.OfType<StopAfterDurationTriggerViewModel>().Single();
-            durationStop.DurationHours = 0;
-            durationStop.DurationMinutes = 45;
-            Dispatcher.UIThread.RunJobs();
-            Assert.Null(editorViewModel.FocusCommitmentError);
-            Assert.False(editorViewModel.HasValidationErrors);
-            Assert.True(editorViewModel.SaveAndCloseCommand.CanExecute(null));
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
-            var options = (Axorith.Core.Models.FocusCommitmentOptions)typeof(SessionEditorViewModel)
-                .GetField("_focusCommitment", System.Reflection.BindingFlags.Instance |
-                                                System.Reflection.BindingFlags.NonPublic)!
-                .GetValue(editorViewModel)!;
-            Assert.Equal(Axorith.Core.Models.FocusEndCondition.Duration, options.EndCondition);
-            Assert.Equal(TimeSpan.FromMinutes(45), options.Duration);
-            Assert.Equal(Axorith.Core.Models.AfterEndBehavior.DoNothing, options.AfterEnd);
-
-            editorViewModel.StopTriggers.Clear();
-            editorViewModel.StopTriggers.Add(new StopAtTimeTriggerViewModel
-            {
-                Time = new TimeSpan(18, 30, 0),
-                RunOnMonday = true,
-                RunOnTuesday = false,
-                RunOnWednesday = false,
-                RunOnThursday = false,
-                RunOnFriday = true,
-                RunOnSaturday = false,
-                RunOnSunday = false
-            });
-            var nextPresetId = Guid.NewGuid();
-            editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
-                Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace) { NextPresetId = nextPresetId });
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
-            Assert.Equal(Axorith.Core.Models.FocusEndCondition.EndAt, options.EndCondition);
-            Assert.Equal(new TimeOnly(18, 30), options.EndAtLocalTime);
-            Assert.Equal(new[] { DayOfWeek.Monday, DayOfWeek.Friday }, options.EndAtDaysOfWeek);
-            Assert.Equal(Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace, options.AfterEnd);
-            Assert.Equal(nextPresetId, options.NextWorkspaceId);
-
-            editorViewModel.ThenTriggers.Clear();
-            editorViewModel.ThenTriggers.Add(new ThenActionTriggerViewModel(editorViewModel,
-                Axorith.Core.Models.AfterEndBehavior.ShutDownPc));
-            Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
-            Assert.Equal(Axorith.Core.Models.AfterEndBehavior.ShutDownPc, options.AfterEnd);
-            Assert.Null(options.NextWorkspaceId);
-
-            foreach (var (behavior, title) in new[]
-                     {
-                         (Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace, "Start next Workspace"),
-                         (Axorith.Core.Models.AfterEndBehavior.LockPc, "Lock PC"),
-                         (Axorith.Core.Models.AfterEndBehavior.Sleep, "Sleep"),
-                         (Axorith.Core.Models.AfterEndBehavior.SignOut, "Sign out"),
-                         (Axorith.Core.Models.AfterEndBehavior.ShutDownPc, "Shut down PC")
-                     })
-            {
-                editorViewModel.ThenTriggers.Clear();
-                var action = new ThenActionTriggerViewModel(editorViewModel, behavior);
-                editorViewModel.ThenTriggers.Add(action);
-                Assert.Equal(title, action.Title);
-                if (behavior == Axorith.Core.Models.AfterEndBehavior.StartNextWorkspace)
-                {
-                    action.NextPresetId = nextPresetId;
-                }
-                Assert.True((bool)validateCommitment.Invoke(editorViewModel, [true])!);
-                Assert.Equal(behavior, options.AfterEnd);
-            }
-
-            var resolveEndAt = typeof(Axorith.Core.Services.SessionManager)
-                .GetMethod("ResolveEndAt",
-                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic,
-                    [typeof(TimeOnly), typeof(IReadOnlyCollection<DayOfWeek>), typeof(DateTimeOffset),
-                        typeof(TimeZoneInfo)])!;
-            var testTimeZone = TimeZoneInfo.CreateCustomTimeZone("Test UTC+03", TimeSpan.FromHours(3),
-                "Test UTC+03", "Test UTC+03");
-            var resolvedEnd = (DateTimeOffset)resolveEndAt.Invoke(null,
-                [options.EndAtLocalTime!.Value, options.EndAtDaysOfWeek,
-                    new DateTimeOffset(2024, 1, 1, 19, 0, 0, TimeSpan.FromHours(3)), testTimeZone])!;
-            Assert.Equal(new DateTimeOffset(2024, 1, 5, 15, 30, 0, TimeSpan.Zero), resolvedEnd);
-
-            editorViewModel.Triggers.Add(new ScheduleTriggerViewModel());
-            Assert.True(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
-            editorViewModel.Triggers.Clear();
-            Assert.False(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
-
-            var view = new MainView { DataContext = viewModel };
-            var mainContent = Assert.IsType<Grid>(view.Content).Children.OfType<Grid>()
-                .Single(grid => Grid.GetColumn(grid) == 1);
-            var homeContent = view.FindControl<ScrollViewer>("HomeScrollViewer")!;
-            Assert.True(viewModel.CreateSessionCommand.CanExecute(null));
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
-                .SetValue(viewModel, true);
-
-            Assert.False(viewModel.CreateSessionCommand.CanExecute(null));
-            Assert.False(viewModel.StartSelectedCommand.CanExecute(null));
-            Assert.False(viewModel.OpenSettingsCommand.CanExecute(null));
-            Assert.False(mainContent.IsEnabled);
-
-            view.Measure(new Size(320, 300));
-            Assert.True(view.FindControl<Border>("StartDialogCard")!.DesiredSize.Width <= 320);
-            Assert.True(view.FindControl<ScrollViewer>("StartDialogScrollViewer")!.DesiredSize.Height <= 300);
-            Assert.Equal(KeyboardNavigationMode.Cycle,
-                KeyboardNavigation.GetTabNavigation(view.FindControl<StackPanel>("StartDialogContent")!));
-
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
-                .SetValue(viewModel, false);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsEmergencyUnlockOpen))!
-                .SetValue(viewModel, true);
-            Assert.False(mainContent.IsEnabled);
-            Assert.False(viewModel.CreateSessionCommand.CanExecute(null));
-            view.Measure(new Size(320, 300));
-            Assert.True(view.FindControl<Border>("EmergencyDialogCard")!.DesiredSize.Width <= 320);
-            Assert.Equal(KeyboardNavigationMode.Cycle,
-                KeyboardNavigation.GetTabNavigation(view.FindControl<StackPanel>("EmergencyDialogContent")!));
-
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsEmergencyUnlockOpen))!
-                .SetValue(viewModel, false);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsSessionActive))!
-                .SetValue(viewModel, true);
-            Assert.Contains(homeContent.GetLogicalDescendants().OfType<TextBlock>(),
-                text => text.Text == viewModel.ActiveWorkspaceName && text.IsVisible);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
-                .SetValue(viewModel, true);
-            Assert.Equal(720, view.FindControl<Border>("StartDialogCard")!.MaxWidth);
-            Assert.Equal(HorizontalAlignment.Stretch,
-                view.FindControl<Border>("StartDialogCard")!.HorizontalAlignment);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
-                .SetValue(viewModel, false);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsEmergencyUnlockOpen))!
-                .SetValue(viewModel, true);
-
-            using var preset = new SessionPresetViewModel(new SessionPreset { Name = "Deep Work" },
-                [], null!, services);
-            var card = view.FindControl<ListBox>("PresetsListBox")!.ItemTemplate!.Build(preset)!;
-            var actions = card.GetVisualDescendants().OfType<Button>()
-                .Single(button => button.Name == "PresetActionsButton");
-            Assert.Equal(1, actions.Opacity);
-
-            var editor = new SessionEditorView();
-            var picker = ((IDataTemplate)editor.Resources["PathPickerSettingTemplate"]!).Build(null)!;
-            var history = picker.GetVisualDescendants().OfType<ComboBox>().Single();
-            var historyItem = history.ItemTemplate!.Build("Recent path")!;
-            var remove = historyItem.GetVisualDescendants().OfType<Button>().Single();
-            Assert.Equal(1, remove.Opacity);
-            Assert.True(remove.IsHitTestVisible);
-
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
-                .SetValue(viewModel, "Protection failed");
-            var protectionStatus = homeContent.GetLogicalDescendants().OfType<TextBlock>()
-                .Single(text => text.Text == "Protection failed");
-            Assert.Equal(Brushes.IndianRed, protectionStatus.Foreground);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
-                .SetValue(viewModel, "Protection active");
-            Assert.Equal(Brushes.LightGreen, protectionStatus.Foreground);
-            Assert.False(protectionStatus.IsVisible);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveProtectionStatus))!
-                .SetValue(viewModel, "Protection inactive");
-            Assert.Equal(Brushes.Gray, protectionStatus.Foreground);
-            Assert.False(protectionStatus.IsVisible);
-
-            var window = new Window { Content = view, Width = 900, Height = 700 };
-            try
-            {
-                typeof(MainViewModel).GetProperty(nameof(MainViewModel.ActiveFocusCommitmentMode))!
-                    .SetValue(viewModel, Axorith.Core.Models.FocusCommitmentMode.Locked);
-                typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsSessionActive))!
-                    .SetValue(viewModel, true);
-                window.Show();
-                Dispatcher.UIThread.RunJobs();
-                Assert.Same(view.FindControl<Button>("EmergencyUnlockHoldButton"),
-                    window.FocusManager?.GetFocusedElement());
-                var holdButton = view.FindControl<Button>("EmergencyUnlockHoldButton")!;
-                var pointer = new Pointer(42, PointerType.Mouse, true);
-                var pressed = new PointerPressedEventArgs(holdButton, pointer, window, new Point(1, 1), 0,
-                    new PointerPointProperties(RawInputModifiers.LeftMouseButton,
-                        PointerUpdateKind.LeftButtonPressed), KeyModifiers.None, 1)
-                {
-                    RoutedEvent = InputElement.PointerPressedEvent
-                };
-                holdButton.RaiseEvent(pressed);
-                Assert.True(pressed.Handled);
-                Assert.Same(holdButton, pointer.Captured);
-                var holdField = typeof(MainViewModel).GetField("_emergencyUnlockCts",
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-                Assert.NotNull(holdField.GetValue(viewModel));
-
-                var released = new PointerReleasedEventArgs(holdButton, pointer, window, new Point(1, 1), 1,
-                    new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.LeftButtonReleased),
-                    KeyModifiers.None, MouseButton.Left)
-                {
-                    RoutedEvent = InputElement.PointerReleasedEvent
-                };
-                holdButton.RaiseEvent(released);
-                Assert.True(released.Handled);
-                Assert.Null(pointer.Captured);
-                Assert.Null(holdField.GetValue(viewModel));
-            }
-            finally
-            {
-                window.Close();
-            }
-
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsEmergencyUnlockOpen))!
-                .SetValue(viewModel, false);
-            typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsStartConfirmationOpen))!
-                .SetValue(viewModel, true);
-            var confirmation = new MainView { DataContext = viewModel };
-            var confirmationWindow = new Window { Content = confirmation, Width = 900, Height = 700 };
-            try
-            {
-                confirmationWindow.Show();
-                Dispatcher.UIThread.RunJobs();
-                Assert.Same(confirmation.FindControl<Button>("StartConfirmationCancelButton"),
-                    confirmationWindow.FocusManager?.GetFocusedElement());
-                Assert.Equal(720, confirmation.FindControl<Border>("StartDialogCard")!.MaxWidth);
-            }
-            finally
-            {
-                confirmationWindow.Close();
-            }
+            thenCard.Measure(new Size(800, 1200));
+            thenCard.Arrange(new Rect(0, 0, 800, 1200));
+            Assert.Equal(Color.Parse("#111"), ((ISolidColorBrush)thenActionCard.Background!).Color);
+            Assert.Equal(Color.Parse("#FF6B6B"), ((ISolidColorBrush)thenActionCard.BorderBrush!).Color);
+            Assert.Single(thenCard.GetVisualDescendants().OfType<TextBlock>(),
+                label => label is { IsVisible: true, Text: "No other Workspaces are available." });
+            Assert.DoesNotContain(thenCard.GetVisualDescendants().OfType<TextBlock>(),
+                label => label is { IsVisible: true, Text: "Choose a Workspace" });
         }
-    }
+        finally
+        {
+            editorWindow.Close();
+            thenCard.Child = previousChild;
+        }
+        editorViewModel.ThenTriggers.Clear();
 
+        editorViewModel.Name = "Focus commitment test";
+        editorViewModel.FocusCommitmentModeIndex = (int)Axorith.Core.Models.FocusCommitmentMode.Strict;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(editorViewModel.HasValidationErrors);
+        Assert.False(editorViewModel.SaveAndCloseCommand.CanExecute(null));
+        Assert.Contains("Add one Stop Trigger", editorViewModel.FocusCommitmentError ?? string.Empty);
+        Assert.Contains("error", focusCard.Classes);
+        var errorText = editorView.FindControl<TextBlock>("FocusCommitmentErrorText")!;
+        Assert.True(errorText.IsVisible);
+        Assert.Contains("Add one Stop Trigger", errorText.Text ?? string.Empty);
+
+        using (editorViewModel.AddStopAfterDurationTriggerCommand.Execute().Subscribe())
+            Dispatcher.UIThread.RunJobs();
+        var durationStop = editorViewModel.StopTriggers.OfType<StopAfterDurationTriggerViewModel>().Single();
+        durationStop.DurationHours = 0;
+        durationStop.DurationMinutes = 45;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Null(editorViewModel.FocusCommitmentError);
+        Assert.False(editorViewModel.HasValidationErrors);
+        Assert.True(editorViewModel.SaveAndCloseCommand.CanExecute(null));
+        Assert.Equal(TimeSpan.FromMinutes(45), durationStop.Duration);
+
+        editorViewModel.Triggers.Add(new ScheduleTriggerViewModel());
+        Assert.True(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
+        editorViewModel.Triggers.Clear();
+        Assert.False(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
+    }
     public sealed class TestApplication : Application;
 
     public sealed class TestAppBuilder

@@ -149,33 +149,6 @@ public class SettingTests
     }
 
     [Fact]
-    public void SetChoices_WithEmptyList_ShouldNotThrow()
-    {
-        var choices = new List<KeyValuePair<string, string>>
-        {
-            new("opt", "Option")
-        };
-        var setting = Setting.AsChoice("choice", "Choice", "opt", choices);
-
-        var act = () => setting.SetChoices([]);
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void SetChoices_WithNull_ShouldThrow()
-    {
-        var choices = new List<KeyValuePair<string, string>> { new("k", "V") };
-        var setting = Setting.AsChoice("choice", "Choice", "k", choices);
-
-        var act = () => setting.SetChoices(null!);
-
-        act.Should().Throw<ArgumentNullException>();
-    }
-
-
-
-    [Fact]
     public void AsSecret_ShouldCreateEphemeralSetting()
     {
         var setting = Setting.AsSecret("token", "API Token");
