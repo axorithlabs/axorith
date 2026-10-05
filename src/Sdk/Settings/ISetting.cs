@@ -60,7 +60,7 @@ public interface ISetting
     /// <summary>
     ///     Updates whether the setting is shown in the module editor.
     /// </summary>
-    void SetVisibility(bool isVisible);
+    void SetVisibility(bool isVisible) { }
 
     /// <summary>
     ///     Returns the current label value synchronously (snapshot).

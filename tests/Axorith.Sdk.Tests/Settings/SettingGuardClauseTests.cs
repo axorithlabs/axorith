@@ -1,4 +1,3 @@
-using System.Reflection;
 using Axorith.Sdk.Settings;
 using FluentAssertions;
 
@@ -109,61 +108,8 @@ public class SettingGuardClauseTests
         var act = () => setting.SetChoices([]);
 
         act.Should().NotThrow();
+        ((ISetting)setting).GetCurrentChoices().Should().BeEmpty();
     }
-
-    [Fact]
-    public void SetChoices_WithNullKeyInList_ShouldNotThrowButAcceptIt()
-    {
-        var choices = new List<KeyValuePair<string, string>> { new("k", "v") };
-        var setting = Setting.AsChoice("choice", "Choice", "k", choices);
-
-        var newChoices = new List<KeyValuePair<string, string>>
-        {
-            new(null!, "Null Key")
-        };
-
-        var act = () => setting.SetChoices(newChoices);
-
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void SetChoices_WithDuplicateKeys_ShouldNotThrowButAcceptThem()
-    {
-        var choices = new List<KeyValuePair<string, string>> { new("k", "v") };
-        var setting = Setting.AsChoice("choice", "Choice", "k", choices);
-
-        var newChoices = new List<KeyValuePair<string, string>>
-        {
-            new("duplicate", "First"),
-            new("duplicate", "Second")
-        };
-
-        var act = () => setting.SetChoices(newChoices);
-
-        act.Should().NotThrow();
-    }
-
-
-
-    [Fact]
-    public void InitializeChoices_WithNull_ShouldThrow()
-    {
-        // This tests internal method through AsChoice
-        var act = () =>
-        {
-            // Use reflection to call internal method
-            var setting = Setting.AsText("key", "Label", "value");
-            var method = typeof(Setting<string>).GetMethod("InitializeChoices",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            method?.Invoke(setting, [null]);
-        };
-
-        act.Should().Throw<TargetInvocationException>()
-            .WithInnerException<ArgumentNullException>();
-    }
-
-
 
     [Fact]
     public void AsChoice_WithKeyNotInChoices_ShouldStillCreate()

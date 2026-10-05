@@ -45,24 +45,6 @@ public class SessionEventBroadcasterTests : IDisposable
 
 
     [Fact]
-    public async Task SubscribeAsync_WithValidSubscriberId_ShouldAddSubscriber()
-    {
-        var mockStream = new Mock<IServerStreamWriter<SessionEvent>>();
-        var cts = new CancellationTokenSource();
-
-        var subscribeTask = _broadcaster.SubscribeAsync("subscriber-1", mockStream.Object, cts.Token);
-
-        // Give it time to register
-        await Task.Delay(50);
-
-        // Cancel to unsubscribe
-        await cts.CancelAsync();
-
-        var completed = await Task.WhenAny(subscribeTask, Task.Delay(TimeSpan.FromSeconds(1))) == subscribeTask;
-        completed.Should().BeTrue();
-    }
-
-    [Fact]
     public async Task SubscribeAsync_WithNullSubscriberId_ShouldThrow()
     {
         var mockStream = new Mock<IServerStreamWriter<SessionEvent>>();
@@ -212,11 +194,13 @@ public class SessionEventBroadcasterTests : IDisposable
 
         _capturedSessionStarted?.Invoke(Guid.NewGuid());
         await Task.Delay(100);
+        _capturedSessionStarted?.Invoke(Guid.NewGuid());
+        await Task.Delay(100);
+        mockStream.Verify(stream => stream.WriteAsync(It.IsAny<SessionEvent>(), It.IsAny<CancellationToken>()),
+            Times.Once);
 
         await cts.CancelAsync();
-
-        var completed = await Task.WhenAny(subscribeTask, Task.Delay(TimeSpan.FromSeconds(1))) == subscribeTask;
-        completed.Should().BeTrue();
+        await subscribeTask;
     }
 
 

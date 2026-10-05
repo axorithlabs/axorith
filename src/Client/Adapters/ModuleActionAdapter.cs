@@ -14,7 +14,8 @@ internal class ModuleActionAdapter(
     Guid moduleId,
     Guid designTimeId,
     string moduleName,
-    ITelemetryService? telemetry = null)
+    ITelemetryService? telemetry = null,
+    Guid? presetId = null)
     : IAction, IDisposable
 {
     private readonly Subject<Unit> _invokedSubject = new();
@@ -66,6 +67,7 @@ internal class ModuleActionAdapter(
             ["moduleId"] = moduleId,
             ["moduleName"] = moduleName,
             ["instanceId"] = designTimeId,
+            ["presetId"] = presetId,
             ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey(Key),
             ["result"] = result
         });
@@ -76,6 +78,7 @@ internal class ModuleActionAdapter(
             ["moduleId"] = moduleId,
             ["moduleName"] = moduleName,
             ["instanceId"] = designTimeId,
+            ["presetId"] = presetId,
             ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey(Key)
         });
 

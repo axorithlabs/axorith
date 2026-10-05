@@ -7,6 +7,7 @@ using Axorith.Core.Logging;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Models;
+using Axorith.Core.Telemetry;
 using Axorith.Host;
 using Axorith.Host.Grpc;
 using Axorith.Host.Interceptors;
@@ -113,6 +114,7 @@ Log.Logger = new LoggerConfiguration()
 var hostInfoPath = ApplicationPaths.HostInfoFile;
 ITelemetryService? telemetry = null;
 FileSystemWatcher? telemetryPreferenceWatcher = null;
+Func<Task>? refreshTelemetryProductState = null;
 
 using var hostMutex = new Mutex(true, "Global\\AxorithHostInstanceMutex", out var createdNew);
 
@@ -172,7 +174,12 @@ try
     try
     {
         if (!isTestRun)
-            telemetryPreferenceWatcher = TelemetryPreference.Watch(enabled => telemetry?.SetEnabled(enabled));
+            telemetryPreferenceWatcher = TelemetryPreference.Watch(enabled =>
+            {
+                telemetry?.SetEnabled(enabled);
+                if (enabled && refreshTelemetryProductState is { } refresh)
+                    _ = Task.Run(refresh);
+            });
     }
     catch (Exception ex)
     {
@@ -373,6 +380,30 @@ try
     await app.Services.GetRequiredService<IScheduleManager>()
         .StartProcessingAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
 
+    refreshTelemetryProductState = async () =>
+    {
+        if (telemetry is not { IsEnabled: true }) return;
+        try
+        {
+            var presets = await app.Services.GetRequiredService<IPresetManager>()
+                .LoadAllPresetsAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+            var schedules = await app.Services.GetRequiredService<IScheduleManager>()
+                .ListSchedulesAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+            telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
+            {
+                ["$set"] = ProductAnalyticsProperties.ProductState(presets, schedules)
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not refresh telemetry product-state properties.");
+        }
+    };
+    if (telemetry is { IsEnabled: true } && refreshTelemetryProductState is { } refresh)
+    {
+        await refresh().ConfigureAwait(false);
+    }
+
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
     app.MapGrpcService<ModulesServiceImpl>();
@@ -457,8 +488,6 @@ try
         telemetry!.IsEnabled);
 
     await app.WaitForShutdownAsync();
-
-    telemetry?.TrackEvent("HostStopped");
 
     return 0;
 }

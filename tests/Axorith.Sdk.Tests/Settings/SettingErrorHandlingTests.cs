@@ -122,6 +122,7 @@ public class SettingErrorHandlingTests
         var act = () => iSetting.SetValueFromObject(new object());
 
         act.Should().NotThrow();
+        setting.GetCurrentValue().Should().Be(0);
     }
 
     [Fact]

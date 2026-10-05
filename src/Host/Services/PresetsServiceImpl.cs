@@ -6,6 +6,7 @@ using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using CoreConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 
 namespace Axorith.Host.Services;
@@ -99,7 +100,8 @@ public class PresetsServiceImpl(
 
         var response = PresetCodec.ToMessage(preset);
         logger.LogInformation("Created preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
-        TrackPresetTelemetry("PresetCreated", preset, "create");
+        await TrackPresetTelemetryAsync("PresetCreated", preset, "create", null, context.CancellationToken)
+            .ConfigureAwait(false);
         return response;
     }
 
@@ -121,6 +123,10 @@ public class PresetsServiceImpl(
         await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
 
         var preset = PresetCodec.ToModel(request.Preset);
+        var previousPreset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
+            .ConfigureAwait(false);
+        if (previousPreset is not null) previousPreset = new SessionPreset(previousPreset);
+        var configurationChanged = previousPreset is null || !PresetsEqual(previousPreset, preset);
         await EnsurePresetNameAvailableAsync(preset, allowSameId: true, context.CancellationToken)
             .ConfigureAwait(false);
 
@@ -131,7 +137,11 @@ public class PresetsServiceImpl(
 
         var response = PresetCodec.ToMessage(preset);
         logger.LogInformation("Updated preset: {PresetId} - {PresetName}", preset.Id, preset.Name);
-        TrackPresetTelemetry("PresetUpdated", preset, "update");
+        if (configurationChanged)
+        {
+            await TrackPresetTelemetryAsync("PresetUpdated", preset, "update", previousPreset,
+                context.CancellationToken).ConfigureAwait(false);
+        }
         return response;
     }
 
@@ -146,23 +156,21 @@ public class PresetsServiceImpl(
         logger.LogDebug("DeletePreset called for {PresetId}", presetId);
 
         await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
-        var presetExisted = _telemetry.IsEnabled &&
-                            await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
-                                .ConfigureAwait(false) is not null;
+        var deletedPreset = _telemetry.IsEnabled
+            ? await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken).ConfigureAwait(false)
+            : null;
+        if (deletedPreset is not null) deletedPreset = new SessionPreset(deletedPreset);
 
         await presetManager.DeletePresetAsync(presetId, context.CancellationToken)
             .ConfigureAwait(false);
 
         logger.LogInformation("Deleted preset: {PresetId}", presetId);
-        var wasDeleted = presetExisted &&
+        var wasDeleted = deletedPreset is not null &&
                          await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
                              .ConfigureAwait(false) is null;
         if (wasDeleted)
         {
-            _telemetry.TrackEvent("PresetDeleted", new Dictionary<string, object?>
-            {
-                ["presetId"] = presetId.ToString()
-            });
+            await TrackPresetDeletedAsync(deletedPreset!, context.CancellationToken).ConfigureAwait(false);
         }
         return new Empty();
     }
@@ -202,20 +210,26 @@ public class PresetsServiceImpl(
         }
     }
 
-    private void TrackPresetTelemetry(string eventName, SessionPreset preset, string changeType)
+    private async Task TrackPresetTelemetryAsync(string eventName, SessionPreset preset, string changeType,
+        SessionPreset? previousPreset, CancellationToken cancellationToken)
     {
         if (!_telemetry.IsEnabled) return;
 
         try
         {
             var moduleDefLookup = moduleRegistry.GetAllDefinitions().ToDictionary(m => m.Id, m => m.Name);
-            _telemetry.TrackEvent(eventName, ProductAnalyticsProperties.Preset(preset, moduleDefLookup, _secureStorage));
+            var properties = ProductAnalyticsProperties.Preset(preset, moduleDefLookup, _secureStorage);
+            await AddProductStateAsync(properties, cancellationToken).ConfigureAwait(false);
+            _telemetry.TrackEvent(eventName, properties);
 
             foreach (var module in preset.Modules)
             {
+                var previousModule = previousPreset?.Modules.FirstOrDefault(candidate =>
+                    candidate.InstanceId == module.InstanceId);
                 _telemetry.TrackEvent("ModuleConfigurationSaved",
                     ProductAnalyticsProperties.ModuleConfigurationSaved(preset, module,
-                        moduleDefLookup.GetValueOrDefault(module.ModuleId, "custom"), changeType, _secureStorage));
+                        moduleDefLookup.GetValueOrDefault(module.ModuleId, "custom"), changeType, _secureStorage,
+                        previousPreset is null || previousModule is null || !ModulesEqual(previousModule, module)));
             }
         }
         catch (Exception ex)
@@ -223,5 +237,60 @@ public class PresetsServiceImpl(
             logger.LogWarning(ex, "Could not track saved preset configuration telemetry.");
         }
     }
+
+    private async Task TrackPresetDeletedAsync(SessionPreset preset, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var moduleDefLookup = moduleRegistry.GetAllDefinitions().ToDictionary(m => m.Id, m => m.Name);
+            var properties = ProductAnalyticsProperties.Preset(preset, moduleDefLookup, _secureStorage);
+            await AddProductStateAsync(properties, cancellationToken).ConfigureAwait(false);
+            _telemetry.TrackEvent("PresetDeleted", properties);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not track deleted preset configuration telemetry.");
+        }
+    }
+
+    private async Task<Dictionary<string, object?>> ProductStateAsync(CancellationToken cancellationToken)
+    {
+        var presets = await presetManager.LoadAllPresetsAsync(cancellationToken).ConfigureAwait(false);
+        var schedules = await scheduleManager.ListSchedulesAsync(cancellationToken).ConfigureAwait(false);
+        return ProductAnalyticsProperties.ProductState(presets, schedules);
+    }
+
+    private async Task AddProductStateAsync(Dictionary<string, object?> eventProperties,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            eventProperties["$set"] = await ProductStateAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not refresh telemetry product-state properties.");
+        }
+    }
+
+    private static bool PresetsEqual(SessionPreset left, SessionPreset right)
+    {
+        var a = left.FocusCommitment;
+        var b = right.FocusCommitment;
+        return left.Id == right.Id && string.Equals(left.Name, right.Name, StringComparison.Ordinal) &&
+               a.Mode == b.Mode && a.EndCondition == b.EndCondition && a.Duration == b.Duration &&
+               a.EndAtLocalTime == b.EndAtLocalTime && a.EndAtDaysOfWeek.Order().SequenceEqual(b.EndAtDaysOfWeek.Order()) &&
+               a.BreakCount == b.BreakCount && a.BreakDuration == b.BreakDuration && a.AfterEnd == b.AfterEnd &&
+               a.NextWorkspaceId == b.NextWorkspaceId && a.ScheduleLockMinutes == b.ScheduleLockMinutes &&
+               left.Modules.Count == right.Modules.Count &&
+               left.Modules.Zip(right.Modules).All(pair => ModulesEqual(pair.First, pair.Second));
+    }
+
+    private static bool ModulesEqual(CoreConfiguredModule left, CoreConfiguredModule right) =>
+        left.InstanceId == right.InstanceId && left.ModuleId == right.ModuleId &&
+        string.Equals(left.CustomName, right.CustomName, StringComparison.Ordinal) && left.StartDelay == right.StartDelay &&
+        left.Settings.Count == right.Settings.Count &&
+        left.Settings.All(setting => right.Settings.TryGetValue(setting.Key, out var value) &&
+                                     string.Equals(setting.Value, value, StringComparison.Ordinal));
 
 }

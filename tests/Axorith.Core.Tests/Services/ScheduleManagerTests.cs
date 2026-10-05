@@ -275,9 +275,9 @@ public class ScheduleManagerTests : IAsyncDisposable
     {
         await _manager.StartAsync(CancellationToken.None);
 
-        var act = async () => await _manager.DisposeAsync();
+        await _manager.DisposeAsync();
 
-        await act.Should().NotThrowAsync();
+        _mockSessionManager.VerifyRemove(manager => manager.SessionStarted -= It.IsAny<Action<Guid>>(), Times.Once);
     }
 
 }
@@ -381,10 +381,8 @@ public class SessionScheduleTests
 
         var result = schedule.GetNextRun(now);
 
-        if (result.HasValue)
-        {
-            schedule.DaysOfWeek.Should().Contain(result.Value.DayOfWeek);
-        }
+        result.Should().NotBeNull();
+        schedule.DaysOfWeek.Should().Contain(result!.Value.DayOfWeek);
     }
 
     [Fact]

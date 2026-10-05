@@ -132,6 +132,206 @@ public sealed class SessionPreflightTelemetryTests
     }
 
     [Fact]
+    public async Task ZeroDurationAutoStop_EndsTheRunningSession()
+    {
+        await using var server = new PostHogTestServer();
+        var directory = Directory.CreateTempSubdirectory("axorith-zero-autostop-telemetry-");
+        try
+        {
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
+            var moduleId = Guid.NewGuid();
+            var preset = new SessionPreset(Guid.NewGuid())
+            {
+                Modules = [new ConfiguredModule { ModuleId = moduleId }]
+            };
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName);
+            await using var autoStop = new SessionAutoStopService(sessionManager,
+                new InMemoryPresetManager(), new NoopNotifier(),
+                NullLogger<SessionAutoStopService>.Instance, telemetry);
+            var stopped = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+            sessionManager.SessionStopped += presetId => stopped.TrySetResult(presetId);
+
+            await sessionManager.StartSessionAsync(preset);
+            var sessionInstanceId = sessionManager.CurrentSessionInstanceId!.Value;
+            await autoStop.StartAsync(CancellationToken.None);
+            await autoStop.StartTrackingAsync(sessionInstanceId, TimeSpan.Zero, null);
+            Assert.Equal(preset.Id, await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.False(sessionManager.IsSessionRunning);
+
+            await telemetry.FlushAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+            var sessionStopped = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "SessionStopped")
+                .GetProperty("properties");
+            Assert.Equal(sessionInstanceId.ToString("D"), sessionStopped.GetProperty("sessionInstanceId").GetString());
+            Assert.Equal("natural_completion", sessionStopped.GetProperty("stopReason").GetString());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StopScheduleAndChainedSession_ShareTheRealSessionInstanceId()
+    {
+        await using var server = new PostHogTestServer();
+        var directory = Directory.CreateTempSubdirectory("axorith-chained-session-telemetry-");
+        try
+        {
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
+            var moduleId = Guid.NewGuid();
+            var previousSessionInstanceId = Guid.NewGuid();
+            var nextPreset = new SessionPreset(Guid.NewGuid())
+            {
+                Name = "Next",
+                Modules = [new ConfiguredModule { ModuleId = moduleId }]
+            };
+            var currentPreset = new SessionPreset(Guid.NewGuid())
+            {
+                Name = "Current",
+                Modules = [new ConfiguredModule { ModuleId = moduleId }]
+            };
+            var schedule = new SessionSchedule
+            {
+                Id = Guid.NewGuid(),
+                PresetId = currentPreset.Id,
+                Type = ScheduleType.StopRecurring,
+                RecurringTime = TimeSpan.FromHours(18),
+                NextPresetId = nextPreset.Id
+            };
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName);
+            var presetManager = new InMemoryPresetManager(nextPreset);
+            await using var autoStop = new SessionAutoStopService(sessionManager, presetManager,
+                new NoopNotifier(), NullLogger<SessionAutoStopService>.Instance, telemetry);
+            await autoStop.StartAsync(CancellationToken.None);
+
+            await sessionManager.StartSessionAsync(currentPreset, sessionInstanceId: previousSessionInstanceId);
+            var activePreset = sessionManager.ActiveSession!;
+            await autoStop.StartTrackingAsync(previousSessionInstanceId, null, nextPreset.Id, schedule: schedule);
+            Assert.True(await autoStop.CompleteNaturallyAsync(activePreset, nextPreset.Id, schedule: schedule));
+            Assert.Equal(nextPreset.Id, sessionManager.ActiveSession?.Id);
+            Assert.NotEqual(previousSessionInstanceId, sessionManager.CurrentSessionInstanceId);
+            await sessionManager.StopCurrentSessionAsync();
+
+            using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await telemetry.FlushAsync(flushCts.Token);
+
+            var events = ReadEvents(server).ToArray();
+            var stopTrigger = events.Single(item => item.GetProperty("event").GetString() == "ScheduleTriggered")
+                .GetProperty("properties");
+            var previousStopped = events.Single(item => item.GetProperty("event").GetString() == "SessionStopped" &&
+                item.GetProperty("properties").GetProperty("presetId").GetString() == currentPreset.Id.ToString("D"))
+                .GetProperty("properties");
+            var chainedStarted = events.Single(item => item.GetProperty("event").GetString() == "SessionStarted" &&
+                item.GetProperty("properties").GetProperty("presetId").GetString() == nextPreset.Id.ToString("D"))
+                .GetProperty("properties");
+            var chainedStopped = events.Single(item => item.GetProperty("event").GetString() == "SessionStopped" &&
+                item.GetProperty("properties").GetProperty("presetId").GetString() == nextPreset.Id.ToString("D"))
+                .GetProperty("properties");
+
+            Assert.Equal(previousSessionInstanceId.ToString("D"),
+                stopTrigger.GetProperty("sessionInstanceId").GetString());
+            Assert.Equal(previousSessionInstanceId.ToString("D"),
+                previousStopped.GetProperty("sessionInstanceId").GetString());
+            Assert.Equal(previousSessionInstanceId.ToString("D"),
+                chainedStarted.GetProperty("previousSessionInstanceId").GetString());
+            Assert.Equal(previousSessionInstanceId.ToString("D"),
+                chainedStopped.GetProperty("previousSessionInstanceId").GetString());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task FailedBreakStart_EmitsFailureTelemetryAfterRollingBack()
+    {
+        await using var server = new PostHogTestServer();
+        var directory = Directory.CreateTempSubdirectory("axorith-break-failure-telemetry-");
+        try
+        {
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
+            var moduleId = Guid.NewGuid();
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName,
+                failBreakStart: true);
+            var preset = new SessionPreset(Guid.NewGuid())
+            {
+                Modules = [new ConfiguredModule { ModuleId = moduleId }],
+                FocusCommitment = new FocusCommitmentOptions
+                {
+                    Mode = FocusCommitmentMode.Locked,
+                    EndCondition = FocusEndCondition.Duration,
+                    Duration = TimeSpan.FromMinutes(20),
+                    BreakCount = 1,
+                    BreakDuration = TimeSpan.FromMinutes(1)
+                }
+            };
+
+            await sessionManager.StartSessionAsync(preset);
+            var sessionInstanceId = sessionManager.CurrentSessionInstanceId!.Value;
+            await Assert.ThrowsAsync<InvalidOperationException>(() => sessionManager.StartBreakAsync());
+            Assert.Null(sessionManager.BreakEndsAt);
+            Assert.Equal(1, sessionManager.BreaksRemaining);
+            Assert.True(await sessionManager.EndCommittedSessionAsync(SessionEndReason.NaturalCompletion));
+
+            using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await telemetry.FlushAsync(flushCts.Token);
+
+            var events = ReadEvents(server).ToArray();
+            Assert.DoesNotContain(events, item => item.GetProperty("event").GetString() == "SessionBreakStarted");
+            var failed = events.Single(item => item.GetProperty("event").GetString() == "SessionBreakStartFailed")
+                .GetProperty("properties");
+            Assert.Equal("failed", failed.GetProperty("result").GetString());
+            Assert.Equal("unknown", failed.GetProperty("failureReason").GetString());
+            Assert.Equal(sessionInstanceId.ToString("D"), failed.GetProperty("sessionInstanceId").GetString());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ValidationWarning_IsReportedWithModuleContextAndNormalizedReason()
+    {
+        await using var server = new PostHogTestServer();
+        var directory = Directory.CreateTempSubdirectory("axorith-validation-warning-telemetry-");
+        try
+        {
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
+            var moduleId = Guid.NewGuid();
+            var moduleInstanceId = Guid.NewGuid();
+            var sessionInstanceId = Guid.NewGuid();
+            const string privateWarning = "Warning with a private path C:\\private\\config";
+            await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName,
+                validationResult: ValidationResult.Warn(privateWarning));
+            var preset = new SessionPreset(Guid.NewGuid())
+            {
+                Modules = [new ConfiguredModule { ModuleId = moduleId, InstanceId = moduleInstanceId }]
+            };
+
+            await sessionManager.StartSessionAsync(preset, sessionInstanceId: sessionInstanceId);
+            await sessionManager.StopCurrentSessionAsync();
+            await telemetry.FlushAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+
+            var warning = ReadEvents(server).Single(item =>
+                item.GetProperty("event").GetString() == "SessionValidationWarning").GetProperty("properties");
+            Assert.Equal(sessionInstanceId.ToString("D"), warning.GetProperty("sessionInstanceId").GetString());
+            Assert.Equal(moduleId.ToString("D"), warning.GetProperty("moduleId").GetString());
+            Assert.Equal(moduleInstanceId.ToString("D"), warning.GetProperty("instanceId").GetString());
+            Assert.Equal("custom", warning.GetProperty("moduleName").GetString());
+            Assert.Equal("module_validation", warning.GetProperty("stage").GetString());
+            Assert.Equal("warning", warning.GetProperty("result").GetString());
+            Assert.Equal("validation_warning", warning.GetProperty("failureReason").GetString());
+            Assert.DoesNotContain(privateWarning, string.Join("\n", server.Payloads), StringComparison.Ordinal);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task LockedSession_ReportsIgnoredDurationScheduleAsSkipped()
     {
         await using var server = new PostHogTestServer();
@@ -209,8 +409,9 @@ public sealed class SessionPreflightTelemetryTests
             FlushInterval = TimeSpan.FromHours(1)
         });
 
-    private static SessionManager CreateSessionManager(Guid moduleId, ITelemetryService telemetry, string directory) =>
-        new(new TestModuleRegistry(moduleId), NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5),
+    private static SessionManager CreateSessionManager(Guid moduleId, ITelemetryService telemetry, string directory,
+        bool failBreakStart = false, ValidationResult? validationResult = null) =>
+        new(new TestModuleRegistry(moduleId, failBreakStart, validationResult), NullLogger<SessionManager>.Instance, TimeSpan.FromSeconds(5),
             TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), telemetry,
             Path.Combine(directory, "committed-session.json"));
 
@@ -220,7 +421,8 @@ public sealed class SessionPreflightTelemetryTests
         return payload.RootElement.GetProperty("batch").EnumerateArray().Select(item => item.Clone()).ToArray();
     });
 
-    private sealed class TestModuleRegistry(Guid moduleId) : IModuleRegistry
+    private sealed class TestModuleRegistry(Guid moduleId, bool failBreakStart = false,
+        ValidationResult? validationResult = null) : IModuleRegistry
     {
         private readonly ModuleDefinition _definition = new() { Id = moduleId, Name = "Test" };
 
@@ -233,19 +435,47 @@ public sealed class SessionPreflightTelemetryTests
 
             var builder = new ContainerBuilder();
             builder.RegisterInstance(_definition).As<ModuleDefinition>();
-            return (new TestModule(), builder.Build());
+            return (new TestModule(failBreakStart, validationResult), builder.Build());
         }
     }
 
-    private sealed class TestModule : IModule
+    private sealed class TestModule(bool failBreakStart = false, ValidationResult? validationResult = null)
+        : IModule, ISessionBreakParticipant
     {
         public IReadOnlyList<Axorith.Sdk.Settings.ISetting> GetSettings() => [];
         public IReadOnlyList<Axorith.Sdk.Actions.IAction> GetActions() => [];
         public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(ValidationResult.Success);
+            Task.FromResult(validationResult ?? ValidationResult.Success);
         public Task OnSessionStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task OnSessionEndAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task PauseForBreakAsync(CancellationToken cancellationToken) => failBreakStart
+            ? Task.FromException(new InvalidOperationException("test break pause failure"))
+            : Task.CompletedTask;
+        public Task ResumeAfterBreakAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public void Dispose() { }
+    }
+
+    private sealed class InMemoryPresetManager(params SessionPreset[] presets) : IPresetManager
+    {
+        private readonly Dictionary<Guid, SessionPreset> _presets = presets.ToDictionary(preset => preset.Id);
+
+        public Task<IReadOnlyList<SessionPreset>> LoadAllPresetsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<SessionPreset>>(_presets.Values.ToArray());
+
+        public Task<SessionPreset?> GetPresetByIdAsync(Guid presetId, CancellationToken cancellationToken) =>
+            Task.FromResult(_presets.GetValueOrDefault(presetId));
+
+        public Task SavePresetAsync(SessionPreset preset, CancellationToken cancellationToken)
+        {
+            _presets[preset.Id] = preset;
+            return Task.CompletedTask;
+        }
+
+        public Task DeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
+        {
+            _presets.Remove(presetId);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingAutoStopService : ISessionAutoStopService

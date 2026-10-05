@@ -60,17 +60,18 @@ public sealed class ClientOnboardingService(
                 discoveredApps.SteamPath != null, discoveredApps.ObsPath != null, discoveredApps.DiscordPath != null,
                 discoveredApps.SpotifyPath != null);
 
-            var presetsToCreate = GenerateCodingPresets(discoveredApps, moduleIds);
+            var presetsToCreate = GenerateCodingPresets(discoveredApps, moduleIds)
+                .Select(preset => (Preset: preset, TemplateType: "Developer")).ToList();
             var gamingPreset = CreateGamingPreset(discoveredApps, moduleIds);
-            if (gamingPreset.Modules.Count > 0) presetsToCreate.Add(gamingPreset);
+            if (gamingPreset.Modules.Count > 0) presetsToCreate.Add((gamingPreset, "Gamer"));
             var streamingPreset = CreateStreamingPreset(discoveredApps, moduleIds);
-            if (streamingPreset.Modules.Count > 0) presetsToCreate.Add(streamingPreset);
+            if (streamingPreset.Modules.Count > 0) presetsToCreate.Add((streamingPreset, "Streamer"));
 
-            foreach (var preset in presetsToCreate.Where(preset => preset.Modules.Count > 0))
+            foreach (var (preset, templateType) in presetsToCreate.Where(item => item.Preset.Modules.Count > 0))
             {
                 preset.Name = GetUniqueName(preset.Name, existingNames);
                 existingNames.Add(preset.Name);
-                await CreatePresetWithRetryAsync(preset, existingNames, result, ct);
+                await CreatePresetWithRetryAsync(preset, existingNames, result, templateType, ct);
             }
 
             result.Success = result.CreatedPresets.Count > 0;
@@ -89,6 +90,7 @@ public sealed class ClientOnboardingService(
         SessionPreset preset,
         HashSet<string> existingNames,
         OnboardingResult result,
+        string templateType,
         CancellationToken ct)
     {
         for (var attempt = 0; attempt < 2; attempt++)
@@ -97,6 +99,8 @@ public sealed class ClientOnboardingService(
             {
                 await presetsApi.CreatePresetAsync(preset, ct);
                 result.CreatedPresets.Add(preset.Name);
+                if (!result.CreatedModuleTypes.Contains(templateType, StringComparer.Ordinal))
+                    result.CreatedModuleTypes.Add(templateType);
                 logger.LogInformation("Created preset: {PresetName}", preset.Name);
                 return;
             }
@@ -368,6 +372,7 @@ public sealed class OnboardingResult
 {
     public bool Success { get; set; }
     public List<string> CreatedPresets { get; } = [];
+    public List<string> CreatedModuleTypes { get; } = [];
     public List<string> SkippedPresets { get; } = [];
     public List<string> Errors { get; } = [];
     public string? ErrorMessage { get; set; }

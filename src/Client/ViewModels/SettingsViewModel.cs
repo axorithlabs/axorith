@@ -238,7 +238,8 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
             {
                 _telemetry.TrackEvent("OnboardingCompleted", new Dictionary<string, object?>
                 {
-                    ["createdCount"] = result.CreatedCount
+                    ["createdCount"] = result.CreatedCount,
+                    ["createdModuleTypes"] = result.CreatedModuleTypes
                 });
                 if (result.CreatedCount > 0)
                 {

@@ -10,8 +10,14 @@ namespace Axorith.Sdk.Actions;
 /// <remarks>
 ///     Initializes a new instance of the <see cref="Action" /> class.
 /// </remarks>
-public sealed class Action(string key, string label, bool isEnabled = true, string? settingKey = null) : IAction, IDisposable
+public sealed class Action(string key, string label, bool isEnabled, string? settingKey) : IAction, IDisposable
 {
+    /// <summary>Creates an action without an associated setting key.</summary>
+    public Action(string key, string label, bool isEnabled = true) : this(key, label, isEnabled, null) { }
+
+    /// <summary>Creates an enabled action associated with a setting.</summary>
+    public Action(string key, string label, string? settingKey) : this(key, label, true, settingKey) { }
+
     private readonly BehaviorSubject<string> _label = new(label);
     private readonly BehaviorSubject<bool> _isEnabled = new(isEnabled);
     private readonly Subject<Unit> _invoked = new();
@@ -86,6 +92,9 @@ public sealed class Action(string key, string label, bool isEnabled = true, stri
     ///     This is used for long-running operations like OAuth login.
     /// </summary>
     public void OnInvokeAsync(Func<Task> handler) => _asyncHandler = handler;
+
+    /// <summary>Creates an action using the original SDK factory signature.</summary>
+    public static Action Create(string key, string label, bool isEnabled = true) => new(key, label, isEnabled);
 
     /// <summary>
     ///     Disposes the action and releases all resources.

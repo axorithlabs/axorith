@@ -43,7 +43,6 @@ public sealed partial class TelemetryService : ITelemetryService
     private readonly Dictionary<string, ErrorAggregate> _errors = new(StringComparer.Ordinal);
     private Task? _flushTask;
     private readonly string _distinctId = string.Empty;
-    private string? _application;
     private string? _appVersion;
     private string? _osVersion;
     private int _enabled;
@@ -76,7 +75,6 @@ public sealed partial class TelemetryService : ITelemetryService
             ? Environment.OSVersion.VersionString
             : resolved.OsVersion;
         _baseProperties = BuildBaseProperties(resolved, version, osVersion);
-        _application = resolved.ApplicationName;
         _appVersion = version;
         _osVersion = osVersion;
 
@@ -154,7 +152,6 @@ public sealed partial class TelemetryService : ITelemetryService
             {
                 [TelemetryConstants.Properties.Set] = new Dictionary<string, object?>
                 {
-                    [TelemetryConstants.Properties.Application] = _application,
                     [TelemetryConstants.Properties.AxorithVersion] = _appVersion,
                     [TelemetryConstants.Properties.OsVersion] = _osVersion
                 }

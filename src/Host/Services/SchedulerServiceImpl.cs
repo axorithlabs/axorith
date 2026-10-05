@@ -1,15 +1,17 @@
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Models;
 using Axorith.Core.Telemetry;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using SessionSchedule = Axorith.Core.Models.SessionSchedule;
+using ContractConfigurationLockStatus = Axorith.Contracts.ConfigurationLockStatus;
 
 namespace Axorith.Host.Services;
 
 public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<SchedulerServiceImpl> logger,
-    ITelemetryService? telemetry = null)
+    ITelemetryService? telemetry = null, IPresetManager? presetManager = null)
     : SchedulerService.SchedulerServiceBase
 {
     private readonly ITelemetryService _telemetry = telemetry ?? NoopTelemetryService.Instance;
@@ -37,7 +39,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         model.Id = Guid.NewGuid();
 
         var saved = await scheduleManager.SaveScheduleAsync(model, context.CancellationToken);
-        TrackScheduleChanged(saved, "create");
+        await TrackScheduleChangedAsync(saved, "create", context.CancellationToken).ConfigureAwait(false);
         return ScheduleCodec.ToMessage(saved);
     }
 
@@ -51,10 +53,12 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         logger.LogInformation("Updating schedule '{Name}' ({Id})", request.Schedule.Name, request.Schedule.Id);
 
         var model = ScheduleCodec.ToModel(request.Schedule);
-        _ = await GetMutableScheduleAsync(model.Id, context.CancellationToken);
+        var existing = await GetMutableScheduleAsync(model.Id, context.CancellationToken);
+        var configurationChanged = existing is null || !SchedulesEqual(existing, model);
         await EnsurePresetMutableAsync(model.PresetId, context.CancellationToken);
         var saved = await scheduleManager.SaveScheduleAsync(model, context.CancellationToken);
-        TrackScheduleChanged(saved, "update");
+        if (configurationChanged)
+            await TrackScheduleChangedAsync(saved, "update", context.CancellationToken).ConfigureAwait(false);
         return ScheduleCodec.ToMessage(saved);
     }
 
@@ -71,7 +75,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         await scheduleManager.DeleteScheduleAsync(id, context.CancellationToken);
         if (existing is not null)
         {
-            TrackScheduleChanged(existing, "delete");
+            await TrackScheduleChangedAsync(existing, "delete", context.CancellationToken).ConfigureAwait(false);
         }
         return new Empty();
     }
@@ -95,13 +99,13 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
 
         if (existing?.IsEnabled != updated.IsEnabled)
         {
-            TrackScheduleChanged(updated, "update");
+            await TrackScheduleChangedAsync(updated, "update", context.CancellationToken).ConfigureAwait(false);
         }
 
         return ScheduleCodec.ToMessage(updated);
     }
 
-    public override async Task<ConfigurationLockStatus> GetConfigurationLockStatus(
+    public override async Task<ContractConfigurationLockStatus> GetConfigurationLockStatus(
         ConfigurationLockStatusRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.PresetId, out var presetId))
@@ -110,7 +114,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         }
 
         var status = await scheduleManager.GetConfigurationLockStatusAsync(presetId, context.CancellationToken);
-        return new ConfigurationLockStatus
+        return new ContractConfigurationLockStatus
         {
             IsLocked = status.IsLocked,
             SecondsUntilStart = (long)(status.StartsIn?.TotalSeconds ?? 0)
@@ -137,6 +141,30 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         }
     }
 
-    private void TrackScheduleChanged(SessionSchedule schedule, string changeType) =>
-        _telemetry.TrackEvent("ScheduleChanged", ProductAnalyticsProperties.Schedule(schedule, changeType));
+    private async Task TrackScheduleChangedAsync(SessionSchedule schedule, string changeType,
+        CancellationToken cancellationToken)
+    {
+        var properties = ProductAnalyticsProperties.Schedule(schedule, changeType);
+        if (presetManager is not null)
+        {
+            try
+            {
+                var presets = await presetManager.LoadAllPresetsAsync(cancellationToken).ConfigureAwait(false);
+                var schedules = await scheduleManager.ListSchedulesAsync(cancellationToken).ConfigureAwait(false);
+                properties["$set"] = ProductAnalyticsProperties.ProductState(presets, schedules);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not refresh telemetry product-state properties after schedule change.");
+            }
+        }
+        _telemetry.TrackEvent("ScheduleChanged", properties);
+    }
+
+    private static bool SchedulesEqual(SessionSchedule left, SessionSchedule right) =>
+        left.PresetId == right.PresetId && string.Equals(left.Name, right.Name, StringComparison.Ordinal) &&
+        left.IsEnabled == right.IsEnabled && left.Type == right.Type && left.OneTimeDate == right.OneTimeDate &&
+        left.RecurringTime == right.RecurringTime && left.DaysOfWeek.Distinct().Order().SequenceEqual(
+            right.DaysOfWeek.Distinct().Order()) && left.AutoStopDuration == right.AutoStopDuration &&
+        left.NextPresetId == right.NextPresetId && left.Use24HourFormat == right.Use24HourFormat;
 }

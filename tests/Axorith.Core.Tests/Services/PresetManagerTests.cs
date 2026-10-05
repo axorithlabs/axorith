@@ -164,6 +164,8 @@ public class PresetManagerTests : IDisposable
     [Fact]
     public async Task Cancellation_ShouldRespectCancellationToken()
     {
+        await _manager.SavePresetAsync(new SessionPreset { Id = Guid.NewGuid(), Name = "Cancelled load" },
+            CancellationToken.None);
         var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 

@@ -265,23 +265,11 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                         if (evt.Type == SessionEventType.ModuleError)
                         {
                             _toastService?.Show(evt.Message ?? "A module failed.", NotificationType.Error, "Sessions");
-                            _telemetry?.TrackEvent("ModuleExecutionFailed", new Dictionary<string, object?>
-                            {
-                                ["presetId"] = evt.PresetId,
-                                ["stage"] = "module_startup",
-                                ["result"] = "failed"
-                            });
                         }
 
                         break;
                     case SessionEventType.ValidationWarning:
                         _toastService?.Show(evt.Message ?? "Session validation warning.", NotificationType.Warning, "Sessions");
-                        _telemetry?.TrackEvent("SessionValidationWarning", new Dictionary<string, object?>
-                        {
-                            ["presetId"] = evt.PresetId,
-                            ["stage"] = "preflight",
-                            ["failureReason"] = "validation_failed"
-                        });
                         break;
                 }
             });

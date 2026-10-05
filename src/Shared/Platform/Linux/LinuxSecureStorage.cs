@@ -204,11 +204,21 @@ internal class LinuxSecureStorage : SecureStorageBase
 
         if (File.Exists(keyPath))
         {
+            var storedKey = File.ReadAllBytes(keyPath);
+            if (storedKey.Length == 32)
+            {
+                WriteEncryptedMasterKey(keyPath, storedKey);
+                Logger.LogInformation("Migrated legacy Linux secure-storage master key");
+                return storedKey;
+            }
+
             try
             {
-                var storedEncryptedKey = File.ReadAllBytes(keyPath);
                 var derivedMachineKey = GetMachineKey();
-                return DecryptAesGcm(storedEncryptedKey, derivedMachineKey, "Encrypted key too short");
+                var decryptedKey = DecryptAesGcm(storedKey, derivedMachineKey, "Encrypted key too short");
+                if (decryptedKey.Length != 32)
+                    throw new CryptographicException("Invalid master key length");
+                return decryptedKey;
             }
             catch (Exception ex)
             {
@@ -219,25 +229,37 @@ internal class LinuxSecureStorage : SecureStorageBase
         }
 
         var key = RandomNumberGenerator.GetBytes(32);
-        var machineKey = GetMachineKey();
-        var encryptedKey = EncryptAesGcm(key, machineKey);
-
-        File.WriteAllBytes(keyPath, encryptedKey);
-
-        if (OperatingSystem.IsLinux())
-        {
-            try
-            {
-                File.SetUnixFileMode(keyPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Failed to set file permissions for key file {File}",
-                    TelemetryGuard.SafePath(keyPath));
-            }
-        }
-
+        WriteEncryptedMasterKey(keyPath, key);
         return key;
+    }
+
+    private void WriteEncryptedMasterKey(string keyPath, byte[] key)
+    {
+        var encryptedKey = EncryptAesGcm(key, GetMachineKey());
+        var tempPath = $"{keyPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllBytes(tempPath, encryptedKey);
+            if (OperatingSystem.IsLinux())
+            {
+                try
+                {
+                    File.SetUnixFileMode(tempPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to set file permissions for key file {File}",
+                        TelemetryGuard.SafePath(tempPath));
+                }
+            }
+
+            File.Move(tempPath, keyPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 
     private static byte[] GetMachineKey()

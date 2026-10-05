@@ -32,6 +32,7 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<string> CustomPath { get; }
     public Setting<string> ApplicationArgs { get; }
     public Setting<string> ProjectPath { get; }
+    public Setting<string> LegacyLauncherModuleKey { get; }
     public Setting<bool> UseCustomWorkingDirectory { get; }
     public Setting<string> WorkingDirectory { get; }
 
@@ -47,6 +48,8 @@ internal sealed class Settings : LauncherSettingsBase
             filter: "Executable files (*.exe)|*.exe|All files (*.*)|*.*", isVisible: false);
         ApplicationArgs = Setting.AsText("ApplicationArgs", "Launch Arguments", "", isVisible: false);
         ProjectPath = Setting.AsDirectoryPicker("ProjectPath", "Project Folder", "", isVisible: false);
+        LegacyLauncherModuleKey = Setting.AsText(ApplicationSelector.LegacyModuleKeySetting,
+            "Legacy Launcher Type", "", isVisible: false);
         UseCustomWorkingDirectory = Setting.AsCheckbox("UseCustomWorkingDirectory", "Use Custom Working Directory", false);
         WorkingDirectory = Setting.AsDirectoryPicker("WorkingDirectory", "Working Directory",
             Environment.CurrentDirectory, isVisible: false);
@@ -80,6 +83,8 @@ internal sealed class Settings : LauncherSettingsBase
         }
 
         ApplicationPath.Value.Subscribe(UpdateModuleVisibility);
+        _subscriptions.Add(LegacyLauncherModuleKey.Value.Subscribe(_ =>
+            UpdateModuleVisibility(ApplicationPath.GetCurrentValue())));
         ProcessMode.Value.Subscribe(_ => UpdateOwnVisibility());
         SetupBaseReactiveVisibility();
         _subscriptions.Add(WindowState.Value.Subscribe(_ => UpdateOwnVisibility()));
@@ -90,7 +95,7 @@ internal sealed class Settings : LauncherSettingsBase
     }
 
     protected override IEnumerable<ISetting> GetAdditionalSettings() =>
-        [CustomPath, ApplicationArgs, ProjectPath, UseCustomWorkingDirectory, WorkingDirectory,
+        [CustomPath, ApplicationArgs, ProjectPath, LegacyLauncherModuleKey, UseCustomWorkingDirectory, WorkingDirectory,
             .. _moduleSettings.Select(entry => entry.Setting)];
 
     protected override IEnumerable<IAction> GetAdditionalActions() => _moduleActions;
@@ -101,6 +106,7 @@ internal sealed class Settings : LauncherSettingsBase
             _appDiscovery, app => app.ExecutablePath, ApplicationSelector.IsSupportedLauncherApp);
         choices.Add(new(CustomApp, "Custom App"));
         ApplicationPath.SetChoices(choices);
+        EnsureApplicationPathChoice(ApplicationPath.GetCurrentValue());
         return Task.CompletedTask;
     }
 
@@ -112,6 +118,10 @@ internal sealed class Settings : LauncherSettingsBase
         return _moduleInitialization.GetOrAdd(moduleKey, _ => module.InitializeAsync(cancellationToken));
     }
 
+    public string? GetSelectedModuleKey() =>
+        ApplicationSelector.GetLauncherModuleKey(ApplicationPath.GetCurrentValue(),
+            LegacyLauncherModuleKey.GetCurrentValue());
+
     protected override async Task<ValidationResult> ValidateAdditionalAsync()
     {
         if (ApplicationPath.GetCurrentValue() == CustomApp &&
@@ -122,7 +132,7 @@ internal sealed class Settings : LauncherSettingsBase
                 "Configuration contains errors.");
         }
 
-        var moduleKey = ApplicationSelector.GetLauncherModuleKey(ApplicationPath.GetCurrentValue());
+        var moduleKey = GetSelectedModuleKey();
         if (moduleKey == null || !_modules.TryGetValue(moduleKey, out var module))
             return ValidationResult.Success;
 
@@ -147,7 +157,9 @@ internal sealed class Settings : LauncherSettingsBase
 
     private void UpdateModuleVisibility(string selectedPath)
     {
-        _selectedModule = ApplicationSelector.GetLauncherModuleKey(selectedPath);
+        EnsureApplicationPathChoice(selectedPath);
+        _selectedModule = ApplicationSelector.GetLauncherModuleKey(selectedPath,
+            LegacyLauncherModuleKey.GetCurrentValue());
         SynchronizeModule(_selectedModule ?? string.Empty);
         if (_selectedModule != null)
             _ = EnsureModuleInitializedAsync(_selectedModule);
@@ -163,6 +175,20 @@ internal sealed class Settings : LauncherSettingsBase
             }
 
         UpdateOwnVisibility();
+    }
+
+    private void EnsureApplicationPathChoice(string selectedPath)
+    {
+        if (string.IsNullOrWhiteSpace(selectedPath) || selectedPath == CustomApp)
+            return;
+
+        var choices = ((ISetting)ApplicationPath).GetCurrentChoices();
+        if (choices == null || choices.Any(choice => choice.Key == selectedPath))
+            return;
+
+        var fileName = Path.GetFileName(selectedPath);
+        var label = string.IsNullOrWhiteSpace(fileName) ? selectedPath : $"{fileName} (Custom)";
+        ApplicationPath.SetChoices([new(selectedPath, label), .. choices]);
     }
 
     private void UpdateOwnVisibility()

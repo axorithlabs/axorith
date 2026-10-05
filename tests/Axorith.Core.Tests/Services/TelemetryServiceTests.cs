@@ -38,7 +38,11 @@ public sealed class TelemetryServiceTests
         Assert.Equal("update", properties.GetProperty("installMode").GetString());
         Assert.Equal("1.2.3", properties.GetProperty("currentVersion").GetString());
         Assert.Equal("1.2.2", properties.GetProperty("previousVersion").GetString());
+        Assert.Equal("Axorith.Client", properties.GetProperty("application").GetString());
         Assert.False(properties.TryGetProperty("privateValue", out _));
+
+        var identify = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "$identify");
+        Assert.False(identify.GetProperty("properties").GetProperty("$set").TryGetProperty("application", out _));
     }
 
     [Fact]
@@ -242,6 +246,8 @@ public sealed class TelemetryServiceTests
         Assert.Equal(new[] { "Gaming" }, appBlocker.GetProperty("categories").EnumerateArray()
             .Select(category => category.GetString()).ToArray());
         Assert.Equal(2, appBlocker.GetProperty("customProcessCount").GetInt32());
+        Assert.Equal(new[] { "private-process", "secret-app" }, appBlocker.GetProperty("customProcessNames")
+            .EnumerateArray().Select(value => value.GetString()).ToArray());
         Assert.Equal(3000, appBlocker.GetProperty("startDelayMs").GetInt32());
         Assert.False(appBlocker.TryGetProperty("CustomProcessList", out _));
 
@@ -250,6 +256,8 @@ public sealed class TelemetryServiceTests
         Assert.Equal(new[] { "Adult", "Forums" }, siteBlocker.GetProperty("categories").EnumerateArray()
             .Select(category => category.GetString()).ToArray());
         Assert.Equal(2, siteBlocker.GetProperty("customSiteCount").GetInt32());
+        Assert.Equal(new[] { "private.example", "secret.example" }, siteBlocker.GetProperty("customSiteDomains")
+            .EnumerateArray().Select(value => value.GetString()).ToArray());
 
         var launcher = modules.Single(module => module.GetProperty("moduleName").GetString() == "Application Launcher");
         Assert.Equal("obs", launcher.GetProperty("launcherAppType").GetString());
@@ -311,7 +319,7 @@ public sealed class TelemetryServiceTests
         var payloadText = string.Join("\n", server.Payloads);
         foreach (var sensitiveValue in new[]
                  {
-                     "private-process", "secret-app", "private.example", "never-send-this-password",
+                     "never-send-this-password",
                      "never-send-this-token", "homeassistant.private.example", "light.private_room",
                       "scene.private_scene", "private setup notes", "private preset name", "private schedule name",
                       "private module name", @"C:\private\working-directory",
@@ -373,6 +381,7 @@ public sealed class TelemetryServiceTests
         var safeModules = presetEvent.GetProperty("properties").GetProperty("modules").EnumerateArray().ToArray();
         var browser = safeModules.Single(module => module.GetProperty("launcherAppType").GetString() == "browser");
         Assert.Equal("chromium", browser.GetProperty("browserFamily").GetString());
+        Assert.Equal("private.example", browser.GetProperty("startUrlDomain").GetString());
         Assert.True(browser.GetProperty("incognitoMode").GetBoolean());
         var ide = safeModules.Single(module => module.GetProperty("launcherAppType").GetString() == "jetbrains");
         Assert.Equal("rider", ide.GetProperty("ideFamily").GetString());
@@ -393,7 +402,7 @@ public sealed class TelemetryServiceTests
 
         foreach (var sensitiveValue in new[]
                  {
-                     "private.example", "private profile", "--private", "private-rider", "private-playlist-id",
+                     "private profile", "--private", "private-rider", "private-playlist-id",
                      "private speaker", "private-game-id", @"C:\private\working-directory",
                      @"C:\private\rider-project", @"C:\private\vscode-project", "private-vscode",
                      @"C:\private\custom-app.exe"
@@ -401,6 +410,140 @@ public sealed class TelemetryServiceTests
         {
             Assert.DoesNotContain(sensitiveValue, payloadText, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task ModuleAnalytics_SendsOnlyNormalizedDetailsAndKeyedHashes()
+    {
+        await using var server = new PostHogTestServer();
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
+        var secureStorage = new InMemorySecureStorage();
+
+        ConfiguredModule Module(params (string Key, string Value)[] values)
+        {
+            var settings = values.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            return new ConfiguredModule { ModuleId = Guid.NewGuid(), InstanceId = Guid.NewGuid(), Settings = settings };
+        }
+
+        var appBlocker = ProductAnalyticsProperties.Module(Module(
+            ("CustomProcessList", "C:\\Private\\Discord.exe\nSlack.exe")), "App Blocker", secureStorage: secureStorage);
+        var siteBlocker = ProductAnalyticsProperties.Module(Module(
+            ("CustomSites", "https://reddit.com/r/cpp?q=private\nhttps://example.org/private")),
+            "Site Blocker", secureStorage: secureStorage);
+        var customLauncher = ProductAnalyticsProperties.Module(Module(
+            ("ApplicationPath", "custom-app"), ("CustomPath", @"C:\Private\custom-editor.exe"),
+            ("ProjectPath", @"C:\Private\Project"), ("UseCustomWorkingDirectory", "true"),
+            ("WorkingDirectory", @"C:\Private\Work"), ("UseCustomSize", "false"),
+            ("WindowWidth", "1280"), ("WindowHeight", "720"), ("MoveToMonitor", "true"),
+            ("TargetMonitor", "2")), "Application Launcher", secureStorage: secureStorage);
+        var browser = ProductAnalyticsProperties.Module(Module(
+            ("ApplicationPath", @"C:\Program Files\Chrome\chrome.exe"),
+            ("StartUrl", "https://forum.example.com/r/topic?q=private"), ("ProfileName", "private-profile")),
+            "Application Launcher", secureStorage: secureStorage);
+        var obs = ProductAnalyticsProperties.Module(Module(
+            ("ApplicationPath", @"C:\OBS\obs64.exe"), ("EnableWebSocket", "true"),
+            ("WebSocketPort", "5678"), ("WebSocketPassword", "private-obs-password")),
+            "Application Launcher", secureStorage: secureStorage);
+        var steam = ProductAnalyticsProperties.Module(Module(
+            ("ApplicationPath", @"C:\Steam\steam.exe"), ("SelectedGame", "570")),
+            "Application Launcher", secureStorage: secureStorage);
+        var homeAssistant = ProductAnalyticsProperties.Module(Module(
+            ("BaseUrl", "https://homeassistant.private.example"), ("AccessToken", "private-ha-token"),
+            ("StartEntityId", "light.private_room"), ("EndEntityId", "scene.private_scene")),
+            "Home Assistant", true, secureStorage);
+
+        telemetry.TrackEvent("PresetCreated", new Dictionary<string, object?>
+        {
+            ["modules"] = new[] { appBlocker, siteBlocker, customLauncher, browser, obs, steam, homeAssistant }
+        });
+        await telemetry.FlushAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+
+        var eventPayload = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "PresetCreated");
+        var modules = eventPayload.GetProperty("properties").GetProperty("modules").EnumerateArray().ToArray();
+        var safeAppBlocker = modules.Single(module => module.GetProperty("moduleName").GetString() == "App Blocker");
+        Assert.Equal(new[] { "discord", "slack" }, safeAppBlocker.GetProperty("customProcessNames")
+            .EnumerateArray().Select(value => value.GetString()).ToArray());
+        var safeSiteBlocker = modules.Single(module => module.GetProperty("moduleName").GetString() == "Site Blocker");
+        Assert.Equal(new[] { "example.org", "reddit.com" }, safeSiteBlocker.GetProperty("customSiteDomains")
+            .EnumerateArray().Select(value => value.GetString()).ToArray());
+
+        var safeCustomLauncher = modules.Single(module => module.TryGetProperty("customApplicationExecutable", out _));
+        Assert.Equal("custom-editor", safeCustomLauncher.GetProperty("customApplicationExecutable").GetString());
+        Assert.Equal(64, safeCustomLauncher.GetProperty("customApplicationPathHash").GetString()!.Length);
+        Assert.Equal(64, safeCustomLauncher.GetProperty("projectPathHash").GetString()!.Length);
+        Assert.Equal(64, safeCustomLauncher.GetProperty("workingDirectoryHash").GetString()!.Length);
+        Assert.False(safeCustomLauncher.TryGetProperty("windowWidth", out _));
+        Assert.False(safeCustomLauncher.TryGetProperty("windowHeight", out _));
+        Assert.Equal(2, safeCustomLauncher.GetProperty("targetMonitorIndex").GetInt32());
+
+        var safeBrowser = modules.Single(module => module.TryGetProperty("startUrlDomain", out _));
+        Assert.Equal("forum.example.com", safeBrowser.GetProperty("startUrlDomain").GetString());
+        Assert.Equal(64, safeBrowser.GetProperty("browserProfileHash").GetString()!.Length);
+        var safeObs = modules.Single(module => module.TryGetProperty("webSocketEnabled", out _));
+        Assert.Equal(5678, safeObs.GetProperty("webSocketPort").GetInt32());
+        Assert.True(safeObs.GetProperty("hasWebSocketPassword").GetBoolean());
+        var safeSteam = modules.Single(module => module.TryGetProperty("launcherAppType", out var appType) &&
+                                                 appType.GetString() == "steam");
+        Assert.Equal(570, safeSteam.GetProperty("selectedSteamAppId").GetInt32());
+        var safeHomeAssistant = modules.Single(module => module.GetProperty("moduleName").GetString() == "Home Assistant");
+        Assert.Equal("light", safeHomeAssistant.GetProperty("startEntityDomain").GetString());
+        Assert.Equal("scene", safeHomeAssistant.GetProperty("endEntityDomain").GetString());
+        Assert.True(safeHomeAssistant.GetProperty("hasAccessToken").GetBoolean());
+
+        var payloadText = string.Join("\n", server.Payloads);
+        foreach (var sensitiveValue in new[]
+                 {
+                     @"C:\Private\Discord.exe", "https://reddit.com/r/cpp?q=private", "forum.example.com/r/topic?q=private",
+                     "private-profile", @"C:\Private\Project", @"C:\Private\Work", @"C:\Private\custom-editor.exe",
+                     "private-obs-password", "private-ha-token", "light.private_room", "scene.private_scene"
+                 })
+        {
+            Assert.DoesNotContain(sensitiveValue, payloadText, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task FocusCommitmentAndProductState_OmitUnusedBreaksAndSetCurrentCounts()
+    {
+        await using var server = new PostHogTestServer();
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
+        var preset = new SessionPreset(Guid.NewGuid());
+        var schedule = new SessionSchedule { Id = Guid.NewGuid(), PresetId = preset.Id, IsEnabled = false };
+        telemetry.TrackEvent("$identify", new Dictionary<string, object?>
+        {
+            ["$set"] = ProductAnalyticsProperties.ProductState([preset], [schedule])
+        });
+        telemetry.TrackEvent("PresetCreated", ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment));
+        telemetry.TrackEvent("OnboardingCompleted", new Dictionary<string, object?>
+        {
+            ["createdCount"] = 3,
+            ["createdModuleTypes"] = new[] { "Developer", "Gamer", "Streamer" }
+        });
+        await telemetry.FlushAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
+
+        var events = ReadEvents(server).ToArray();
+        var identifyProperties = events.Last(item => item.GetProperty("event").GetString() == "$identify")
+            .GetProperty("properties").GetProperty("$set");
+        Assert.Equal(1, identifyProperties.GetProperty("presetCount").GetInt32());
+        Assert.Equal(1, identifyProperties.GetProperty("scheduleCount").GetInt32());
+        Assert.Equal(0, identifyProperties.GetProperty("enabledScheduleCount").GetInt32());
+        Assert.True(identifyProperties.GetProperty("hasScheduler").GetBoolean());
+        Assert.False(identifyProperties.GetProperty("hasCommittedPreset").GetBoolean());
+        Assert.False(events.Single(item => item.GetProperty("event").GetString() == "PresetCreated")
+            .GetProperty("properties").TryGetProperty("breakDurationMs", out _));
+        Assert.Equal(new[] { "Developer", "Gamer", "Streamer" }, events.Single(item =>
+                item.GetProperty("event").GetString() == "OnboardingCompleted")
+            .GetProperty("properties").GetProperty("createdModuleTypes").EnumerateArray()
+            .Select(value => value.GetString()).ToArray());
+    }
+
+    private sealed class InMemorySecureStorage : Axorith.Sdk.Services.ISecureStorageService
+    {
+        private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+
+        public void StoreSecret(string key, string secret) => _values[key] = secret;
+        public string? RetrieveSecret(string key) => _values.GetValueOrDefault(key);
+        public void DeleteSecret(string key) => _values.Remove(key);
     }
     private static TelemetryService CreateTelemetry(PostHogTestServer server, string applicationName,
         string? distinctId = null) => new(new TelemetrySettings

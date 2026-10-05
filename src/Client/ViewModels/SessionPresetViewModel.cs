@@ -111,7 +111,7 @@ public partial class SessionPresetViewModel : ReactiveObject, IDisposable
             .Select(m =>
             {
                 var def = availableModules.FirstOrDefault(md => md.Id == m.ModuleId);
-                return def != null ? new ConfiguredModuleViewModel(def, m, modulesApi, serviceProvider) : null;
+                return def != null ? new ConfiguredModuleViewModel(def, m, modulesApi, serviceProvider, model.Id) : null;
             })
             .Where(vm => vm != null);
 

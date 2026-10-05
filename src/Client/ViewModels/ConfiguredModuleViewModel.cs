@@ -23,6 +23,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private readonly IDisposable _settingUpdatesSubscription;
     private readonly ILogger<ConfiguredModuleViewModel>? _logger;
     private readonly ITelemetryService? _telemetry;
+    private readonly Guid? _presetId;
     private IDisposable? _settingStreamHandle;
     private IDisposable? _validationSubscription;
 
@@ -100,7 +101,8 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         ModuleDefinition definition,
         ConfiguredModule model,
         IModulesApi modulesApi,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        Guid? presetId = null)
     {
         Definition = definition;
         Model = model;
@@ -108,6 +110,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         _serviceProvider = serviceProvider;
         _logger = serviceProvider.GetService<ILogger<ConfiguredModuleViewModel>>();
         _telemetry = serviceProvider.GetService<ITelemetryService>();
+        _presetId = presetId;
 
         _settingUpdatesSubscription = _modulesApi.SettingUpdates
             .Where(update => update.ModuleInstanceId == Model.InstanceId)
@@ -225,6 +228,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     {
                         applicationSetting.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
                     }
+
+                    var legacyModuleKeySetting = Settings.FirstOrDefault(setting =>
+                        setting.Setting.Key == ApplicationSelector.LegacyModuleKeySetting);
+                    if (legacyModuleKeySetting != null)
+                        legacyModuleKeySetting.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
                 }
 
                 foreach (var action in settingsInfo.Actions)
@@ -238,7 +246,8 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                         Definition.Id,
                         Model.InstanceId,
                         Definition.Name,
-                        _telemetry);
+                        _telemetry,
+                        _presetId);
                     var actionViewModel = new ActionViewModel(adaptedAction);
                     if (action.SettingKey is not null)
                     {
@@ -290,9 +299,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             return;
 
         var applicationPath = Settings.FirstOrDefault(setting => setting.Setting.Key == "ApplicationPath")?.StringValue;
+        var legacyModuleKey = Settings.FirstOrDefault(setting =>
+            setting.Setting.Key == ApplicationSelector.LegacyModuleKeySetting)?.StringValue;
         var moduleKey = string.IsNullOrWhiteSpace(applicationPath)
             ? null
-            : ApplicationSelector.GetLauncherModuleKey(applicationPath);
+            : ApplicationSelector.GetLauncherModuleKey(applicationPath, legacyModuleKey);
 
         foreach (var action in Actions)
             action.SetVisible(moduleKey != null && action.Key.StartsWith($"{moduleKey}.", StringComparison.Ordinal));

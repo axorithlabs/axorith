@@ -25,7 +25,7 @@ public class SessionAutoStopService(
     private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
     private long _nextProtectionHealthCheck;
 
-    private Guid? _currentSessionId;
+    private Guid? _currentSessionInstanceId;
     private Guid? _nextPresetId;
     private DateTimeOffset? _stopAt;
     private long? _stopAtTimestamp;
@@ -42,13 +42,13 @@ public class SessionAutoStopService(
         return Task.CompletedTask;
     }
 
-    public Task StartTrackingAsync(Guid sessionId, TimeSpan? autoStopDuration, Guid? nextPresetId,
+    public Task StartTrackingAsync(Guid sessionInstanceId, TimeSpan? autoStopDuration, Guid? nextPresetId,
         CancellationToken cancellationToken = default, SessionSchedule? schedule = null)
     {
         lock (_stateLock)
         {
             StopTrackingLoopLocked();
-            _currentSessionId = sessionId;
+            _currentSessionInstanceId = sessionInstanceId;
             _nextPresetId = nextPresetId;
             _stopSchedule = schedule;
             _sentNotificationKeys.Clear();
@@ -63,13 +63,14 @@ public class SessionAutoStopService(
 
                 logger.LogInformation(
                     "Started tracking session {SessionId} with auto-stop at {StopAt} (in {Duration}). Next preset: {NextPresetId}",
-                    sessionId, _stopAt.Value, duration, nextPresetId?.ToString() ?? "none");
+                    sessionInstanceId, _stopAt.Value, duration, nextPresetId?.ToString() ?? "none");
             }
             else
             {
                 _stopAt = null;
                 _stopAtTimestamp = null;
-                logger.LogInformation("Started tracking session {SessionId} without auto-stop", sessionId);
+                logger.LogInformation("Started tracking session instance {SessionInstanceId} without auto-stop",
+                    sessionInstanceId);
             }
         }
 
@@ -231,7 +232,7 @@ public class SessionAutoStopService(
 
         lock (_stateLock)
         {
-            currentSessionId = _currentSessionId;
+            currentSessionId = _currentSessionInstanceId;
             stopAtTicks = _stopAt?.Ticks;
             nextPresetIdLocal = _nextPresetId;
         }
@@ -295,10 +296,15 @@ public class SessionAutoStopService(
             }
 
             var currentPreset = expectedSession;
-            var currentSessionId = _currentSessionId ?? currentPreset.Id;
+            Guid? trackedSessionInstanceId;
+            lock (_stateLock)
+            {
+                trackedSessionInstanceId = _currentSessionInstanceId;
+            }
+            var currentSessionInstanceId = trackedSessionInstanceId ?? sessionManager.CurrentSessionInstanceId;
 
-            logger.LogInformation("Auto-stopping session '{PresetName}' (ID: {SessionId})",
-                currentPreset.Name, currentSessionId);
+            logger.LogInformation("Auto-stopping session '{PresetName}' (instance: {SessionInstanceId})",
+                currentPreset.Name, currentSessionInstanceId);
 
             var commitment = currentPreset.FocusCommitment;
             var afterEnd = commitment.AfterEnd;
@@ -321,7 +327,8 @@ public class SessionAutoStopService(
                 if (!ended)
                 {
                     logger.LogInformation("Session ended before its natural completion handler acquired the stop lock.");
-                    TrackScheduleTriggered(schedule, "skipped", skipReason: "session_ended_before_stop");
+                    TrackScheduleTriggered(schedule, "skipped", sessionInstanceId: currentSessionInstanceId,
+                        skipReason: "session_ended_before_stop");
                     return false;
                 }
 
@@ -332,7 +339,8 @@ public class SessionAutoStopService(
                 logger.LogError(ex, "Failed to auto-stop session '{PresetName}'", currentPreset.Name);
                 await notifier.ShowSystemAsync("Auto-Stop Error",
                     $"Failed to stop session '{currentPreset.Name}': {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
-                TrackScheduleTriggered(schedule, "failed", failureReason: ProductAnalyticsProperties.FailureReason(ex));
+                TrackScheduleTriggered(schedule, "failed", sessionInstanceId: currentSessionInstanceId,
+                    failureReason: ProductAnalyticsProperties.FailureReason(ex));
                 return false;
             }
             finally
@@ -343,7 +351,7 @@ public class SessionAutoStopService(
                 }
             }
 
-            TrackScheduleTriggered(schedule, "completed");
+            TrackScheduleTriggered(schedule, "completed", sessionInstanceId: currentSessionInstanceId);
             if (nextPresetId.HasValue)
             {
                 try
@@ -364,7 +372,8 @@ public class SessionAutoStopService(
                     await notifier.ShowSystemAsync("Session Transition",
                         $"Starting '{nextPreset.Name}'...", category: "Session Auto-Stop").ConfigureAwait(false);
 
-                    await sessionManager.StartSessionAsync(nextPreset, CancellationToken.None, startSource: "chained").ConfigureAwait(false);
+                    await sessionManager.StartSessionAsync(nextPreset, CancellationToken.None, startSource: "chained",
+                        previousSessionInstanceId: currentSessionInstanceId).ConfigureAwait(false);
 
                     logger.LogInformation("Next preset '{NextPresetName}' started successfully", nextPreset.Name);
                 }
@@ -391,12 +400,12 @@ public class SessionAutoStopService(
         }
     }
 
-    private void TrackScheduleTriggered(SessionSchedule? schedule, string result, string? failureReason = null,
-        string? skipReason = null)
+    private void TrackScheduleTriggered(SessionSchedule? schedule, string result, Guid? sessionInstanceId = null,
+        string? failureReason = null, string? skipReason = null)
     {
         if (schedule is null) return;
         _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
-            "stop", result, failureReason: failureReason, skipReason: skipReason));
+            "stop", result, sessionInstanceId ?? sessionManager.CurrentSessionInstanceId, failureReason, skipReason));
     }
 
 
@@ -479,7 +488,7 @@ public class SessionAutoStopService(
 
     private void ClearTrackingStateLocked()
     {
-        _currentSessionId = null;
+        _currentSessionInstanceId = null;
         _nextPresetId = null;
         _stopAt = null;
         _stopAtTimestamp = null;
