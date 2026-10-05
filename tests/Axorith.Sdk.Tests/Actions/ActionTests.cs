@@ -17,6 +17,14 @@ public class ActionTests
     }
 
     [Fact]
+    public void SettingKeyOverloadAssociatesActionWithItsSetting()
+    {
+        var action = new Action("key", "Label", "setting-key");
+
+        action.SettingKey.Should().Be("setting-key");
+    }
+
+    [Fact]
     public void SetLabel_ShouldUpdateLabelObservable()
     {
         var action = new Action("key", "Old Label");

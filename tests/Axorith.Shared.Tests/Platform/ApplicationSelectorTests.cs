@@ -43,6 +43,15 @@ public sealed class ApplicationSelectorTests
     public void ExecutableRoutesToItsLauncherModule(string path, string? expectedModule) =>
         Assert.Equal(expectedModule, ApplicationSelector.GetLauncherModuleKey(path));
 
+    [Theory]
+    [InlineData(@"C:\Apps\custom-browser.exe", "Browser", "Browser")]
+    [InlineData(@"C:\Apps\custom-browser.exe", "Unknown", null)]
+    [InlineData("custom-app", "Browser", null)]
+    [InlineData("chrome.exe", "OBS", "Browser")]
+    public void LegacyModuleKeyPreservesOnlyValidLegacyRoutes(string path, string? legacyModuleKey,
+        string? expectedModule) =>
+        Assert.Equal(expectedModule, ApplicationSelector.GetLauncherModuleKey(path, legacyModuleKey));
+
     private sealed class TestAppDiscovery : IAppDiscoveryService
     {
         public List<AppInfo> Applications { get; }
