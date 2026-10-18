@@ -36,6 +36,7 @@ public sealed class SessionDashboardRegressionTests
                     ["Persistence:ConfigPath"] = Path.Combine(dataPath, "config"),
                     ["Persistence:PresetsPath"] = Path.Combine(dataPath, "presets"),
                     ["Persistence:LogsPath"] = Path.Combine(dataPath, "logs"),
+                    ["Persistence:HostInfoPath"] = Path.Combine(dataPath, "host-info.json"),
                     ["Modules:SearchPaths:0"] = Path.Combine(dataPath, "modules"),
                     ["Modules:SearchPaths:1"] = Path.Combine(dataPath, "empty"),
                     ["Modules:SearchPaths:2"] = Path.Combine(dataPath, "empty"),
@@ -44,9 +45,9 @@ public sealed class SessionDashboardRegressionTests
                 }));
         }
 
-        public GrpcChannel Connect(string dataPath)
+        public GrpcChannel Connect(string dataPath, params DelegatingHandler[] handlers)
         {
-            var client = CreateDefaultClient();
+            var client = CreateDefaultClient(handlers);
             var token = File.ReadAllText(Path.Combine(dataPath, "config", ".auth_token"));
             return TestGrpc.CreateAuthenticatedChannel(client, token);
         }
@@ -165,13 +166,17 @@ public sealed class SessionDashboardRegressionTests
         Assert.InRange(vm.FocusActivityValues.Sum(), 10, 11);
     }
 
-    [AvaloniaFact]
-    public async Task AppPickerPersistsNewlineListAndClosesProcessesLaunchedAfterSessionStart()
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AppPickerPersistsNewlineListAndClosesProcessesLaunchedAfterSessionStart(bool slowSettings)
     {
         var dataPath = Path.Combine(Path.GetTempPath(), "AxorithBlocker", Guid.NewGuid().ToString("N"));
         var moduleId = InstallModule(dataPath, typeof(Axorith.Module.AppBlocker.Module), "App Blocker");
         await using var host = new RealHost(dataPath);
-        using var channel = host.Connect(dataPath);
+        using var channel = slowSettings
+            ? host.Connect(dataPath, new SlowModuleSettingsHandler())
+            : host.Connect(dataPath);
         using var api = new GrpcModulesApi(new ModulesService.ModulesServiceClient(channel),
             Policy.Handle<Exception>().RetryAsync(0), NullLogger.Instance);
         using var services = new ServiceCollection().BuildServiceProvider();
@@ -241,6 +246,20 @@ public sealed class SessionDashboardRegressionTests
         File.WriteAllText(path, "broken history");
         Assert.Throws<System.Text.Json.JsonException>(() => store.Add(new SessionActivity(midnight, midnight.AddHours(1), "New")));
         Assert.Equal("broken history", File.ReadAllText(path));
+    }
+
+    private sealed class SlowModuleSettingsHandler : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var delay = request.RequestUri!.AbsolutePath.EndsWith("/BeginEdit", StringComparison.Ordinal)
+                ? Task.Delay(TimeSpan.FromSeconds(4), cancellationToken)
+                : Task.CompletedTask;
+            var response = await base.SendAsync(request, cancellationToken);
+            await delay;
+            return response;
+        }
     }
 
     private static Guid InstallModule(string dataPath, Type moduleType, string name)
