@@ -165,37 +165,8 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             }
 
             var streamTask = _modulesApi.SubscribeToSettingUpdatesAsync(Model.InstanceId);
-            var beginTask = _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot);
-
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(3));
-            BeginEditResult? beginResult = null;
-
-            var completed = await Task.WhenAny(beginTask, timeoutTask).ConfigureAwait(false);
-            if (completed == beginTask)
-            {
-                beginResult = await beginTask.ConfigureAwait(false);
-            }
-            else
-            {
-                var cached = _modulesApi.GetCachedSettings(Definition.Id);
-                if (cached != null)
-                {
-                    beginResult = new BeginEditResult(
-                        cached,
-                        new OperationResult(true, "Used cached module settings"));
-                }
-            }
-
-            if (beginResult == null)
-            {
-                // Do not block indefinitely: surface a degraded result and observe completion separately
-                _ = beginTask.ContinueWith(task => _ = task.Exception, CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
-                beginResult = new BeginEditResult(
-                    new ModuleSettingsInfo([], []),
-                    new OperationResult(false, "BeginEdit timed out; using empty settings"));
-            }
+            var beginResult = await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
+                .ConfigureAwait(false);
 
             streamHandle = await streamTask.ConfigureAwait(false);
             _settingStreamHandle = streamHandle;
