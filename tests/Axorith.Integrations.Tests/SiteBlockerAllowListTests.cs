@@ -74,15 +74,29 @@ public sealed class SiteBlockerAllowListTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var pipeRequests = ServeChromeExtensionAsync(timeout.Token);
 
-        var validation = await module.ValidateSettingsAsync(timeout.Token);
-        Assert.Equal(ValidationStatus.Ok, validation.Status);
-        Assert.True(await module.CanStartCommittedSessionAsync(timeout.Token));
-        await module.OnSessionStartAsync(timeout.Token);
-        Assert.True(await module.IsProtectionHealthyAsync(timeout.Token));
-        await module.OnSessionEndAsync(timeout.Token);
-        timeout.Cancel();
+        List<ExtensionRequest> requests;
+        try
+        {
+            var validation = await module.ValidateSettingsAsync(timeout.Token);
+            Assert.Equal(ValidationStatus.Ok, validation.Status);
+            Assert.True(await module.CanStartCommittedSessionAsync(timeout.Token), module.ProtectionStatusMessage);
+            await module.OnSessionStartAsync(timeout.Token);
+            for (var check = 0; check < 3; check++)
+                Assert.True(await module.IsProtectionHealthyAsync(timeout.Token), module.ProtectionStatusMessage);
+        }
+        finally
+        {
+            try
+            {
+                await module.OnSessionEndAsync(CancellationToken.None);
+            }
+            finally
+            {
+                timeout.Cancel();
+                requests = await pipeRequests;
+            }
+        }
 
-        var requests = await pipeRequests;
         var blockRequests = requests.Where(request => request.Command == "block").ToArray();
         Assert.NotEmpty(blockRequests);
         Assert.All(blockRequests, request =>
@@ -98,50 +112,59 @@ public sealed class SiteBlockerAllowListTests
     private static async Task<List<ExtensionRequest>> ServeChromeExtensionAsync(CancellationToken cancellationToken)
     {
         var requests = new List<ExtensionRequest>();
-        while (!cancellationToken.IsCancellationRequested)
+        var listeningPipe = CreateChromeExtensionPipe();
+        try
         {
-            await using var pipe = new NamedPipeServerStream("axorith-nm-pipe-chrome", PipeDirection.InOut, 1,
-                PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-            try
+            while (!cancellationToken.IsCancellationRequested)
             {
+                await using var pipe = listeningPipe;
                 await pipe.WaitForConnectionAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
 
-            using var reader = new StreamReader(pipe, new UTF8Encoding(false), false, 1024, leaveOpen: true);
-            using var writer = new StreamWriter(pipe, new UTF8Encoding(false), 1024, leaveOpen: true) { AutoFlush = true };
-            var requestText = await reader.ReadLineAsync(cancellationToken);
-            if (requestText == null)
-            {
-                continue;
-            }
+                // Keep a listener available before replying so the next request cannot race pipe recreation.
+                listeningPipe = CreateChromeExtensionPipe();
 
-            using var document = JsonDocument.Parse(requestText);
-            var root = document.RootElement;
-            var command = root.GetProperty("command").GetString()!;
-            var request = new ExtensionRequest(command,
-                root.TryGetProperty("mode", out var mode) ? mode.GetString() : null,
-                root.TryGetProperty("sites", out var sites)
-                    ? sites.EnumerateArray().Select(site => site.GetString()!).ToArray()
-                    : []);
-            requests.Add(request);
-            await writer.WriteLineAsync(JsonSerializer.Serialize(new
-            {
-                requestId = root.GetProperty("requestId").GetString(),
-                protocolVersion = 1,
-                status = "Connected",
-                browser = "chromium",
-                ok = true,
-                blocking = command == "block",
-                version = "test"
-            }));
+                using var reader = new StreamReader(pipe, new UTF8Encoding(false), false, 1024, leaveOpen: true);
+                using var writer = new StreamWriter(pipe, new UTF8Encoding(false), 1024, leaveOpen: true) { AutoFlush = true };
+                var requestText = await reader.ReadLineAsync(cancellationToken);
+                if (requestText == null)
+                {
+                    continue;
+                }
+
+                using var document = JsonDocument.Parse(requestText);
+                var root = document.RootElement;
+                var command = root.GetProperty("command").GetString()!;
+                var request = new ExtensionRequest(command,
+                    root.TryGetProperty("mode", out var mode) ? mode.GetString() : null,
+                    root.TryGetProperty("sites", out var sites)
+                        ? sites.EnumerateArray().Select(site => site.GetString()!).ToArray()
+                        : []);
+                requests.Add(request);
+                await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                {
+                    requestId = root.GetProperty("requestId").GetString(),
+                    protocolVersion = 1,
+                    status = "Connected",
+                    browser = "chromium",
+                    ok = true,
+                    blocking = command == "block",
+                    version = "test"
+                }).AsMemory(), cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            await listeningPipe.DisposeAsync();
         }
 
         return requests;
     }
+
+    private static NamedPipeServerStream CreateChromeExtensionPipe() =>
+        new("axorith-nm-pipe-chrome", PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
     private sealed record ExtensionRequest(string Command, string? Mode, string[] Sites);
 

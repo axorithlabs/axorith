@@ -7,6 +7,13 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Include="..\..\src\Modules\SiteBlocker\BrowserExtension\**\*"
+              Exclude="..\..\src\Modules\SiteBlocker\BrowserExtension\**\*.zip"
+              Link="BrowserExtension\%(RecursiveDir)%(Filename)%(Extension)"
+              CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\Contracts\Axorith.Contracts.csproj" />
         <ProjectReference Include="..\..\src\Host\Axorith.Host.csproj" />
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />

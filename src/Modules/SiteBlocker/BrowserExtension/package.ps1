@@ -7,7 +7,8 @@ param(
 $root = $PSScriptRoot
 $browserDir = Join-Path $root $Browser
 $commonDir = Join-Path $root "Common"
-$output = Join-Path $browserDir ("site-blocker-extension-{0}.zip" -f $Browser.ToLowerInvariant())
+$archiveName = if ($Browser -eq "Chrome") { "chrome-extension-latest.zip" } else { "site-blocker-extension-firefox.zip" }
+$output = Join-Path $browserDir $archiveName
 $staging = Join-Path ([IO.Path]::GetTempPath()) ("axorith-site-blocker-" + [guid]::NewGuid())
 
 try {

@@ -189,7 +189,7 @@ jobs:
         shell: pwsh
         run: |
           ./src/Modules/SiteBlocker/BrowserExtension/package.ps1 -Browser Chrome
-          Copy-Item ./src/Modules/SiteBlocker/BrowserExtension/Chrome/site-blocker-extension-chrome.zip ./release-assets/chrome-extension-latest.zip
+          Copy-Item ./src/Modules/SiteBlocker/BrowserExtension/Chrome/chrome-extension-latest.zip ./release-assets/
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
