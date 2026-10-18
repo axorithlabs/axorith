@@ -387,7 +387,7 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
             {
                 ModuleId = factory.SiteBlockerModuleId.ToString()
             });
-            Assert.DoesNotContain(siteBlockerSettings.Actions, action => action.Key == "InstallExtension.Chrome");
+            Assert.Contains(siteBlockerSettings.Actions, action => action.Key == "InstallExtension.Chrome");
         }
     }
 

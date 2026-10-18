@@ -59,7 +59,26 @@ public sealed class ApplicationLauncherExecutionTests
             }
 
             module.Dispose();
-            Directory.Delete(directory, recursive: true);
+            await DeleteDirectoryAsync(directory);
+        }
+    }
+
+    private static async Task DeleteDirectoryAsync(string directory)
+    {
+        var timer = Stopwatch.StartNew();
+        while (true)
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+                return;
+            }
+            catch (Exception ex) when ((ex is IOException or UnauthorizedAccessException) &&
+                                       timer.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                // Windows can briefly keep the executable locked after the process exits.
+                await Task.Delay(50);
+            }
         }
     }
 
