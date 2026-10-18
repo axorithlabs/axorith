@@ -28,18 +28,14 @@ internal sealed class DiscordApp(
     private async Task WaitForDiscordMainWindowAsync(CancellationToken cancellationToken)
     {
         if (CurrentProcess is null or { HasExited: true })
-        {
             return;
-        }
 
         var deadline = DateTime.UtcNow.AddMilliseconds(MaxWindowWaitMs);
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (CurrentProcess.HasExited)
-            {
                 return;
-            }
 
             CurrentProcess.Refresh();
             if (CurrentProcess.MainWindowHandle != IntPtr.Zero && !IsLoadingTitle(CurrentProcess.MainWindowTitle))
@@ -59,15 +55,11 @@ internal sealed class DiscordApp(
         {
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             if (CurrentProcess is null or { HasExited: true })
-            {
                 return;
-            }
 
             CurrentProcess.Refresh();
             if (CurrentProcess.MainWindowHandle != IntPtr.Zero && !IsLoadingTitle(CurrentProcess.MainWindowTitle))
-            {
                 return;
-            }
 
             delay = Math.Min(delay * 2, MaxPostWindowDelayMs);
         }

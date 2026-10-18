@@ -174,9 +174,7 @@ public class GrpcCoreConnection : ICoreConnection
     public async Task DisconnectAsync()
     {
         if (State == ConnectionState.Disconnected)
-        {
             return;
-        }
 
         _logger.LogInformation("Disconnecting from {Address}", _serverAddress);
 
@@ -189,15 +187,9 @@ public class GrpcCoreConnection : ICoreConnection
 
     private async Task DisposeChannelAsync()
     {
-        if (_sessionsApi is IDisposable sessionsDisposable)
-        {
-            sessionsDisposable.Dispose();
-        }
+        if (_sessionsApi is IDisposable sessionsDisposable) sessionsDisposable.Dispose();
 
-        if (_modulesApi is IDisposable modulesDisposable)
-        {
-            modulesDisposable.Dispose();
-        }
+        if (_modulesApi is IDisposable modulesDisposable) modulesDisposable.Dispose();
 
         _presetsApi = null;
         _sessionsApi = null;
@@ -227,9 +219,7 @@ public class GrpcCoreConnection : ICoreConnection
     private void SetState(ConnectionState newState)
     {
         if (_stateSubject.Value == newState)
-        {
             return;
-        }
 
         _logger.LogDebug("Connection state changed: {OldState} -> {NewState}",
             _stateSubject.Value, newState);
@@ -239,9 +229,7 @@ public class GrpcCoreConnection : ICoreConnection
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
-        {
             return;
-        }
 
         _disposed = true;
 

@@ -13,9 +13,7 @@ public static class CommitmentStatePaths
     public static string Resolve(string fallbackDirectory, bool secure = true, bool migrateLegacy = true)
     {
         if (!OperatingSystem.IsWindows())
-        {
             return fallbackDirectory;
-        }
 
         if (!secure)
         {
@@ -55,9 +53,7 @@ public static class CommitmentStatePaths
         {
             var path = Path.Combine(directory, name);
             if (!File.Exists(path))
-            {
                 continue;
-            }
 
             var payload = CommittedSessionStateFile.ReadPayloadOrLegacy(path);
             if (payload == File.ReadAllText(path))

@@ -31,11 +31,19 @@ public class UpdateService : IDisposable
         #if DEBUG
         _isEnabled = false;
         _logger.LogInformation("Update service disabled in DEBUG mode");
-        _initialCheckComplete.TrySetResult();
-        _timer = new PeriodicTimer(TimeSpan.FromHours(24));
-        _httpClient = new HttpClient();
         #else
-        _isEnabled = true;
+        _isEnabled = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") != "1";
+        if (!_isEnabled)
+            _logger.LogInformation("Update service disabled in test mode");
+        #endif
+
+        if (!_isEnabled)
+        {
+            _initialCheckComplete.TrySetResult();
+            _timer = new PeriodicTimer(TimeSpan.FromHours(24));
+            _httpClient = new HttpClient();
+            return;
+        }
 
         _httpClient = new HttpClient
         {
@@ -47,7 +55,6 @@ public class UpdateService : IDisposable
         _timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
 
         _ = Task.Run(CheckForUpdatesLoopAsync);
-        #endif
     }
 
     public async Task WaitForInitialCheckAsync(CancellationToken ct = default)

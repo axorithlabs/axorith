@@ -35,11 +35,9 @@ public abstract class ScheduledTriggerViewModel : TriggerViewModel
 
 public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : ScheduledTriggerViewModel
 {
-    private TimeSpan _time = defaultTime;
     private decimal? _hours = defaultTime.Hours;
     private decimal? _minutes = defaultTime.Minutes;
     private bool _isAm = defaultTime.Hours < 12;
-    private bool _use24HourFormat = true;
     private bool _isUpdatingTime;
 
     public override string IconKey => "TimerIcon";
@@ -62,14 +60,14 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
 
     public TimeSpan Time
     {
-        get => _time;
+        get => field;
         set
         {
-            this.RaiseAndSetIfChanged(ref _time, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             UpdateTimeInputs();
             this.RaisePropertyChanged(nameof(Description));
         }
-    }
+    } = defaultTime;
 
     public decimal? Hours { get => _hours; set => SetTimePart(ref _hours, value); }
 
@@ -82,10 +80,7 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
         get => _isAm;
         set
         {
-            if (_isAm == value)
-            {
-                return;
-            }
+            if (_isAm == value) return;
 
             this.RaiseAndSetIfChanged(ref _isAm, value);
             UpdateTimeFromInputs();
@@ -94,19 +89,16 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
 
     public bool Use24HourFormat
     {
-        get => _use24HourFormat;
+        get => field;
         set
         {
-            if (_use24HourFormat == value)
-            {
-                return;
-            }
+            if (field == value) return;
 
-            this.RaiseAndSetIfChanged(ref _use24HourFormat, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             UpdateTimeInputs();
             this.RaisePropertyChanged(nameof(Description));
         }
-    }
+    } = true;
 
     [Reactive(nameof(Description))]
     public partial bool RunOnMonday { get; set; } = true;
@@ -170,10 +162,7 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
 
     private void UpdateTimeInputs()
     {
-        if (_isUpdatingTime)
-        {
-            return;
-        }
+        if (_isUpdatingTime) return;
 
         _isUpdatingTime = true;
         try
@@ -204,10 +193,7 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
 
     private void UpdateTimeFromInputs()
     {
-        if (_isUpdatingTime || !_hours.HasValue || !_minutes.HasValue)
-        {
-            return;
-        }
+        if (_isUpdatingTime || !_hours.HasValue || !_minutes.HasValue) return;
 
         _isUpdatingTime = true;
         try
@@ -272,14 +258,12 @@ public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
         }
     } = TimeSpan.FromHours(1);
 
-    private decimal? _durationHours = 1;
-    public decimal? DurationHours { get => _durationHours; set => SetDurationPart(ref _durationHours, value); }
+    public decimal? DurationHours { get => field; set => SetDurationPart(ref field, value); } = 1;
 
-    private decimal? _durationMinutes = 0;
-    public decimal? DurationMinutes { get => _durationMinutes; set => SetDurationPart(ref _durationMinutes, value); }
+    public decimal? DurationMinutes { get => field; set => SetDurationPart(ref field, value); } = 0;
 
-    public bool HasDurationError => !_durationHours.HasValue || !_durationMinutes.HasValue ||
-                                    ((int)(_durationHours ?? 0) == 0 && (int)(_durationMinutes ?? 0) == 0);
+    public bool HasDurationError => !DurationHours.HasValue || !DurationMinutes.HasValue ||
+                                    ((int)(DurationHours ?? 0) == 0 && (int)(DurationMinutes ?? 0) == 0);
 
     public override bool HasError => HasDurationError;
 
@@ -289,9 +273,9 @@ public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
         this.RaisePropertyChanged(nameof(HasDurationError));
         this.RaisePropertyChanged(nameof(HasError));
         this.RaisePropertyChanged(nameof(Description));
-        if (_durationHours.HasValue && _durationMinutes.HasValue)
+        if (DurationHours.HasValue && DurationMinutes.HasValue)
         {
-            Duration = TimeSpan.FromHours((int)_durationHours.Value) + TimeSpan.FromMinutes((int)_durationMinutes.Value);
+            Duration = TimeSpan.FromHours((int)DurationHours.Value) + TimeSpan.FromMinutes((int)DurationMinutes.Value);
         }
     }
 }
@@ -693,10 +677,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
         AddThenActionTriggerCommand = ReactiveCommand.Create<AfterEndBehavior>(behavior =>
         {
-            if (behavior is AfterEndBehavior.DoNothing || !Enum.IsDefined(behavior))
-            {
-                return;
-            }
+            if (behavior is AfterEndBehavior.DoNothing || !Enum.IsDefined(behavior)) return;
 
             AddThenTrigger(behavior);
         }, canAddThenAction);
@@ -910,10 +891,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             {
                 trigger.SelectedNextPreset = preset;
             }
-            else
-            {
-                _ = LoadThenPresetNameAsync(trigger, id);
-            }
+            else _ = LoadThenPresetNameAsync(trigger, id);
         }
 
         ThenTriggers.Add(trigger);
@@ -987,10 +965,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        if (!ValidateFocusCommitment(applyOptions: true))
-        {
-            return;
-        }
+        if (!ValidateFocusCommitment(applyOptions: true)) return;
 
         ErrorMessage = string.Empty;
         _preset.Modules =
@@ -1011,15 +986,12 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             {
                 await _presetsApi.UpdatePresetAsync(_preset);
             }
-            else
-            {
-                await _presetsApi.CreatePresetAsync(_preset);
-            }
+            else await _presetsApi.CreatePresetAsync(_preset);
 
             var existingSchedules = await _schedulerApi.ListSchedulesAsync();
             var presetSchedules = existingSchedules.Where(s => s.PresetId == _preset.Id).ToList();
 
-            var activeTriggerIds = new HashSet<Guid>();
+            HashSet<Guid> activeTriggerIds = [];
 
             var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
             var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
@@ -1102,10 +1074,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         {
             await _schedulerApi.UpdateScheduleAsync(schedule);
         }
-        else
-        {
-            await _schedulerApi.CreateScheduleAsync(schedule);
-        }
+        else await _schedulerApi.CreateScheduleAsync(schedule);
 
         activeTriggerIds.Add(schedule.Id);
     }
@@ -1243,10 +1212,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 

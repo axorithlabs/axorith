@@ -36,10 +36,7 @@ public class ModuleRegistry(
 
         foreach (var def in definitionsList)
         {
-            if (definitionsMap.TryAdd(def.Id, def))
-            {
-                continue;
-            }
+            if (definitionsMap.TryAdd(def.Id, def)) continue;
 
             var existing = definitionsMap[def.Id];
             logger.LogWarning(
@@ -63,14 +60,11 @@ public class ModuleRegistry(
 
         logger.LogInformation("Disposing ModuleRegistry and initiating module unload...");
 
-        var contextsToTrack = new List<(string Name, WeakReference<AssemblyLoadContext> Ref)>();
+        List<(string Name, WeakReference<AssemblyLoadContext> Ref)> contextsToTrack = [];
 
         foreach (var definition in _definitions.Values)
         {
-            if (definition.LoadContext?.IsCollectible != true)
-            {
-                continue;
-            }
+            if (definition.LoadContext?.IsCollectible != true) continue;
 
             try
             {
@@ -111,10 +105,7 @@ public class ModuleRegistry(
 
             contexts.RemoveAll(c => !c.Ref.TryGetTarget(out _));
 
-            if (contexts.Count != 0)
-            {
-                continue;
-            }
+            if (contexts.Count != 0) continue;
 
             logger.LogDebug("All module contexts unloaded successfully.");
             return;

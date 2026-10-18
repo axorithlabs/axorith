@@ -141,9 +141,7 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
         if (_lastNotificationTime.TryGetValue(processName, out var lastTime))
         {
             if (now - lastTime < _notificationCooldown)
-            {
                 return;
-            }
         }
 
         _lastNotificationTime[processName] = now;

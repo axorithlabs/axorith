@@ -50,9 +50,7 @@ public class DesktopNotificationManager(
         var screen = desktop.MainWindow?.Screens.Primary ?? desktop.MainWindow?.Screens.All.FirstOrDefault();
 
         if (screen == null)
-        {
             return;
-        }
 
         var workingArea = screen.WorkingArea;
         var currentY = workingArea.Bottom - MarginBottom;

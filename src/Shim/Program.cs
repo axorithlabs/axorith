@@ -128,14 +128,10 @@ internal static class Program
                 var firstRead = await input.ReadAsync(header.AsMemory(0, header.Length), shutdown.Token)
                     .ConfigureAwait(false);
                 if (firstRead == 0)
-                {
                     break;
-                }
 
                 if (firstRead < header.Length)
-                {
                     await input.ReadExactlyAsync(header.AsMemory(firstRead), shutdown.Token).ConfigureAwait(false);
-                }
 
                 var messageLength = BinaryPrimitives.ReadInt32LittleEndian(header);
                 if (messageLength <= 0 || messageLength > MaxNativeMessageBytes)
@@ -173,9 +169,11 @@ internal static class Program
         var browser = args.FirstOrDefault(arg => arg.StartsWith("--browser=", StringComparison.OrdinalIgnoreCase))?
             .Split('=', 2)[1].ToLowerInvariant();
         if (browser is "chrome" or "edge" or "chromium" or "firefox")
-        {
             return $"axorith-nm-pipe-{browser}";
-        }
+
+        // shortcut: Chromium origins default to Chrome; other Chromium launchers must supply --browser.
+        if (args.Any(arg => arg.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase)))
+            return "axorith-nm-pipe-chrome";
 
         // Firefox passes the add-on ID as an argument; manifest "args" are not passed to the host.
         return args.Any(arg => string.Equals(arg, SiteBlockerExtensionIds.Firefox, StringComparison.OrdinalIgnoreCase))
@@ -239,15 +237,10 @@ internal static class Program
     private static async Task StopLogFlusherAsync()
     {
         if (_logFlushCts == null)
-        {
             return;
-        }
 
         _logFlushCts.Cancel();
-        if (_logFlushTask != null)
-        {
-            await _logFlushTask.ConfigureAwait(false);
-        }
+        if (_logFlushTask != null) await _logFlushTask.ConfigureAwait(false);
 
         await FlushLogsAsync().ConfigureAwait(false);
         _logFlushCts.Dispose();
@@ -258,9 +251,7 @@ internal static class Program
     private static async Task FlushLogsAsync()
     {
         if (LogQueue.IsEmpty)
-        {
             return;
-        }
 
         await LogSemaphore.WaitAsync();
         try
@@ -281,10 +272,7 @@ internal static class Program
                 batch.AppendLine(logEntry);
             }
 
-            if (batch.Length > 0)
-            {
-                await File.AppendAllTextAsync(errorLogPath, batch.ToString());
-            }
+            if (batch.Length > 0) await File.AppendAllTextAsync(errorLogPath, batch.ToString());
         }
         catch
         {
@@ -309,9 +297,7 @@ internal static class Program
         LogQueue.Enqueue(errorMessage);
 
         if (LogQueue.Count > 100)
-        {
             return FlushLogsAsync();
-        }
 
         return Task.CompletedTask;
     }

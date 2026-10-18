@@ -72,14 +72,12 @@ public class PresetsServiceImpl(
 
     public override async Task<Preset> CreatePreset(CreatePresetRequest request, ServerCallContext context)
     {
-        if (request.Preset == null)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
-        }
+        var requestPreset = request.Preset ?? throw new RpcException(
+            new Status(StatusCode.InvalidArgument, "Preset is required"));
 
-        logger.LogDebug("CreatePreset called: {PresetName}", request.Preset.Name);
+        logger.LogDebug("CreatePreset called: {PresetName}", requestPreset.Name);
 
-        var preset = PresetCodec.ToModel(request.Preset);
+        var preset = PresetCodec.ToModel(requestPreset);
         await EnsurePresetNameAvailableAsync(preset, allowSameId: false, context.CancellationToken)
             .ConfigureAwait(false);
 
@@ -107,22 +105,20 @@ public class PresetsServiceImpl(
 
     public override async Task<Preset> UpdatePreset(UpdatePresetRequest request, ServerCallContext context)
     {
-        if (request.Preset == null)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Preset is required"));
-        }
+        var requestPreset = request.Preset ?? throw new RpcException(
+            new Status(StatusCode.InvalidArgument, "Preset is required"));
 
-        if (!Guid.TryParse(request.Preset.Id, out var presetId) || presetId == Guid.Empty)
+        if (!Guid.TryParse(requestPreset.Id, out var presetId) || presetId == Guid.Empty)
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument,
-                $"Invalid preset ID: {request.Preset.Id}"));
+                $"Invalid preset ID: {requestPreset.Id}"));
         }
 
         logger.LogDebug("UpdatePreset called for {PresetId}", presetId);
 
         await EnsurePresetMutableAsync(presetId, context.CancellationToken).ConfigureAwait(false);
 
-        var preset = PresetCodec.ToModel(request.Preset);
+        var preset = PresetCodec.ToModel(requestPreset);
         var previousPreset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
             .ConfigureAwait(false);
         if (previousPreset is not null) previousPreset = new SessionPreset(previousPreset);
@@ -187,10 +183,7 @@ public class PresetsServiceImpl(
 
         var status = await scheduleManager.GetConfigurationLockStatusAsync(presetId, cancellationToken)
             .ConfigureAwait(false);
-        if (!status.IsLocked)
-        {
-            return;
-        }
+        if (!status.IsLocked) return;
 
         var time = status.StartsIn is { } remaining && remaining > TimeSpan.Zero
             ? $"Session starts in {(int)Math.Ceiling(remaining.TotalMinutes)} min"

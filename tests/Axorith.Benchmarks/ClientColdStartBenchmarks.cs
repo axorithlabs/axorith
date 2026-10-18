@@ -5,18 +5,18 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Axorith.Contracts;
-using Axorith.Shared.Platform.Windows;
 using BenchmarkDotNet.Attributes;
 using Grpc.Core;
 using Grpc.Net.Client;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axorith.Benchmarks;
 
 public class ClientColdStartBenchmarks
 {
     private const string HostMutexName = "Global\\AxorithHostInstanceMutex";
+    private const string TestHostMutexName = "Global\\AxorithTestHostInstanceMutex";
     private const string ReadyMessage = "Axorith Client initialization sequence complete.";
+
     private readonly object _outputLock = new();
     private readonly StringBuilder _clientOutput = new();
     private string _installDirectory = null!;
@@ -63,14 +63,22 @@ public class ClientColdStartBenchmarks
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("A real Client process and visible window require Windows.");
 
-        var buildDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
-        _installDirectory = Path.Combine(BenchmarkEnvironment.Root, "client-installation");
+        _installDirectory = Path.Combine(BenchmarkEnvironment.Root, "client-installation",
+            Guid.NewGuid().ToString("N"));
         _clientDirectory = Path.Combine(_installDirectory, "Axorith.Client");
         _hostDirectory = Path.Combine(_installDirectory, "Axorith.Host");
         _modulesDirectory = Path.Combine(_installDirectory, "Modules");
-        BenchmarkEnvironment.CopyDirectory(Path.Combine(buildDirectory, "Axorith.Client"), _clientDirectory);
-        BenchmarkEnvironment.CopyDirectory(Path.Combine(buildDirectory, "Axorith.Host"), _hostDirectory);
-        BenchmarkEnvironment.CopyDirectory(Path.Combine(buildDirectory, "Modules"), _modulesDirectory);
+        BenchmarkEnvironment.CopyDirectory(BenchmarkEnvironment.ProjectOutputDirectory("Axorith.Client"),
+            _clientDirectory);
+        BenchmarkEnvironment.CopyDirectory(BenchmarkEnvironment.ProjectOutputDirectory("Axorith.Host"),
+            _hostDirectory);
+        if (!File.ReadAllBytes(Path.Combine(_clientDirectory, "Axorith.Client.dll")).AsSpan()
+                .SequenceEqual(File.ReadAllBytes(typeof(Axorith.Client.App).Assembly.Location)) ||
+            !File.ReadAllBytes(Path.Combine(_hostDirectory, "Axorith.Host.dll")).AsSpan()
+                .SequenceEqual(File.ReadAllBytes(typeof(global::Program).Assembly.Location)))
+            throw new InvalidOperationException("Startup benchmarks must run the same Client and Host build as the benchmark runner.");
+        BenchmarkEnvironment.CopyDirectory(Path.Combine(BenchmarkEnvironment.BuildOutputDirectory, "Modules"),
+            _modulesDirectory);
 
         _profileDirectory = Path.Combine(BenchmarkEnvironment.Root, "client-profile", Guid.NewGuid().ToString("N"));
         _roamingRoot = Path.Combine(_profileDirectory, "AppData", "Roaming", "Axorith");
@@ -80,21 +88,6 @@ public class ClientColdStartBenchmarks
         _hostInfoPath = Path.Combine(_roamingRoot, "host-info.json");
         _tokenPath = Path.Combine(_configDirectory, ".auth_token");
         _clientLogDirectory = _logsDirectory;
-        Directory.CreateDirectory(_configDirectory);
-        Directory.CreateDirectory(_logsDirectory);
-        Directory.CreateDirectory(_localRoot);
-        File.WriteAllText(Path.Combine(_configDirectory, "telemetry-preference.txt"), "false");
-
-        var autostartEnabled = OperatingSystem.IsWindows() &&
-                               new WindowsAutoStartManager(NullLogger.Instance).IsAutoStartEnabled;
-        File.WriteAllText(Path.Combine(_configDirectory, "clientsettings.json"), JsonSerializer.Serialize(new
-        {
-            AutoStartEnabled = autostartEnabled,
-            AutoStartMinimized = true,
-            TelemetryEnabled = false,
-            MinimizeToTrayOnClose = false
-        }));
-
         _hostPort = GetAvailablePort();
         var hostStartInfo = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
         {
@@ -117,12 +110,30 @@ public class ClientColdStartBenchmarks
         hostStartInfo.Environment["DOTNET_ENVIRONMENT"] = "Development";
         hostStartInfo.Environment["DOTNET_NOLOGO"] = "1";
         hostStartInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+        hostStartInfo.Environment["AXORITH_TEST_MODE"] = "1";
+        hostStartInfo.Environment["Logging__LogLevel__Default"] = "Information";
+        hostStartInfo.Environment["Logging__LogLevel__Microsoft.AspNetCore"] = "Warning";
+        hostStartInfo.Environment["Logging__LogLevel__Grpc"] = "Information";
+        hostStartInfo.Environment["Serilog__MinimumLevel__Default"] = "Debug";
+        hostStartInfo.Environment["Serilog__MinimumLevel__Override__Microsoft"] = "Warning";
+        hostStartInfo.Environment["Serilog__MinimumLevel__Override__Microsoft.AspNetCore"] = "Warning";
+        hostStartInfo.Environment["Serilog__MinimumLevel__Override__Grpc"] = "Information";
 
         _hostProcess = Process.Start(hostStartInfo)
                        ?? throw new InvalidOperationException("Could not start the benchmark Host process.");
         _hostStdout = _hostProcess.StandardOutput.ReadToEndAsync();
         _hostStderr = _hostProcess.StandardError.ReadToEndAsync();
         await ConnectToHealthyHostAsync();
+    }
+
+    [IterationSetup(Target = nameof(ClientColdStartToConnectedMainWindow))]
+    public void PrepareClientProfile()
+    {
+        if (!Directory.Exists(_clientLogDirectory))
+            return;
+
+        foreach (var logFile in Directory.EnumerateFiles(_clientLogDirectory, "client-*.log"))
+            File.Delete(logFile);
     }
 
     [Benchmark]
@@ -142,6 +153,7 @@ public class ClientColdStartBenchmarks
         };
         ConfigureProfileEnvironment(startInfo.Environment);
         startInfo.Environment["DOTNET_NOLOGO"] = "1";
+        startInfo.Environment["AXORITH_TEST_MODE"] = "1";
         startInfo.ArgumentList.Add($"--Host:Port={_hostPort}");
 
         _clientProcess = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
@@ -386,7 +398,10 @@ public class ClientColdStartBenchmarks
 
         try
         {
-            using var mutex = Mutex.OpenExisting(HostMutexName);
+            var mutexName = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1"
+                ? Environment.GetEnvironmentVariable("AXORITH_TEST_HOST_MUTEX") ?? TestHostMutexName
+                : HostMutexName;
+            using var mutex = Mutex.OpenExisting(mutexName);
             throw new InvalidOperationException("Stop the running Axorith.Host before measuring Client startup.");
         }
         catch (WaitHandleCannotBeOpenedException)

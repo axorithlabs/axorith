@@ -152,7 +152,14 @@ public static partial class ProductAnalyticsProperties
             ["scheduleId"] = schedule.Id,
             ["presetId"] = schedule.PresetId,
             ["enabled"] = schedule.IsEnabled,
-            ["scheduleType"] = NormalizeScheduleType(schedule.Type),
+            ["scheduleType"] = schedule.Type switch
+            {
+                ScheduleType.OneTime => "one_time",
+                ScheduleType.Recurring => "recurring_start",
+                ScheduleType.StopRecurring => "recurring_stop",
+                ScheduleType.StopDuration => "duration_stop",
+                _ => "unknown"
+            },
             ["daysOfWeek"] = days,
             ["daysCount"] = days.Length,
             ["scheduledMinuteOfDay"] = schedule is
@@ -170,10 +177,7 @@ public static partial class ProductAnalyticsProperties
             ["oneTimeDayOfWeek"] = null,
             ["oneTimeLeadTimeMs"] = null
         };
-        if (changeType is not null)
-        {
-            properties["changeType"] = changeType;
-        }
+        if (changeType is not null) properties["changeType"] = changeType;
 
         if (schedule is { Type: ScheduleType.OneTime, OneTimeDate: { } oneTime })
         {
@@ -267,7 +271,14 @@ public static partial class ProductAnalyticsProperties
         var categories = Values(settings, "Categories").Where(allowedCategories.Contains).Distinct().Order().ToArray();
         properties["categories"] = categories;
         properties["categoryCount"] = categories.Length;
-        var customValues = NormalizeEntries(Value(settings, customSetting), normalizeCustomValue);
+        var customValues = (Value(settings, customSetting) ?? string.Empty)
+            .Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(normalizeCustomValue)
+            .Where(item => item is not null)
+            .Select(item => item!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
         properties[hasCustomProperty] = customValues.Length > 0;
         properties[customCountProperty] = customValues.Length;
         properties[customValuesProperty] = customValues;
@@ -390,14 +401,9 @@ public static partial class ProductAnalyticsProperties
         properties["hasBaseUrl"] = !string.IsNullOrWhiteSpace(baseUrl);
         properties["usesHttps"] = Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) &&
                                     uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
-        if (hasAccessToken.HasValue)
-        {
-            properties["hasAccessToken"] = hasAccessToken.Value;
-        }
+        if (hasAccessToken.HasValue) properties["hasAccessToken"] = hasAccessToken.Value;
         else if (settings.ContainsKey("AccessToken") || settings.ContainsKey("HaAccessToken"))
-        {
             properties["hasAccessToken"] = HasValue(settings, "AccessToken") || HasValue(settings, "HaAccessToken");
-        }
         properties["hasStartEntity"] = HasValue(settings, "StartEntityId");
         properties["hasEndEntity"] = HasValue(settings, "EndEntityId");
         properties["startEntityDomain"] = EntityDomain(Value(settings, "StartEntityId"));
@@ -446,16 +452,6 @@ public static partial class ProductAnalyticsProperties
         };
     }
 
-    private static string NormalizeScheduleType(ScheduleType type) => type switch
-    {
-        ScheduleType.OneTime => "one_time",
-        ScheduleType.Recurring => "recurring_start",
-        ScheduleType.StopRecurring => "recurring_stop",
-        ScheduleType.StopDuration => "duration_stop",
-        _ => "unknown"
-    };
-
-
     private static string[] DayKeys(IEnumerable<DayOfWeek>? days) =>
     [
         .. (days ?? [])
@@ -489,16 +485,6 @@ public static partial class ProductAnalyticsProperties
     private static bool? BoolValue(IReadOnlyDictionary<string, string> settings, string key) =>
         bool.TryParse(Value(settings, key), out var value) ? value : null;
 
-
-    private static string[] NormalizeEntries(string? value, Func<string, string?> normalize) =>
-        (value ?? string.Empty)
-        .Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Select(normalize)
-        .Where(item => item is not null)
-        .Select(item => item!)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .Order(StringComparer.Ordinal)
-        .ToArray();
 
     private static string? NormalizeProcessName(string value)
     {
@@ -584,7 +570,8 @@ public static partial class ProductAnalyticsProperties
     private static string[] Values(IReadOnlyDictionary<string, string> settings, string key) =>
         (Value(settings, key) ?? string.Empty).Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private static string? Choice(string? value, params (string Input, string Output)[] choices) => (from choice in choices where string.Equals(choice.Input, value, StringComparison.OrdinalIgnoreCase) select choice.Output).FirstOrDefault();
+    private static string? Choice(string? value, params (string Input, string Output)[] choices) =>
+        choices.FirstOrDefault(choice => string.Equals(choice.Input, value, StringComparison.OrdinalIgnoreCase)).Output;
 
     [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_]{0,63}$")]
     private static partial System.Text.RegularExpressions.Regex EntityDomainRegex();

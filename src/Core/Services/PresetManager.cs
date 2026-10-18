@@ -38,7 +38,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         logger.LogInformation("Loading all presets from {Directory}", TelemetryGuard.SafePath(presetsDirectory));
         Directory.CreateDirectory(presetsDirectory);
 
-        var presets = new List<SessionPreset>();
+        List<SessionPreset> presets = [];
         foreach (var filePath in Directory.EnumerateFiles(presetsDirectory, "*.json"))
         {
             if (cancellationToken.IsCancellationRequested)
@@ -171,9 +171,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
             .ConfigureAwait(false);
         if (preset is not { Version: < CurrentPresetVersion })
-        {
             return preset;
-        }
 
         logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
             preset.Name, preset.Version, CurrentPresetVersion);

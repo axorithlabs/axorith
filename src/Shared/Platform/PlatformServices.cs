@@ -13,10 +13,7 @@ public static class PlatformServices
 {
     public static IAutoStartManager CreateAutoStartManager(ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsAutoStartManager(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsAutoStartManager(logger);
 
         // Return no-op for unsupported platforms
         return new NoOpAutoStartManager();
@@ -24,20 +21,11 @@ public static class PlatformServices
 
     public static ISecureStorageService CreateSecureStorage(ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsSecureStorage(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsSecureStorage(logger);
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return new LinuxSecureStorage(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return new LinuxSecureStorage(logger);
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return new MacOsSecureStorage(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return new MacOsSecureStorage(logger);
 
         throw new PlatformNotSupportedException(
             $"Secure storage is not supported on this platform: {RuntimeInformation.OSDescription}");
@@ -46,9 +34,7 @@ public static class PlatformServices
     public static IAppDiscoveryService CreateAppDiscoveryService(ILoggerFactory loggerFactory)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
             return new WindowsAppDiscoveryService(loggerFactory.CreateLogger<WindowsAppDiscoveryService>());
-        }
 
         throw new PlatformNotSupportedException(
             $"App discovery is not supported on this platform: {RuntimeInformation.OSDescription}");
@@ -56,10 +42,7 @@ public static class PlatformServices
 
     public static IProcessBlocker CreateProcessBlocker(ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsProcessBlocker(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsProcessBlocker(logger);
 
         throw new PlatformNotSupportedException(
             $"Process blocker is not supported on this platform: {RuntimeInformation.OSDescription}");
@@ -67,10 +50,7 @@ public static class PlatformServices
 
     public static ISystemNotificationService CreateNotificationService(ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsSystemNotificationService(logger);
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsSystemNotificationService(logger);
 
         return new NoOpNotificationService();
     }
@@ -78,9 +58,7 @@ public static class PlatformServices
     public static INativeMessagingManager CreateNativeMessagingManager(ILoggerFactory loggerFactory)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
             return new WindowsNativeMessagingManager(loggerFactory.CreateLogger<WindowsNativeMessagingManager>());
-        }
 
         throw new PlatformNotSupportedException(
             $"Native Messaging registration is not supported on this platform: {RuntimeInformation.OSDescription}");
@@ -89,9 +67,7 @@ public static class PlatformServices
     public static IFilePermissionsService CreateFilePermissionsService(ILoggerFactory loggerFactory)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
             return new WindowsFilePermissionsService(loggerFactory.CreateLogger<WindowsFilePermissionsService>());
-        }
 
         return new UnixFilePermissionsService(loggerFactory.CreateLogger<UnixFilePermissionsService>());
     }
@@ -99,29 +75,18 @@ public static class PlatformServices
     public static INamedPipeFactory CreateNamedPipeFactory(ILoggerFactory loggerFactory)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
             return new WindowsNamedPipeFactory(loggerFactory.CreateLogger<WindowsNamedPipeFactory>());
-        }
 
         return new UnixNamedPipeFactory(loggerFactory.CreateLogger<UnixNamedPipeFactory>());
     }
 
     public static IPlatformWindowService CreateWindowService()
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsPlatformWindowService();
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsPlatformWindowService();
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return new LinuxPlatformWindowService();
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return new LinuxPlatformWindowService();
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return new MacOsPlatformWindowService();
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return new MacOsPlatformWindowService();
 
         throw new PlatformNotSupportedException(
             $"Window management is not supported on this platform: {RuntimeInformation.OSDescription}");
@@ -129,10 +94,7 @@ public static class PlatformServices
 
     public static IPlatformProcessService CreateProcessService()
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new WindowsPlatformProcessService();
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return new WindowsPlatformProcessService();
 
         return new FallbackPlatformProcessService();
     }

@@ -20,9 +20,7 @@ internal sealed class VSCodeApp(
         var projectPath = _settings.ProjectPath.GetCurrentValue();
 
         if (string.IsNullOrWhiteSpace(projectPath))
-        {
             return args;
-        }
 
         var safePath = projectPath.Contains(' ') ? $"\"{projectPath}\"" : projectPath;
         args = string.IsNullOrWhiteSpace(args) ? safePath : $"{args} {safePath}";

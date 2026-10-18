@@ -25,8 +25,7 @@ public class ModulesServiceImpl(
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
         {
-            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
-                [$"Could not parse: {request.ModuleInstanceId}"]));
+            return Task.FromResult(CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId));
         }
 
         try
@@ -142,8 +141,7 @@ public class ModulesServiceImpl(
 
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
         {
-            return SessionMapper.CreateResult(false, "Invalid module instance ID",
-                [$"Could not parse: {request.ModuleInstanceId}"]);
+            return CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId);
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
@@ -187,8 +185,7 @@ public class ModulesServiceImpl(
 
         if (!Guid.TryParse(request.ModuleId, out var moduleId))
         {
-            return SessionMapper.CreateResult(false, "Invalid module ID",
-                [$"Could not parse: {request.ModuleId}"]);
+            return CreateInvalidGuidResult("module ID", request.ModuleId);
         }
 
         Guid? moduleInstanceId = null;
@@ -196,8 +193,7 @@ public class ModulesServiceImpl(
         {
             if (!Guid.TryParse(request.ModuleInstanceId, out var parsedInstanceId))
             {
-                return SessionMapper.CreateResult(false, "Invalid module instance ID",
-                    [$"Could not parse: {request.ModuleInstanceId}"]);
+                return CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId);
             }
 
             moduleInstanceId = parsedInstanceId;
@@ -284,8 +280,7 @@ public class ModulesServiceImpl(
 
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
         {
-            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
-                [$"Could not parse: {request.ModuleInstanceId}"]));
+            return Task.FromResult(CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(request.SettingKey);
@@ -348,14 +343,16 @@ public class ModulesServiceImpl(
     private bool IsCommittedSessionActive() =>
         sessionManager.ActiveSession?.FocusCommitment.IsCommitted == true;
 
+    private static OperationResult CreateInvalidGuidResult(string idType, string value) =>
+        SessionMapper.CreateResult(false, $"Invalid {idType}", [$"Could not parse: {value}"]);
+
     public override async Task<BeginEditResponse> BeginEdit(BeginEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleId, out var moduleId))
         {
             return new BeginEditResponse
             {
-                Result = SessionMapper.CreateResult(false, "Invalid module ID",
-                    [$"Could not parse: {request.ModuleId}"])
+                Result = CreateInvalidGuidResult("module ID", request.ModuleId)
             };
         }
 
@@ -363,8 +360,7 @@ public class ModulesServiceImpl(
         {
             return new BeginEditResponse
             {
-                Result = SessionMapper.CreateResult(false, "Invalid module instance ID",
-                    [$"Could not parse: {request.ModuleInstanceId}"])
+                Result = CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId)
             };
         }
 
@@ -412,8 +408,7 @@ public class ModulesServiceImpl(
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
         {
-            return Task.FromResult(SessionMapper.CreateResult(false, "Invalid module instance ID",
-                [$"Could not parse: {request.ModuleInstanceId}"]));
+            return Task.FromResult(CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId));
         }
 
         sandboxManager.DisposeSandbox(instanceId);
@@ -437,14 +432,10 @@ public class ModulesServiceImpl(
         try
         {
             if (!Guid.TryParse(request.ModuleId, out var moduleId))
-            {
                 return new ValidationResponse { IsValid = false, Message = "Invalid Module ID" };
-            }
 
             if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-            {
                 return new ValidationResponse { IsValid = false, Message = "Invalid Instance ID" };
-            }
 
             var settingsDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             foreach (var value in request.Values)
@@ -455,9 +446,7 @@ public class ModulesServiceImpl(
 
             var module = sandboxManager.GetModule(instanceId);
             if (module == null)
-            {
                 return new ValidationResponse { IsValid = false, Message = "Failed to load module instance" };
-            }
 
             foreach (var kv in settingsDict)
             {

@@ -57,10 +57,7 @@ internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, str
     {
         foreach (var (key, subscriber) in _items)
         {
-            if (filter == null || filter(key))
-            {
-                subscriber.Queue.Writer.TryWrite(value);
-            }
+            if (filter == null || filter(key)) subscriber.Queue.Writer.TryWrite(value);
         }
     }
 

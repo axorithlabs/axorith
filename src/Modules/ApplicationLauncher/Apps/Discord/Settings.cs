@@ -64,10 +64,7 @@ internal sealed class Settings : LauncherSettingsBase
                     path = _appDiscovery.FindKnownApp("Discord.exe", "Discord");
                 }
             }
-            else
-            {
-                path = _appDiscovery.FindKnownApp("discord");
-            }
+            else path = _appDiscovery.FindKnownApp("discord");
 
             SetDetectedApplicationPath(path, "Discord (Auto-Detected)", "Discord not found");
         });

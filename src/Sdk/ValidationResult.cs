@@ -49,6 +49,6 @@ public class ValidationResult
     {
         Status = status;
         Message = message;
-        FieldErrors = fieldErrors?.ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, string>();
+        FieldErrors = fieldErrors?.ToDictionary(k => k.Key, v => v.Value) ?? new();
     }
 }

@@ -45,7 +45,7 @@ internal static class LinuxWindowApi
 
     private static List<MonitorInfo> GetMonitors()
     {
-        var monitors = new List<MonitorInfo>();
+        List<MonitorInfo> monitors = [];
 
         try
         {
@@ -55,9 +55,7 @@ internal static class LinuxWindowApi
             foreach (var line in lines)
             {
                 if (!line.Contains(" connected ") || !line.Contains('+'))
-                {
                     continue;
-                }
 
                 var parts = line.Split([' ', '+'], StringSplitOptions.RemoveEmptyEntries);
                 for (var i = 0; i < parts.Length - 2; i++)

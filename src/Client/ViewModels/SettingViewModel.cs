@@ -52,19 +52,18 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
     [Reactive]
     public partial bool IsVisible { get; private set; } = true;
 
-    private string _searchText = string.Empty;
     private string _applicationInputText = string.Empty;
 
     public string SearchText
     {
-        get => _searchText;
+        get => field;
         set
         {
-            if (_searchText == value) return;
-            this.RaiseAndSetIfChanged(ref _searchText, value);
+            if (field == value) return;
+            this.RaiseAndSetIfChanged(ref field, value);
             UpdateDisplayedChoices();
         }
-    }
+    } = string.Empty;
 
     public bool IsApplicationSelector => Setting.Key is "ApplicationPath" or "AppToAdd";
     public bool IsCustomAppsField => Setting.Key == "CustomProcessList";
@@ -106,15 +105,13 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     public ObservableCollection<string> History { get; } = [];
 
-    private string? _selectedHistoryItem;
-
     public string? SelectedHistoryItem
     {
-        get => _selectedHistoryItem;
+        get => field;
         set
         {
-            if (_selectedHistoryItem == value) return;
-            this.RaiseAndSetIfChanged(ref _selectedHistoryItem, value);
+            if (field == value) return;
+            this.RaiseAndSetIfChanged(ref field, value);
             if (!string.IsNullOrEmpty(value)) StringValue = value;
         }
     }
@@ -125,15 +122,9 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         set
         {
             var current = Setting.GetCurrentValueAsObject() as string;
-            if (string.Equals(current, value, StringComparison.Ordinal))
-            {
-                return;
-            }
+            if (string.Equals(current, value, StringComparison.Ordinal)) return;
 
-            if (IsTextBasedSetting())
-            {
-                _isUserEditing = true;
-            }
+            if (IsTextBasedSetting()) _isUserEditing = true;
 
             Setting.SetValueFromString(value);
             this.RaisePropertyChanged();
@@ -152,10 +143,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         set
         {
             var current = Setting.GetCurrentValueAsObject() as bool?;
-            if (current == value)
-            {
-                return;
-            }
+            if (current == value) return;
 
             Setting.SetValueFromObject(value);
             this.RaisePropertyChanged();
@@ -170,10 +158,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         get
         {
             var value = Setting.GetCurrentValueAsObject();
-            if (value == null)
-            {
-                return 0;
-            }
+            if (value == null) return 0;
 
             return value switch
             {
@@ -192,10 +177,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
                 : value;
 
             var current = Setting.GetCurrentValueAsObject();
-            if (current != null && current.Equals(boxedValue))
-            {
-                return;
-            }
+            if (current != null && current.Equals(boxedValue)) return;
 
             Setting.SetValueFromObject(boxedValue);
             this.RaisePropertyChanged();
@@ -209,8 +191,6 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
     public ObservableCollection<ApplicationChoiceViewModel> ApplicationChoices { get; } = [];
 
     public ObservableCollection<MultiChoiceItemViewModel> MultiChoices { get; } = [];
-    public ICommand SelectChoiceCommand { get; }
-    public ICommand OpenApplicationSelectorCommand { get; }
 
     public decimal NumberIncrement => Setting.ValueType == typeof(int) ? 1 : 0.1m;
 
@@ -225,15 +205,9 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         }
         set
         {
-            if (!value.HasValue)
-            {
-                return;
-            }
+            if (!value.HasValue) return;
 
-            if (value.Value.Key == StringValue)
-            {
-                return;
-            }
+            if (value.Value.Key == StringValue) return;
 
             StringValue = value.Value.Key;
             if (IsApplicationSelector)
@@ -244,8 +218,6 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
     }
 
     public ICommand ClickCommand { get; }
-    public ICommand RemoveHistoryItemCommand { get; }
-    public ICommand BrowseCommand { get; }
 
     public SettingViewModel(
         ISetting setting,
@@ -275,10 +247,6 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         }
 
         ClickCommand = ReactiveCommand.Create(() => BoolValue = true);
-        SelectChoiceCommand = ReactiveCommand.CreateFromTask<KeyValuePair<string, string>>(SelectChoiceAsync);
-        OpenApplicationSelectorCommand = ReactiveCommand.Create(OpenApplicationSelector);
-        RemoveHistoryItemCommand = ReactiveCommand.Create<string>(RemoveHistoryItem);
-        BrowseCommand = ReactiveCommand.CreateFromTask(BrowseAsync);
 
         Setting.Label.Subscribe(value => RunOnUiThread(() => Label = value));
         Setting.IsVisible.Subscribe(value => RunOnUiThread(() => IsVisible = value));
@@ -297,10 +265,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             });
         });
 
-        if (setting.GetCurrentChoices() is { } initialChoices)
-        {
-            _rawChoices = initialChoices;
-        }
+        if (setting.GetCurrentChoices() is { } initialChoices) _rawChoices = initialChoices;
 
         _applicationInputText = GetSelectedApplicationName();
 
@@ -331,6 +296,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         });
     }
 
+    [ReactiveCommand]
     private async Task SelectChoiceAsync(KeyValuePair<string, string> choice)
     {
         SelectedChoice = choice;
@@ -368,6 +334,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         IsSelectorOpen = false;
     }
 
+    [ReactiveCommand]
     private void OpenApplicationSelector()
     {
         if (IsSelectorOpen)
@@ -413,10 +380,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             {
                 _ = SendSettingUpdateAsync(valueToSend);
 
-                if (IsTextBasedSetting())
-                {
-                    Dispatcher.UIThread.Post(() => _isUserEditing = false);
-                }
+                if (IsTextBasedSetting()) Dispatcher.UIThread.Post(() => _isUserEditing = false);
             }
         }, null, delay, Timeout.Infinite);
     }
@@ -429,19 +393,13 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         _numberThrottleTimer = new Timer(_ =>
         {
             var valueToSend = _pendingNumberValue;
-            if (valueToSend != null)
-            {
-                _ = SendSettingUpdateAsync(valueToSend);
-            }
+            if (valueToSend != null) _ = SendSettingUpdateAsync(valueToSend);
         }, null, _inputConfig.NumberThrottleMs, Timeout.Infinite);
     }
 
     private void UpdateDisplayedChoices()
     {
-        if (Setting.ControlType != SettingControlType.Choice)
-        {
-            return;
-        }
+        if (Setting.ControlType != SettingControlType.Choice) return;
 
         if (!Dispatcher.UIThread.CheckAccess())
         {
@@ -499,10 +457,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     private void UpdateMultiChoices()
     {
-        if (Setting.ControlType != SettingControlType.MultiChoice)
-        {
-            return;
-        }
+        if (Setting.ControlType != SettingControlType.MultiChoice) return;
 
         if (!Dispatcher.UIThread.CheckAccess())
         {
@@ -546,12 +501,10 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    [ReactiveCommand]
     private async Task BrowseAsync()
     {
-        if (_filePickerService == null)
-        {
-            return;
-        }
+        if (_filePickerService == null) return;
 
         var result = Setting.ControlType switch
         {
@@ -570,15 +523,9 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     private void LoadHistory()
     {
-        if (!Setting.HasHistory || _uiConfig == null)
-        {
-            return;
-        }
+        if (!Setting.HasHistory || _uiConfig == null) return;
 
-        if (!_uiConfig.InputHistory.TryGetValue(Setting.Key, out var items))
-        {
-            return;
-        }
+        if (!_uiConfig.InputHistory.TryGetValue(Setting.Key, out var items)) return;
 
         foreach (var item in items)
         {
@@ -586,14 +533,12 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         }
     }
 
+    [ReactiveCommand]
     private void RemoveHistoryItem(string item)
     {
         if (!History.Remove(item)) return;
 
-        if (_uiConfig == null || _uiSettingsStore == null)
-        {
-            return;
-        }
+        if (_uiConfig == null || _uiSettingsStore == null) return;
 
         _uiConfig.InputHistory[Setting.Key] = [.. History];
         _uiSettingsStore.Save(_uiConfig);
@@ -601,10 +546,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     private void TryAddToHistory(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || !Setting.HasHistory || _uiSettingsStore == null || _uiConfig == null)
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(value) || !Setting.HasHistory || _uiSettingsStore == null || _uiConfig == null) return;
 
         var isValidPath = false;
         try
@@ -618,19 +560,13 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             // Ignore invalid path characters
         }
 
-        if (!isValidPath)
-        {
-            return;
-        }
+        if (!isValidPath) return;
 
         if (History.Contains(value))
         {
             History.Move(History.IndexOf(value), 0);
         }
-        else
-        {
-            History.Insert(0, value);
-        }
+        else History.Insert(0, value);
 
         while (History.Count > 5)
         {
@@ -667,10 +603,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     public void OnFocusLost()
     {
-        if (!IsTextBasedSetting())
-        {
-            return;
-        }
+        if (!IsTextBasedSetting()) return;
 
         if (_isUserEditing && _inputConfig.FlushOnFocusLoss)
         {

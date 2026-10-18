@@ -15,9 +15,7 @@ internal static class SteamGameScanner
     public static string? GetSteamDirectory(string steamExePath)
     {
         if (string.IsNullOrEmpty(steamExePath))
-        {
             return null;
-        }
 
         var dir = Path.GetDirectoryName(steamExePath);
         return Directory.Exists(dir) ? dir : null;
@@ -25,7 +23,7 @@ internal static class SteamGameScanner
 
     public static List<SteamGame> GetInstalledGames(string steamDirectory)
     {
-        var games = new List<SteamGame>();
+        List<SteamGame> games = [];
         var libraries = GetLibraryFolders(steamDirectory);
 
         foreach (var steamappsPath in libraries.Select(library => Path.Combine(library, "steamapps"))
@@ -57,9 +55,7 @@ internal static class SteamGameScanner
 
         var libraryFoldersPath = Path.Combine(steamDirectory, "steamapps", "libraryfolders.vdf");
         if (!File.Exists(libraryFoldersPath))
-        {
             return libraries;
-        }
 
         try
         {
@@ -94,9 +90,7 @@ internal static class SteamGameScanner
             var nameMatch = Regex.Match(content, @"""name""\s+""([^""]+)""", RegexOptions.IgnoreCase, RegexTimeout);
 
             if (!appIdMatch.Success || !nameMatch.Success)
-            {
                 return null;
-            }
 
             var name = nameMatch.Groups[1].Value;
 

@@ -101,7 +101,7 @@ internal static class WindowApi
 
     private static List<Rect> GetMonitors()
     {
-        var monitors = new List<Rect>();
+        List<Rect> monitors = [];
         EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
             (_, _, ref rect, _) =>
             {
@@ -113,15 +113,12 @@ internal static class WindowApi
 
     public static List<Process> FindProcesses(string processNameOrPath)
     {
-        var results = new List<Process>();
+        List<Process> results = [];
 
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
         results.AddRange(Process.GetProcessesByName(processName));
 
-        if (!File.Exists(processNameOrPath))
-        {
-            return results;
-        }
+        if (!File.Exists(processNameOrPath)) return results;
 
         var allProcesses = Process.GetProcesses();
         foreach (var process in allProcesses)
@@ -164,15 +161,9 @@ internal static class WindowApi
 
     public static WindowState GetWindowState(IntPtr windowHandle)
     {
-        if (IsIconic(windowHandle))
-        {
-            return WindowState.Minimized;
-        }
+        if (IsIconic(windowHandle)) return WindowState.Minimized;
 
-        if (IsZoomed(windowHandle))
-        {
-            return WindowState.Maximized;
-        }
+        if (IsZoomed(windowHandle)) return WindowState.Maximized;
 
         return WindowState.Normal;
     }
@@ -224,10 +215,7 @@ internal static class WindowApi
         try
         {
             var monitorNames = GetMonitorNamesFromEdid();
-            if (monitorIndex >= 0 && monitorIndex < monitorNames.Count)
-            {
-                return monitorNames[monitorIndex];
-            }
+            if (monitorIndex >= 0 && monitorIndex < monitorNames.Count) return monitorNames[monitorIndex];
         }
         catch
         {
@@ -239,7 +227,7 @@ internal static class WindowApi
 
     private static List<string> GetMonitorNamesFromEdid()
     {
-        var names = new List<string>();
+        List<string> names = [];
 
         using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM WmiMonitorID");
         foreach (var obj in searcher.Get())
@@ -272,18 +260,12 @@ internal static class WindowApi
 
     private static string DecodeUshortArray(ushort[]? arr)
     {
-        if (arr == null || arr.Length == 0)
-        {
-            return string.Empty;
-        }
+        if (arr == null || arr.Length == 0) return string.Empty;
 
         var sb = new StringBuilder();
         foreach (var c in arr)
         {
-            if (c == 0)
-            {
-                break;
-            }
+            if (c == 0) break;
 
             sb.Append((char)c);
         }

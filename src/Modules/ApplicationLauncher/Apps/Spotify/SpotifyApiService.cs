@@ -30,9 +30,7 @@ internal sealed class SpotifyApiService(
     {
         var accessToken = await authService.GetValidAccessTokenAsync();
         if (!string.IsNullOrWhiteSpace(accessToken))
-        {
             return accessToken;
-        }
 
         logger.LogWarning("Cannot perform API call without a valid access token.");
         return null;
@@ -42,9 +40,7 @@ internal sealed class SpotifyApiService(
     {
         var token = await GetAccessTokenForRequestAsync().ConfigureAwait(false);
         if (token is null)
-        {
             return default;
-        }
 
         var config = SpotifyClientConfig.CreateDefault(token)
             .WithHTTPClient(_httpClient)
@@ -85,9 +81,7 @@ internal sealed class SpotifyApiService(
         var response = await ExecuteAsync(client => client.Library.GetTracks(
             new LibraryTracksRequest { Limit = 50 })).ConfigureAwait(false);
         if (response is null)
-        {
             return string.Empty;
-        }
 
         var uris = response.Items?.Select(saved => saved.Track.Uri).ToList() ?? [];
         return JsonSerializer.Serialize(new { uris });
@@ -100,10 +94,7 @@ internal sealed class SpotifyApiService(
         {
             request.ContextUri = contextUri;
         }
-        else
-        {
-            request.Uris = trackUris.ToList();
-        }
+        else request.Uris = trackUris.ToList();
 
         await ExecuteAsync(client => client.Player.ResumePlayback(request)).ConfigureAwait(false);
     }

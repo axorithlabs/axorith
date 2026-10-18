@@ -32,10 +32,7 @@ public partial class MainView : UserControl
     {
         ObserveViewModel();
         _window = TopLevel.GetTopLevel(this) as Window;
-        if (_window != null)
-        {
-            _window.Deactivated += OnWindowDeactivated;
-        }
+        if (_window != null) _window.Deactivated += OnWindowDeactivated;
 
         UpdateDialogFocus();
     }
@@ -63,47 +60,32 @@ public partial class MainView : UserControl
     private void ObserveViewModel()
     {
         if (ReferenceEquals(_observedViewModel, ViewModel))
-        {
             return;
-        }
 
-        if (_observedViewModel != null)
-        {
-            _observedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
-        }
+        if (_observedViewModel != null) _observedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
         _observedViewModel = ViewModel;
-        if (_observedViewModel != null)
-        {
-            _observedViewModel.PropertyChanged += OnViewModelPropertyChanged;
-        }
+        if (_observedViewModel != null) _observedViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         UpdateDialogFocus();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.IsOverlayOpen))
-        {
-            UpdateDialogFocus();
-        }
+        if (e.PropertyName == nameof(MainViewModel.IsOverlayOpen)) UpdateDialogFocus();
     }
 
     private void UpdateDialogFocus()
     {
         var isOpen = ViewModel?.IsOverlayOpen == true;
         if (!isOpen && !_dialogWasOpen)
-        {
             return;
-        }
 
         _dialogWasOpen = isOpen;
         Dispatcher.UIThread.Post(() =>
         {
             if (TopLevel.GetTopLevel(this) == null)
-            {
                 return;
-            }
 
             Control? target;
             if (ViewModel?.IsEmergencyUnlockOpen == true)
@@ -177,9 +159,7 @@ public partial class MainView : UserControl
     private void OnRootPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (_emergencyUnlockPointerId != e.Pointer.Id)
-        {
             return;
-        }
 
         _emergencyUnlockPointerId = null;
         e.Pointer.Capture(null);

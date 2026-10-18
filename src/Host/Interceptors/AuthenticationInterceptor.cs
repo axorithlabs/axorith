@@ -52,9 +52,7 @@ public class AuthenticationInterceptor(
         var token = context.RequestHeaders.GetValue(AuthConstants.TokenHeaderName);
 
         if (authService.ValidateToken(token))
-        {
             return;
-        }
 
         logger.LogWarning("Unauthorized access attempt from {Peer}. Token present: {HasToken}",
             context.Peer, !string.IsNullOrEmpty(token));

@@ -134,10 +134,7 @@ internal sealed class PlaybackService : IDisposable
         for (var i = 0; i < 5; i++)
         {
             targetDeviceId = await ResolveTargetDeviceIdAsync();
-            if (!string.IsNullOrEmpty(targetDeviceId))
-            {
-                break;
-            }
+            if (!string.IsNullOrEmpty(targetDeviceId)) break;
 
             _logger.LogInfo("Target device not found yet. Retrying in 2s... (Attempt {Attempt}/5)", i + 1);
             await Task.Delay(2000, cancellationToken);
@@ -182,10 +179,7 @@ internal sealed class PlaybackService : IDisposable
         var mode = _settings.DeviceSelectionMode.GetCurrentValue();
         var devices = await _apiService.GetDevicesAsync();
 
-        if (devices.Count == 0)
-        {
-            return null;
-        }
+        if (devices.Count == 0) return null;
 
         switch (mode)
         {
@@ -214,10 +208,7 @@ internal sealed class PlaybackService : IDisposable
 
             case Settings.ModeSpecificName:
                 var targetName = _settings.SpecificDeviceName.GetCurrentValue();
-                if (string.IsNullOrWhiteSpace(targetName))
-                {
-                    return null;
-                }
+                if (string.IsNullOrWhiteSpace(targetName)) return null;
 
                 var specific =
                     devices.FirstOrDefault(d => d.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase));
@@ -230,18 +221,12 @@ internal sealed class PlaybackService : IDisposable
                 break;
         }
 
-        if (mode != Settings.ModeLocalComputer)
-        {
-            return null;
-        }
+        if (mode != Settings.ModeLocalComputer) return null;
 
         {
             var machineName = Environment.MachineName;
             var match = devices.FirstOrDefault(d => d.Name.Contains(machineName, StringComparison.OrdinalIgnoreCase));
-            if (match == null)
-            {
-                return null;
-            }
+            if (match == null) return null;
 
             _logger.LogInfo("Found device matching machine name: {Name}", match.Name);
             return match.Id;
@@ -257,10 +242,7 @@ internal sealed class PlaybackService : IDisposable
 
         while (DateTime.UtcNow - startTime < timeout)
         {
-            if (ct.IsCancellationRequested)
-            {
-                return false;
-            }
+            if (ct.IsCancellationRequested) return false;
 
             try
             {
@@ -290,27 +272,18 @@ internal sealed class PlaybackService : IDisposable
 
     public Task OnSessionEndAsync()
     {
-        if (!_settings.EnablePlayback.GetCurrentValue())
-        {
-            return Task.CompletedTask;
-        }
+        if (!_settings.EnablePlayback.GetCurrentValue()) return Task.CompletedTask;
 
         return !_authService.HasRefreshToken() ? Task.CompletedTask : _apiService.PauseAsync();
     }
 
     private async Task LoadDynamicChoicesAsync(bool force = false)
     {
-        if (!await _choicesRefreshLock.WaitAsync(0))
-        {
-            return;
-        }
+        if (!await _choicesRefreshLock.WaitAsync(0)) return;
 
         try
         {
-            if (!force && ShouldUseCache())
-            {
-                return;
-            }
+            if (!force && ShouldUseCache()) return;
 
             var playlistsTask = _apiService.GetPlaylistsAsync();
             var albumsTask = _apiService.GetSavedAlbumsAsync();
@@ -416,10 +389,7 @@ internal sealed class PlaybackService : IDisposable
 
     private static string ConvertUrlToUri(string url)
     {
-        if (url.Contains("spotify:", StringComparison.Ordinal))
-        {
-            return url;
-        }
+        if (url.Contains("spotify:", StringComparison.Ordinal)) return url;
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
@@ -438,18 +408,12 @@ internal sealed class PlaybackService : IDisposable
         {
             _ = LoadDynamicChoicesAsync(force: true);
         }
-        else
-        {
-            ClearChoices();
-        }
+        else ClearChoices();
     }
 
     private bool TryServeCachedChoices()
     {
-        if (!ShouldUseCache())
-        {
-            return false;
-        }
+        if (!ShouldUseCache()) return false;
 
         RebuildPlaybackChoices();
         return true;
@@ -457,15 +421,9 @@ internal sealed class PlaybackService : IDisposable
 
     private bool ShouldUseCache()
     {
-        if (_choicesLastUpdatedUtc == DateTime.MinValue)
-        {
-            return false;
-        }
+        if (_choicesLastUpdatedUtc == DateTime.MinValue) return false;
 
-        if (DateTime.UtcNow - _choicesLastUpdatedUtc > _choicesTtl)
-        {
-            return false;
-        }
+        if (DateTime.UtcNow - _choicesLastUpdatedUtc > _choicesTtl) return false;
 
         return _cachedPlaylists.Count > 0 || _cachedAlbums.Count > 0 ||
                !string.IsNullOrWhiteSpace(_cachedLikedSongsUri);

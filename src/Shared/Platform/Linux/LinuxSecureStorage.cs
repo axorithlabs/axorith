@@ -49,7 +49,8 @@ internal class LinuxSecureStorage : SecureStorageBase
     protected override void StoreSecretCore(string key, string secret)
     {
         if (_useSecretService)
-            StoreSecretViaSecretService(key, secret);
+            CommandRunner.RunChecked("secret-tool",
+                ["store", $"--label={SecretServiceLabel}", "application", "axorith", "key", key], secret);
         else
             StoreSecretViaFile(key, secret);
     }
@@ -78,10 +79,6 @@ internal class LinuxSecureStorage : SecureStorageBase
         }
     }
 
-    private static void StoreSecretViaSecretService(string key, string secret) =>
-        CommandRunner.RunChecked("secret-tool",
-            ["store", $"--label={SecretServiceLabel}", "application", "axorith", "key", key], secret);
-
     private static string? RetrieveSecretViaSecretService(string key)
     {
         var result = CommandRunner.Run("secret-tool", ["lookup", "application", "axorith", "key", key]);
@@ -102,13 +99,10 @@ internal class LinuxSecureStorage : SecureStorageBase
 
     private void StoreSecretViaFile(string key, string secret)
     {
-        if (_storageDir == null)
-        {
-            throw new InvalidOperationException("Storage directory not initialized");
-        }
+        var storageDir = _storageDir ?? throw new InvalidOperationException("Storage directory not initialized");
 
         var fileName = GetSecretFileName(key);
-        var filePath = Path.Combine(_storageDir, fileName);
+        var filePath = Path.Combine(storageDir, fileName);
 
         var encryptionKey = GetOrCreateFileEncryptionKey();
         var plaintextBytes = Encoding.UTF8.GetBytes(secret);
@@ -132,18 +126,12 @@ internal class LinuxSecureStorage : SecureStorageBase
 
     private string? RetrieveSecretViaFile(string key)
     {
-        if (_storageDir == null)
-        {
-            throw new InvalidOperationException("Storage directory not initialized");
-        }
+        var storageDir = _storageDir ?? throw new InvalidOperationException("Storage directory not initialized");
 
         var fileName = GetSecretFileName(key);
-        var filePath = Path.Combine(_storageDir, fileName);
+        var filePath = Path.Combine(storageDir, fileName);
 
-        if (!File.Exists(filePath))
-        {
-            return null;
-        }
+        if (!File.Exists(filePath)) return null;
 
         var encryptedData = File.ReadAllBytes(filePath);
         var encryptionKey = GetOrCreateFileEncryptionKey();
@@ -171,13 +159,10 @@ internal class LinuxSecureStorage : SecureStorageBase
 
     private void DeleteSecretViaFile(string key)
     {
-        if (_storageDir == null)
-        {
-            throw new InvalidOperationException("Storage directory not initialized");
-        }
+        var storageDir = _storageDir ?? throw new InvalidOperationException("Storage directory not initialized");
 
         var fileName = GetSecretFileName(key);
-        var filePath = Path.Combine(_storageDir, fileName);
+        var filePath = Path.Combine(storageDir, fileName);
 
         if (File.Exists(filePath))
         {
@@ -195,12 +180,9 @@ internal class LinuxSecureStorage : SecureStorageBase
 
     private byte[] GetOrCreateFileEncryptionKey()
     {
-        if (_storageDir == null)
-        {
-            throw new InvalidOperationException("Storage directory not initialized");
-        }
+        var storageDir = _storageDir ?? throw new InvalidOperationException("Storage directory not initialized");
 
-        var keyPath = Path.Combine(_storageDir, FileKeyName);
+        var keyPath = Path.Combine(storageDir, FileKeyName);
 
         if (File.Exists(keyPath))
         {

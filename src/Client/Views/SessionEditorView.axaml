@@ -1131,6 +1131,42 @@
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                     <Panel>
+                        <Border IsVisible="{Binding IsChromeExtensionDialogOpen}" ZIndex="1000"
+                                Background="#D9000000">
+                            <ScrollViewer Margin="24" VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+                                <Border Classes="Card" MaxWidth="580" Padding="24"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                        Background="#111111" BorderBrush="#555555">
+                                    <StackPanel Spacing="14" KeyboardNavigation.TabNavigation="Cycle">
+                                        <TextBlock Text="Install Chrome Extension" FontSize="22" FontWeight="Bold" />
+                                        <StackPanel Spacing="8" IsVisible="{Binding IsChromeExtensionDownloading}">
+                                            <TextBlock Text="Downloading the latest extension from GitHub…" TextWrapping="Wrap" />
+                                            <ProgressBar IsIndeterminate="True" />
+                                        </StackPanel>
+                                        <StackPanel Spacing="12" IsVisible="{Binding ChromeExtensionArchivePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <TextBlock Text="ZIP downloaded. Install it in Chrome:" TextWrapping="Wrap" />
+                                            <SelectableTextBlock Text="{Binding ChromeExtensionArchivePath}" TextWrapping="Wrap" Foreground="#B0B0B0" />
+                                            <TextBlock Text="1. Open the download folder and extract the ZIP into a permanent folder.&#x0a;&#x0a;2. Enter chrome://extensions in Chrome's address bar.&#x0a;&#x0a;3. Turn on Developer mode (top right).&#x0a;&#x0a;4. Click Load unpacked and select the extracted folder containing manifest.json.&#x0a;&#x0a;5. Keep that folder in place and keep Axorith running to use Site Blocker."
+                                                       TextWrapping="Wrap" LineHeight="22" />
+                                        </StackPanel>
+                                        <StackPanel Spacing="12" IsVisible="{Binding ChromeExtensionDownloadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <TextBlock Text="{Binding ChromeExtensionDownloadError}" TextWrapping="Wrap" Foreground="#FF9999" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                            <Button Content="Open download folder" Classes="secondary"
+                                                    Command="{Binding OpenChromeExtensionFolderCommand}"
+                                                    IsVisible="{Binding ChromeExtensionArchivePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            <Button Content="Retry download" Classes="accent"
+                                                    Command="{Binding RetryChromeExtensionDownloadCommand}"
+                                                    IsVisible="{Binding ChromeExtensionDownloadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            <Button Content="Close" Classes="secondary"
+                                                    Command="{Binding CloseChromeExtensionDialogCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
+                        </Border>
                         <Border Background="#000000" Opacity="0.85"/>
                         <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="600" MaxHeight="800" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
                             <Grid RowDefinitions="Auto, *">

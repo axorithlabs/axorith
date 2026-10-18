@@ -182,9 +182,7 @@ public abstract class LauncherSettingsBase : IDisposable
             }
 
             if (errors.Count == 0 && !string.IsNullOrEmpty(additionalResult.Message))
-            {
                 return additionalResult;
-            }
         }
 
         return errors.Count > 0

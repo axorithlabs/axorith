@@ -132,9 +132,7 @@ internal sealed class Settings : LauncherSettingsBase
     protected override Task<ValidationResult> ValidateAdditionalAsync()
     {
         if (!EnableWebSocket.GetCurrentValue())
-        {
             return Task.FromResult(ValidationResult.Success);
-        }
 
         var port = WebSocketPort.GetCurrentValue();
         if (port < MinPort || port > MaxPort)

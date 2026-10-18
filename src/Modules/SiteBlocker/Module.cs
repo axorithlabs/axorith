@@ -73,6 +73,8 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private volatile bool _legacyFirefoxProtocol;
     private readonly Action _firefoxExtensionAction =
         new Action("InstallExtension.Firefox", "Install Firefox Extension");
+    private readonly Action _chromeExtensionAction =
+        new Action("InstallExtension.Chrome", "Install Chrome Extension");
 
     private bool HasActiveRules => _activeSiteList.Count > 0 || _isAllowList;
 
@@ -95,7 +97,8 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     public IReadOnlyList<IAction> GetActions()
     {
         _firefoxExtensionAction.OnInvokeAsync(InstallFirefoxExtensionAsync);
-        return [_firefoxExtensionAction];
+        _chromeExtensionAction.OnInvokeAsync(() => Task.CompletedTask);
+        return [_firefoxExtensionAction, _chromeExtensionAction];
     }
 
     private Task InstallFirefoxExtensionAsync()
@@ -128,7 +131,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             .ConfigureAwait(false);
         UpdateBrowserStatuses(extensionResults);
 
-        var warnings = new List<string>();
+        List<string> warnings = [];
         if (noSitesConfigured)
         {
             warnings.Add("No categories or sites selected. The module will not block anything.");
@@ -187,10 +190,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task PauseForBreakAsync(CancellationToken cancellationToken)
     {
-        if (!HasActiveRules)
-        {
-            return;
-        }
+        if (!HasActiveRules) return;
 
         var results = await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken)
             .ConfigureAwait(false);
@@ -201,10 +201,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task ResumeAfterBreakAsync(CancellationToken cancellationToken)
     {
-        if (!HasActiveRules)
-        {
-            return;
-        }
+        if (!HasActiveRules) return;
 
         var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         _pausedForBreak = false;
@@ -214,10 +211,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task<bool> IsProtectionHealthyAsync(CancellationToken cancellationToken)
     {
-        if (!HasActiveRules)
-        {
-            return true;
-        }
+        if (!HasActiveRules) return true;
 
         if (_pausedForBreak)
         {
@@ -245,10 +239,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task<bool> CanStartCommittedSessionAsync(CancellationToken cancellationToken)
     {
-        if (GetAllSites().Count == 0 && _mode.GetCurrentValue() != "AllowList")
-        {
-            return true;
-        }
+        if (GetAllSites().Count == 0 && _mode.GetCurrentValue() != "AllowList") return true;
 
         var results = await SendToAllExtensionsAsync(new { command = "health" }, cancellationToken)
             .ConfigureAwait(false);
@@ -270,9 +261,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         CancellationToken cancellationToken)
     {
         if (endpoint.Name == "Firefox" && _legacyFirefoxProtocol)
-        {
             return await SendLegacyFirefoxMessageAsync(endpoint, message, cancellationToken).ConfigureAwait(false);
-        }
 
         var requestId = Guid.NewGuid().ToString("N");
         var request = JsonSerializer.SerializeToNode(message)?.AsObject()
@@ -298,25 +287,19 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             await writer.WriteLineAsync(request.ToJsonString().AsMemory(), linked.Token).ConfigureAwait(false);
             var responseText = await reader.ReadLineAsync(linked.Token).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(responseText))
-            {
                 return new ExtensionResult(endpoint, "Error", null, false, "The native host returned no response.");
-            }
 
             using var response = JsonDocument.Parse(responseText);
             var root = response.RootElement;
             if (!root.TryGetProperty("requestId", out var responseId) || responseId.GetString() != requestId)
-            {
                 return new ExtensionResult(endpoint, "Error", null, false, "The extension response did not match the request.");
-            }
 
             var protocolVersion = root.TryGetProperty("protocolVersion", out var versionElement) &&
                                   versionElement.TryGetInt32(out var parsedProtocolVersion)
                 ? parsedProtocolVersion
                 : 0;
             if (protocolVersion != ExtensionProtocolVersion)
-            {
                 return new ExtensionResult(endpoint, "Outdated", null, false, "The extension protocol is outdated.");
-            }
 
             if (root.TryGetProperty("status", out var statusElement) &&
                 statusElement.ValueKind == JsonValueKind.String &&
@@ -411,10 +394,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     private string GetUnavailableStatus(BrowserEndpoint endpoint)
     {
-        if (_connectedBrowsers.Contains(endpoint.Name) || IsBrowserRunning(endpoint.Processes))
-        {
-            return "Disconnected";
-        }
+        if (_connectedBrowsers.Contains(endpoint.Name) || IsBrowserRunning(endpoint.Processes)) return "Disconnected";
 
         return "Missing";
     }
@@ -424,10 +404,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         foreach (var name in processNames)
         {
             var processes = Process.GetProcessesByName(name);
-            if (processes.Length == 0)
-            {
-                continue;
-            }
+            if (processes.Length == 0) continue;
 
             foreach (var process in processes)
             {
@@ -445,33 +422,23 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         foreach (var result in results)
         {
             _browserStatuses[result.Endpoint.Name] = result.Status;
-            if (result.Status == "Connected")
-            {
-                _connectedBrowsers.Add(result.Endpoint.Name);
-            }
+            if (result.Status == "Connected") _connectedBrowsers.Add(result.Endpoint.Name);
         }
     }
 
     private void ApplyBrowserFallback(IEnumerable<ExtensionResult> unavailable)
     {
-        var processes = GetFallbackProcesses(unavailable.Select(result =>
-                (result.Endpoint.Name, result.Endpoint.Processes)))
+        var processes = unavailable
+            .Select(result => (result.Endpoint.Name, result.Endpoint.Processes))
+            .Where(browser => !string.Equals(browser.Name, "Firefox", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(browser => browser.Processes)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (processes.SetEquals(_fallbackBrowserProcesses) && !_browserFallbackFailed)
-        {
-            return;
-        }
+        if (processes.SetEquals(_fallbackBrowserProcesses) && !_browserFallbackFailed) return;
 
         try
         {
-            if (processes.Count == 0)
-            {
-                browserBlocker.UnblockAll();
-            }
-            else
-            {
-                browserBlocker.Block(processes);
-            }
+            if (processes.Count == 0) browserBlocker.UnblockAll();
+            else browserBlocker.Block(processes);
 
             _fallbackBrowserProcesses = processes;
             _browserFallbackFailed = false;
@@ -483,22 +450,13 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         }
     }
 
-    private static IEnumerable<string> GetFallbackProcesses(
-        IEnumerable<(string BrowserName, string[] Processes)> unavailable) =>
-        unavailable
-            .Where(browser => !string.Equals(browser.BrowserName, "Firefox", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(browser => browser.Processes);
-
     private List<string> GetAllSites()
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var category in _categories.GetCurrentValue())
         {
-            if (_categorySites!.TryGetValue(category, out var sites))
-            {
-                result.UnionWith(sites);
-            }
+            if (_categorySites!.TryGetValue(category, out var sites)) result.UnionWith(sites);
         }
 
         result.UnionWith(_customSites.GetCurrentValue()
@@ -509,22 +467,16 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     private static void EnsureCategoriesLoaded()
     {
-        if (_categorySites != null)
-        {
-            return;
-        }
+        if (_categorySites != null) return;
 
         lock (_loadLock)
         {
-            if (_categorySites != null)
-            {
-                return;
-            }
+            if (_categorySites != null) return;
 
             var moduleDirectory = Path.GetDirectoryName(typeof(Module).Assembly.Location);
             if (string.IsNullOrEmpty(moduleDirectory))
             {
-                _categorySites = new Dictionary<string, string[]>();
+                _categorySites = new();
                 return;
             }
 
@@ -532,19 +484,18 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
             if (!File.Exists(jsonPath))
             {
-                _categorySites = new Dictionary<string, string[]>();
+                _categorySites = new();
                 return;
             }
 
             try
             {
                 var json = File.ReadAllText(jsonPath);
-                _categorySites = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json)
-                                 ?? new Dictionary<string, string[]>();
+                _categorySites = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) ?? new();
             }
             catch
             {
-                _categorySites = new Dictionary<string, string[]>();
+                _categorySites = new();
             }
         }
     }
@@ -576,17 +527,11 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     private static FirefoxExtensionState? FindInstalledFirefoxExtension()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return null;
-        }
+        if (!OperatingSystem.IsWindows()) return null;
 
         var profilesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Mozilla", "Firefox", "Profiles");
-        if (!Directory.Exists(profilesPath))
-        {
-            return null;
-        }
+        if (!Directory.Exists(profilesPath)) return null;
 
         FirefoxExtensionState? installedExtension = null;
         try
@@ -594,10 +539,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             foreach (var profilePath in Directory.EnumerateDirectories(profilesPath))
             {
                 var extensionsFile = Path.Combine(profilePath, "extensions.json");
-                if (!File.Exists(extensionsFile))
-                {
-                    continue;
-                }
+                if (!File.Exists(extensionsFile)) continue;
 
                 try
                 {
@@ -618,10 +560,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
                                 Active: ReadBoolean(addon, "active"),
                                 UserDisabled: ReadBoolean(addon, "userDisabled"),
                                 AppDisabled: ReadBoolean(addon, "appDisabled"));
-                            if (extension.Active && !extension.UserDisabled && !extension.AppDisabled)
-                            {
-                                return extension;
-                            }
+                            if (extension.Active && !extension.UserDisabled && !extension.AppDisabled) return extension;
 
                             installedExtension ??= extension;
                         }
@@ -646,10 +585,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 

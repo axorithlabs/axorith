@@ -111,12 +111,17 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
 
+var isTestRun = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1";
+var testHostMutexName = Environment.GetEnvironmentVariable("AXORITH_TEST_HOST_MUTEX");
+var hostMutexName = isTestRun && !string.IsNullOrWhiteSpace(testHostMutexName)
+    ? testHostMutexName
+    : isTestRun ? "Global\\AxorithTestHostInstanceMutex" : "Global\\AxorithHostInstanceMutex";
 var hostInfoPath = ApplicationPaths.HostInfoFile;
 ITelemetryService? telemetry = null;
 FileSystemWatcher? telemetryPreferenceWatcher = null;
 Func<Task>? refreshTelemetryProductState = null;
 
-using var hostMutex = new Mutex(true, "Global\\AxorithHostInstanceMutex", out var createdNew);
+using var hostMutex = new Mutex(true, hostMutexName, out var createdNew);
 
 if (!createdNew)
 {
@@ -161,7 +166,6 @@ try
     Log.Information("Starting Axorith.Host...");
 
     var builder = WebApplication.CreateBuilder(args);
-    var isTestRun = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1";
     var telemetryEnabled = !isTestRun && TelemetryPreference.ReadOrDefault(true);
     var telemetrySettings = new TelemetrySettings()
             .WithEnvironmentOverrides() with

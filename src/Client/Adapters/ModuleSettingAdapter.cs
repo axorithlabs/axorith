@@ -33,17 +33,11 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
         Filter = setting.Filter;
         HasHistory = setting.HasHistory;
 
-        if (!Enum.TryParse<SettingControlType>(setting.ControlType, out var controlType))
-        {
-            controlType = SettingControlType.Text;
-        }
+        if (!Enum.TryParse<SettingControlType>(setting.ControlType, out var controlType)) controlType = SettingControlType.Text;
 
         ControlType = controlType;
 
-        if (!Enum.TryParse<SettingPersistence>(setting.Persistence, out var persistence))
-        {
-            persistence = SettingPersistence.Persisted;
-        }
+        if (!Enum.TryParse<SettingPersistence>(setting.Persistence, out var persistence)) persistence = SettingPersistence.Persisted;
 
         Persistence = persistence;
 
@@ -66,20 +60,9 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
 
     public object? GetCurrentValueAsObject() => _valueSubject.Value;
 
-    public string GetValueAsString()
-    {
-        var value = _valueSubject.Value;
-        return value switch
-        {
-            null => string.Empty,
-            string s => s,
-            bool b => b.ToString(),
-            decimal d => d.ToString(),
-            int i => i.ToString(),
-            double d => d.ToString(),
-            _ => value.ToString() ?? string.Empty
-        };
-    }
+    public string GetValueAsString() => _valueSubject.Value is List<string> list
+        ? string.Join("|", list)
+        : _valueSubject.Value?.ToString() ?? string.Empty;
 
     public void SetValueFromObject(object? value) => _valueSubject.OnNext(value);
 
@@ -116,10 +99,7 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
 
     private static Type ParseValueType(string typeName)
     {
-        if (string.IsNullOrEmpty(typeName))
-        {
-            return typeof(string);
-        }
+        if (string.IsNullOrEmpty(typeName)) return typeof(string);
 
         return typeName switch
         {
@@ -135,42 +115,21 @@ internal class ModuleSettingAdapter : ISetting, IDisposable
 
     private object? ParseValue(string? value)
     {
-        if (string.IsNullOrEmpty(value))
-        {
-            return ValueType == typeof(bool) ? false : null;
-        }
+        if (string.IsNullOrEmpty(value)) return ValueType == typeof(bool) ? false : null;
 
         try
         {
-            if (ValueType == typeof(string))
-            {
-                return value;
-            }
+            if (ValueType == typeof(string)) return value;
 
-            if (ValueType == typeof(bool))
-            {
-                return bool.TryParse(value, out var b) && b;
-            }
+            if (ValueType == typeof(bool)) return bool.TryParse(value, out var b) && b;
 
-            if (ValueType == typeof(int))
-            {
-                return int.TryParse(value, out var i) ? i : 0;
-            }
+            if (ValueType == typeof(int)) return int.TryParse(value, out var i) ? i : 0;
 
-            if (ValueType == typeof(decimal))
-            {
-                return decimal.TryParse(value, out var d) ? d : 0m;
-            }
+            if (ValueType == typeof(decimal)) return decimal.TryParse(value, out var d) ? d : 0m;
 
-            if (ValueType == typeof(double))
-            {
-                return double.TryParse(value, out var d) ? d : 0d;
-            }
+            if (ValueType == typeof(double)) return double.TryParse(value, out var d) ? d : 0d;
 
-            if (ValueType == typeof(TimeSpan))
-            {
-                return TimeSpan.TryParse(value, out var ts) ? ts : TimeSpan.Zero;
-            }
+            if (ValueType == typeof(TimeSpan)) return TimeSpan.TryParse(value, out var ts) ? ts : TimeSpan.Zero;
         }
         catch
         {

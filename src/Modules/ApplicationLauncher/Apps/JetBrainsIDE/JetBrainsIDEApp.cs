@@ -34,9 +34,7 @@ internal sealed class JetBrainsIDEApp(
         try
         {
             if (!string.IsNullOrWhiteSpace(projectPath) && Directory.Exists(projectPath))
-            {
                 return projectPath;
-            }
         }
         catch
         {

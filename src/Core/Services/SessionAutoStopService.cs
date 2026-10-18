@@ -93,10 +93,7 @@ public class SessionAutoStopService(
     {
         lock (_stateLock)
         {
-            if (!_stopAt.HasValue)
-            {
-                return null;
-            }
+            if (!_stopAt.HasValue) return null;
 
             return GetRemainingTimeLocked();
         }
@@ -104,10 +101,7 @@ public class SessionAutoStopService(
 
     private async void OnSessionStopped(Guid sessionId)
     {
-        if (_isStoppingSession)
-        {
-            return;
-        }
+        if (_isStoppingSession) return;
 
         try
         {
@@ -156,10 +150,7 @@ public class SessionAutoStopService(
 
         lock (_stateLock)
         {
-            if (!_stopAt.HasValue || !sessionManager.IsSessionRunning)
-            {
-                return;
-            }
+            if (!_stopAt.HasValue || !sessionManager.IsSessionRunning) return;
 
             nextPresetId = _nextPresetId;
             stopSchedule = _stopSchedule;
@@ -241,17 +232,11 @@ public class SessionAutoStopService(
 
         lock (_stateLock)
         {
-            if (!_sentNotificationKeys.Add(key))
-            {
-                return;
-            }
+            if (!_sentNotificationKeys.Add(key)) return;
         }
 
         var preset = sessionManager.ActiveSession;
-        if (preset == null)
-        {
-            return;
-        }
+        if (preset == null) return;
 
         string message;
         if (nextPresetIdLocal.HasValue)
@@ -411,10 +396,7 @@ public class SessionAutoStopService(
 
     private void CleanupNotificationCache()
     {
-        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1)
-        {
-            return;
-        }
+        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1) return;
 
         lock (_stateLock)
         {
@@ -426,10 +408,7 @@ public class SessionAutoStopService(
 
     public async Task ExecuteAfterEndActionAsync(AfterEndBehavior behavior)
     {
-        if (behavior is AfterEndBehavior.DoNothing or AfterEndBehavior.StartNextWorkspace)
-        {
-            return;
-        }
+        if (behavior is AfterEndBehavior.DoNothing or AfterEndBehavior.StartNextWorkspace) return;
 
         if (!OperatingSystem.IsWindows())
         {

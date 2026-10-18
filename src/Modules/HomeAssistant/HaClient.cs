@@ -51,9 +51,7 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
     public async Task<bool> CheckConnectionAsync(string baseUrl, string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
-        {
             return false;
-        }
 
         baseUrl = baseUrl.TrimEnd('/');
         if (!baseUrl.StartsWith("http"))

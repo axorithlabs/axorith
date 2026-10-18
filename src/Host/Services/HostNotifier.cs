@@ -34,10 +34,7 @@ public class HostNotifier(
 
                 await notificationBroadcaster.BroadcastAsync(combinedMessage, NotificationType.Info, source);
             }
-            else
-            {
-                await systemNotificationService.ShowNotificationAsync(title, message, expiration);
-            }
+            else await systemNotificationService.ShowNotificationAsync(title, message, expiration);
         }
         catch (Exception ex)
         {

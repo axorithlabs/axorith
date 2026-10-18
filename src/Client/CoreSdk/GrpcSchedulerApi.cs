@@ -9,13 +9,13 @@ namespace Axorith.Client.CoreSdk;
 internal class GrpcSchedulerApi(SchedulerService.SchedulerServiceClient client, AsyncRetryPolicy retryPolicy)
     : ISchedulerApi
 {
-    public async Task<IReadOnlyList<SessionSchedule>> ListSchedulesAsync(CancellationToken ct = default) =>
-        await retryPolicy.ExecuteAsync(async () =>
+    public Task<IReadOnlyList<SessionSchedule>> ListSchedulesAsync(CancellationToken ct = default) =>
+        retryPolicy.ExecuteAsync<IReadOnlyList<SessionSchedule>>(async () =>
         {
             var response = await client.ListSchedulesAsync(new ListSchedulesRequest(), cancellationToken: ct)
                 .ConfigureAwait(false);
             return response.Schedules.Select(message => ScheduleCodec.ToModel(message, includeLastRun: true)).ToList();
-        }).ConfigureAwait(false);
+        });
 
     public Task<ConfigurationLockStatusModel> GetConfigurationLockStatusAsync(Guid presetId,
         CancellationToken ct = default) => retryPolicy.ExecuteAsync(async () =>

@@ -19,39 +19,22 @@ public sealed class WindowsAutoStartManager : IAutoStartManager
         _executablePath = GetExecutablePath();
     }
 
-    public bool IsAutoStartEnabled
-    {
-        get
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
-                var value = key?.GetValue(AppName) as string;
-                return !string.IsNullOrEmpty(value);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to check auto-start status");
-                return false;
-            }
-        }
-    }
+    public bool IsAutoStartEnabled => !string.IsNullOrEmpty(ReadAutoStartCommand("Failed to check auto-start status"));
 
-    public bool IsStartMinimized
+    public bool IsStartMinimized => ReadAutoStartCommand("Failed to check start minimized status")?
+        .Contains("--tray", StringComparison.OrdinalIgnoreCase) ?? false;
+
+    private string? ReadAutoStartCommand(string errorMessage)
     {
-        get
+        try
         {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
-                var value = key?.GetValue(AppName) as string;
-                return value?.Contains("--tray", StringComparison.OrdinalIgnoreCase) ?? false;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to check start minimized status");
-                return false;
-            }
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
+            return key?.GetValue(AppName) as string;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, errorMessage);
+            return null;
         }
     }
 
@@ -86,10 +69,7 @@ public sealed class WindowsAutoStartManager : IAutoStartManager
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, true);
-            if (key == null)
-            {
-                return true;
-            }
+            if (key is null) return true;
 
             if (key.GetValue(AppName) != null)
             {
@@ -109,10 +89,7 @@ public sealed class WindowsAutoStartManager : IAutoStartManager
     private static string GetExecutablePath()
     {
         var exePath = Environment.ProcessPath;
-        if (!string.IsNullOrEmpty(exePath))
-        {
-            return exePath;
-        }
+        if (!string.IsNullOrEmpty(exePath)) return exePath;
 
         var assembly = Assembly.GetEntryAssembly();
         return assembly?.Location ?? "Axorith.Client.exe";

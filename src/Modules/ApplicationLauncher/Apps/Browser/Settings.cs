@@ -77,9 +77,7 @@ internal sealed class Settings : LauncherSettingsBase
     {
         var url = StartUrl.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(url))
-        {
             return Task.FromResult(ValidationResult.Success);
-        }
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != "http" && uri.Scheme != "https"))
@@ -103,7 +101,7 @@ internal sealed class Settings : LauncherSettingsBase
     {
         return Task.Run(() =>
         {
-            var browsers = new List<AppInfo>();
+            List<AppInfo> browsers = [];
 
             foreach (var publisher in BrowserPublishers)
             {
@@ -157,9 +155,7 @@ internal sealed class Settings : LauncherSettingsBase
     {
         var entries = group.ToList();
         if (entries.Count == 1)
-        {
             return entries[0];
-        }
 
         var exeNameWithoutExt = Path.GetFileNameWithoutExtension(group.Key);
 

@@ -211,15 +211,11 @@ public class SessionsServiceImpl(
     public override async Task<OperationResult> PreflightSession(PreflightSessionRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.PresetId, out var presetId))
-        {
             return SessionMapper.CreateResult(false, "Invalid Workspace ID", [$"Could not parse ID: {request.PresetId}"]);
-        }
 
         var preset = await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken).ConfigureAwait(false);
         if (preset == null)
-        {
             return SessionMapper.CreateResult(false, "Workspace not found", [$"No Workspace found with ID: {presetId}"]);
-        }
 
         try
         {

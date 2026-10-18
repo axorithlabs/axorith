@@ -19,6 +19,24 @@ internal static class BenchmarkEnvironment
         }
     }
 
+    public static string BuildOutputDirectory
+    {
+        get
+        {
+            for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+                 directory is not null;
+                 directory = directory.Parent)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "Axorith.Host", "Axorith.Host.dll")))
+                    return directory.FullName;
+            }
+
+            throw new DirectoryNotFoundException("Could not locate the build output containing Axorith.Host.");
+        }
+    }
+
+    public static string ProjectOutputDirectory(string projectName) => Path.Combine(BuildOutputDirectory, projectName);
+
     public static void Initialize()
     {
         lock (Gate)
@@ -32,6 +50,9 @@ internal static class BenchmarkEnvironment
                 Path.Combine(_root, "roaming", "Axorith"));
             Environment.SetEnvironmentVariable("AXORITH_LOCAL_ROOT",
                 Path.Combine(_root, "local", "Axorith"));
+            Environment.SetEnvironmentVariable("AXORITH_TEST_MODE", "1");
+            Environment.SetEnvironmentVariable("AXORITH_TEST_HOST_MUTEX",
+                $"Global\\AxorithBenchmarkHost-{Environment.ProcessId}");
 
             AppDomain.CurrentDomain.ProcessExit += (_, _) =>
             {

@@ -53,10 +53,7 @@ public class ScheduleManager(
 
     public Task StartProcessingAsync(CancellationToken cancellationToken)
     {
-        if (_loopTask != null)
-        {
-            return Task.CompletedTask;
-        }
+        if (_loopTask != null) return Task.CompletedTask;
 
         _loopCts = CancellationTokenSource.CreateLinkedTokenSource(_applicationStoppingToken, cancellationToken);
         _loopTask = RunSchedulerLoopAsync(_loopCts.Token);
@@ -115,10 +112,7 @@ public class ScheduleManager(
                 s is { Type: ScheduleType.StopDuration, IsEnabled: true, AutoStopDuration: not null } &&
                 s.AutoStopDuration.Value > TimeSpan.Zero);
 
-            if (durationSchedule == null)
-            {
-                return;
-            }
+            if (durationSchedule == null) return;
 
             logger.LogInformation(
                 "Found StopDuration schedule for preset {PresetId}: duration={Duration}, nextPreset={NextPresetId}",
@@ -169,10 +163,7 @@ public class ScheduleManager(
     {
         var preset = await presetManager.GetPresetByIdAsync(presetId, cancellationToken).ConfigureAwait(false);
         var lockMinutes = preset?.FocusCommitment.ScheduleLockMinutes ?? 0;
-        if (lockMinutes <= 0)
-        {
-            return new ConfigurationLockStatus(false, null);
-        }
+        if (lockMinutes <= 0) return new ConfigurationLockStatus(false, null);
 
         if (lockMinutes is not (5 or 15 or 60))
         {
@@ -272,10 +263,7 @@ public class ScheduleManager(
 
     private async Task CheckAndRunSchedulesAsync(CancellationToken ct)
     {
-        if (_isProcessingSchedule)
-        {
-            return;
-        }
+        if (_isProcessingSchedule) return;
 
         var now = DateTimeOffset.Now;
         List<(SessionSchedule Schedule, DateTimeOffset RunTime)> toRun = [];
@@ -286,30 +274,18 @@ public class ScheduleManager(
         {
             foreach (var schedule in _schedules)
             {
-                if (!schedule.IsEnabled)
-                {
-                    continue;
-                }
+                if (!schedule.IsEnabled) continue;
 
                 var nextRun = schedule.GetNextRun(now);
 
-                if (!nextRun.HasValue)
-                {
-                    continue;
-                }
+                if (!nextRun.HasValue) continue;
 
                 var runTime = nextRun.Value;
                 var timeLeft = runTime - now;
 
-                if (timeLeft.TotalMinutes is > 6 or < -5)
-                {
-                    continue;
-                }
+                if (timeLeft.TotalMinutes is > 6 or < -5) continue;
 
-                if (schedule.Type == ScheduleType.StopDuration)
-                {
-                    continue;
-                }
+                if (schedule.Type == ScheduleType.StopDuration) continue;
 
                 var isStop = schedule.Type == ScheduleType.StopRecurring;
                 if (isStop)
@@ -331,10 +307,7 @@ public class ScheduleManager(
                 if (timeLeft > TimeSpan.Zero)
                     await NotifyScheduleWarningAsync(schedule, runTime, timeLeft, isStop, ct);
 
-                if (!IsTriggerWindow(timeLeft) || !IsScheduleReadyToRun(schedule, now))
-                {
-                    continue;
-                }
+                if (!IsTriggerWindow(timeLeft) || !IsScheduleReadyToRun(schedule, now)) continue;
 
                 (isStop ? toStop : toRun).Add((schedule, runTime));
             }
@@ -523,16 +496,10 @@ public class ScheduleManager(
             threshold = TimeSpan.FromMinutes(5);
             timeText = "5 minutes";
         }
-        else
-        {
-            return;
-        }
+        else return;
 
         var key = $"{(isStop ? "stop_" : string.Empty)}{schedule.Id}_{runTime.Ticks}_{threshold.TotalSeconds}";
-        if (!_sentNotificationKeys.Add(key))
-        {
-            return;
-        }
+        if (!_sentNotificationKeys.Add(key)) return;
 
         if (isStop)
         {
@@ -543,10 +510,7 @@ public class ScheduleManager(
         }
 
         var preset = await presetManager.GetPresetByIdAsync(schedule.PresetId, ct);
-        if (preset == null)
-        {
-            return;
-        }
+        if (preset == null) return;
 
         logger.LogInformation("Sending schedule warning: {Name} in {TimeText}", schedule.Name, timeText);
         await notifier.ShowSystemAsync("Session Scheduler", $"Session '{preset.Name}' will start in {timeText}.",
@@ -555,10 +519,7 @@ public class ScheduleManager(
 
     private void CleanupNotificationCache()
     {
-        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1)
-        {
-            return;
-        }
+        if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1) return;
 
         _sentNotificationKeys.Clear();
         _reportedScheduleTriggerSkips.Clear();
@@ -567,10 +528,7 @@ public class ScheduleManager(
 
     private async Task LoadAsync(CancellationToken ct)
     {
-        if (!File.Exists(_storagePath))
-        {
-            return;
-        }
+        if (!File.Exists(_storagePath)) return;
 
         try
         {

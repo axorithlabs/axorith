@@ -26,15 +26,12 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
 
     public override async Task<Schedule> CreateSchedule(CreateScheduleRequest request, ServerCallContext context)
     {
-        if (request.Schedule == null)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Schedule is required"));
-        }
+        var schedule = request.Schedule ?? throw new RpcException(
+            new Status(StatusCode.InvalidArgument, "Schedule is required"));
 
-        logger.LogInformation("Creating schedule '{Name}' for preset {PresetId}", request.Schedule.Name,
-            request.Schedule.PresetId);
+        logger.LogInformation("Creating schedule '{Name}' for preset {PresetId}", schedule.Name, schedule.PresetId);
 
-        var model = ScheduleCodec.ToModel(request.Schedule);
+        var model = ScheduleCodec.ToModel(schedule);
         await EnsurePresetMutableAsync(model.PresetId, context.CancellationToken);
         model.Id = Guid.NewGuid();
 
@@ -45,14 +42,12 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
 
     public override async Task<Schedule> UpdateSchedule(UpdateScheduleRequest request, ServerCallContext context)
     {
-        if (request.Schedule == null)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Schedule is required"));
-        }
+        var schedule = request.Schedule ?? throw new RpcException(
+            new Status(StatusCode.InvalidArgument, "Schedule is required"));
 
-        logger.LogInformation("Updating schedule '{Name}' ({Id})", request.Schedule.Name, request.Schedule.Id);
+        logger.LogInformation("Updating schedule '{Name}' ({Id})", schedule.Name, schedule.Id);
 
-        var model = ScheduleCodec.ToModel(request.Schedule);
+        var model = ScheduleCodec.ToModel(schedule);
         var existing = await GetMutableScheduleAsync(model.Id, context.CancellationToken);
         var configurationChanged = existing is null || !SchedulesEqual(existing, model);
         await EnsurePresetMutableAsync(model.PresetId, context.CancellationToken);
@@ -90,12 +85,8 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         var existing = await GetMutableScheduleAsync(id, context.CancellationToken);
         logger.LogInformation("Setting schedule {Id} enabled: {Enabled}", id, request.Enabled);
 
-        var updated = await scheduleManager.SetEnabledAsync(id, request.Enabled, context.CancellationToken);
-
-        if (updated == null)
-        {
-            throw new RpcException(new Status(StatusCode.NotFound, "Schedule not found"));
-        }
+        var updated = await scheduleManager.SetEnabledAsync(id, request.Enabled, context.CancellationToken)
+            ?? throw new RpcException(new Status(StatusCode.NotFound, "Schedule not found"));
 
         if (existing?.IsEnabled != updated.IsEnabled)
         {

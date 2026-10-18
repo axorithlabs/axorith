@@ -15,7 +15,7 @@ public sealed class HostController(
     ITokenProvider tokenProvider)
 {
     private static readonly string HostInfoPath = ApplicationPaths.HostInfoFile;
-    private static readonly Mutex HostStartMutex = new(false, "Global\\AxorithHostStartMutex");
+    private static readonly SemaphoreSlim HostStartLock = new(1, 1);
 
     private readonly object _portLock = new();
     private int? _cachedPort;
@@ -24,6 +24,9 @@ public sealed class HostController(
     {
         try
         {
+            if (!File.Exists(Path.Combine(ApplicationPaths.Config, AuthConstants.TokenFileName)))
+                return false;
+
             var token = await tokenProvider.GetTokenAsync(ct);
             var port = GetDiscoveredPort();
             using var channel = CreateAuthenticatedChannel(token ?? string.Empty, port);
@@ -50,23 +53,11 @@ public sealed class HostController(
 
     public async Task StartHostAsync(bool forceRestart = false, CancellationToken ct = default)
     {
-        var mutexAcquired = false;
+        var lockAcquired = false;
         try
         {
-            mutexAcquired = HostStartMutex.WaitOne(TimeSpan.FromSeconds(30));
-
-            if (!mutexAcquired)
-            {
-                logger.LogWarning(
-                    "Could not acquire Host start mutex within 30 seconds; another Client may be starting Host.");
-
-                if (await IsHostReachableAsync(ct))
-                {
-                    return;
-                }
-
-                logger.LogWarning("Host not reachable and mutex timeout. Will attempt start anyway.");
-            }
+            await HostStartLock.WaitAsync(ct);
+            lockAcquired = true;
 
             var existingProcesses = Process.GetProcessesByName("Axorith.Host");
 
@@ -78,9 +69,7 @@ public sealed class HostController(
                 {
                     var reachable = await IsHostReachableAsync(ct);
                     if (reachable)
-                    {
                         return;
-                    }
 
                     logger.LogInformation(
                         "Host process detected but not yet reachable. Waiting up to 10 seconds for initialization...");
@@ -98,9 +87,7 @@ public sealed class HostController(
 
 
                         if (await IsHostReachableAsync(ct))
-                        {
                             return;
-                        }
 
                         await Task.Delay(200, ct);
                     }
@@ -153,10 +140,7 @@ public sealed class HostController(
                         "The existing Axorith Host could not be stopped; refusing to start a second Host process.");
                 }
             }
-            else
-            {
-                logger.LogInformation("No existing Host processes found. Will start new Host.");
-            }
+            else logger.LogInformation("No existing Host processes found. Will start new Host.");
 
             var startTimestampUtc = DateTime.UtcNow;
 
@@ -266,18 +250,8 @@ public sealed class HostController(
         }
         finally
         {
-            if (mutexAcquired)
-            {
-                try
-                {
-                    HostStartMutex.ReleaseMutex();
-                    logger.LogInformation("Released Host start mutex");
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to release Host start mutex");
-                }
-            }
+            if (lockAcquired)
+                HostStartLock.Release();
         }
     }
 
@@ -362,9 +336,7 @@ public sealed class HostController(
         lock (_portLock)
         {
             if (_cachedPort.HasValue)
-            {
                 return _cachedPort.Value;
-            }
 
             if (HostInfoReader.TryReadPort(HostInfoPath, out var port))
             {
@@ -388,9 +360,7 @@ public sealed class HostController(
             var debugProbe =
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../Axorith.Host", "Axorith.Host.exe"));
             if (File.Exists(debugProbe))
-            {
                 return debugProbe;
-            }
             #else
             var env = Environment.GetEnvironmentVariable("AXORITH_HOST_PATH", EnvironmentVariableTarget.User);
             if (!string.IsNullOrWhiteSpace(env))

@@ -22,9 +22,7 @@ public sealed class NotificationBroadcaster(ILogger<NotificationBroadcaster> log
     public Task BroadcastAsync(string message, NotificationType type, string source = "Axorith")
     {
         if (_subscribers.IsEmpty)
-        {
             return Task.CompletedTask;
-        }
 
         var evt = new NotificationEvent
         {

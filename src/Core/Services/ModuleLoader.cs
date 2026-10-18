@@ -22,16 +22,13 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
         IEnumerable<string>? allowedSymlinks = null)
     {
         logger.LogInformation("Starting module definition discovery from 'module.json' files...");
-        var definitions = new List<ModuleDefinition>();
+        List<ModuleDefinition> definitions = [];
         var currentPlatform = GetCurrentPlatform();
         var allowedSymlinkSet = allowedSymlinks?.Select(Path.GetFullPath).ToHashSet() ?? [];
 
         foreach (var path in searchPaths)
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
+            if (cancellationToken.IsCancellationRequested) break;
 
             var dirInfo = new DirectoryInfo(path);
             if (dirInfo.LinkTarget != null)
@@ -75,15 +72,9 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             {
                 var jsonFile = Path.Combine(moduleDir, "module.json");
 
-                if (!File.Exists(jsonFile))
-                {
-                    continue;
-                }
+                if (!File.Exists(jsonFile)) continue;
 
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
+                if (cancellationToken.IsCancellationRequested) break;
 
                 try
                 {
@@ -120,10 +111,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     }
 
                     var moduleDirectory = Path.GetDirectoryName(jsonFile);
-                    if (moduleDirectory == null)
-                    {
-                        continue;
-                    }
+                    if (moduleDirectory == null) continue;
 
                     var moduleDirectoryFullPath = Path.GetFullPath(moduleDirectory);
 
@@ -132,11 +120,10 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     {
                         var combinedPath = Path.Combine(moduleDirectoryFullPath, definition.AssemblyFileName);
                         var dllFullPath = Path.GetFullPath(combinedPath);
-                        var moduleDirectoryNormalized = Path.GetFullPath(moduleDirectoryFullPath);
 
-                        if (!dllFullPath.StartsWith(moduleDirectoryNormalized + Path.DirectorySeparatorChar,
+                        if (!dllFullPath.StartsWith(moduleDirectoryFullPath + Path.DirectorySeparatorChar,
                                 StringComparison.OrdinalIgnoreCase) &&
-                            !dllFullPath.Equals(moduleDirectoryNormalized, StringComparison.OrdinalIgnoreCase))
+                            !dllFullPath.Equals(moduleDirectoryFullPath, StringComparison.OrdinalIgnoreCase))
                         {
                             logger.LogWarning(
                                 "Specified assembly path '{Assembly}' for module '{ModuleName}' escapes module directory '{ModuleDir}'. Skipping",

@@ -57,10 +57,7 @@ public sealed partial class TelemetryService : ITelemetryService
     {
         var resolved = (settings ?? throw new ArgumentNullException(nameof(settings))).WithEnvironmentOverrides();
         _baseProperties = new Dictionary<string, object?>();
-        if (!resolved.IsConfigured)
-        {
-            return;
-        }
+        if (!resolved.IsConfigured) return;
 
         _distinctId = string.IsNullOrWhiteSpace(resolved.DistinctId)
             ? DeviceIdProvider.GetDeviceId()
@@ -101,19 +98,13 @@ public sealed partial class TelemetryService : ITelemetryService
 
     public void SetEnabled(bool enabled)
     {
-        if (_client is null)
-        {
-            return;
-        }
+        if (_client is null) return;
 
         bool wasEnabled;
         bool identify;
         lock (_consentLock)
         {
-            if (_disposed || Volatile.Read(ref _acceptingEvents) == 0)
-            {
-                return;
-            }
+            if (_disposed || Volatile.Read(ref _acceptingEvents) == 0) return;
 
             wasEnabled = Volatile.Read(ref _enabled) != 0;
             if (wasEnabled != enabled)
@@ -141,10 +132,7 @@ public sealed partial class TelemetryService : ITelemetryService
             identify = enabled && (!wasEnabled || Interlocked.Exchange(ref _identified, 1) == 0);
         }
 
-        if (!enabled)
-        {
-            return;
-        }
+        if (!enabled) return;
 
         if (identify)
         {
@@ -165,25 +153,17 @@ public sealed partial class TelemetryService : ITelemetryService
         {
             lock (_flushLock)
             {
-                if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0)
-                {
-                    return;
-                }
+                if (!IsEnabled || Volatile.Read(ref _acceptingEvents) == 0) return;
 
                 var name = string.IsNullOrWhiteSpace(eventName) ? TelemetryConstants.DefaultEvent : eventName;
-                if (!EventNameRegex().IsMatch(name))
-                {
-                    return;
-                }
+                if (!EventNameRegex().IsMatch(name)) return;
 
                 var safeProperties = properties is null
                     ? new Dictionary<string, object?>()
                     : TelemetryEventSanitizer.SanitizeProperties(properties);
                 var eventProperties = new Dictionary<string, object>(StringComparer.Ordinal);
                 if (!string.Equals(name, TelemetryConstants.IdentifyEvent, StringComparison.OrdinalIgnoreCase))
-                {
                     AddProperties(eventProperties, _baseProperties);
-                }
 
                 AddProperties(eventProperties, safeProperties);
                 eventProperties[TelemetryConstants.Properties.PreferenceGeneration] =
@@ -202,10 +182,7 @@ public sealed partial class TelemetryService : ITelemetryService
         bool handled, bool fatal, IReadOnlyDictionary<string, object?>? properties = null)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        if (!IsEnabled)
-        {
-            return;
-        }
+        if (!IsEnabled) return;
 
         var (fingerprint, diagnostic) = Describe(exception);
         var details = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -239,10 +216,7 @@ public sealed partial class TelemetryService : ITelemetryService
 
             aggregate.PendingCount++;
             aggregate.PendingFatal |= fatal;
-            if (!fatal && now - aggregate.LastEmittedAt < ErrorRepeatInterval)
-            {
-                return;
-            }
+            if (!fatal && now - aggregate.LastEmittedAt < ErrorRepeatInterval) return;
 
             var repeatProperties = new Dictionary<string, object?>(aggregate.Properties, StringComparer.Ordinal)
             {
@@ -258,19 +232,13 @@ public sealed partial class TelemetryService : ITelemetryService
 
     public async Task FlushAsync(CancellationToken ct = default)
     {
-        if (_client is null || _disposed)
-        {
-            return;
-        }
+        if (_client is null || _disposed) return;
 
         FlushPendingErrors();
         Task flushTask;
         lock (_flushLock)
         {
-            if (_disposed)
-            {
-                return;
-            }
+            if (_disposed) return;
 
             if (_flushTask is null)
             {
@@ -374,21 +342,18 @@ public sealed partial class TelemetryService : ITelemetryService
     {
         foreach (var (key, value) in properties)
         {
-            if (value is not null)
-            {
-                destination[key] = ToPostHogValue(value);
-            }
+            if (value is not null) destination[key] = ToPostHogValue(value)!;
         }
     }
 
-    private static object ToPostHogValue(object value) => value switch
+    private static object? ToPostHogValue(object? value) => value switch
     {
-        IReadOnlyDictionary<string, object?> dictionary => JsonSerializer.SerializeToElement(
-            dictionary.ToDictionary(pair => pair.Key, pair => pair.Value is null ? null : ToPostHogValue(pair.Value))),
-        IDictionary<string, object?> dictionary => JsonSerializer.SerializeToElement(
-            dictionary.ToDictionary(pair => pair.Key, pair => pair.Value is null ? null : ToPostHogValue(pair.Value))),
+        IEnumerable<KeyValuePair<string, object?>> dictionary
+            when value is IReadOnlyDictionary<string, object?> or IDictionary<string, object?> =>
+                JsonSerializer.SerializeToElement(
+                    dictionary.ToDictionary(pair => pair.Key, pair => ToPostHogValue(pair.Value))),
         IEnumerable sequence when value is not string => sequence.Cast<object?>()
-            .Select(item => item is null ? null : ToPostHogValue(item)).ToArray(),
+            .Select(ToPostHogValue).ToArray(),
         _ => value
     };
 

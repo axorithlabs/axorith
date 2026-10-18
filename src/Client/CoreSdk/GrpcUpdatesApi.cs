@@ -31,9 +31,7 @@ public class GrpcUpdatesApi : IUpdatesApi
             var response = await _client.GetUpdateInfoAsync(new Empty(), cancellationToken: ct);
 
             if (!response.UpdateAvailable)
-            {
                 return null;
-            }
 
             return new UpdateInfoDto(
                 response.LatestVersion,
@@ -198,10 +196,7 @@ public class GrpcUpdatesApi : IUpdatesApi
     {
         try
         {
-            if (!File.Exists(installerPath))
-            {
-                throw new FileNotFoundException("Installer not found", installerPath);
-            }
+            if (!File.Exists(installerPath)) throw new FileNotFoundException("Installer not found", installerPath);
 
             _logger.LogInformation("Starting installer: {Path}", TelemetryGuard.SafePath(installerPath));
 

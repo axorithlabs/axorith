@@ -50,11 +50,10 @@ public class SettingUpdateBroadcaster : IDisposable
         }
 
         var prefix = moduleInstanceId + ":";
-        var choiceKeys = _lastChoicesFingerprint.Keys
-            .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
-        foreach (var ck in choiceKeys)
+        foreach (var key in _lastChoicesFingerprint.Keys)
         {
-            _lastChoicesFingerprint.TryRemove(ck, out _);
+            if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                _lastChoicesFingerprint.TryRemove(key, out _);
         }
     }
 
@@ -131,19 +130,14 @@ public class SettingUpdateBroadcaster : IDisposable
     public Task BroadcastUpdateAsync(Guid moduleInstanceId, string settingKey,
         SettingProperty property, object? value)
     {
-        if (_disposed || _subscribers.IsEmpty)
-        {
-            return Task.CompletedTask;
-        }
+        if (_disposed || _subscribers.IsEmpty) return Task.CompletedTask;
 
         if (property == SettingProperty.Choices && value is IReadOnlyList<KeyValuePair<string, string>> choicesList)
         {
             var fingerprint = string.Join("\n", choicesList.Select(kv => kv.Key + "\u0001" + kv.Value));
             var cacheKey = $"{moduleInstanceId}:{settingKey}:choices";
             if (_lastChoicesFingerprint.TryGetValue(cacheKey, out var prev) && prev == fingerprint)
-            {
                 return Task.CompletedTask;
-            }
 
             _lastChoicesFingerprint[cacheKey] = fingerprint;
         }
@@ -156,10 +150,7 @@ public class SettingUpdateBroadcaster : IDisposable
         _subscribers.Publish(update, subscriberKey =>
         {
             var separator = subscriberKey.IndexOf(':');
-            if (separator <= 0 || separator == subscriberKey.Length - 1)
-            {
-                return true;
-            }
+            if (separator <= 0 || separator == subscriberKey.Length - 1) return true;
 
             var filter = subscriberKey[(separator + 1)..];
             return string.Equals(filter, moduleInstanceId.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -227,7 +218,7 @@ public class SettingUpdateBroadcaster : IDisposable
     {
         ArgumentNullException.ThrowIfNull(action);
 
-        disposables ??= _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => new CompositeDisposable());
+        disposables ??= _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => []);
 
         action.Label
             .Skip(1)
@@ -250,10 +241,7 @@ public class SettingUpdateBroadcaster : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 

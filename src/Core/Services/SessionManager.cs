@@ -114,10 +114,7 @@ public class SessionManager(
 
     public async Task RecoverCommittedSessionAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_committedSessionPath) || !File.Exists(_committedSessionPath))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(_committedSessionPath) || !File.Exists(_committedSessionPath)) return;
 
         PersistedCommittedSession? state;
         try
@@ -140,12 +137,10 @@ public class SessionManager(
         var strictStateVerified = false;
         if (state.Preset.FocusCommitment.IsStrict)
         {
-            if (_commitmentProtection == null)
-            {
+            var protection = _commitmentProtection ??
                 throw new SessionException("Strict Windows protection is unavailable for recovery.");
-            }
 
-            await _commitmentProtection.CheckRecoveryStateAsync(cancellationToken).ConfigureAwait(false);
+            await protection.CheckRecoveryStateAsync(cancellationToken).ConfigureAwait(false);
             strictStateVerified = true;
         }
 
@@ -208,14 +203,12 @@ public class SessionManager(
         _ = GetSessionEnd(snapshot.FocusCommitment, DateTimeOffset.Now);
         if (snapshot.FocusCommitment.IsStrict)
         {
-            if (_commitmentProtection == null)
-            {
+            var protection = _commitmentProtection ??
                 throw new SessionException("Strict Session cannot start because Windows protection is unavailable on this Host.");
-            }
 
             try
             {
-                await _commitmentProtection.CheckCanEnableAsync(cancellationToken).ConfigureAwait(false);
+                await protection.CheckCanEnableAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -241,7 +234,7 @@ public class SessionManager(
         }
 
         await _asyncLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        var modules = new List<ActiveModule>();
+        List<ActiveModule> modules = [];
         try
         {
             if (IsSessionRunning)
@@ -265,7 +258,9 @@ public class SessionManager(
             await ValidateAllModulesAsync(modules, cancellationToken).ConfigureAwait(false);
             if (snapshot.FocusCommitment.IsCommitted)
             {
-                await ValidateCommittedModuleSetupAsync(modules, cancellationToken).ConfigureAwait(false);
+                await ValidateCommittedModulesAsync(modules,
+                    static (validator, token) => validator.CanStartCommittedSessionAsync(token),
+                    "is disconnected or unavailable for this session.", cancellationToken).ConfigureAwait(false);
             }
         }
         finally
@@ -402,20 +397,18 @@ public class SessionManager(
 
                 if (snapshot.FocusCommitment.IsStrict)
                 {
-                    if (_commitmentProtection == null)
-                    {
+                    var protection = _commitmentProtection ??
                         throw new SessionException("Strict Session cannot start because Windows protection is unavailable on this Host.");
-                    }
 
                     try
                     {
-                        await _commitmentProtection.EnableAsync(cancellationToken).ConfigureAwait(false);
+                        await protection.EnableAsync(cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
                         try
                         {
-                            await _commitmentProtection.RestoreAsync(CancellationToken.None).ConfigureAwait(false);
+                            await protection.RestoreAsync(CancellationToken.None).ConfigureAwait(false);
                         }
                         catch (Exception restoreError)
                         {
@@ -590,7 +583,7 @@ public class SessionManager(
     {
         logger.LogInformation("Starting modules (Hybrid Mode)...");
 
-        var batch = new List<ActiveModule>();
+        List<ActiveModule> batch = [];
 
         foreach (var currentModule in modules)
         {
@@ -610,10 +603,7 @@ public class SessionManager(
 
                 await StartSingleModuleAsync(currentModule, ct).ConfigureAwait(false);
             }
-            else
-            {
-                batch.Add(currentModule);
-            }
+            else batch.Add(currentModule);
         }
 
         if (batch.Count > 0)
@@ -741,15 +731,12 @@ public class SessionManager(
                     throw;
                 }
 
-                var paused = new List<ISessionBreakParticipant>();
+                List<ISessionBreakParticipant> paused = [];
                 try
                 {
                     foreach (var module in _activeModules)
                     {
-                        if (module.Instance is not ISessionBreakParticipant participant)
-                        {
-                            continue;
-                        }
+                        if (module.Instance is not ISessionBreakParticipant participant) continue;
 
                         paused.Add(participant);
                         await participant.PauseForBreakAsync(cancellationToken).ConfigureAwait(false);
@@ -851,18 +838,12 @@ public class SessionManager(
         await _asyncLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (!BreakEndsAt.HasValue)
-            {
-                return;
-            }
+            if (!BreakEndsAt.HasValue) return;
 
             Exception? resumeError = null;
             foreach (var module in _activeModules)
             {
-                if (module.Instance is not ISessionBreakParticipant participant)
-                {
-                    continue;
-                }
+                if (module.Instance is not ISessionBreakParticipant participant) continue;
 
                 try
                 {
@@ -882,10 +863,7 @@ public class SessionManager(
                 ProtectionStatus = "Protection failed";
                 _protectionWasUnavailable = true;
             }
-            else
-            {
-                UpdateHealthyProtectionStatus();
-            }
+            else UpdateHealthyProtectionStatus();
 
             if (ActiveSession?.FocusCommitment.IsCommitted == true)
             {
@@ -928,17 +906,15 @@ public class SessionManager(
                 await ValidateCommittedProtectionAsync(_activeModules, cancellationToken).ConfigureAwait(false);
                 if (ActiveSession.FocusCommitment.IsStrict)
                 {
-                    if (_commitmentProtection == null)
-                    {
+                    var protection = _commitmentProtection ??
                         throw new SessionException("Strict Windows protection is unavailable.");
-                    }
 
-                    if (!await _commitmentProtection.IsEnabledAsync(cancellationToken).ConfigureAwait(false))
+                    if (!await protection.IsEnabledAsync(cancellationToken).ConfigureAwait(false))
                     {
-                        await _commitmentProtection.EnableAsync(cancellationToken).ConfigureAwait(false);
+                        await protection.EnableAsync(cancellationToken).ConfigureAwait(false);
                     }
 
-                    if (!await _commitmentProtection.IsEnabledAsync(cancellationToken).ConfigureAwait(false))
+                    if (!await protection.IsEnabledAsync(cancellationToken).ConfigureAwait(false))
                     {
                         throw new SessionException("Strict Windows protection is unavailable.");
                     }
@@ -963,11 +939,6 @@ public class SessionManager(
         ValidateCommittedModulesAsync(modules,
             static (validator, token) => validator.IsProtectionHealthyAsync(token),
             "is disconnected or not protecting this session.", cancellationToken);
-
-    private static Task ValidateCommittedModuleSetupAsync(List<ActiveModule> modules, CancellationToken cancellationToken) =>
-        ValidateCommittedModulesAsync(modules,
-            static (validator, token) => validator.CanStartCommittedSessionAsync(token),
-            "is disconnected or unavailable for this session.", cancellationToken);
 
     private static async Task ValidateCommittedModulesAsync(List<ActiveModule> modules,
         Func<ICommittedSessionValidator, CancellationToken, Task<bool>> validate, string failureMessage,
@@ -1037,14 +1008,12 @@ public class SessionManager(
             var wasCommittedSession = ActiveSession?.FocusCommitment.IsCommitted == true;
             if (ActiveSession?.FocusCommitment.IsStrict == true)
             {
-                if (_commitmentProtection == null)
-                {
+                var protection = _commitmentProtection ??
                     throw new SessionException("Session remains committed because Windows protection is unavailable.");
-                }
 
                 try
                 {
-                    await _commitmentProtection.RestoreAsync(cancellationToken).ConfigureAwait(false);
+                    await protection.RestoreAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -1220,10 +1189,7 @@ public class SessionManager(
 
     private void DeleteCommittedSessionState()
     {
-        if (string.IsNullOrWhiteSpace(_committedSessionPath))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(_committedSessionPath)) return;
 
         try
         {
@@ -1239,10 +1205,7 @@ public class SessionManager(
     private static DateTimeOffset? GetSessionEnd(FocusCommitmentOptions options, DateTimeOffset localNow)
     {
         ValidateFocusCommitment(options);
-        if (options.Mode == FocusCommitmentMode.Normal)
-        {
-            return null;
-        }
+        if (options.Mode == FocusCommitmentMode.Normal) return null;
 
         if (!options.IsCommitted)
         {
@@ -1337,10 +1300,7 @@ public class SessionManager(
         for (var daysAhead = 0; daysAhead <= 7; daysAhead++)
         {
             var date = localNow.Date.AddDays(daysAhead);
-            if (daysOfWeek.Count > 0 && !daysOfWeek.Contains(date.DayOfWeek))
-            {
-                continue;
-            }
+            if (daysOfWeek.Count > 0 && !daysOfWeek.Contains(date.DayOfWeek)) continue;
 
             var localEnd = DateTime.SpecifyKind(date.Add(endTime.ToTimeSpan()), DateTimeKind.Unspecified);
             while (timeZone.IsInvalidTime(localEnd))
@@ -1352,10 +1312,7 @@ public class SessionManager(
                 ? timeZone.GetAmbiguousTimeOffsets(localEnd).Max()
                 : timeZone.GetUtcOffset(localEnd);
             var end = new DateTimeOffset(localEnd, offset);
-            if (end > localNow)
-            {
-                return end.ToUniversalTime();
-            }
+            if (end > localNow) return end.ToUniversalTime();
         }
 
         throw new SessionException("Fixed Time does not include a valid end day.");
@@ -1375,10 +1332,7 @@ public class SessionManager(
     {
         lock (_syncLock)
         {
-            if (!IsSessionRunning || ActiveSession == null)
-            {
-                return null;
-            }
+            if (!IsSessionRunning || ActiveSession == null) return null;
 
             return new SessionSnapshot(
                 ActiveSession.Id,
@@ -1428,10 +1382,7 @@ public class SessionManager(
     private void TrackSessionPreflightCompleted(Guid sessionInstanceId, Guid presetId, string startSource,
         string result, string? failureReason = null)
     {
-        if (!telemetry.IsEnabled || !_reportedPreflightAttempts.TryAdd(sessionInstanceId, 0))
-        {
-            return;
-        }
+        if (!telemetry.IsEnabled || !_reportedPreflightAttempts.TryAdd(sessionInstanceId, 0)) return;
 
         var properties = new Dictionary<string, object?>
         {

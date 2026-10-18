@@ -44,19 +44,14 @@ internal sealed class BrowserApp(
 
         var startUrl = _settings.StartUrl.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(startUrl))
-        {
             return args.ToString().Trim();
-        }
 
         var sanitizedUrl = SanitizeUrl(startUrl);
         if (sanitizedUrl.Contains(' '))
         {
             args.Append($"\"{sanitizedUrl}\"");
         }
-        else
-        {
-            args.Append(sanitizedUrl);
-        }
+        else args.Append(sanitizedUrl);
 
         return args.ToString().Trim();
     }
@@ -71,9 +66,7 @@ internal sealed class BrowserApp(
     private static string SanitizeAdditionalArguments(string arguments)
     {
         if (string.IsNullOrWhiteSpace(arguments))
-        {
             return string.Empty;
-        }
 
         var dangerousFlags = new[]
         {
@@ -101,9 +94,7 @@ internal sealed class BrowserApp(
     private static string SanitizeUrl(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
-        {
             return string.Empty;
-        }
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {

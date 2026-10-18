@@ -20,9 +20,7 @@ internal sealed class ObsWebSocketService : IDisposable
     public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
     {
         if (_client.IsIdentified)
-        {
             return true;
-        }
 
         var uri = $"ws://127.0.0.1:{_settings.GetPort()}";
         try
@@ -85,9 +83,7 @@ internal sealed class ObsWebSocketService : IDisposable
     private async Task<bool> SendRequestAsync(string requestType, Action sendRequest, CancellationToken ct)
     {
         if (!_client.IsIdentified)
-        {
             return false;
-        }
 
         try
         {

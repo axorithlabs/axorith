@@ -72,7 +72,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
 
     public string AppVersion { get; }
 
-    public ICommand SaveCommand { get; }
     public ICommand BackCommand { get; }
     public ICommand OpenPresetsCommand { get; }
     public ICommand SelectSectionCommand { get; }
@@ -107,7 +106,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
 
         LoadSettings();
 
-        SaveCommand = ReactiveCommand.Create(SaveSettings);
         BackCommand = ReactiveCommand.CreateFromTask(() => NavigateToMainAsync(showPresets: false));
         OpenPresetsCommand = ReactiveCommand.CreateFromTask(() => NavigateToMainAsync(showPresets: true));
         SelectSectionCommand = ReactiveCommand.Create<string>(section => SelectedSection = section);
@@ -132,11 +130,12 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
         HasUnsavedChanges = false;
     }
 
-    private void SaveSettings()
+    [ReactiveCommand]
+    private void Save()
     {
         try
         {
-            var changedCategories = new List<string>();
+            List<string> changedCategories = [];
             if (_config.TelemetryEnabled != _telemetryEnabled) changedCategories.Add("telemetry");
             if (_config.AutoStartEnabled != _autoStartEnabled || _config.AutoStartMinimized != _autoStartMinimized)
                 changedCategories.Add("startup");
@@ -158,10 +157,7 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
             {
                 _autoStartManager.EnableAutoStart(_autoStartMinimized);
             }
-            else
-            {
-                _autoStartManager.DisableAutoStart();
-            }
+            else _autoStartManager.DisableAutoStart();
 
             HasUnsavedChanges = false;
 
@@ -191,7 +187,7 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
     {
         if (HasUnsavedChanges)
         {
-            SaveSettings();
+            Save();
         }
 
         var mainViewModel = MainViewModel ?? _serviceProvider.GetRequiredService<MainViewModel>();
@@ -199,10 +195,7 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
         {
             mainViewModel.ShowPresets();
         }
-        else
-        {
-            mainViewModel.ShowHome();
-        }
+        else mainViewModel.ShowHome();
 
         await mainViewModel.InitializeAsync();
         _shell.NavigateTo(mainViewModel);
@@ -223,9 +216,7 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
     private async Task RunSetupWizard()
     {
         if (_onboardingService == null)
-        {
             return;
-        }
 
         IsRunningSetup = true;
 

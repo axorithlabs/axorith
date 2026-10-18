@@ -39,9 +39,7 @@ public class Module : IModule
 
         var entityId = _settings.StartEntityId.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(entityId))
-        {
             return;
-        }
 
         await CallServiceAsync("turn_on", entityId, cancellationToken);
     }
@@ -52,17 +50,12 @@ public class Module : IModule
 
         var entityId = _settings.EndEntityId.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(entityId))
-        {
             return;
-        }
 
         var domain = entityId.Split('.')[0].ToLowerInvariant();
         var service = "turn_off";
 
-        if (domain is "script" or "scene" or "automation" or "input_button")
-        {
-            service = "turn_on";
-        }
+        if (domain is "script" or "scene" or "automation" or "input_button") service = "turn_on";
 
         await CallServiceAsync(service, entityId, cancellationToken);
     }

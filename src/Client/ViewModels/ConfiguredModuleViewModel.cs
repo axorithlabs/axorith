@@ -1,11 +1,15 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Net.Http;
 using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia.Threading;
 using Axorith.Client.Adapters;
 using Axorith.Client.CoreSdk.Abstractions;
+using Axorith.Client.Services;
 using Axorith.Core.Models;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
 using Axorith.Telemetry;
@@ -26,6 +30,19 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private readonly Guid? _presetId;
     private IDisposable? _settingStreamHandle;
     private IDisposable? _validationSubscription;
+    private readonly List<IDisposable> _extensionSubscriptions = [];
+
+    [Reactive]
+    public partial bool IsChromeExtensionDialogOpen { get; set; }
+
+    [Reactive]
+    public partial bool IsChromeExtensionDownloading { get; private set; }
+
+    [Reactive]
+    public partial string? ChromeExtensionArchivePath { get; private set; }
+
+    [Reactive]
+    public partial string? ChromeExtensionDownloadError { get; private set; }
 
     public ModuleDefinition Definition { get; }
     public ConfiguredModule Model { get; }
@@ -249,6 +266,10 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                         _telemetry,
                         _presetId);
                     var actionViewModel = new ActionViewModel(adaptedAction);
+                    if (action.Key == "InstallExtension.Chrome")
+                        _extensionSubscriptions.Add(adaptedAction.Invoked
+                            .ObserveOn(RxApp.MainThreadScheduler)
+                            .Subscribe(unit => _ = DownloadChromeExtensionAsync()));
                     if (action.SettingKey is not null)
                     {
                         var targetSetting = Settings.FirstOrDefault(setting => setting.Setting.Key == action.SettingKey);
@@ -320,10 +341,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             ).Select(_ => Unit.Default)
         ).ToList();
 
-        if (observables.Count == 0)
-        {
-            return;
-        }
+        if (observables.Count == 0) return;
 
         var changes = observables.Merge();
 
@@ -332,6 +350,43 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             .ObserveOn(RxApp.MainThreadScheduler)
             .SelectMany(_ => ValidateAsync())
             .Subscribe();
+    }
+
+    [ReactiveCommand]
+    private void CloseChromeExtensionDialog() => IsChromeExtensionDialogOpen = false;
+
+    [ReactiveCommand]
+    private void RetryChromeExtensionDownload() => _ = DownloadChromeExtensionAsync();
+
+    [ReactiveCommand]
+    private void OpenChromeExtensionFolder()
+    {
+        if (ChromeExtensionArchivePath is { } path)
+            Process.Start(new ProcessStartInfo(Path.GetDirectoryName(path)!) { UseShellExecute = true });
+    }
+
+    private async Task DownloadChromeExtensionAsync()
+    {
+        if (IsChromeExtensionDownloading) return;
+        IsChromeExtensionDialogOpen = true;
+        IsChromeExtensionDownloading = true;
+        ChromeExtensionArchivePath = null;
+        ChromeExtensionDownloadError = null;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+            ChromeExtensionArchivePath = await ChromeExtensionDownload.DownloadAsync(client,
+                Path.Combine(ApplicationPaths.LocalRoot, "browser-extensions"));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to download Chrome extension from GitHub");
+            ChromeExtensionDownloadError = $"Download failed: {ex.Message}";
+        }
+        finally
+        {
+            IsChromeExtensionDownloading = false;
+        }
     }
 
     private async Task<Unit> ValidateAsync()
@@ -358,10 +413,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     setting.Error = null;
                 }
 
-                if (!hasErrors || result.FieldErrors.Count <= 0)
-                {
-                    return;
-                }
+                if (!hasErrors || result.FieldErrors.Count <= 0) return;
 
                 {
                     foreach (var (key, error) in result.FieldErrors)
@@ -426,10 +478,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         }
 
         var actionVm = Actions.FirstOrDefault(a => a.Key == update.SettingKey);
-        if (actionVm?.SourceAction is not ModuleActionAdapter actionAdapter)
-        {
-            return;
-        }
+        if (actionVm?.SourceAction is not ModuleActionAdapter actionAdapter) return;
 
         switch (update.Property)
         {
@@ -454,10 +503,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     {
         foreach (var settingVm in Settings)
         {
-            if (settingVm.Setting.Persistence != SettingPersistence.Persisted)
-            {
-                continue;
-            }
+            if (settingVm.Setting.Persistence != SettingPersistence.Persisted) continue;
 
             Model.Settings[settingVm.Setting.Key] = settingVm.Setting.GetValueAsString();
         }
@@ -465,16 +511,14 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 
         _settingUpdatesSubscription.Dispose();
         _settingStreamHandle?.Dispose();
         _validationSubscription?.Dispose();
+        foreach (var subscription in _extensionSubscriptions) subscription.Dispose();
 
         AddDelayCommand.Dispose();
         RemoveDelayCommand.Dispose();

@@ -46,17 +46,13 @@ public sealed class UserRegistrationService
     public async Task<UserRegistration> GetOrCreateAsync(CancellationToken ct = default)
     {
         if (_cached is not null)
-        {
             return _cached;
-        }
 
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (_cached is not null)
-            {
                 return _cached;
-            }
 
             var existing = await TryLoadAsync(_registrationFilePath, ct).ConfigureAwait(false);
             var hasDistinctLegacyPath = !string.Equals(_registrationFilePath, _legacyRegistrationFilePath,
@@ -111,9 +107,7 @@ public sealed class UserRegistrationService
     private static async Task<UserRegistration?> TryLoadAsync(string filePath, CancellationToken ct)
     {
         if (!File.Exists(filePath))
-        {
             return null;
-        }
 
         try
         {

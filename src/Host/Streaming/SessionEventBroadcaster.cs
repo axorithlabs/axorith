@@ -40,9 +40,7 @@ public sealed class SessionEventBroadcaster : IDisposable
     public void Dispose()
     {
         if (_disposed)
-        {
             return;
-        }
 
         _disposed = true;
         _sessionManager.SessionStarted -= OnSessionStarted;

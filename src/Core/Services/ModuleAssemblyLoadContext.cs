@@ -18,9 +18,7 @@ internal class ModuleAssemblyLoadContext(string modulePath) : AssemblyLoadContex
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         if (assemblyName.Name != null && SharedAssemblies.Contains(assemblyName.Name))
-        {
             return null;
-        }
 
         var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
 

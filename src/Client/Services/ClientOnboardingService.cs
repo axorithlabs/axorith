@@ -122,9 +122,7 @@ public sealed class ClientOnboardingService(
     private DiscoveredApps ScanForKnownAppsParallel()
     {
         if (_cachedApps != null && DateTime.UtcNow - _cacheTime < CacheExpiry)
-        {
             return _cachedApps;
-        }
 
         appDiscovery.GetInstalledApplicationsIndex();
 
@@ -164,7 +162,7 @@ public sealed class ClientOnboardingService(
 
     private List<SessionPreset> GenerateCodingPresets(DiscoveredApps apps, Dictionary<string, Guid> moduleIds)
     {
-        var presets = new List<SessionPreset>();
+        List<SessionPreset> presets = [];
 
         var ideConfigs = new (string? Path, string PresetName, string ModuleName, string PathKey)[]
         {
@@ -184,9 +182,7 @@ public sealed class ClientOnboardingService(
         foreach (var (path, presetName, moduleName, pathKey) in ideConfigs)
         {
             if (path == null)
-            {
                 continue;
-            }
 
             var preset = CreateCodingPreset(presetName, moduleName, pathKey, path, moduleIds, apps);
             if (preset.Modules.Count > 0)
@@ -302,9 +298,7 @@ public sealed class ClientOnboardingService(
         }
 
         if (!hasStreamingSoftware)
-        {
             return preset;
-        }
 
         var browserPath = apps.ChromePath ?? apps.FirefoxPath ?? apps.EdgePath;
         if (browserPath is not null)
@@ -329,9 +323,7 @@ public sealed class ClientOnboardingService(
     private static string GetUniqueName(string baseName, HashSet<string> existingNames)
     {
         if (!existingNames.Contains(baseName))
-        {
             return baseName;
-        }
 
         var counter = 1;
         string candidate;

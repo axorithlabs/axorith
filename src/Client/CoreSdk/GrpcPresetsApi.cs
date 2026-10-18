@@ -10,15 +10,15 @@ namespace Axorith.Client.CoreSdk;
 internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncRetryPolicy retryPolicy)
     : IPresetsApi
 {
-    public async Task<IReadOnlyList<PresetSummary>> ListPresetsAsync(CancellationToken ct = default) =>
-        await retryPolicy.ExecuteAsync(async () =>
+    public Task<IReadOnlyList<PresetSummary>> ListPresetsAsync(CancellationToken ct = default) =>
+        retryPolicy.ExecuteAsync<IReadOnlyList<PresetSummary>>(async () =>
         {
             var response = await client.ListPresetsAsync(new ListPresetsRequest(), cancellationToken: ct)
                 .ConfigureAwait(false);
             return response.Presets
                 .Select(p => new PresetSummary(Guid.Parse(p.Id), p.Name, p.Version, p.ModuleCount))
                 .ToList();
-        }).ConfigureAwait(false);
+        });
 
     public Task<SessionPreset?> GetPresetAsync(Guid presetId, CancellationToken ct = default) =>
         retryPolicy.ExecuteAsync(async () =>

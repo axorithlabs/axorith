@@ -29,10 +29,7 @@ public sealed record TelemetrySettings
     {
         var envApiKey = Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_API_KEY", EnvironmentVariableTarget.User);
 
-        if (string.IsNullOrWhiteSpace(envApiKey))
-        {
-            return this;
-        }
+        if (string.IsNullOrWhiteSpace(envApiKey)) return this;
 
         return this with { PostHogApiKey = envApiKey };
     }
@@ -46,10 +43,7 @@ public static class TelemetryGuard
 
     public static string SafeString(string? value, int maxLength = 1_024)
     {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrEmpty(value)) return string.Empty;
 
         return value.Length <= maxLength ? value : value[..maxLength];
     }
@@ -57,10 +51,7 @@ public static class TelemetryGuard
 
     public static string SafePath(string? path, int maxLength = 1_024)
     {
-        if (string.IsNullOrEmpty(path))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrEmpty(path)) return string.Empty;
 
         var masked = path;
 
@@ -73,10 +64,7 @@ public static class TelemetryGuard
         }
 
         // Replace username in paths (fallback for cases where profile path doesn't match)
-        if (!string.IsNullOrEmpty(UserName))
-        {
-            masked = masked.Replace(UserName, "[USER]", StringComparison.OrdinalIgnoreCase);
-        }
+        if (!string.IsNullOrEmpty(UserName)) masked = masked.Replace(UserName, "[USER]", StringComparison.OrdinalIgnoreCase);
 
         return SafeString(masked, maxLength);
     }

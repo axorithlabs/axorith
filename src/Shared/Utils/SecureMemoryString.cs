@@ -10,10 +10,7 @@ public sealed class SecureMemoryString : IDisposable
 
     public SecureMemoryString(string value)
     {
-        if (value == null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
+        ArgumentNullException.ThrowIfNull(value);
 
         _data = Encoding.UTF8.GetBytes(value);
     }
@@ -24,10 +21,7 @@ public sealed class SecureMemoryString : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, nameof(SecureMemoryString));
 
-            if (_data == null)
-            {
-                return string.Empty;
-            }
+            if (_data == null) return string.Empty;
 
             return Encoding.UTF8.GetString(_data);
         }
@@ -47,10 +41,7 @@ public sealed class SecureMemoryString : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         lock (_lock)
         {

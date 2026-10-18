@@ -70,9 +70,7 @@ public partial class SessionPresetViewModel : ReactiveObject, IDisposable
     private static string FormatRecurringSchedule(SessionSchedule schedule, string action, string missingTime)
     {
         if (schedule.RecurringTime is not { } time || time < TimeSpan.Zero || time >= TimeSpan.FromDays(1))
-        {
             return missingTime;
-        }
 
         var days = schedule.DaysOfWeek.Distinct().OrderBy(day => ((int)day + 6) % 7).ToArray();
         var daysLabel = days.Length is 0 or 7
@@ -99,7 +97,7 @@ public partial class SessionPresetViewModel : ReactiveObject, IDisposable
     [Reactive]
     public partial int ErrorCount { get; private set; }
 
-    public ObservableCollection<ConfiguredModuleViewModel> Modules { get; } = [];
+    public ObservableCollection<ConfiguredModuleViewModel> Modules { get; }
 
     public SessionPresetViewModel(SessionPreset model, IReadOnlyList<ModuleDefinition> availableModules,
         IModulesApi modulesApi, IServiceProvider serviceProvider, IReadOnlyList<SessionSchedule>? schedules = null)
@@ -107,18 +105,13 @@ public partial class SessionPresetViewModel : ReactiveObject, IDisposable
         Model = model;
         _schedules = schedules ?? [];
 
-        var moduleVms = model.Modules
+        Modules = new(model.Modules
             .Select(m =>
             {
                 var def = availableModules.FirstOrDefault(md => md.Id == m.ModuleId);
                 return def != null ? new ConfiguredModuleViewModel(def, m, modulesApi, serviceProvider, model.Id) : null;
             })
-            .Where(vm => vm != null);
-
-        foreach (var vm in moduleVms)
-        {
-            Modules.Add(vm!);
-        }
+            .OfType<ConfiguredModuleViewModel>());
 
         _validationSubscription = Modules
             .Select(m => m.WhenAnyValue(x => x.HasErrors))

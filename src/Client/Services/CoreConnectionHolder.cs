@@ -17,9 +17,7 @@ internal sealed class CoreConnectionHolder
 
         var previous = Interlocked.Exchange(ref _connection, connection);
         if (previous is null || ReferenceEquals(previous, connection))
-        {
             return;
-        }
 
         await CloseAsync(previous).ConfigureAwait(false);
     }

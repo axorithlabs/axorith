@@ -66,9 +66,7 @@ public class PersistenceConfiguration
     public string ResolvePresetsPath()
     {
         if (string.IsNullOrWhiteSpace(PresetsPath))
-        {
             return ApplicationPaths.Presets;
-        }
 
         return ApplicationPaths.ExpandPath(PresetsPath);
     }
@@ -77,9 +75,7 @@ public class PersistenceConfiguration
     public string ResolveConfigPath()
     {
         if (string.IsNullOrWhiteSpace(ConfigPath))
-        {
             return ApplicationPaths.Config;
-        }
 
         return ApplicationPaths.ExpandPath(ConfigPath);
     }
@@ -87,9 +83,7 @@ public class PersistenceConfiguration
     public string ResolveHostInfoPath()
     {
         if (string.IsNullOrWhiteSpace(HostInfoPath))
-        {
             return ApplicationPaths.HostInfoFile;
-        }
 
         return ApplicationPaths.ExpandPath(HostInfoPath);
     }

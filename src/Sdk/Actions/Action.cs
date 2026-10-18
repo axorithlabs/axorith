@@ -65,26 +65,18 @@ public sealed class Action(string key, string label, bool isEnabled, string? set
     /// <inheritdoc />
     public void Invoke()
     {
-        if (_isEnabled.Value)
-        {
-            _invoked.OnNext(Unit.Default);
-        }
+        if (_isEnabled.Value) _invoked.OnNext(Unit.Default);
     }
 
     /// <inheritdoc />
     public async Task InvokeAsync()
     {
         if (!_isEnabled.Value)
-        {
             return;
-        }
 
         _invoked.OnNext(Unit.Default);
 
-        if (_asyncHandler != null)
-        {
-            await _asyncHandler().ConfigureAwait(false);
-        }
+        if (_asyncHandler != null) await _asyncHandler().ConfigureAwait(false);
     }
 
     /// <summary>

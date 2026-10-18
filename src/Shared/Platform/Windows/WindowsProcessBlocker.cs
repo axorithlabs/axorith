@@ -86,7 +86,10 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         lock (_lock)
         {
             StopMonitoring();
-            _targetProcessNames = NormalizeNames(processNames);
+            _targetProcessNames = processNames
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => NormalizeName(name.Trim()))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (allowOnly && _targetProcessNames.Count == 0)
                 throw new ArgumentException("At least one workspace application must be allowed.", nameof(processNames));
 
@@ -129,10 +132,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private void StartPollingMonitoring()
     {
-        if (_pollingScanCts != null)
-        {
-            return;
-        }
+        if (_pollingScanCts != null) return;
 
         _pollingScanCts = new CancellationTokenSource();
         var token = _pollingScanCts.Token;
@@ -182,10 +182,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private List<string> ScanAndKillByList(bool initialScan = false)
     {
-        if (IsAllowOnlyMode())
-        {
-            return ScanAndKillOutsideAllowlist(initialScan);
-        }
+        if (IsAllowOnlyMode()) return ScanAndKillOutsideAllowlist(initialScan);
 
         var killedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         List<string> targets;
@@ -197,10 +194,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
         foreach (var target in targets)
         {
-            if (SafeList.Contains(target))
-            {
-                continue;
-            }
+            if (SafeList.Contains(target)) continue;
 
             var processes = Process.GetProcessesByName(target);
             foreach (var p in processes)
@@ -247,10 +241,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             targets = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
         }
 
-        if (targets.Count == 0)
-        {
-            return [];
-        }
+        if (targets.Count == 0) return [];
 
         var killedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var process in Process.GetProcesses())
@@ -258,17 +249,11 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             try
             {
                 var processName = NormalizeName(process.ProcessName);
-                if (SafeList.Contains(processName) || targets.Contains(processName))
-                {
-                    continue;
-                }
+                if (SafeList.Contains(processName) || targets.Contains(processName)) continue;
 
                 var path = process.MainModule?.FileName;
                 var originalName = FindBlockedTarget(processName, path);
-                if (originalName == null || process.HasExited)
-                {
-                    continue;
-                }
+                if (originalName == null || process.HasExited) continue;
 
                 process.Kill();
                 logger.LogInformation("Blocked renamed process: {Target} (PID: {Pid}, image: {Image})",
@@ -306,17 +291,14 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             allowedNames = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
         }
 
-        if (allowedNames.Count == 0)
-        {
-            return [];
-        }
+        if (allowedNames.Count == 0) return [];
 
         using var currentProcess = Process.GetCurrentProcess();
         var currentSessionId = currentProcess.SessionId;
         var parentIds = GetProcessParentIds();
         var processes = Process.GetProcesses();
         var sessionProcesses = new Dictionary<int, Process>();
-        var allowedIds = new HashSet<int>();
+        HashSet<int> allowedIds = [];
         var childrenByParent = new Dictionary<int, List<int>>();
         var killedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -326,10 +308,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             {
                 try
                 {
-                    if (process.SessionId != currentSessionId)
-                    {
-                        continue;
-                    }
+                    if (process.SessionId != currentSessionId) continue;
 
                     sessionProcesses[process.Id] = process;
                     var processName = NormalizeName(process.ProcessName);
@@ -357,10 +336,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
             foreach (var (processId, parentId) in parentIds)
             {
-                if (!sessionProcesses.ContainsKey(processId) || !sessionProcesses.ContainsKey(parentId))
-                {
-                    continue;
-                }
+                if (!sessionProcesses.ContainsKey(processId) || !sessionProcesses.ContainsKey(parentId)) continue;
 
                 if (!childrenByParent.TryGetValue(parentId, out var children))
                 {
@@ -374,10 +350,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             var pending = new Queue<int>(allowedIds);
             while (pending.TryDequeue(out var allowedParent))
             {
-                if (!childrenByParent.TryGetValue(allowedParent, out var children))
-                {
-                    continue;
-                }
+                if (!childrenByParent.TryGetValue(allowedParent, out var children)) continue;
 
                 foreach (var child in children)
                 {
@@ -394,10 +367,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 {
                     var processName = NormalizeName(process.ProcessName);
                     if (allowedIds.Contains(processId) || SafeList.Contains(processName) ||
-                        AllowlistSupportProcesses.Contains(processName) || process.HasExited)
-                    {
-                        continue;
-                    }
+                        AllowlistSupportProcesses.Contains(processName) || process.HasExited) continue;
 
                     process.Kill();
                     logger.LogInformation("Blocked non-workspace process: {Name} (PID: {Pid})", processName, processId);
@@ -451,10 +421,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         try
         {
             var entry = new ProcessEntry32 { Size = (uint)Marshal.SizeOf<ProcessEntry32>() };
-            if (!Process32First(snapshot, ref entry))
-            {
-                return result;
-            }
+            if (!Process32First(snapshot, ref entry)) return result;
 
             do
             {
@@ -472,18 +439,12 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private string? FindBlockedTarget(string normalizedName, string? imagePath)
     {
-        if (SafeList.Contains(normalizedName))
-        {
-            return null;
-        }
+        if (SafeList.Contains(normalizedName)) return null;
 
         HashSet<string> targets;
         lock (_lock)
         {
-            if (_targetProcessNames.Contains(normalizedName))
-            {
-                return normalizedName;
-            }
+            if (_targetProcessNames.Contains(normalizedName)) return normalizedName;
 
             targets = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
         }
@@ -497,10 +458,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     private string GetOriginalExecutableName(string? imagePath)
     {
-        if (string.IsNullOrWhiteSpace(imagePath))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(imagePath)) return string.Empty;
 
         return _originalExecutableNames.GetOrAdd(imagePath, static path =>
         {
@@ -517,11 +475,6 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             }
         });
     }
-
-    private static HashSet<string> NormalizeNames(IEnumerable<string> names) => names
-        .Where(name => !string.IsNullOrWhiteSpace(name))
-        .Select(name => NormalizeName(name.Trim()))
-        .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private static string NormalizeName(string name)
     {

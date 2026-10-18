@@ -7,15 +7,13 @@ public static class SessionMapper
 {
     public static SessionEvent CreateEvent(SessionEventType type, Guid? presetId, string? message = null)
     {
-        var evt = new SessionEvent
+        return new SessionEvent
         {
             Type = type,
             PresetId = presetId?.ToString() ?? string.Empty,
             Message = message ?? string.Empty,
             Timestamp = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow)
         };
-
-        return evt;
     }
 
     public static OperationResult CreateResult(bool success, string? message = null,
@@ -27,15 +25,8 @@ public static class SessionMapper
             Message = message ?? (success ? "Operation completed successfully" : "Operation failed")
         };
 
-        if (errors != null)
-        {
-            result.Errors.AddRange(errors);
-        }
-
-        if (warnings != null)
-        {
-            result.Warnings.AddRange(warnings);
-        }
+        result.Errors.AddRange(errors ?? []);
+        result.Warnings.AddRange(warnings ?? []);
 
         return result;
     }

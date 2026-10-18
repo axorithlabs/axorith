@@ -185,12 +185,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Package Chrome extension
+        shell: pwsh
+        run: |
+          ./src/Modules/SiteBlocker/BrowserExtension/package.ps1 -Browser Chrome
+          Copy-Item ./src/Modules/SiteBlocker/BrowserExtension/Chrome/site-blocker-extension-chrome.zip ./release-assets/chrome-extension-latest.zip
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           body: ${{ steps.build_changelog.outputs.changelog }}
           files: |
             ./release-assets/axorith-setup.exe
+            ./release-assets/chrome-extension-latest.zip
           draft: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:

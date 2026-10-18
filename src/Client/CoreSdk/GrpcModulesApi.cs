@@ -36,16 +36,10 @@ internal class GrpcModulesApi(
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(GrpcModulesApi));
 
-        if (_instanceStreams.TryGetValue(moduleInstanceId, out var stream))
-        {
-            return Disposable.Create(() => { });
-        }
+        if (_instanceStreams.ContainsKey(moduleInstanceId)) return Disposable.Empty;
 
         var cts = new CancellationTokenSource();
-        if (!_instanceStreams.TryAdd(moduleInstanceId, cts))
-        {
-            return Disposable.Create(() => { });
-        }
+        if (!_instanceStreams.TryAdd(moduleInstanceId, cts)) return Disposable.Empty;
 
         var connectionReadyTcs = new TaskCompletionSource();
 
@@ -61,10 +55,7 @@ internal class GrpcModulesApi(
 
         return Disposable.Create(() =>
         {
-            if (!_instanceStreams.TryRemove(moduleInstanceId, out var existing))
-            {
-                return;
-            }
+            if (!_instanceStreams.TryRemove(moduleInstanceId, out var existing)) return;
 
             try
             {
@@ -80,18 +71,12 @@ internal class GrpcModulesApi(
 
     public async Task<IReadOnlyList<ModuleDefinition>> ListModulesAsync(CancellationToken ct = default)
     {
-        if (_modulesCache != null)
-        {
-            return _modulesCache;
-        }
+        if (_modulesCache != null) return _modulesCache;
 
         await _modulesCacheLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_modulesCache != null)
-            {
-                return _modulesCache;
-            }
+            if (_modulesCache != null) return _modulesCache;
 
             var modules = await retryPolicy.ExecuteAsync(async () =>
             {
@@ -264,9 +249,7 @@ internal class GrpcModulesApi(
             var response = await client.ValidateSettingsAsync(request, cancellationToken: ct).ConfigureAwait(false);
 
             if (response.IsValid)
-            {
                 return response.IsWarning ? ValidationResult.Warn(response.Message) : ValidationResult.Success;
-            }
 
             var fieldErrors = new Dictionary<string, string>();
             foreach (var error in response.FieldErrors)
@@ -335,10 +318,7 @@ internal class GrpcModulesApi(
 
             await foreach (var update in call.ResponseStream.ReadAllAsync(token).ConfigureAwait(false))
             {
-                if (!Guid.TryParse(update.ModuleInstanceId, out var instanceId))
-                {
-                    continue;
-                }
+                if (!Guid.TryParse(update.ModuleInstanceId, out var instanceId)) continue;
 
                 _settingUpdatesSubject.OnNext(new SettingUpdate(
                     instanceId,
@@ -368,10 +348,7 @@ internal class GrpcModulesApi(
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 

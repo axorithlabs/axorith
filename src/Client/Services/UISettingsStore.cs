@@ -28,9 +28,7 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
             }
 
             if (!File.Exists(settingsPath))
-            {
                 return LoadDefaults();
-            }
 
             var fileInfo = new FileInfo(settingsPath);
             if (fileInfo.Length > MaxSettingsFileSizeBytes)
@@ -43,9 +41,7 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
 
             var json = File.ReadAllText(settingsPath);
             if (string.IsNullOrWhiteSpace(json))
-            {
                 return new ClientUiConfiguration();
-            }
 
             // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
             // File size and MaxDepth are validated to prevent DoS attacks

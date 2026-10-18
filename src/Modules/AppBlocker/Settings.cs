@@ -110,10 +110,7 @@ internal sealed class Settings : IDisposable
 
         foreach (var category in _categories.GetCurrentValue())
         {
-            if (_categoryProcesses!.TryGetValue(category, out var processes))
-            {
-                result.UnionWith(processes);
-            }
+            if (_categoryProcesses!.TryGetValue(category, out var processes)) result.UnionWith(processes);
         }
 
         result.UnionWith(_customProcessList.GetCurrentValue()
@@ -125,35 +122,30 @@ internal sealed class Settings : IDisposable
     private static void EnsureCategoriesLoaded()
     {
         if (_categoryProcesses != null)
-        {
             return;
-        }
 
         lock (_loadLock)
         {
             if (_categoryProcesses != null)
-            {
                 return;
-            }
 
             var moduleDirectory = Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? AppContext.BaseDirectory;
             var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_apps.json");
 
             if (!File.Exists(jsonPath))
             {
-                _categoryProcesses = new Dictionary<string, string[]>();
+                _categoryProcesses = new();
                 return;
             }
 
             try
             {
                 var json = File.ReadAllText(jsonPath);
-                _categoryProcesses = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json)
-                                     ?? new Dictionary<string, string[]>();
+                _categoryProcesses = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) ?? new();
             }
             catch
             {
-                _categoryProcesses = new Dictionary<string, string[]>();
+                _categoryProcesses = new();
             }
         }
     }

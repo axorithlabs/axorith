@@ -21,18 +21,20 @@ public sealed class HostTrayService(
     private NativeMenuItem? _hostStatusItem;
     private NativeMenuItem? _hostStartStopItem;
     private NativeMenuItem? _hostRestartItem;
+    private NativeMenuItem? _showItem;
+    private NativeMenuItem? _exitItem;
     private CancellationTokenSource? _cts;
     private bool _isHostRunning;
     private bool _canControlHost;
+    private bool _isInitializing = true;
+    private bool _isChangingHost;
     private IDisposable? _shellSubscription;
     private IDisposable? _sessionSubscription;
 
     public void Initialize(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> appLogger)
     {
         if (_trayIcon != null)
-        {
             return;
-        }
 
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
 
@@ -43,12 +45,13 @@ public sealed class HostTrayService(
             IsVisible = true
         };
 
-        var showItem = new NativeMenuItem("Show");
-        showItem.Click += (_, _) => { ShowMainWindow(desktop); };
+        _showItem = new NativeMenuItem("Show") { IsEnabled = false };
+        _showItem.Click += (_, _) => { ShowMainWindow(desktop); };
 
-        var exitItem = new NativeMenuItem("Exit");
-        exitItem.Click += (_, _) =>
+        _exitItem = new NativeMenuItem("Exit") { IsEnabled = false };
+        _exitItem.Click += (_, _) =>
         {
+            if (_isInitializing || _isChangingHost) return;
             appLogger.LogInformation("Exit requested from tray");
             try
             {
@@ -62,9 +65,7 @@ public sealed class HostTrayService(
 
         var menu = new NativeMenu
         {
-            new NativeMenuItem("Axorith Client") { IsEnabled = false },
-            new NativeMenuItemSeparator(),
-            showItem,
+            _showItem,
             new NativeMenuItemSeparator()
         };
 
@@ -72,6 +73,9 @@ public sealed class HostTrayService(
         _hostStartStopItem = new NativeMenuItem("Start Host") { IsEnabled = false };
         _hostStartStopItem.Click += async (_, _) =>
         {
+            if (_isInitializing || _isChangingHost || !_hostStartStopItem.IsEnabled) return;
+            _isChangingHost = true;
+            await UpdateMenuAsync();
             try
             {
                 if (_isHostRunning)
@@ -97,11 +101,19 @@ public sealed class HostTrayService(
                 logger.LogError(ex, "Host start/stop failed from tray");
                 healthMonitor.Resume();
             }
+            finally
+            {
+                _isChangingHost = false;
+                await UpdateMenuAsync();
+            }
         };
 
         _hostRestartItem = new NativeMenuItem("Restart Host") { IsEnabled = false };
         _hostRestartItem.Click += async (_, _) =>
         {
+            if (_isInitializing || _isChangingHost || !_hostRestartItem.IsEnabled) return;
+            _isChangingHost = true;
+            await UpdateMenuAsync();
             try
             {
                 healthMonitor.Pause();
@@ -116,6 +128,8 @@ public sealed class HostTrayService(
             finally
             {
                 healthMonitor.Resume();
+                _isChangingHost = false;
+                await UpdateMenuAsync();
             }
         };
 
@@ -124,7 +138,7 @@ public sealed class HostTrayService(
         menu.Add(_hostStartStopItem);
         menu.Add(_hostRestartItem);
         menu.Add(new NativeMenuItemSeparator());
-        menu.Add(exitItem);
+        menu.Add(_exitItem);
 
         _trayIcon.Menu = menu;
 
@@ -132,8 +146,11 @@ public sealed class HostTrayService(
         {
             _shellSubscription = shell.WhenAnyValue(vm => vm.Content).Subscribe(content =>
             {
-                if (content is not MainViewModel main) return;
                 _sessionSubscription?.Dispose();
+                _sessionSubscription = null;
+                _isInitializing = content is null or LoadingViewModel;
+                _ = UpdateMenuAsync();
+                if (content is not MainViewModel main) return;
                 _sessionSubscription = main.WhenAnyValue(vm => vm.IsCommittedSession).Subscribe(committed =>
                 {
                     _canControlHost = !committed;
@@ -181,10 +198,13 @@ public sealed class HostTrayService(
     {
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
+            var isReady = !_isInitializing && !_isChangingHost;
+            if (_showItem != null) _showItem.IsEnabled = isReady;
+            if (_exitItem != null) _exitItem.IsEnabled = isReady;
             _hostStatusItem?.Header = _isHostRunning ? "Host: Running" : "Host: Stopped";
             _hostStartStopItem?.Header = _isHostRunning ? "Stop Host" : "Start Host";
-            if (_hostStartStopItem != null) _hostStartStopItem.IsEnabled = !_isHostRunning || _canControlHost;
-            if (_hostRestartItem != null) _hostRestartItem.IsEnabled = _isHostRunning && _canControlHost;
+            if (_hostStartStopItem != null) _hostStartStopItem.IsEnabled = isReady && (!_isHostRunning || _canControlHost);
+            if (_hostRestartItem != null) _hostRestartItem.IsEnabled = isReady && _isHostRunning && _canControlHost;
         });
     }
 
@@ -196,9 +216,7 @@ public sealed class HostTrayService(
             var errorVm = services.GetService<ErrorViewModel>();
 
             if (shell == null || errorVm == null)
-            {
                 return;
-            }
 
             errorVm.Configure(
                 "Axorith.Host has been stopped from the tray.\n\nUse 'Start Host' from the tray menu or click 'Retry Connection' below to restart.",
@@ -229,6 +247,7 @@ public sealed class HostTrayService(
 
     private void ShowMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
     {
+        if (_isInitializing || _isChangingHost) return;
         try
         {
             if (desktop.MainWindow != null)

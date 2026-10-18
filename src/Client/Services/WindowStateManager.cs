@@ -52,9 +52,7 @@ public sealed class WindowStateManager
         {
             ConstrainSizeToScreen(window, window.Screens.Primary, window.Width, window.Height);
             if (!File.Exists(_stateFilePath))
-            {
                 return;
-            }
 
             var fileInfo = new FileInfo(_stateFilePath);
             if (fileInfo.Length > MaxStateFileSizeBytes)
@@ -84,10 +82,7 @@ public sealed class WindowStateManager
                     Math.Clamp(state.X, area.X, Math.Max(area.X, area.Right - (int)Math.Ceiling(window.Width * scale))),
                     Math.Clamp(state.Y, area.Y, Math.Max(area.Y, area.Bottom - (int)Math.Ceiling(window.Height * scale))));
             }
-            else
-            {
-                window.Position = new PixelPoint(state.X, state.Y);
-            }
+            else window.Position = new PixelPoint(state.X, state.Y);
 
             if (state.IsMaximized)
             {

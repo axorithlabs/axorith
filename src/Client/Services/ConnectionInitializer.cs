@@ -175,10 +175,7 @@ public sealed class ConnectionInitializer
                         "Host auto-start completed but Host is not reachable. Will attempt connection anyway.");
                 }
             }
-            else
-            {
-                logger.LogInformation("Host is already reachable. Skipping auto-start.");
-            }
+            else logger.LogInformation("Host is already reachable. Skipping auto-start.");
         }
         catch (Exception ex)
         {
@@ -255,9 +252,7 @@ public sealed class ConnectionInitializer
         ILogger<App> logger)
     {
         if (Interlocked.Exchange(ref _healthMonitoringStarted, 1) != 0)
-        {
             return;
-        }
 
         var healthMonitor = services.GetRequiredService<HostHealthMonitor>();
         var shellViewModel = services.GetRequiredService<ShellViewModel>();

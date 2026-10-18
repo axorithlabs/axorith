@@ -54,10 +54,7 @@ public class WindowsAppDiscoveryService(
         {
             var exeName = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : $"{name}.exe";
 
-            if (TryGetCachedFallback(exeName, out var cached))
-            {
-                return cached;
-            }
+            if (TryGetCachedFallback(exeName, out var cached)) return cached;
 
             var registryPath = GetPathFromRegistry(exeName);
             if (!string.IsNullOrEmpty(registryPath) && File.Exists(registryPath))
@@ -71,10 +68,7 @@ public class WindowsAppDiscoveryService(
                 Path.GetFileName(a.ExecutablePath).Equals(exeName, StringComparison.OrdinalIgnoreCase) ||
                 a.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
 
-            if (match != null)
-            {
-                return match.ExecutablePath;
-            }
+            if (match != null) return match.ExecutablePath;
 
             var fallback = FindExecutableOnFileSystem(exeName);
             if (!string.IsNullOrEmpty(fallback))
@@ -90,16 +84,13 @@ public class WindowsAppDiscoveryService(
     public List<AppInfo> FindAppsByPublisher(string publisherName)
     {
         var allApps = GetInstalledApplicationsIndex();
-        var results = new List<AppInfo>();
+        List<AppInfo> results = [];
 
         foreach (var app in allApps)
         {
             try
             {
-                if (!File.Exists(app.ExecutablePath))
-                {
-                    continue;
-                }
+                if (!File.Exists(app.ExecutablePath)) continue;
 
                 var info = FileVersionInfo.GetVersionInfo(app.ExecutablePath);
                 if (!string.IsNullOrWhiteSpace(info.CompanyName) &&
@@ -121,10 +112,7 @@ public class WindowsAppDiscoveryService(
     {
         lock (_lock)
         {
-            if (_cachedIndex.Count > 0 && DateTime.UtcNow - _lastIndexTime < _cacheDuration)
-            {
-                return [.. _cachedIndex];
-            }
+            if (_cachedIndex.Count > 0 && DateTime.UtcNow - _lastIndexTime < _cacheDuration) return [.. _cachedIndex];
 
             _cachedIndex.Clear();
             var uniquePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -165,10 +153,7 @@ public class WindowsAppDiscoveryService(
         try
         {
             var root = Environment.GetFolderPath(folder);
-            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
-            {
-                return;
-            }
+            if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return;
 
             var shortcuts = SafeEnumerateFiles(root, "*.lnk");
 
@@ -177,10 +162,7 @@ public class WindowsAppDiscoveryService(
                 try
                 {
                     var target = ResolveShortcut(shortcut);
-                    if (string.IsNullOrEmpty(target))
-                    {
-                        continue;
-                    }
+                    if (string.IsNullOrEmpty(target)) continue;
 
                     var name = Path.GetFileNameWithoutExtension(shortcut);
                     onFound(name, target, target);
@@ -210,20 +192,14 @@ public class WindowsAppDiscoveryService(
                 {
                     using var baseKey = RegistryKey.OpenBaseKey(hive, view);
                     using var uninstall = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
-                    if (uninstall == null)
-                    {
-                        continue;
-                    }
+                    if (uninstall == null) continue;
 
                     foreach (var subKeyName in uninstall.GetSubKeyNames())
                     {
                         try
                         {
                             using var subKey = uninstall.OpenSubKey(subKeyName);
-                            if (subKey == null)
-                            {
-                                continue;
-                            }
+                            if (subKey == null) continue;
 
                             var displayName = subKey.GetValue("DisplayName") as string;
                             var displayIcon = NormalizeExecutablePath(subKey.GetValue("DisplayIcon") as string);
@@ -291,10 +267,7 @@ public class WindowsAppDiscoveryService(
             try
             {
                 var found = SafeEnumerateFiles(root, exeName, DefaultFallbackSearchDepth).FirstOrDefault();
-                if (!string.IsNullOrEmpty(found))
-                {
-                    return found;
-                }
+                if (!string.IsNullOrEmpty(found)) return found;
             }
             catch (Exception ex)
             {
@@ -311,10 +284,7 @@ public class WindowsAppDiscoveryService(
         {
             foreach (var root in fallbackSearchRoots)
             {
-                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-                {
-                    continue;
-                }
+                if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) continue;
 
                 yield return root;
             }
@@ -384,10 +354,7 @@ public class WindowsAppDiscoveryService(
 
     private static string? NormalizeExecutablePath(string? rawPath)
     {
-        if (string.IsNullOrWhiteSpace(rawPath))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(rawPath)) return null;
 
         var trimmed = rawPath.Trim().Trim('"');
         var commaIndex = trimmed.IndexOf(',');
@@ -417,10 +384,7 @@ public class WindowsAppDiscoveryService(
 
     private static string NormalizeName(string? name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
 
         var builder = new StringBuilder(name.Length);
         foreach (var ch in name)
@@ -436,10 +400,7 @@ public class WindowsAppDiscoveryService(
 
     private string? TryFindExeInInstallLocation(string? displayName, string? installLocation)
     {
-        if (string.IsNullOrWhiteSpace(installLocation) || !Directory.Exists(installLocation))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(installLocation) || !Directory.Exists(installLocation)) return null;
 
         var preferredName = NormalizeName(displayName);
         string? firstExe = null;
@@ -448,16 +409,10 @@ public class WindowsAppDiscoveryService(
         {
             firstExe ??= exe;
 
-            if (string.IsNullOrWhiteSpace(preferredName))
-            {
-                continue;
-            }
+            if (string.IsNullOrWhiteSpace(preferredName)) continue;
 
             var current = NormalizeName(Path.GetFileNameWithoutExtension(exe));
-            if (current.Contains(preferredName, StringComparison.OrdinalIgnoreCase))
-            {
-                return exe;
-            }
+            if (current.Contains(preferredName, StringComparison.OrdinalIgnoreCase)) return exe;
         }
 
         return firstExe;
@@ -465,14 +420,10 @@ public class WindowsAppDiscoveryService(
 
     private static bool ShouldSkipDirectory(string directoryPath)
     {
-        var dirName = Path.GetFileName(directoryPath);
-        if (string.IsNullOrEmpty(dirName))
-        {
-            return false;
-        }
-
-        return ExcludedDirectories.Contains(dirName) || ExcludedDirectories.Any(excluded =>
-            directoryPath.Contains(excluded, StringComparison.OrdinalIgnoreCase));
+        var name = Path.GetFileName(directoryPath);
+        return !string.IsNullOrEmpty(name) &&
+               (ExcludedDirectories.Contains(name) || ExcludedDirectories.Any(excluded =>
+                   directoryPath.Contains(excluded, StringComparison.OrdinalIgnoreCase)));
     }
 
     private IEnumerable<string> SafeEnumerateFiles(string rootPath, string searchPattern, int? maxDepth = null)
@@ -501,10 +452,7 @@ public class WindowsAppDiscoveryService(
                 }
             }
 
-            if (maxDepth.HasValue && depth >= maxDepth.Value)
-            {
-                continue;
-            }
+            if (maxDepth.HasValue && depth >= maxDepth.Value) continue;
 
             string[]? subDirs = null;
             try
@@ -515,10 +463,7 @@ public class WindowsAppDiscoveryService(
             {
             }
 
-            if (subDirs == null)
-            {
-                continue;
-            }
+            if (subDirs == null) continue;
 
             foreach (var subDir in subDirs)
             {

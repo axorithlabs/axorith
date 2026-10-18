@@ -60,14 +60,10 @@ public class HostAuthenticationService(
     public bool ValidateToken(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
-        {
             return false;
-        }
 
         if (string.IsNullOrWhiteSpace(_currentToken))
-        {
             return false;
-        }
 
         try
         {

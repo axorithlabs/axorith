@@ -18,7 +18,20 @@ public static class SettingMapper
             Key = setting.Key,
             Label = setting.GetCurrentLabel(),
             Description = setting.Description ?? string.Empty,
-            ControlType = ToMessageControlType(setting.ControlType),
+            ControlType = setting.ControlType switch
+            {
+                Sdk.Settings.SettingControlType.Text => SettingControlType.Text,
+                Sdk.Settings.SettingControlType.TextArea => SettingControlType.TextArea,
+                Sdk.Settings.SettingControlType.Checkbox => SettingControlType.Checkbox,
+                Sdk.Settings.SettingControlType.Number => SettingControlType.Number,
+                Sdk.Settings.SettingControlType.Choice => SettingControlType.Choice,
+                Sdk.Settings.SettingControlType.MultiChoice => SettingControlType.MultiChoice,
+                Sdk.Settings.SettingControlType.Secret => SettingControlType.Secret,
+                Sdk.Settings.SettingControlType.FilePicker => SettingControlType.FilePicker,
+                Sdk.Settings.SettingControlType.DirectoryPicker => SettingControlType.DirectoryPicker,
+                Sdk.Settings.SettingControlType.Button => SettingControlType.Button,
+                _ => SettingControlType.Text
+            },
             Persistence = (SettingPersistence)setting.Persistence,
             IsVisible = setting.GetCurrentVisibility(),
             IsReadOnly = setting.GetCurrentReadOnly(),
@@ -37,15 +50,11 @@ public static class SettingMapper
         var currentValue = setting.GetCurrentValueAsObject();
         switch (setting.ControlType)
         {
-            case Sdk.Settings.SettingControlType.Text:
-            case Sdk.Settings.SettingControlType.TextArea:
-            case Sdk.Settings.SettingControlType.Secret:
-            case Sdk.Settings.SettingControlType.FilePicker:
-            case Sdk.Settings.SettingControlType.DirectoryPicker:
-            case Sdk.Settings.SettingControlType.Choice:
-            case Sdk.Settings.SettingControlType.MultiChoice:
-            case Sdk.Settings.SettingControlType.Button:
-                message.StringValue = currentValue?.ToString() ?? string.Empty;
+            case Sdk.Settings.SettingControlType.Text or Sdk.Settings.SettingControlType.TextArea or
+                Sdk.Settings.SettingControlType.Secret or Sdk.Settings.SettingControlType.FilePicker or
+                Sdk.Settings.SettingControlType.DirectoryPicker or Sdk.Settings.SettingControlType.Choice or
+                Sdk.Settings.SettingControlType.MultiChoice or Sdk.Settings.SettingControlType.Button:
+                message.StringValue = setting.GetValueAsString();
                 break;
 
             case Sdk.Settings.SettingControlType.Checkbox:
@@ -90,13 +99,10 @@ public static class SettingMapper
             case SettingProperty.Value:
                 SetUpdateValue(update, value);
                 break;
-            case SettingProperty.Label:
-            case SettingProperty.ActionLabel:
+            case SettingProperty.Label or SettingProperty.ActionLabel:
                 update.StringValue = value?.ToString() ?? string.Empty;
                 break;
-            case SettingProperty.Visibility:
-            case SettingProperty.ReadOnly:
-            case SettingProperty.ActionEnabled:
+            case SettingProperty.Visibility or SettingProperty.ReadOnly or SettingProperty.ActionEnabled:
                 update.BoolValue = value is true;
                 break;
             case SettingProperty.Choices:
@@ -148,21 +154,4 @@ public static class SettingMapper
         }
     }
 
-    private static SettingControlType ToMessageControlType(Sdk.Settings.SettingControlType controlType)
-    {
-        return controlType switch
-        {
-            Sdk.Settings.SettingControlType.Text => SettingControlType.Text,
-            Sdk.Settings.SettingControlType.TextArea => SettingControlType.TextArea,
-            Sdk.Settings.SettingControlType.Checkbox => SettingControlType.Checkbox,
-            Sdk.Settings.SettingControlType.Number => SettingControlType.Number,
-            Sdk.Settings.SettingControlType.Choice => SettingControlType.Choice,
-            Sdk.Settings.SettingControlType.MultiChoice => SettingControlType.MultiChoice,
-            Sdk.Settings.SettingControlType.Secret => SettingControlType.Secret,
-            Sdk.Settings.SettingControlType.FilePicker => SettingControlType.FilePicker,
-            Sdk.Settings.SettingControlType.DirectoryPicker => SettingControlType.DirectoryPicker,
-            Sdk.Settings.SettingControlType.Button => SettingControlType.Button,
-            _ => SettingControlType.Text
-        };
-    }
 }

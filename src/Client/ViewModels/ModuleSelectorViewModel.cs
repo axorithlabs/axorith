@@ -40,7 +40,7 @@ public partial class ModuleSelectorViewModel : ReactiveObject
     [Reactive]
     public partial string SelectedCategory { get; set; } = "All";
 
-    public ObservableCollection<CategoryViewModel> Categories { get; } = [];
+    public ObservableCollection<CategoryViewModel> Categories { get; }
 
     public ObservableCollection<ModuleDefinitionViewModel> FilteredModules { get; } = [];
 
@@ -53,10 +53,15 @@ public partial class ModuleSelectorViewModel : ReactiveObject
     {
         _allModules = allModules;
         _onModuleSelected = onModuleSelected;
+        Categories = new(_allModules
+            .Select(module => module.Category)
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .Distinct()
+            .OrderBy(category => category)
+            .Select(category => new CategoryViewModel(category))
+            .Prepend(new CategoryViewModel("All", true)));
 
         CloseCommand = ReactiveCommand.Create(onCancel);
-
-        InitializeCategories();
 
         this.WhenAnyValue(x => x.SearchText, x => x.SelectedCategory)
             .Throttle(TimeSpan.FromMilliseconds(100))
@@ -64,22 +69,6 @@ public partial class ModuleSelectorViewModel : ReactiveObject
             .Subscribe(_ => FilterModules());
 
         FilterModules();
-    }
-
-    private void InitializeCategories()
-    {
-        Categories.Add(new CategoryViewModel("All", true));
-
-        var distinctCategories = _allModules
-            .Select(m => m.Category)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Distinct()
-            .OrderBy(c => c);
-
-        foreach (var cat in distinctCategories)
-        {
-            Categories.Add(new CategoryViewModel(cat));
-        }
     }
 
     [ReactiveCommand]
@@ -121,10 +110,7 @@ public partial class ModuleSelectorViewModel : ReactiveObject
     [ReactiveCommand]
     private async Task SelectModule(ModuleDefinitionViewModel vm)
     {
-        if (vm.IsJustAdded)
-        {
-            return;
-        }
+        if (vm.IsJustAdded) return;
 
         _onModuleSelected(vm.Definition);
         vm.IsJustAdded = true;

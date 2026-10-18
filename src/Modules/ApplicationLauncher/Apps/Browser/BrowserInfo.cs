@@ -35,16 +35,12 @@ internal static class BrowserProfiles
         var fileName = Path.GetFileNameWithoutExtension(executablePath).ToLowerInvariant();
 
         if (KnownBrowsers.TryGetValue(fileName, out var profile))
-        {
             return profile;
-        }
 
         foreach (var (key, value) in KnownBrowsers)
         {
             if (fileName.Contains(key, StringComparison.OrdinalIgnoreCase))
-            {
                 return value;
-            }
         }
 
         return new BrowserProfile("--profile-directory=\"{0}\"", "--incognito");

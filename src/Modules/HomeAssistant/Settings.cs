@@ -114,10 +114,7 @@ internal sealed class Settings : IDisposable
     public void LoadToken()
     {
         var token = _secureStorage.RetrieveSecret(TokenStorageKey);
-        if (!string.IsNullOrWhiteSpace(token))
-        {
-            AccessToken.SetValue(token);
-        }
+        if (!string.IsNullOrWhiteSpace(token)) AccessToken.SetValue(token);
     }
 
     public IReadOnlyList<ISetting> GetSettings() => _allSettings;
@@ -129,10 +126,7 @@ internal sealed class Settings : IDisposable
         var errors = new Dictionary<string, string>();
 
         var baseUrl = BaseUrl.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            errors[BaseUrl.Key] = "Home Assistant URL is required.";
-        }
+        if (string.IsNullOrWhiteSpace(baseUrl)) errors[BaseUrl.Key] = "Home Assistant URL is required.";
         else if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
                  (uri.Scheme != "http" && uri.Scheme != "https"))
         {
@@ -140,23 +134,15 @@ internal sealed class Settings : IDisposable
         }
 
         var token = AccessToken.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            token = _secureStorage.RetrieveSecret(TokenStorageKey);
-        }
+        if (string.IsNullOrWhiteSpace(token)) token = _secureStorage.RetrieveSecret(TokenStorageKey);
 
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            errors[AccessToken.Key] = "Access Token is required.";
-        }
+        if (string.IsNullOrWhiteSpace(token)) errors[AccessToken.Key] = "Access Token is required.";
 
         var startEntity = StartEntityId.GetCurrentValue();
         var endEntity = EndEntityId.GetCurrentValue();
 
         if (string.IsNullOrWhiteSpace(startEntity) && string.IsNullOrWhiteSpace(endEntity))
-        {
             errors[StartEntityId.Key] = "At least one entity ID is required.";
-        }
 
         return Task.FromResult(errors.Count > 0
             ? ValidationResult.Fail(errors, "Configuration contains errors.")

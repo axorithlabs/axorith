@@ -52,9 +52,7 @@ internal sealed class SpotifyApp : LauncherAppBase
     public override void Dispose()
     {
         if (_disposed)
-        {
             return;
-        }
 
         _disposed = true;
         _playbackService.Dispose();

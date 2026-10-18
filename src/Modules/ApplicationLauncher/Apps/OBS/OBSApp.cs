@@ -37,9 +37,7 @@ internal sealed class OBSApp : LauncherAppBase
     {
         await base.OnSessionStartAsync(cancellationToken).ConfigureAwait(false);
         if (!_settings.EnableWebSocket.GetCurrentValue())
-        {
             return;
-        }
 
         if (await ConnectWithRetryAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -98,9 +96,7 @@ internal sealed class OBSApp : LauncherAppBase
                 attempt, MaxWebSocketConnectAttempts);
 
             if (await _webSocketService.ConnectAsync(cancellationToken).ConfigureAwait(false))
-            {
                 return true;
-            }
 
             if (attempt < MaxWebSocketConnectAttempts)
             {

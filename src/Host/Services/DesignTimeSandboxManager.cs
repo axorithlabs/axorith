@@ -128,9 +128,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public async Task<bool> TryInvokeActionAsync(Guid instanceId, string actionKey, CancellationToken ct)
     {
         if (!_sandboxes.TryGetValue(instanceId, out var sb))
-        {
             return false;
-        }
 
         sb.LastAccessUtc = DateTime.UtcNow;
 
@@ -148,9 +146,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public void DisposeSandbox(Guid instanceId)
     {
         if (!_sandboxes.TryRemove(instanceId, out var sb))
-        {
             return;
-        }
 
         try
         {
@@ -247,9 +243,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
         {
             var oldest = _sandboxes.OrderBy(kv => kv.Value.LastAccessUtc).FirstOrDefault();
             if (oldest.Key == Guid.Empty)
-            {
                 break;
-            }
 
             DisposeSandbox(oldest.Key);
         }

@@ -106,10 +106,7 @@ internal static partial class TelemetryEventSanitizer
         foreach (var (key, value) in properties)
         {
             var safe = SanitizeValue(key, value);
-            if (safe is not null)
-            {
-                sanitized[key] = safe;
-            }
+            if (safe is not null) sanitized[key] = safe;
         }
 
         return sanitized;
@@ -117,15 +114,10 @@ internal static partial class TelemetryEventSanitizer
 
     private static object? SanitizeValue(string key, object? value)
     {
-        if (value is null)
-        {
-            return null;
-        }
+        if (value is null) return null;
 
         if (key == TelemetryConstants.Properties.Set && value is IReadOnlyDictionary<string, object?> set)
-        {
             return SanitizeProperties(set);
-        }
 
         if (GuidProperties.Contains(key))
         {
@@ -140,20 +132,12 @@ internal static partial class TelemetryEventSanitizer
                 : null;
         }
 
-        if (BooleanProperties.Contains(key))
-        {
-            return value is bool flag ? flag : null;
-        }
+        if (BooleanProperties.Contains(key)) return value is bool flag ? flag : null;
 
         if (HashProperties.Contains(key))
-        {
             return value is string hash && FingerprintRegex().IsMatch(hash) ? hash : null;
-        }
 
-        if (key == "modules")
-        {
-            return SanitizeModules(value);
-        }
+        if (key == "modules") return SanitizeModules(value);
 
         if (key is "moduleIds" or "moduleTypes" or "createdModuleTypes" or "changedCategories" or
             "categories" or "daysOfWeek" or "endAtDaysOfWeek" or "customProcessNames" or "customSiteDomains")
@@ -161,10 +145,7 @@ internal static partial class TelemetryEventSanitizer
             return SanitizeStringList(key, value);
         }
 
-        if (!StringProperties.Contains(key) || value is not string text)
-        {
-            return null;
-        }
+        if (!StringProperties.Contains(key) || value is not string text) return null;
 
         if (EnumValues.TryGetValue(key, out var allowed))
         {
@@ -190,12 +171,9 @@ internal static partial class TelemetryEventSanitizer
 
     private static object? SanitizeModules(object value)
     {
-        if (value is not IEnumerable items || value is string)
-        {
-            return null;
-        }
+        if (value is not IEnumerable items || value is string) return null;
 
-        var safeModules = new List<IReadOnlyDictionary<string, object?>>();
+        List<IReadOnlyDictionary<string, object?>> safeModules = [];
         foreach (var item in items.Cast<object?>().Take(64))
         {
             if (item is not IDictionary<string, object?> dictionary) continue;
@@ -210,7 +188,7 @@ internal static partial class TelemetryEventSanitizer
     {
         if (value is not IEnumerable items || value is string) return null;
 
-        var result = new List<string>();
+        List<string> result = [];
         foreach (var item in items.Cast<object?>().Take(64))
         {
             if (item is not string text) continue;

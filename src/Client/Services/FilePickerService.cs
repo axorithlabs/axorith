@@ -10,9 +10,7 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
     public async Task<string?> PickFileAsync(string title, string? filter, string? initialPath)
     {
         if (StorageProvider is null)
-        {
             return null;
-        }
 
         var options = new FilePickerOpenOptions
         {
@@ -48,9 +46,7 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
     public async Task<string?> PickFolderAsync(string title, string? initialPath)
     {
         if (StorageProvider is null)
-        {
             return null;
-        }
 
         var options = new FolderPickerOpenOptions
         {
@@ -74,9 +70,7 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
         var folder = result.FirstOrDefault();
 
         if (folder == null)
-        {
             return null;
-        }
 
         return folder.Path.IsAbsoluteUri ? folder.Path.LocalPath : folder.Path.OriginalString;
     }
@@ -84,14 +78,12 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
     private static IReadOnlyList<FilePickerFileType> ParseFilter(string filterString)
     {
         var parts = filterString.Split('|');
-        var filters = new List<FilePickerFileType>();
+        List<FilePickerFileType> filters = [];
 
         for (var i = 0; i < parts.Length; i += 2)
         {
             if (i + 1 >= parts.Length)
-            {
                 break;
-            }
 
             var name = parts[i];
             var pattern = parts[i + 1];

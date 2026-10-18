@@ -17,7 +17,7 @@ public sealed class SiteBlockerExtensionPipeCollection
 public sealed class SiteBlockerAllowListTests
 {
     [Fact]
-    public void FirefoxInstallActionIsAvailableAndChromeInstallIsNotOffered()
+    public void BrowserInstallActionsAreAvailableInModuleSettings()
     {
         using var blocker = new RecordingProcessBlocker();
         using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
@@ -26,7 +26,7 @@ public sealed class SiteBlockerAllowListTests
         try
         {
             Assert.Contains(actions, action => action.Key == "InstallExtension.Firefox");
-            Assert.DoesNotContain(actions, action => action.Key == "InstallExtension.Chrome");
+            Assert.Contains(actions, action => action.Key == "InstallExtension.Chrome");
         }
         finally
         {

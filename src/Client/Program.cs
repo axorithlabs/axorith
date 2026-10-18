@@ -64,8 +64,12 @@ internal static class Program
             .Build();
         RuntimeConfiguration = configuration;
 
-        var telemetryEnabled = TelemetryPreference.ReadOrDefault(LoadLegacyTelemetryEnabledSetting());
-        TelemetryPreference.Save(telemetryEnabled);
+        var isTestRun = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1";
+        var telemetryEnabled = !isTestRun && TelemetryPreference.ReadOrDefault(LoadLegacyTelemetryEnabledSetting());
+        if (!isTestRun)
+        {
+            TelemetryPreference.Save(telemetryEnabled);
+        }
 
         var telemetrySettings = new TelemetrySettings()
                 .WithEnvironmentOverrides() with
@@ -74,7 +78,7 @@ internal static class Program
                 Enabled = telemetryEnabled
             };
 
-        Telemetry = new TelemetryService(telemetrySettings);
+        Telemetry = isTestRun ? NoopTelemetryService.Instance : new TelemetryService(telemetrySettings);
         _pendingInstallation = LoadPendingInstallation();
         if ((_pendingInstallation is null && File.Exists(PendingInstallationPath)) ||
             (_pendingInstallation is { } pending &&

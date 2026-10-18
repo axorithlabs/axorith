@@ -77,12 +77,12 @@ public class App : Application
         services.AddSingleton<HostController>();
         services.AddSingleton<ITokenProvider, FileTokenProvider>();
         services.AddSingleton<CoreConnectionHolder>();
-        services.AddTransient<IPresetsApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Presets);
-        services.AddTransient<ISessionsApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Sessions);
-        services.AddTransient<IModulesApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Modules);
-        services.AddTransient<ISchedulerApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Scheduler);
-        services.AddTransient<INotificationApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Notifications);
-        services.AddTransient<IUpdatesApi>(sp => sp.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection().Updates);
+        services.AddTransient<IPresetsApi>(sp => GetCoreConnection(sp).Presets);
+        services.AddTransient<ISessionsApi>(sp => GetCoreConnection(sp).Sessions);
+        services.AddTransient<IModulesApi>(sp => GetCoreConnection(sp).Modules);
+        services.AddTransient<ISchedulerApi>(sp => GetCoreConnection(sp).Scheduler);
+        services.AddTransient<INotificationApi>(sp => GetCoreConnection(sp).Notifications);
+        services.AddTransient<IUpdatesApi>(sp => GetCoreConnection(sp).Updates);
         services.AddSingleton<HostHealthMonitor>();
         services.AddSingleton<HostTrayService>();
         services.AddSingleton<ConnectionInitializer>();
@@ -142,7 +142,10 @@ public class App : Application
             };
         }
 
-        ApplyAutoStartSettings(uiSettingsStore, Services, logger);
+        if (Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") != "1")
+        {
+            ApplyAutoStartSettings(uiSettingsStore, Services, logger);
+        }
 
         _mainWindow.Closing += (_, e) =>
         {
@@ -190,6 +193,9 @@ public class App : Application
     }
 
     private bool _isShuttingDown;
+
+    private static ICoreConnection GetCoreConnection(IServiceProvider services) =>
+        services.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection();
 
     private void RegisterShutdownHandler(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> logger)
     {

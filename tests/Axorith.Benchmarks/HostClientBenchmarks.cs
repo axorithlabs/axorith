@@ -240,18 +240,23 @@ public class HostClientBenchmarks
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseContentRoot(Path.Combine(Directory.GetCurrentDirectory(), "src", "Host"));
-            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            builder.ConfigureAppConfiguration((_, config) =>
             {
-                ["Persistence:PresetsPath"] = Path.Combine(dataPath, "presets"),
-                ["Persistence:LogsPath"] = Path.Combine(dataPath, "logs"),
-                ["Persistence:ConfigPath"] = Path.Combine(dataPath, "config"),
-                ["Persistence:HostInfoPath"] = Path.Combine(dataPath, "host-info.json"),
-                ["Modules:SearchPaths:0"] = Path.Combine(dataPath, "modules"),
-                ["Modules:SearchPaths:1"] = Path.Combine(dataPath, "empty"),
-                ["Modules:SearchPaths:2"] = Path.Combine(dataPath, "empty"),
-                ["Modules:SearchPaths:3"] = Path.Combine(dataPath, "empty"),
-                ["Modules:SearchPaths:4"] = Path.Combine(dataPath, "empty")
-            }));
+                config.AddJsonFile(Path.Combine(Directory.GetCurrentDirectory(), "src", "Host", "appsettings.json"),
+                    optional: true, reloadOnChange: false);
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Persistence:PresetsPath"] = Path.Combine(dataPath, "presets"),
+                    ["Persistence:LogsPath"] = Path.Combine(dataPath, "logs"),
+                    ["Persistence:ConfigPath"] = Path.Combine(dataPath, "config"),
+                    ["Persistence:HostInfoPath"] = Path.Combine(dataPath, "host-info.json"),
+                    ["Modules:SearchPaths:0"] = Path.Combine(dataPath, "modules"),
+                    ["Modules:SearchPaths:1"] = Path.Combine(dataPath, "empty"),
+                    ["Modules:SearchPaths:2"] = Path.Combine(dataPath, "empty"),
+                    ["Modules:SearchPaths:3"] = Path.Combine(dataPath, "empty"),
+                    ["Modules:SearchPaths:4"] = Path.Combine(dataPath, "empty")
+                });
+            });
         }
     }
 }

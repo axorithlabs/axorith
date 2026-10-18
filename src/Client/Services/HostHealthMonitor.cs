@@ -36,9 +36,7 @@ public sealed class HostHealthMonitor(
     public void Stop()
     {
         if (_monitoringTask == null)
-        {
             return;
-        }
 
         logger.LogInformation("Stopping host health monitoring");
         _monitoringCts.Cancel();
@@ -69,9 +67,7 @@ public sealed class HostHealthMonitor(
     {
         var diagnosticsApi = _diagnosticsApi;
         if (diagnosticsApi is null)
-        {
             return false;
-        }
 
         for (var i = 0; i < MaxRetries; i++)
             try
@@ -80,9 +76,7 @@ public sealed class HostHealthMonitor(
                 var healthStatus = await diagnosticsApi.GetHealthAsync(cts.Token);
 
                 if (healthStatus.State == HealthState.Healthy)
-                {
                     return true;
-                }
 
                 logger.LogWarning("Host health check returned non-healthy status: {Status}", healthStatus.State);
             }

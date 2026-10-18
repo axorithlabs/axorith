@@ -100,10 +100,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     public Task CheckCanSetRecoveryStartupAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!OperatingSystem.IsWindows())
-        {
-            return Task.CompletedTask;
-        }
+        if (!OperatingSystem.IsWindows()) return Task.CompletedTask;
 
         try
         {
@@ -125,10 +122,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     public Task SetRecoveryStartupAsync(bool active, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!OperatingSystem.IsWindows())
-        {
-            return Task.CompletedTask;
-        }
+        if (!OperatingSystem.IsWindows()) return Task.CompletedTask;
 
         try
         {
@@ -155,10 +149,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
             else
             {
                 using var existingKey = Registry.CurrentUser.OpenSubKey(RunKey);
-                if (!IsRecoveryStartupCommand(existingKey?.GetValue(RunValueName)))
-                {
-                    return Task.CompletedTask;
-                }
+                if (!IsRecoveryStartupCommand(existingKey?.GetValue(RunValueName))) return Task.CompletedTask;
 
                 using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true)
                                 ?? throw new InvalidOperationException("Windows startup settings are unavailable.");
@@ -220,10 +211,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
 
     public async Task RestoreAsync(CancellationToken cancellationToken = default)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        if (!OperatingSystem.IsWindows()) return;
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         var restored = false;
@@ -322,20 +310,15 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         strictSessionActive ? EnableAsync(cancellationToken) :
         File.Exists(_statePath) ? RestoreAsync(cancellationToken) : Task.CompletedTask;
 
-    private static string GetRecoveryCommand() =>
-        $"\"{Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Axorith.Host.exe"))}\"";
-
-
     private static bool IsRecoveryStartupCommand(object? value) =>
-        value is string command && string.Equals(command, GetRecoveryCommand(), StringComparison.OrdinalIgnoreCase);
+        value is string command && string.Equals(command,
+            $"\"{Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Axorith.Host.exe"))}\"",
+            StringComparison.OrdinalIgnoreCase);
 
     public Task<bool> IsEnabledAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!OperatingSystem.IsWindows() || !File.Exists(_statePath))
-        {
-            return Task.FromResult(false);
-        }
+        if (!OperatingSystem.IsWindows() || !File.Exists(_statePath)) return Task.FromResult(false);
 
         try
         {
@@ -354,7 +337,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
 
     private SavedState CaptureState()
     {
-        var values = new List<SavedValue>();
+        List<SavedValue> values = [];
         Capture(SystemPolicy, "DisableTaskMgr");
         Capture(WindowsPolicy, "DisableCMD");
         Capture(ExplorerPolicy, "NoRun");
@@ -426,10 +409,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     private static bool HasBlockedExecutableList()
     {
         using var key = Registry.CurrentUser.OpenSubKey(DisallowRunPolicy);
-        if (key == null)
-        {
-            return false;
-        }
+        if (key == null) return false;
 
         for (var i = 0; i < BlockedExecutables.Length; i++)
         {

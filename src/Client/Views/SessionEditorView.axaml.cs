@@ -15,25 +15,16 @@ public partial class SessionEditorView : UserControl
 
         AddHandler(PointerWheelChangedEvent, (_, e) =>
         {
-            if (e.Source is not Control control)
-            {
-                return;
-            }
+            if (e.Source is not Control control) return;
 
             var comboBox = control.FindAncestorOfType<ComboBox>();
 
-            if (comboBox == null || comboBox.IsDropDownOpen)
-            {
-                return;
-            }
+            if (comboBox == null || comboBox.IsDropDownOpen) return;
 
             e.Handled = true;
 
             var scrollViewer = comboBox.FindAncestorOfType<ScrollViewer>();
-            if (scrollViewer == null)
-            {
-                return;
-            }
+            if (scrollViewer == null) return;
 
             switch (e.Delta.Y)
             {
@@ -58,15 +49,9 @@ public partial class SessionEditorView : UserControl
 
         AddHandler(KeyDownEvent, (_, e) =>
         {
-            if (e.Source is not TextBox textBox || (e.Key != Key.Enter && e.Key != Key.Escape))
-            {
-                return;
-            }
+            if (e.Source is not TextBox textBox || (e.Key != Key.Enter && e.Key != Key.Escape)) return;
 
-            if (e.Key == Key.Enter && textBox.AcceptsReturn)
-            {
-                return;
-            }
+            if (e.Key == Key.Enter && textBox.AcceptsReturn) return;
 
             if (e.Key == Key.Escape && textBox.Name == "ApplicationInput" &&
                 textBox.DataContext is SettingViewModel appSetting)
@@ -86,10 +71,7 @@ public partial class SessionEditorView : UserControl
 
     private static void OnTextBoxGotFocus(object? sender, GotFocusEventArgs e)
     {
-        if (e.Source is not TextBox textBox)
-        {
-            return;
-        }
+        if (e.Source is not TextBox textBox) return;
 
         if (textBox.DataContext is SettingViewModel settingVm)
         {
@@ -105,14 +87,8 @@ public partial class SessionEditorView : UserControl
 
     private static void OnTextBoxLostFocus(object? sender, RoutedEventArgs e)
     {
-        if (e.Source is not TextBox textBox)
-        {
-            return;
-        }
+        if (e.Source is not TextBox textBox) return;
 
-        if (textBox.DataContext is SettingViewModel settingVm)
-        {
-            settingVm.OnFocusLost();
-        }
+        if (textBox.DataContext is SettingViewModel settingVm) settingVm.OnFocusLost();
     }
 }

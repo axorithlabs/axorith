@@ -11,7 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Client\Axorith.Client.csproj" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\src\Client\Axorith.Client.csproj" />
         <ProjectReference Include="..\..\src\Core\Axorith.Core.csproj" />
         <ProjectReference Include="..\..\src\Sdk\Axorith.Sdk.csproj" />
         <ProjectReference Include="..\..\src\Host\Axorith.Host.csproj" />

@@ -50,26 +50,18 @@ public sealed class FocusActivityChart : Control
         var width = Bounds.Width;
         var height = Bounds.Height;
         if (width <= 1 || height <= 1)
-        {
             return;
-        }
 
         if (AxisStroke is { } axisStroke)
-        {
             context.DrawLine(new Pen(axisStroke), new Point(0, height - 1), new Point(width, height - 1));
-        }
 
         var values = Values;
         if (Stroke is not { } stroke || values.Count < 2)
-        {
             return;
-        }
 
         var max = values.Max();
         if (max <= 0)
-        {
             return;
-        }
 
         var pen = new Pen(stroke, 2);
         var chartHeight = Math.Max(1, height - 12);

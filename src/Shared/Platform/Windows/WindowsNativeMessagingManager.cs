@@ -46,11 +46,8 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
 
             var registryPath = $@"Software\Mozilla\NativeMessagingHosts\{hostName}";
 
-            using var key = Registry.CurrentUser.CreateSubKey(registryPath, writable: true);
-            if (key == null)
-            {
-                throw new InvalidOperationException($"Failed to create or open registry key: {registryPath}");
-            }
+            using var key = Registry.CurrentUser.CreateSubKey(registryPath, writable: true)
+                ?? throw new InvalidOperationException($"Failed to create or open registry key: {registryPath}");
 
             key.SetValue(string.Empty, manifestPath, RegistryValueKind.String);
 
@@ -75,10 +72,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
     private void RemoveExtensionSettingsEntry(string registryPath, string valueName, string extensionId)
     {
         using var key = Registry.CurrentUser.OpenSubKey(registryPath, writable: true);
-        if (key == null)
-        {
-            return;
-        }
+        if (key is null) return;
 
         var existingValue = key.GetValue(valueName);
         string[] values = existingValue switch
@@ -112,10 +106,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
             }
         }
 
-        if (!changed)
-        {
-            return;
-        }
+        if (!changed) return;
 
         if (updatedValues.Count == 0)
         {
@@ -125,10 +116,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         {
             key.SetValue(valueName, updatedValues.ToArray(), RegistryValueKind.MultiString);
         }
-        else
-        {
-            key.SetValue(valueName, updatedValues[0], RegistryValueKind.String);
-        }
+        else key.SetValue(valueName, updatedValues[0], RegistryValueKind.String);
 
         logger.LogInformation("Removed legacy Firefox install policy for add-on {ExtensionId}", extensionId);
     }

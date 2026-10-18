@@ -205,8 +205,6 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     public ICommand OpenSettingsCommand { get; }
 
-    public ICommand CheckForUpdatesCommand { get; }
-
     public ICommand InstallUpdateCommand { get; }
 
     public ICommand OpenEmergencyUnlockCommand { get; }
@@ -320,8 +318,6 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         OpenSettingsCommand = ReactiveCommand.Create(
             () => _shell.NavigateTo(_serviceProvider.GetRequiredService<SettingsViewModel>()),
             this.WhenAnyValue(vm => vm.IsOverlayOpen, overlayOpen => !overlayOpen));
-        CheckForUpdatesCommand = ReactiveCommand.CreateFromTask(CheckForUpdatesAsync);
-
         var canInstallUpdate = this
             .WhenAnyValue(vm => vm.UpdateAvailable, vm => vm.IsDownloadingUpdate, vm => vm.IsCommittedSession,
                 (available, downloading, committed) => available && !downloading && !committed)
@@ -349,10 +345,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     private void SetPage(bool showPresets)
     {
-        if (_isPresetsPage == showPresets)
-        {
-            return;
-        }
+        if (_isPresetsPage == showPresets) return;
 
         _isPresetsPage = showPresets;
         this.RaisePropertyChanged(nameof(IsHomePage));
@@ -378,6 +371,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         IsSessionActive = false;
     }
 
+    [ReactiveCommand]
     private async Task CheckForUpdatesAsync()
     {
         try
@@ -406,10 +400,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     private async Task InstallUpdateAsync()
     {
-        if (_availableUpdate == null)
-        {
-            return;
-        }
+        if (_availableUpdate == null) return;
 
         var stage = "update_download";
         try
@@ -540,24 +531,15 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     private static string FormatEndAtReview(FocusCommitmentOptions options, DateTime localNow)
     {
-        if (options.EndAtLocalTime is not { } endTime)
-        {
-            return "End time is not set.";
-        }
+        if (options.EndAtLocalTime is not { } endTime) return "End time is not set.";
 
         for (var daysAhead = 0; daysAhead <= 7; daysAhead++)
         {
             var date = localNow.Date.AddDays(daysAhead);
-            if (options.EndAtDaysOfWeek is { Count: > 0 } days && !days.Contains(date.DayOfWeek))
-            {
-                continue;
-            }
+            if (options.EndAtDaysOfWeek is { Count: > 0 } days && !days.Contains(date.DayOfWeek)) continue;
 
             var end = date.Add(endTime.ToTimeSpan());
-            if (end > localNow)
-            {
-                return $"Ends {end:ddd, MMM d} at {end:HH:mm} local time";
-            }
+            if (end > localNow) return $"Ends {end:ddd, MMM d} at {end:HH:mm} local time";
         }
 
         return "No valid end day is selected.";
@@ -566,10 +548,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     [ReactiveCommand]
     private async Task ConfirmStart()
     {
-        if (_pendingStartPreset == null || IsStartCountdownRunning)
-        {
-            return;
-        }
+        if (_pendingStartPreset == null || IsStartCountdownRunning) return;
 
         var preset = _pendingStartPreset;
         var sessionInstanceId = _pendingStartSessionInstanceId ?? Guid.NewGuid();
@@ -712,10 +691,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     public void BeginEmergencyUnlockHold()
     {
-        if (!IsCommittedSession || _emergencyUnlockCts != null)
-        {
-            return;
-        }
+        if (!IsCommittedSession || _emergencyUnlockCts != null) return;
 
         var cts = new CancellationTokenSource();
         _emergencyUnlockCts = cts;
@@ -755,10 +731,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                     }
                 });
 
-                if (!progress.Completed)
-                {
-                    continue;
-                }
+                if (!progress.Completed) continue;
 
                 completed = true;
                 break;
@@ -854,8 +827,8 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 schedulesAvailable = false;
             }
 
-            var newVms = new List<SessionPresetViewModel>();
-            var fullPresets = new List<SessionPreset>();
+            List<SessionPresetViewModel> newVms = [];
+            List<SessionPreset> fullPresets = [];
             foreach (var summary in presets)
             {
                 var fullPreset = await _presetsApi.GetPresetAsync(summary.Id);
@@ -1125,10 +1098,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             var seconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
             ActiveBreakStatus = $"Break in progress | {seconds / 60:00}:{seconds % 60:00} remaining";
         }
-        else
-        {
-            ActiveBreakStatus = string.Empty;
-        }
+        else ActiveBreakStatus = string.Empty;
 
     }
 

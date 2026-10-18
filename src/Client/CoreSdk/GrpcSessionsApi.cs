@@ -53,15 +53,15 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
 
     public IObservable<SessionEvent> SessionEvents => _eventsSubject.AsObservable();
 
-    public async Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default) =>
-        await _retryPolicy.ExecuteAsync(async () =>
+    public Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default) =>
+        _retryPolicy.ExecuteAsync<IReadOnlyList<SessionActivity>>(async () =>
         {
             var response = await _client.GetSessionHistoryAsync(new GetSessionStateRequest(), cancellationToken: ct)
                 .ConfigureAwait(false);
             return response.Entries.Select(entry => new SessionActivity(
                 DateTimeOffset.FromUnixTimeMilliseconds(entry.StartedAtUnixMs),
                 DateTimeOffset.FromUnixTimeMilliseconds(entry.EndedAtUnixMs), entry.PresetName)).ToArray();
-        }).ConfigureAwait(false);
+        });
 
     public Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default)
     {
@@ -72,34 +72,15 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                     cancellationToken: ct)
                 .ConfigureAwait(false);
 
-            if (!response.IsActive)
-            {
-                return null;
-            }
+            if (!response.IsActive) return null;
 
-            Guid? presetId = null;
-            if (Guid.TryParse(response.PresetId, out var parsedId))
-            {
-                presetId = parsedId;
-            }
+            Guid? presetId = Guid.TryParse(response.PresetId, out var parsedId) ? parsedId : null;
 
-            DateTimeOffset? startedAt = null;
-            if (response.StartedAt != null)
-            {
-                startedAt = response.StartedAt.ToDateTimeOffset();
-            }
+            DateTimeOffset? startedAt = response.StartedAt?.ToDateTimeOffset();
 
-            DateTimeOffset? endsAt = null;
-            if (response.EndsAt != null)
-            {
-                endsAt = response.EndsAt.ToDateTimeOffset();
-            }
+            DateTimeOffset? endsAt = response.EndsAt?.ToDateTimeOffset();
 
-            DateTimeOffset? breakEndsAt = null;
-            if (response.BreakEndsAt != null)
-            {
-                breakEndsAt = response.BreakEndsAt.ToDateTimeOffset();
-            }
+            DateTimeOffset? breakEndsAt = response.BreakEndsAt?.ToDateTimeOffset();
 
             return new SessionState(
                 response.IsActive,
@@ -117,7 +98,7 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 response.WebsiteBlocking,
                 response.BreaksTotal,
                 TimeSpan.FromSeconds(response.RemainingSeconds),
-                response.BreakEndsAt == null ? null : TimeSpan.FromSeconds(response.BreakRemainingSeconds));
+                breakEndsAt is null ? null : TimeSpan.FromSeconds(response.BreakRemainingSeconds));
         });
     }
 
@@ -195,10 +176,7 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
             {
                 var progress = call.ResponseStream.Current;
                 yield return new EmergencyUnlockProgress(progress.Progress, progress.Completed, progress.Message);
-                if (progress.Completed)
-                {
-                    break;
-                }
+                if (progress.Completed) break;
             }
         }
         finally
@@ -220,10 +198,7 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 

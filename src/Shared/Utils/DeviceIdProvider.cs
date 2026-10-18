@@ -12,9 +12,7 @@ public static class DeviceIdProvider
         {
             var machineIdPath = Path.Combine(ApplicationPaths.MachineConfig, "installation-id.txt");
             if (Guid.TryParse(File.Exists(machineIdPath) ? File.ReadAllText(machineIdPath) : null, out var machineId))
-            {
                 return machineId.ToString("D");
-            }
         }
 
         return GetDeviceId(Path.Combine(ApplicationPaths.Config, "installation-id.txt"));
@@ -39,9 +37,7 @@ public static class DeviceIdProvider
             }
 
             if (Guid.TryParse(File.Exists(path) ? File.ReadAllText(path) : null, out var existingId))
-            {
                 return existingId.ToString("D");
-            }
 
             var installationId = Guid.NewGuid().ToString("D");
             File.WriteAllText(path, installationId, new UTF8Encoding(false));

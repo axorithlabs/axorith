@@ -17,10 +17,7 @@ public static class ModuleMapper
             Assembly = definition.AssemblyFileName ?? string.Empty
         };
 
-        foreach (var platform in definition.Platforms)
-        {
-            message.Platforms.Add(platform.ToString());
-        }
+        message.Platforms.AddRange(definition.Platforms.Select(platform => platform.ToString()));
 
         return message;
     }
