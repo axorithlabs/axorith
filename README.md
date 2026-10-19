@@ -35,38 +35,6 @@ You choose which actions and restrictions each Workspace contains.
 | Local background Host | Keep session execution separate from the desktop user interface.                                             |
 | Module SDK            | Extend Axorith with additional modules using the C# SDK.                                                     |
 
-## Examples
-
-These examples illustrate configurations you can create with the available modules and session settings. They are not built-in templates.
-
-### Programming
-
-Create a Workspace called `Coding`.
-
-Configure Application Launcher to open VS Code or a JetBrains IDE, optionally with a specific project. Use App Blocker to restrict distracting applications and Site Blocker to block selected websites.
-
-Set a two-hour session if you want the Workspace to stop automatically, or use Focus Commitment when you want restrictions on ending it early.
-
-### Studying
-
-Create a Workspace called `Study`.
-
-Open the applications needed for the subject, block distracting websites, and schedule the session for a regular study period. Configure allowed breaks if using a committed session.
-
-The applications and restrictions can differ from those used in your programming Workspace.
-
-### Switching between work and leisure
-
-Create separate `Work` and `Rest` Workspaces.
-
-Use the Scheduler to start Work at a selected time. Configure the end behavior to activate Rest after Work finishes. The Rest Workspace can launch different applications and use different module settings.
-
-### Smart home automation
-
-Add the Home Assistant module to a Workspace to control configured lights, switches, scenes, or scripts when sessions start or end.
-
-This requires an existing Home Assistant installation and a configured connection.
-
 ## Getting started
 
 ### Requirements
