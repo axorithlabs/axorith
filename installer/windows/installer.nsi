@@ -447,15 +447,32 @@ FunctionEnd
     SetOutPath "$TEMP"
     inetc::get /SILENT "${RuntimeUrl}" "$TEMP\${InstallerFile}" /END
     Pop $0
-    StrCmp $0 "OK" +3
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download ${RuntimeName}. Please install it manually from https://dotnet.microsoft.com/download"
-    Return
+    ${If} $0 != "OK"
+        Delete "$TEMP\${InstallerFile}"
+        MessageBox MB_OK|MB_ICONSTOP "Failed to download ${RuntimeName}. Axorith installation cannot continue. Please install it manually from https://dotnet.microsoft.com/download" /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
     DetailPrint "Installing ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_install"
+    ClearErrors
     ExecWait '"$TEMP\${InstallerFile}" /install /quiet /norestart' $0
-    IntCmp $0 0 +2
-    ExecWait '"$TEMP\${InstallerFile}" /install /passive /norestart' $0
+    ${IfNot} ${Errors}
+    ${AndIf} $0 != 0
+    ${AndIf} $0 != 3010
+        ExecWait '"$TEMP\${InstallerFile}" /install /passive /norestart' $0
+    ${EndIf}
+    ${If} ${Errors}
+        StrCpy $0 "launch failed"
+    ${EndIf}
     Delete "$TEMP\${InstallerFile}"
+    ${If} $0 == 3010
+        SetRebootFlag true
+    ${ElseIf} $0 != 0
+        MessageBox MB_OK|MB_ICONSTOP "Failed to install ${RuntimeName} ($0). Axorith installation cannot continue." /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
 !macroend
 
 Function InstallDotNetDesktopRuntime
