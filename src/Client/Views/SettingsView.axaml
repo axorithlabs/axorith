@@ -20,11 +20,11 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid ColumnDefinitions="220,*" Background="#050505">
-        <Border Grid.Column="0" Background="#0A0A0A" BorderBrush="#333333" BorderThickness="0,0,1,0">
+    <Grid ColumnDefinitions="220,*" Background="{DynamicResource BackgroundPrimaryBrush}">
+        <Border Grid.Column="0" Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,0,1,0">
             <Grid RowDefinitions="Auto,*,Auto" Margin="13,18,6,14">
                 <TextBlock x:Name="SettingsSidebarHeading" Grid.Row="0" Text="Settings" FontSize="16" FontWeight="SemiBold"
-                           Foreground="#E0E0E0" Margin="10,8,10,18" />
+                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="10,8,10,18" />
                 <StackPanel Grid.Row="1" Spacing="4">
                     <Button Classes="SidebarButton" Classes.Active="{Binding IsGeneralSection}"
                             Command="{Binding SelectSectionCommand}" CommandParameter="General">
@@ -66,15 +66,15 @@
                         <StackPanel Spacing="0" IsVisible="{Binding IsGeneralSection}">
                             <StackPanel Spacing="4" Margin="0,4,0,12">
                                 <TextBlock Text="General" FontSize="22" FontWeight="Bold" />
-                                <TextBlock Text="Startup and window behavior" Foreground="#B0B0B0" />
+                                <TextBlock Text="Startup and window behavior" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
 
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,17">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,17">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Start with Windows" FontSize="15" />
                                         <TextBlock Text="Launch automatically after sign in"
-                                                   FontSize="12" Foreground="#888888" TextWrapping="Wrap" />
+                                                   FontSize="12" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoStartEnabled}"
                                                   VerticalAlignment="Center"
@@ -82,7 +82,7 @@
                                 </Grid>
                             </Border>
 
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,17">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,17">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20"
                                       IsEnabled="{Binding AutoStartEnabled}">
                                     <Grid.Styles>
@@ -93,7 +93,7 @@
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Start minimized" FontSize="15" />
                                         <TextBlock Text="Open directly in the tray" FontSize="12"
-                                                   Foreground="#888888" TextWrapping="Wrap" />
+                                                   Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoStartMinimized}"
                                                   VerticalAlignment="Center"
@@ -101,12 +101,12 @@
                                 </Grid>
                             </Border>
 
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,17">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,17">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Minimize to tray on close" FontSize="15" />
                                         <TextBlock Text="Closing the window keeps the app running"
-                                                   FontSize="12" Foreground="#888888" TextWrapping="Wrap" />
+                                                   FontSize="12" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding MinimizeToTrayOnClose}"
                                                   VerticalAlignment="Center"
@@ -114,14 +114,14 @@
                                 </Grid>
                             </Border>
 
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,17">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,17">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Updates" FontSize="15" />
                                         <TextBlock Text="{Binding AppVersion, StringFormat='Current version {0}'}"
-                                                   FontSize="12" Foreground="#888888" />
+                                                   FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
                                         <TextBlock Text="{Binding MainViewModel.UpdateVersion, StringFormat='Available: {0}'}"
-                                                   FontSize="12" Foreground="#B0B0B0"
+                                                   FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                                    IsVisible="{Binding MainViewModel.UpdateAvailable}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
@@ -139,25 +139,25 @@
                         <StackPanel Spacing="18" IsVisible="{Binding IsPrivacySection}">
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Privacy" FontSize="22" FontWeight="Bold" />
-                                <TextBlock Text="Telemetry and data collection" Foreground="#B0B0B0" />
+                                <TextBlock Text="Telemetry and data collection" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,18">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,18">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="Usage telemetry" FontSize="15" />
                                         <TextBlock Text="Sends product telemetry from Client and Host while enabled"
-                                                   FontSize="12" Foreground="#888888" TextWrapping="Wrap" />
+                                                   FontSize="12" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding TelemetryEnabled}"
                                                   VerticalAlignment="Center"
                                                   AutomationProperties.Name="Usage telemetry" />
                                 </Grid>
                             </Border>
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,12">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,12">
                                 <StackPanel Spacing="7">
                                     <TextBlock Text="Data collected" FontWeight="SemiBold" />
                                     <TextBlock Text="Usage events include app/OS versions, a pseudonymous installation ID, Workspace/module/session/schedule IDs and types, lifecycle and update events, selected non-secret configuration options, and sanitized error details.&#x0a;Allowlisted details may include custom process names, site/browser/Home Assistant domains, launcher types and executable basenames, selected categories, schedule times, and public Steam App IDs. Secret values such as tokens and passwords are not sent; presence flags may be sent.&#x0a;Workspace and schedule names, custom module/action names, full paths and URLs, raw browser profile names, arbitrary settings dictionaries, raw error messages, and stack traces are not sent. Paths and profile names may be represented by keyed HMAC hashes. Client and Host telemetry requests may let PostHog infer coarse location from network metadata; Axorith does not send an IP property."
-                                               FontSize="12" Foreground="#888888" LineHeight="20" />
+                                               FontSize="12" Foreground="{DynamicResource TextMutedBrush}" LineHeight="20" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
                             <Button Content="View privacy policy" Command="{Binding OpenPrivacyPolicyCommand}"
@@ -167,15 +167,15 @@
                         <StackPanel Spacing="18" IsVisible="{Binding IsAboutSection}">
                             <StackPanel Spacing="4">
                                 <TextBlock Text="About" FontSize="22" FontWeight="Bold" />
-                                <TextBlock Text="Application information" Foreground="#B0B0B0" />
+                                <TextBlock Text="Application information" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="0,18">
+                            <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,18">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                                     <StackPanel Spacing="4">
                                         <TextBlock Text="Version" FontSize="15" />
-                                        <TextBlock Text="Desktop client" FontSize="12" Foreground="#888888" />
+                                        <TextBlock Text="Desktop client" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding AppVersion}" Foreground="#B0B0B0"
+                                    <TextBlock Grid.Column="1" Text="{Binding AppVersion}" Foreground="{DynamicResource TextSecondaryBrush}"
                                                VerticalAlignment="Center" />
                                 </Grid>
                             </Border>

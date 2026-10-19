@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
-             xmlns:converters="using:Axorith.Client.Converters"
              x:Class="Axorith.Client.Views.LoadingView"
              x:DataType="vm:LoadingViewModel">
     <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -9,20 +8,18 @@
             <ProgressBar IsIndeterminate="True" 
                          Width="130" 
                          Height="30"
-                         Theme="{StaticResource FluentProgressBar}"
-                         Foreground="{DynamicResource SystemAccentColor}"
                          HorizontalAlignment="Center"/>
             
             <StackPanel Spacing="8">
                 <TextBlock Text="{Binding Message}" 
                            FontSize="18" 
                            FontWeight="SemiBold"
-                           Foreground="#E0E0E0"
+                           Foreground="{DynamicResource TextPrimaryBrush}"
                            HorizontalAlignment="Center"/>
                 
                 <TextBlock Text="{Binding SubMessage}" 
                            FontSize="14" 
-                           Foreground="#A0A0A0"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
                            TextWrapping="Wrap"

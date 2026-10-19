@@ -4,87 +4,21 @@
              xmlns:core="using:Axorith.Core.Models"
              xmlns:converters="using:Axorith.Client.Converters"
              xmlns:selectors="using:Axorith.Client.Selectors"
-             xmlns:sdk="clr-namespace:Axorith.Sdk;assembly=Axorith.Sdk"
              x:Class="Axorith.Client.Views.SessionEditorView"
              x:DataType="vm:SessionEditorViewModel">
     <UserControl.Styles>
-        <Style Selector="Border.error">
-            <Setter Property="BorderBrush" Value="#FF4444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="#1F0505"/>
-        </Style>
-        <Style Selector="Border.ItemCard">
-            <Setter Property="Background" Value="#111"/>
-            <Setter Property="BorderBrush" Value="#333"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="16"/>
-        </Style>
-        <Style Selector="Border.ItemCard.error">
-            <Setter Property="Background" Value="#111"/>
-            <Setter Property="BorderBrush" Value="#FF6B6B"/>
-        </Style>
-        <Style Selector="Border.warning">
-            <Setter Property="BorderBrush" Value="#E5B546"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="#1F0505"/>
-        </Style>
-        <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
-            <Setter Property="BorderBrush" Value="#FF4444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-        <Style Selector="TextBox.setting-input">
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="Background" Value="#050505"/>
-            <Setter Property="BorderBrush" Value="#333"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="10,8"/>
-        </Style>
         <Style Selector="TransitioningContentControl">
             <Setter Property="PageTransition">
-                <CrossFade Duration="0:0:0.15"/>
+                <CrossFade Duration="0:0:0.15" />
             </Setter>
-        </Style>
-        <Style Selector="ComboBox.error /template/ Border#Border">
-            <Setter Property="BorderBrush" Value="#FF4444"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-        <Style Selector="TextBox.appPicker">
-            <Setter Property="CornerRadius" Value="6,0,0,6"/>
-        </Style>
-        <Style Selector="Button.inline-action.success">
-            <Setter Property="Background" Value="#183622"/>
-            <Setter Property="BorderBrush" Value="#3D8B56"/>
-            <Setter Property="Foreground" Value="#8FE0A6"/>
-        </Style>
-        <Style Selector="Button.inline-action.failure">
-            <Setter Property="Background" Value="#3A1919"/>
-            <Setter Property="BorderBrush" Value="#A84848"/>
-            <Setter Property="Foreground" Value="#FF9A9A"/>
-        </Style>
-
-        <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ RepeatButton">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-        </Style>
-
-        <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ RepeatButton:disabled /template/ ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Opacity" Value="0.3"/>
-        </Style>
-
-        <Style Selector="NumericUpDown.error /template/ TextBox">
-            <Setter Property="BorderBrush" Value="#FF4444"/>
-            <Setter Property="BorderThickness" Value="1"/>
         </Style>
     </UserControl.Styles>
 
-
-<UserControl.Resources>
+    <UserControl.Resources>
 
         <DataTemplate x:Key="InlineActionTemplate" x:DataType="vm:ActionViewModel">
             <Button Content="{Binding Label}" Command="{Binding InvokeCommand}"
-                    IsVisible="{Binding IsVisible}" Background="#111" BorderBrush="#333" Foreground="#AAA"
+                    IsVisible="{Binding IsVisible}"
                     BorderThickness="1" CornerRadius="0,6,6,0" Padding="8,0" MinWidth="64" Height="36"
                     FontSize="11" FontWeight="SemiBold" Classes="inline-action"
                     Classes.success="{Binding IsSuccess}" Classes.failure="{Binding IsFailure}"
@@ -93,14 +27,14 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ApplicationChoiceItemTemplate" x:DataType="vm:ApplicationChoiceViewModel">
-            <Border Background="#111" BorderBrush="#292929" BorderThickness="1"
+            <Border Background="{DynamicResource BackgroundSecondaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1"
                     CornerRadius="6" Padding="8" Margin="0,0,0,4">
                 <Grid ColumnDefinitions="36,*,76" ColumnSpacing="10" MinHeight="52">
-                    <Border Grid.Column="0" Width="32" Height="32" Background="#1B1B1B"
+                    <Border Grid.Column="0" Width="32" Height="32" Background="{DynamicResource BackgroundSelectedBrush}"
                             CornerRadius="6" VerticalAlignment="Center">
                         <Grid>
                             <PathIcon Data="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V8H20V6H4M4,18H20V10H4V18Z"
-                                      Width="18" Height="18" Foreground="#888"
+                                      Width="18" Height="18" Foreground="{DynamicResource TextMutedBrush}"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             <Image Source="{Binding Icon}"
                                    Width="26" Height="26" Stretch="Uniform"
@@ -109,9 +43,9 @@
                     </Border>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                         <TextBlock Text="{Binding Name}"
-                                   FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis"/>
+                                   FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
                         <TextBlock Text="{Binding Path}"
-                                   FontSize="11" Foreground="#777" TextTrimming="CharacterEllipsis"/>
+                                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                     <Button Grid.Column="2"
                             Command="{Binding SelectCommand}"
@@ -124,14 +58,14 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ApplicationPickerPopupTemplate" x:DataType="vm:SettingViewModel">
-            <Border Background="#101010" BorderBrush="#333" BorderThickness="1"
-                    CornerRadius="7" Padding="6" BoxShadow="0 10 28 0 #80000000">
+            <Border Background="{DynamicResource BackgroundSecondaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1"
+                    CornerRadius="7" Padding="6" BoxShadow="{DynamicResource PopupShadow}">
                 <StackPanel Spacing="6">
                     <TextBox Text="{Binding SearchText, Mode=TwoWay}"
                              IsVisible="{Binding ShowPopupSearch}" Watermark="Search apps..."
                              Classes="setting-input"/>
                     <ListBox ItemsSource="{Binding ApplicationChoices}" MaxHeight="320"
-                             Background="Transparent" BorderThickness="0" Padding="0"
+                             Background="{DynamicResource TransparentBrush}" BorderThickness="0" Padding="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              ScrollViewer.IsScrollChainingEnabled="False"
                              ItemTemplate="{StaticResource ApplicationChoiceItemTemplate}"/>
@@ -175,11 +109,10 @@
                              Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     </TextBox>
                     <Button Grid.Column="1" Command="{Binding ApplicationPicker.OpenApplicationSelectorCommand}"
-                            IsVisible="{Binding IsCustomAppsField}" IsEnabled="{Binding !IsReadOnly}"
-                            Background="#111" BorderBrush="#333" BorderThickness="1"
+                            IsVisible="{Binding IsCustomAppsField}" IsEnabled="{Binding !IsReadOnly}" BorderThickness="1"
                             CornerRadius="0,6,6,0" Padding="0" MinHeight="80" Width="44"
                             ToolTip.Tip="Add an installed app">
-                        <PathIcon Data="{StaticResource SearchIcon}" Width="17" Height="17" Foreground="#AAA"/>
+                        <PathIcon Data="{StaticResource SearchIcon}" Width="17" Height="17"/>
                     </Button>
                 </Grid>
                 <ContentControl Content="{Binding ApplicationPicker}"
@@ -210,8 +143,6 @@
                            FormatString="{Binding NumberFormatString}"
                            IsEnabled="{Binding !IsReadOnly}"
                            HorizontalAlignment="Stretch"
-                           Background="#050505"
-                           BorderBrush="#333"
                            CornerRadius="6"
                            Padding="10,8"
                            Classes.error="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -228,10 +159,9 @@
                              Watermark="Select application..."
                              Classes="setting-input" CornerRadius="6,0,0,6"/>
                     <Button Grid.Column="1"
-                            Command="{Binding OpenApplicationSelectorCommand}"
-                            Background="#111" BorderBrush="#333" BorderThickness="1,1,1,1"
+                            Command="{Binding OpenApplicationSelectorCommand}" BorderThickness="1,1,1,1"
                             CornerRadius="0,6,6,0" Padding="0" Width="44" Height="38">
-                        <PathIcon Data="{StaticResource SearchIcon}" Width="17" Height="17" Foreground="#AAA"/>
+                        <PathIcon Data="{StaticResource SearchIcon}" Width="17" Height="17"/>
                     </Button>
                     <Popup PlacementTarget="{Binding #ApplicationSelectorRoot}"
                            Placement="Bottom"
@@ -283,18 +213,17 @@
                           ToolTip.Tip="{Binding PickerHistoryToolTip}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid ColumnDefinitions="*,Auto" Background="Transparent">
+                            <Grid ColumnDefinitions="*,Auto" Background="{DynamicResource TransparentBrush}">
                                 <TextBlock Grid.Column="0" Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="350" VerticalAlignment="Center"/>
 
                                 <Button Grid.Column="1"
-                                        Classes="icon"
+                                        Classes="icon delete-btn"
                                         Command="{Binding $parent[ComboBox].DataContext.RemoveHistoryItemCommand}"
                                         CommandParameter="{Binding}"
                                         Width="24" Height="24" Padding="4" Margin="8,0,0,0"
                                         ToolTip.Tip="Remove from history">
                                     <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
-                                              Width="12" Height="12"
-                                              Foreground="#FF5555"/>
+                                              Width="12" Height="12"/>
                                 </Button>
                             </Grid>
                         </DataTemplate>
@@ -307,23 +236,23 @@
 
                 <DataTemplate x:Key="TimeTriggerEditorTemplate" x:DataType="vm:TimeTriggerViewModel">
             <Panel>
-                <Border Background="#000000" Opacity="0.85"/>
+                <Border Background="{DynamicResource OverlayBrush}"/>
 
-                <Border Background="#0A0A0A"
-                        BorderBrush="#333"
+                <Border Background="{DynamicResource BackgroundTertiaryBrush}"
+                        BorderBrush="{DynamicResource BorderPrimaryBrush}"
                         BorderThickness="1"
                         Width="520"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
                         CornerRadius="12"
-                        BoxShadow="0 25 80 0 #80000000">
+                        BoxShadow="{DynamicResource DialogShadow}">
 
                     <Grid RowDefinitions="Auto, *">
                         <Border Grid.Row="0"
                                 Padding="20,16"
                                 BorderThickness="0,0,0,1"
-                                BorderBrush="#222"
-                                Background="#0F0F0F"
+                                BorderBrush="{DynamicResource BorderSecondaryBrush}"
+                                Background="{DynamicResource BackgroundTertiaryBrush}"
                                 CornerRadius="12,12,0,0">
                             <DockPanel>
                                 <Button DockPanel.Dock="Right"
@@ -332,11 +261,10 @@
                                         Classes="link"
                                         FontSize="18"
                                         Padding="8"
-                                        Margin="10,-5,-10,-5"
-                                        Foreground="#666"/>
+                                        Margin="10,-5,-10,-5"/>
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="{Binding EditorAccentBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding EditorTitle}" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="{Binding EditorAccentType, Converter={StaticResource NotificationTypeToBrushConverter}}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding EditorTitle}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </DockPanel>
                         </Border>
@@ -346,7 +274,7 @@
                                 <StackPanel Spacing="24">
                                     <StackPanel Spacing="20">
                                         <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="{Binding TimeLabel}" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
+                                            <TextBlock Grid.Column="0" Text="{Binding TimeLabel}" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="Medium"/>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                                 <NumericUpDown Value="{Binding Hours}"
                                                                Minimum="{Binding Use24HourFormat, Converter={x:Static converters:AppConverters.BoolToMinHour}}"
@@ -359,7 +287,7 @@
                                                                HorizontalContentAlignment="Center"
                                                                VerticalContentAlignment="Center"
                                                                Classes.error="{Binding HasTimeError}"/>
-                                                <TextBlock Text=":" VerticalAlignment="Center" Foreground="#888" FontSize="16" FontWeight="Bold"/>
+                                                <TextBlock Text=":" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" FontSize="16" FontWeight="Bold"/>
                                                 <NumericUpDown Value="{Binding Minutes}"
                                                                Minimum="0" Maximum="59"
                                                                FormatString="00"
@@ -375,12 +303,12 @@
                                                                  IsChecked="{Binding IsAm}"
                                                                  GroupName="{Binding EditorTitle}"
                                                                  Padding="8,4"
-                                                                 Foreground="#E0E0E0"/>
+                                                                 Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                     <RadioButton Content="PM"
                                                                  IsChecked="{Binding !IsAm}"
                                                                  GroupName="{Binding EditorTitle}"
                                                                  Padding="8,4"
-                                                                 Foreground="#E0E0E0"/>
+                                                                 Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -390,44 +318,44 @@
                                             <CheckBox Grid.Column="1"
                                                       IsChecked="{Binding Use24HourFormat}"
                                                       Content="Use 24-hour format"
-                                                      Foreground="#AAA"/>
+                                                      Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </Grid>
 
                                         <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="#AAA" FontWeight="Medium"/>
+                                            <TextBlock Grid.Column="0" Text="Repeat On" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="Medium"/>
                                             <Border Grid.Column="1"
-                                                    Background="#050505"
-                                                    BorderBrush="#333"
+                                                    Background="{DynamicResource BackgroundPrimaryBrush}"
+                                                    BorderBrush="{DynamicResource BorderPrimaryBrush}"
                                                     BorderThickness="1"
                                                     CornerRadius="8"
                                                     Padding="8,12">
                                                 <UniformGrid Rows="1" Columns="7">
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Mon" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Mon" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnMonday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Tue" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Tue" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnTuesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Wed" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Wed" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnWednesday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Thu" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Thu" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnThursday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Fri" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Fri" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnFriday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Sat" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Sat" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnSaturday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                                                        <TextBlock Text="Sun" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Sun" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"/>
                                                         <CheckBox IsChecked="{Binding RunOnSunday}" HorizontalAlignment="Center" Padding="0" MinWidth="0"/>
                                                     </StackPanel>
                                                 </UniformGrid>
@@ -451,7 +379,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="MultiChoiceSettingTemplate" DataType="vm:SettingViewModel">
-            <Border Background="#050505" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="10">
+            <Border Background="{DynamicResource BackgroundPrimaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" CornerRadius="6" Padding="10">
                 <ItemsControl ItemsSource="{Binding MultiChoices}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="vm:MultiChoiceItemViewModel">
@@ -480,14 +408,14 @@
 
         <DataTemplate x:Key="ModuleSettingRowTemplate" x:DataType="vm:SettingViewModel">
             <StackPanel Margin="0,0,0,24" IsVisible="{Binding IsVisible}" HorizontalAlignment="Stretch">
-                <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" Foreground="#E0E0E0"
+                <TextBlock Text="{Binding Label}" FontWeight="Medium" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}"
                            Margin="0,0,0,6" HorizontalAlignment="Left"/>
-                <TextBlock Text="{Binding Setting.Description}" Foreground="#A0A0A0" FontSize="12"
+                <TextBlock Text="{Binding Setting.Description}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
                            TextWrapping="Wrap" MaxWidth="520" Margin="0,0,0,10" HorizontalAlignment="Left"
                            IsVisible="{Binding Setting.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingSelector}"
                                 HorizontalAlignment="Stretch"/>
-                <TextBlock Text="{Binding Error}" Foreground="#FF6B6B" FontSize="12" Margin="0,4,0,0"
+                <TextBlock Text="{Binding Error}" Foreground="{DynamicResource ErrorPrimaryBrush}" FontSize="12" Margin="0,4,0,0"
                            TextWrapping="Wrap"
                            IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
@@ -507,12 +435,12 @@
 
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
-                            <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" Background="#050505" BorderBrush="#333" CornerRadius="6"/>
-                            <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF5555" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            <TextBlock Text="Preset Name" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBox Text="{Binding Name}" Watermark="e.g. Deep Work, Gaming..." FontSize="16" Padding="10" CornerRadius="6"/>
+                            <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource ErrorPrimaryBrush}" FontSize="13" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                            <Border Background="#2A0505"
-                                    BorderBrush="#FF4444"
+                            <Border Background="{DynamicResource ErrorBackgroundBrush}"
+                                    BorderBrush="{DynamicResource ErrorPrimaryBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
                                     Padding="12"
@@ -520,18 +448,18 @@
                                     IsVisible="{Binding HasValidationErrors}">
                                 <Grid ColumnDefinitions="Auto, *">
                                     <PathIcon Grid.Column="0" Data="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"
-                                              Foreground="#FF4444"
+                                              Foreground="{DynamicResource ErrorPrimaryBrush}"
                                               Width="20" Height="20"
                                               VerticalAlignment="Top"
                                               Margin="0,2,10,0"/>
 
                                     <StackPanel Grid.Column="1" Spacing="4">
                                         <TextBlock Text="Configuration Error"
-                                                   Foreground="#FF4444"
+                                                   Foreground="{DynamicResource ErrorPrimaryBrush}"
                                                    FontWeight="Bold"
                                                    FontSize="14"/>
                                         <TextBlock Text="Please fix the highlighted configuration errors before saving."
-                                                   Foreground="#FFCCCC"
+                                                   Foreground="{DynamicResource ErrorTextBrush}"
                                                    FontSize="13"
                                                    TextWrapping="Wrap"/>
                                     </StackPanel>
@@ -542,30 +470,30 @@
 
                     <Border x:Name="FocusCommitmentCard" Classes="Card" Classes.error="{Binding FocusCommitmentError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Padding="24" Margin="0,40,0,0" Width="500">
                         <StackPanel Spacing="12">
-                            <TextBlock Text="Focus commitment" FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            <TextBlock Text="Focus commitment" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
                             <TextBlock Text="Choose whether this Workspace can be stopped once it starts."
-                                       Foreground="#888" FontSize="13" TextWrapping="Wrap"/>
+                                       Foreground="{DynamicResource TextMutedBrush}" FontSize="13" TextWrapping="Wrap"/>
                             <ComboBox ItemsSource="{Binding FocusCommitmentModes}"
                                       SelectedIndex="{Binding FocusCommitmentModeIndex, Mode=TwoWay}"/>
 
                             <StackPanel IsVisible="{Binding IsCommittedMode}" Spacing="10">
-                                <Border Background="#1A1710" BorderBrush="#665522" BorderThickness="1"
+                                <Border Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1"
                                         CornerRadius="6" Padding="10" IsVisible="{Binding IsStrictMode}">
                                     <TextBlock Text="Strict requires Windows protection. The Host will refuse to start if it cannot enable that protection."
-                                               Foreground="#E6C878" FontSize="12" TextWrapping="Wrap"/>
+                                               Foreground="{DynamicResource WarningPrimaryBrush}" FontSize="12" TextWrapping="Wrap"/>
                                 </Border>
 
-                                <TextBlock Text="Breaks" FontWeight="SemiBold" Foreground="#CCC" Margin="0,4,0,0"/>
+                                <TextBlock Text="Breaks" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,0"/>
                                 <ComboBox ItemsSource="{Binding BreakOptions}"
                                           SelectedIndex="{Binding BreakPresetIndex, Mode=TwoWay}"/>
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsCustomBreakBudget}">
                                     <StackPanel Spacing="5">
-                                        <TextBlock Text="Number of breaks" Foreground="#AAA" FontSize="12"/>
+                                        <TextBlock Text="Number of breaks" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
                                         <NumericUpDown Value="{Binding BreakCount, Mode=TwoWay}" Minimum="1" Maximum="5"
                                                        Increment="1" FormatString="0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Spacing="5">
-                                        <TextBlock Text="Minutes per break" Foreground="#AAA" FontSize="12"/>
+                                        <TextBlock Text="Minutes per break" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
                                         <NumericUpDown Value="{Binding BreakDurationMinutes, Mode=TwoWay}" Minimum="1" Maximum="60"
                                                        Increment="1" FormatString="0"/>
                                     </StackPanel>
@@ -573,24 +501,24 @@
 
                                 <StackPanel x:Name="ScheduleLockPanel" Spacing="8" IsVisible="{Binding HasScheduledStart}">
                                     <TextBlock Text="Lock configuration before scheduled start" FontWeight="SemiBold"
-                                               Foreground="#CCC" Margin="0,4,0,0"/>
+                                               Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,0"/>
                                     <ComboBox ItemsSource="{Binding ScheduleLockOptions}"
                                               SelectedIndex="{Binding ScheduleLockIndex, Mode=TwoWay}"/>
                                     <TextBlock Text="{Binding ScheduledConfigurationLockStatus}"
-                                               Foreground="#E6C878" FontSize="12" TextWrapping="Wrap"/>
+                                               Foreground="{DynamicResource WarningPrimaryBrush}" FontSize="12" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>
                             <TextBlock x:Name="FocusCommitmentErrorText" Text="{Binding FocusCommitmentError}"
-                                       Foreground="#FF6B6B" FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ErrorPrimaryBrush}" FontSize="12" TextWrapping="Wrap"
                                        IsVisible="{Binding FocusCommitmentError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
                     </Border>
 
-                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+                    <Path Data="M 0 0 L 0 40" Stroke="{DynamicResource BorderHoverBrush}" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
                     <Border Classes="Card" Padding="24" Margin="0" MinWidth="500">
                         <StackPanel Spacing="15">
-                            <TextBlock Text="Start On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            <TextBlock Text="Start On..." FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                             <ItemsControl ItemsSource="{Binding Triggers}">
                                 <ItemsControl.ItemTemplate>
@@ -601,8 +529,8 @@
                                                 Margin="0,0,0,10">
                                             <Border>
                                                 <Grid ColumnDefinitions="Auto, *, Auto">
-                                                    <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
-                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="#00AAFF"/>
+                                                    <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
+                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="{DynamicResource AccentInfoBrush}"/>
                                                     </Border>
 
                                                     <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
@@ -626,8 +554,6 @@
                             </ItemsControl>
 
                             <Button HorizontalAlignment="Stretch"
-                                    Background="Transparent"
-                                    BorderBrush="#333"
                                     BorderThickness="1"
                                     CornerRadius="8"
                                     Padding="10"
@@ -643,43 +569,29 @@
                                     </MenuFlyout>
                                 </Button.Flyout>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12" Foreground="#888"/>
-                                    <TextBlock Text="Add Trigger" Foreground="#888" FontWeight="Medium"/>
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12"/>
+                                    <TextBlock Text="Add Trigger" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
 
                             <TextBlock Text="If empty, start manually via button."
                                        HorizontalAlignment="Center"
-                                       Foreground="#666"
+                                       Foreground="{DynamicResource TextMutedBrush}"
                                        FontSize="12"
                                        Margin="0,5,0,0"
                                        IsVisible="{Binding !Triggers.Count}"/>
                         </StackPanel>
                     </Border>
 
-                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+                    <Path Data="M 0 0 L 0 40" Stroke="{DynamicResource BorderHoverBrush}" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
-                    <ListBox ItemsSource="{Binding ConfiguredModules}"
-                             Background="Transparent"
+                    <ListBox Classes="workflow-list" ItemsSource="{Binding ConfiguredModules}"
+                             Background="{DynamicResource TransparentBrush}"
                              BorderThickness="0"
                              Padding="0"
                              HorizontalAlignment="Center"
                              SelectionMode="Single"
                              SelectedItem="{Binding SelectedModule}">
-                        <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="Margin" Value="0"/>
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                            </Style>
-                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                                <Setter Property="Background" Value="Transparent"/>
-                            </Style>
-                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                                <Setter Property="Background" Value="Transparent"/>
-                            </Style>
-                        </ListBox.Styles>
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <VirtualizingStackPanel/>
@@ -697,8 +609,8 @@
                                                 ToolTip.Tip="{Binding WarningMessage}">
                                             <Grid ColumnDefinitions="*, Auto">
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                    <TextBlock Text="{Binding Definition.Description}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" TextWrapping="Wrap" MaxWidth="400" Margin="0,6,0,0"/>
+                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="16"/>
+                                                    <TextBlock Text="{Binding Definition.Description}" FontSize="13" TextWrapping="Wrap" MaxWidth="400" Margin="0,6,0,0"/>
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="15,0,0,0">
@@ -726,21 +638,14 @@
                                                 <PathIcon Data="{StaticResource TimerIcon}" Width="12" Height="12" Foreground="{DynamicResource AccentInfoBrush}"/>
                                                 <TextBlock Text="Wait" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
 
-                                                <TextBox Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}"
+                                                <TextBox Classes="delay-input" Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}"
                                                          Width="36" Height="22" Padding="0" FontSize="13"
                                                          TextAlignment="Center"
                                                          VerticalContentAlignment="Center"
-                                                         Background="Transparent" BorderThickness="0"
+                                                         Background="{DynamicResource TransparentBrush}" BorderThickness="0"
                                                          MaxLength="3">
-                                                    <TextBox.Styles>
-                                                        <Style Selector="TextBox:focus">
-                                                            <Setter Property="Background" Value="#222"/>
-                                                            <Setter Property="BorderThickness" Value="0"/>
-                                                            <Setter Property="SelectionBrush" Value="#007ACC"/>
-                                                        </Style>
-                                                    </TextBox.Styles>
                                                 </TextBox>
-                                                <TextBlock Text="s" FontSize="12" Foreground="#888" VerticalAlignment="Center"/>
+                                                <TextBlock Text="s" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
 
                                                 <Button Classes="RemoveDelay"
                                                         Command="{Binding RemoveDelayCommand}"
@@ -772,7 +677,7 @@
                     </ListBox>
 
                     <StackPanel MinWidth="500" Margin="0,0,0,0" Spacing="0">
-                        <Path Data="M 0 0 L 0 30" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
+                        <Path Data="M 0 0 L 0 30" Stroke="{DynamicResource BorderHoverBrush}" StrokeThickness="1" HorizontalAlignment="Center" Margin="0" IsVisible="{Binding ConfiguredModules.Count}"/>
 
                         <Button Command="{Binding OpenAddModuleCommand}"
                                 Classes="CardButton"
@@ -781,17 +686,17 @@
                             <Border Classes="Card" Padding="20,15" CornerRadius="8">
                                 <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                                     <PathIcon Data="{StaticResource PlusIcon}" Width="14" Height="14" Foreground="{DynamicResource AccentInfoBrush}"/>
-                                    <TextBlock Text="Add Module" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="Add Module" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </Border>
                         </Button>
                     </StackPanel>
 
-                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+                    <Path Data="M 0 0 L 0 40" Stroke="{DynamicResource BorderHoverBrush}" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
                     <Border x:Name="StopOnCard" Classes="Card" Padding="24" MinWidth="500">
                         <StackPanel Spacing="15">
-                            <TextBlock x:Name="StopOnHeading" Text="Stop On..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            <TextBlock x:Name="StopOnHeading" Text="Stop On..." FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                             <ItemsControl ItemsSource="{Binding StopTriggers}">
                                 <ItemsControl.ItemTemplate>
@@ -803,8 +708,8 @@
                                                 Classes.error="{Binding HasError}">
                                             <Border>
                                                 <Grid ColumnDefinitions="Auto, *, Auto">
-                                                    <Border Background="#222" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
-                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="#FF6B6B"/>
+                                                    <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
+                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="{DynamicResource ErrorPrimaryBrush}"/>
                                                     </Border>
 
                                                     <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
@@ -828,8 +733,6 @@
                             </ItemsControl>
 
                             <Button x:Name="AddStopTriggerButton" HorizontalAlignment="Stretch"
-                                    Background="Transparent"
-                                    BorderBrush="#333"
                                     BorderThickness="1"
                                     CornerRadius="8"
                                     Padding="10"
@@ -853,25 +756,25 @@
                                     </MenuFlyout>
                                 </Button.Flyout>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12" Foreground="#888"/>
-                                    <TextBlock Text="Add Stop Trigger" Foreground="#888" FontWeight="Medium"/>
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12"/>
+                                    <TextBlock Text="Add Stop Trigger" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
 
                             <TextBlock Text="If empty, stop manually via button."
                                        HorizontalAlignment="Center"
-                                       Foreground="#666"
+                                       Foreground="{DynamicResource TextMutedBrush}"
                                        FontSize="12"
                                        Margin="0,5,0,0"
                                        IsVisible="{Binding !StopTriggers.Count}"/>
                         </StackPanel>
                     </Border>
 
-                    <Path Data="M 0 0 L 0 40" Stroke="#444" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
+                    <Path Data="M 0 0 L 0 40" Stroke="{DynamicResource BorderHoverBrush}" StrokeThickness="1" HorizontalAlignment="Center" Margin="0"/>
 
                     <Border x:Name="ThenCard" Classes="Card" Padding="24" MinWidth="500" Margin="0,0,0,120">
                         <StackPanel Spacing="15">
-                            <TextBlock x:Name="ThenHeading" Text="Then..." FontWeight="Bold" FontSize="16" Foreground="#E0E0E0"/>
+                            <TextBlock x:Name="ThenHeading" Text="Then..." FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                             <ItemsControl ItemsSource="{Binding ThenTriggers}">
                                 <ItemsControl.ItemTemplate>
@@ -879,10 +782,10 @@
                                         <Border Classes="ItemCard" Margin="0,0,0,10"
                                                 Classes.error="{Binding HasError}">
                                             <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
-                                                <Border Background="#222" CornerRadius="6" Width="40" Height="40"
+                                                <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="6" Width="40" Height="40"
                                                         VerticalAlignment="Center">
                                                     <PathIcon Data="{StaticResource PlayIcon}" Width="20" Height="20"
-                                                              Foreground="#4CAF50"/>
+                                                              Foreground="{DynamicResource SuccessPrimaryBrush}"/>
                                                 </Border>
                                                 <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
                                                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
@@ -918,8 +821,6 @@
                             </ItemsControl>
 
                             <Button x:Name="AddThenTriggerButton" HorizontalAlignment="Stretch"
-                                    Background="Transparent"
-                                    BorderBrush="#333"
                                     BorderThickness="1"
                                     CornerRadius="8"
                                     Padding="10"
@@ -965,14 +866,14 @@
                                     </MenuFlyout>
                                 </Button.Flyout>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12" Foreground="#888"/>
-                                    <TextBlock Text="Add Then Trigger" Foreground="#888" FontWeight="Medium"/>
+                                    <PathIcon Data="{StaticResource PlusIcon}" Width="12" Height="12"/>
+                                    <TextBlock Text="Add Then Trigger" FontWeight="Medium"/>
                                 </StackPanel>
                             </Button>
 
                             <TextBlock Text="Triggers next session after stop. Does not apply when stopped manually."
                                        HorizontalAlignment="Center"
-                                       Foreground="#666"
+                                       Foreground="{DynamicResource TextMutedBrush}"
                                        FontSize="12"
                                        TextWrapping="Wrap"
                                        TextAlignment="Center"
@@ -987,27 +888,21 @@
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:ModuleSelectorViewModel">
                     <Panel>
-                        <Border Background="#000000" Opacity="0.85"/>
-                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="800" MaxHeight="700" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                        <Border Background="{DynamicResource OverlayBrush}"/>
+                        <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" Width="800" MaxHeight="700" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="{DynamicResource DialogShadow}">
                             <Grid RowDefinitions="Auto, Auto, *">
-                                <Border Grid.Row="0" Padding="24" BorderThickness="0,0,0,1" BorderBrush="#333" Background="#0A0A0A" CornerRadius="12,12,0,0">
+                                <Border Grid.Row="0" Padding="24" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource BorderPrimaryBrush}" Background="{DynamicResource BackgroundTertiaryBrush}" CornerRadius="12,12,0,0">
                                     <DockPanel>
-                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding CloseCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0" Foreground="#888">
-                                            <Button.Styles>
-                                                <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                                    <Setter Property="Background" Value="#222"/>
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </Style>
-                                            </Button.Styles>
+                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding CloseCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0">
                                         </Button>
-                                        <TextBlock Text="Add Module" FontSize="20" FontWeight="Bold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Add Module" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     </DockPanel>
                                 </Border>
 
                                 <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="24,20,24,10">
-                                    <TextBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}" Watermark="Search modules..." Background="#050505" BorderBrush="#333" CornerRadius="6" Padding="10,8" Margin="0,0,15,0">
+                                    <TextBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}" Watermark="Search modules..." CornerRadius="6" Padding="10,8" Margin="0,0,15,0">
                                         <TextBox.InnerRightContent>
-                                            <PathIcon Data="{StaticResource SearchIcon}" Width="14" Height="14" Foreground="#666" Margin="0,0,10,0"/>
+                                            <PathIcon Data="{StaticResource SearchIcon}" Width="14" Height="14" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,10,0"/>
                                         </TextBox.InnerRightContent>
                                     </TextBox>
 
@@ -1024,7 +919,7 @@
                                                              Command="{Binding $parent[ItemsControl].DataContext.SelectCategoryCommand}"
                                                              CommandParameter="{Binding}"
                                                              IsChecked="{Binding IsSelected}"
-                                                             Theme="{StaticResource ButtonRadioButton}"/>
+                                                             Theme="{StaticResource {x:Type ToggleButton}}"/>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -1042,13 +937,13 @@
                                                 <Border Classes="SelectorCard" Width="360" Margin="0,0,15,15" BorderThickness="1" CornerRadius="8" Padding="16">
                                                     <Grid RowDefinitions="Auto, *, Auto">
                                                         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                                                            <Border Background="#222" CornerRadius="4" Padding="6,2" DockPanel.Dock="Right" VerticalAlignment="Top">
-                                                                <TextBlock Text="{Binding Definition.Category}" Foreground="#888" FontSize="11"/>
+                                                            <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="4" Padding="6,2" DockPanel.Dock="Right" VerticalAlignment="Top">
+                                                                <TextBlock Text="{Binding Definition.Category}" Foreground="{DynamicResource TextMutedBrush}" FontSize="11"/>
                                                             </Border>
-                                                            <TextBlock Text="{Binding Definition.Name}" FontWeight="Bold" FontSize="15" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding Definition.Name}" FontWeight="Bold" FontSize="15" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
                                                         </DockPanel>
 
-                                                        <TextBlock Grid.Row="1" Text="{Binding Definition.Description}" Foreground="#999" FontSize="13" TextWrapping="Wrap" Height="40" TextTrimming="CharacterEllipsis" Margin="0,0,0,15"/>
+                                                        <TextBlock Grid.Row="1" Text="{Binding Definition.Description}" Foreground="{DynamicResource TextMutedBrush}" FontSize="13" TextWrapping="Wrap" Height="40" TextTrimming="CharacterEllipsis" Margin="0,0,0,15"/>
 
                                                         <Panel Grid.Row="2">
                                                             <Button Content="Add" Classes="accent" HorizontalAlignment="Stretch"
@@ -1057,14 +952,14 @@
                                                                     IsVisible="{Binding !IsJustAdded}"/>
 
                                                             <Border IsVisible="{Binding IsJustAdded}"
-                                                                    Background="Transparent"
-                                                                    BorderBrush="#10B981"
+                                                                    Background="{DynamicResource TransparentBrush}"
+                                                                    BorderBrush="{DynamicResource SuccessPrimaryBrush}"
                                                                     BorderThickness="1"
                                                                     CornerRadius="6"
                                                                     Height="32">
                                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
-                                                                    <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" Width="12" Height="12" Foreground="#10B981"/>
-                                                                    <TextBlock Text="Added" Foreground="#10B981" FontWeight="SemiBold" FontSize="13"/>
+                                                                    <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" Width="12" Height="12" Foreground="{DynamicResource SuccessPrimaryBrush}"/>
+                                                                    <TextBlock Text="Added" Foreground="{DynamicResource SuccessPrimaryBrush}" FontWeight="SemiBold" FontSize="13"/>
                                                                 </StackPanel>
                                                             </Border>
                                                         </Panel>
@@ -1089,15 +984,15 @@
             <TransitioningContentControl.ContentTemplate>
                 <DataTemplate x:DataType="vm:StopAfterDurationTriggerViewModel">
             <Panel>
-                <Border Background="#000000" Opacity="0.85"/>
-                <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                <Border Background="{DynamicResource OverlayBrush}"/>
+                <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="{DynamicResource DialogShadow}">
                     <Grid RowDefinitions="Auto, *">
-                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="#222" Background="#0F0F0F" CornerRadius="12,12,0,0">
+                        <Border Grid.Row="0" Padding="20,16" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource BorderSecondaryBrush}" Background="{DynamicResource BackgroundTertiaryBrush}" CornerRadius="12,12,0,0">
                             <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5" Foreground="#666"/>
+                                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}" Classes="link" FontSize="18" Padding="8" Margin="10,-5,-10,-5"/>
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="#FF6B6B" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Edit Session Duration" FontSize="16" FontWeight="SemiBold" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                                    <PathIcon Data="{StaticResource TimerIcon}" Width="18" Height="18" Foreground="{DynamicResource ErrorPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Edit Session Duration" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </DockPanel>
                         </Border>
@@ -1106,15 +1001,15 @@
                                 <StackPanel Spacing="24">
                                     <StackPanel Spacing="20">
                                         <Grid ColumnDefinitions="120, *">
-                                            <TextBlock Grid.Column="0" Text="Duration" VerticalAlignment="Center" Foreground="#AAA" FontWeight="Medium"/>
+                                            <TextBlock Grid.Column="0" Text="Duration" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="Medium"/>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                                 <NumericUpDown Value="{Binding DurationHours}" Minimum="0" Maximum="23" FormatString="0" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasDurationError}"/>
-                                                <TextBlock Text="hours" VerticalAlignment="Center" Foreground="#666"/>
+                                                <TextBlock Text="hours" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}"/>
                                                 <NumericUpDown Value="{Binding DurationMinutes}" Minimum="0" Maximum="59" FormatString="00" Width="70" Height="32" Padding="8,0" ShowButtonSpinner="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Classes.error="{Binding HasDurationError}"/>
-                                                <TextBlock Text="min" VerticalAlignment="Center" Foreground="#666"/>
+                                                <TextBlock Text="min" VerticalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}"/>
                                             </StackPanel>
                                         </Grid>
-                                        <TextBlock Text="Session will automatically stop after this duration from start." Foreground="#666" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
+                                        <TextBlock Text="Session will automatically stop after this duration from start." Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="120,0,0,0"/>
                                     </StackPanel>
                                     <Button Content="Done" Command="{Binding $parent[UserControl].DataContext.CloseTriggerCommand}" CommandParameter="{Binding}" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10" FontWeight="SemiBold"/>
                                 </StackPanel>
@@ -1132,12 +1027,12 @@
                 <DataTemplate x:DataType="vm:ConfiguredModuleViewModel">
                     <Panel>
                         <Border IsVisible="{Binding IsChromeExtensionDialogOpen}" ZIndex="1000"
-                                Background="#D9000000">
+                                Background="{DynamicResource OverlayBrush}">
                             <ScrollViewer Margin="24" VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
                                 <Border Classes="Card" MaxWidth="580" Padding="24"
                                         HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                                        Background="#111111" BorderBrush="#555555">
+                                        Background="{DynamicResource BackgroundSecondaryBrush}" BorderBrush="{DynamicResource BorderHoverBrush}">
                                     <StackPanel Spacing="14" KeyboardNavigation.TabNavigation="Cycle">
                                         <TextBlock Text="Install Chrome Extension" FontSize="22" FontWeight="Bold" />
                                         <StackPanel Spacing="8" IsVisible="{Binding IsChromeExtensionDownloading}">
@@ -1146,12 +1041,12 @@
                                         </StackPanel>
                                         <StackPanel Spacing="12" IsVisible="{Binding ChromeExtensionArchivePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                             <TextBlock Text="ZIP downloaded. Install it in Chrome:" TextWrapping="Wrap" />
-                                            <SelectableTextBlock Text="{Binding ChromeExtensionArchivePath}" TextWrapping="Wrap" Foreground="#B0B0B0" />
+                                            <SelectableTextBlock Text="{Binding ChromeExtensionArchivePath}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
                                             <TextBlock Text="1. Open the download folder and extract the ZIP into a permanent folder.&#x0a;&#x0a;2. Enter chrome://extensions in Chrome's address bar.&#x0a;&#x0a;3. Turn on Developer mode (top right).&#x0a;&#x0a;4. Click Load unpacked and select the extracted folder containing manifest.json.&#x0a;&#x0a;5. Keep that folder in place and keep Axorith running to use Site Blocker."
                                                        TextWrapping="Wrap" LineHeight="22" />
                                         </StackPanel>
                                         <StackPanel Spacing="12" IsVisible="{Binding ChromeExtensionDownloadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                            <TextBlock Text="{Binding ChromeExtensionDownloadError}" TextWrapping="Wrap" Foreground="#FF9999" />
+                                            <TextBlock Text="{Binding ChromeExtensionDownloadError}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorPrimaryBrush}" />
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                                             <Button Content="Open download folder" Classes="secondary"
@@ -1167,22 +1062,16 @@
                                 </Border>
                             </ScrollViewer>
                         </Border>
-                        <Border Background="#000000" Opacity="0.85"/>
-                        <Border Background="#0A0A0A" BorderBrush="#333" BorderThickness="1" Width="600" MaxHeight="800" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="0 25 80 0 #80000000">
+                        <Border Background="{DynamicResource OverlayBrush}"/>
+                        <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" Width="600" MaxHeight="800" VerticalAlignment="Center" HorizontalAlignment="Center" CornerRadius="12" BoxShadow="{DynamicResource DialogShadow}">
                             <Grid RowDefinitions="Auto, *">
-                                <Border Grid.Row="0" Padding="30,24" BorderThickness="0,0,0,1" BorderBrush="#333" Background="#0A0A0A" CornerRadius="12,12,0,0">
+                                <Border Grid.Row="0" Padding="30,24" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource BorderPrimaryBrush}" Background="{DynamicResource BackgroundTertiaryBrush}" CornerRadius="12,12,0,0">
                                     <DockPanel>
-                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseModuleSettingsCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0" Foreground="#888">
-                                            <Button.Styles>
-                                                <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                                    <Setter Property="Background" Value="#222"/>
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </Style>
-                                            </Button.Styles>
+                                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding $parent[UserControl].DataContext.CloseModuleSettingsCommand}" Classes="link" FontSize="20" Padding="8" Margin="10,0,-10,0">
                                         </Button>
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="{Binding Definition.Name}" FontSize="22" FontWeight="Bold" Foreground="#E0E0E0" LetterSpacing="-0.5"/>
-                                            <TextBlock Text="Configuration" Foreground="#A0A0A0" FontSize="14" FontWeight="Medium"/>
+                                            <TextBlock Text="{Binding Definition.Name}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" LetterSpacing="-0.5"/>
+                                            <TextBlock Text="Configuration" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="14" FontWeight="Medium"/>
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
@@ -1190,10 +1079,10 @@
                                               IsScrollChainingEnabled="False">
                                     <StackPanel Spacing="0">
                                         <StackPanel Spacing="8" Margin="30,24,30,24">
-                                            <TextBlock Text="Instance Name" Foreground="#E0E0E0" FontSize="14" FontWeight="Medium"/>
+                                            <TextBlock Text="Instance Name" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="14" FontWeight="Medium"/>
                                             <TextBox Text="{Binding CustomName, Mode=TwoWay}" Watermark="{Binding Definition.Name}" Classes="setting-input"/>
                                         </StackPanel>
-                                        <Separator Background="#333" Height="1" Margin="0"/>
+                                        <Separator Background="{DynamicResource BorderPrimaryBrush}" Height="1" Margin="0"/>
                                         <StackPanel Margin="30,24,30,24">
                                             <ItemsControl ItemsSource="{Binding LauncherBaseSettings}"
                                                           ItemTemplate="{StaticResource ModuleSettingRowTemplate}"
@@ -1224,7 +1113,7 @@
             </TransitioningContentControl.ContentTemplate>
         </TransitioningContentControl>
 
-        <Border VerticalAlignment="Bottom" Background="#0A0A0A" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="20"
+        <Border VerticalAlignment="Bottom" Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="20"
                 IsVisible="{Binding IsFooterVisible}">
             <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Right">
                 <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary"/>

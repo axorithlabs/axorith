@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Windows.Input;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services.Abstractions;
@@ -43,7 +42,7 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
     public override string IconKey => "TimerIcon";
     public abstract string EditorTitle { get; }
     public abstract string TimeLabel { get; }
-    public abstract IBrush EditorAccentBrush { get; }
+    public abstract NotificationType EditorAccentType { get; }
 
     public override string Description
     {
@@ -219,24 +218,20 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
 
 public sealed class ScheduleTriggerViewModel() : TimeTriggerViewModel(new TimeSpan(9, 0, 0))
 {
-    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#00AAFF"));
-
     public override string Title => "Time Schedule";
     public override string EditorTitle => "Edit Schedule";
     public override string TimeLabel => "Start Time";
-    public override IBrush EditorAccentBrush => Accent;
+    public override NotificationType EditorAccentType => NotificationType.Info;
 }
 
 public sealed record NextPresetOption(Guid? PresetId, string Name);
 
 public sealed class StopAtTimeTriggerViewModel() : TimeTriggerViewModel(new TimeSpan(17, 0, 0))
 {
-    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#FF6B6B"));
-
     public override string Title => "Fixed Time";
     public override string EditorTitle => "Edit Fixed Time Stop";
     public override string TimeLabel => "Stop Time";
-    public override IBrush EditorAccentBrush => Accent;
+    public override NotificationType EditorAccentType => NotificationType.Error;
 }
 
 public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel

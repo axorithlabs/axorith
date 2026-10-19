@@ -13,7 +13,7 @@
         CanResize="True"
         CanMinimize="True"
         CanMaximize="True"
-        Background="{DynamicResource SystemRegionBrush}"
+        Background="{DynamicResource BackgroundPrimaryBrush}"
         WindowStartupLocation="CenterScreen"
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         RenderOptions.BitmapInterpolationMode="HighQuality"> 
