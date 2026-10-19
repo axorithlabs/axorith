@@ -2,7 +2,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Axorith.Client.ViewModels"
              xmlns:controls="using:Axorith.Client.Controls"
-             xmlns:converters="using:Axorith.Client.Converters"
              x:Class="Axorith.Client.Views.MainView"
              x:DataType="vm:MainViewModel">
 
@@ -12,32 +11,8 @@
         <StreamGeometry x:Key="SettingsIcon">M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z</StreamGeometry>
     </UserControl.Resources>
 
-    <UserControl.Styles>
-        <Style Selector="Border.PresetCard">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.12" />
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="ListBoxItem:pointerover Border.PresetCard">
-            <Setter Property="Background" Value="#161616" />
-            <Setter Property="BorderBrush" Value="#444444" />
-        </Style>
-        <Style Selector="ListBoxItem">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,0,14" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        </Style>
-        <Style Selector="ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-    </UserControl.Styles>
-
-    <Grid RowDefinitions="*" ColumnDefinitions="220,*" Background="#050505">
-        <Border Grid.Column="0" Background="#0A0A0A" BorderBrush="#333333" BorderThickness="0,0,1,0">
+    <Grid RowDefinitions="*" ColumnDefinitions="220,*" Background="{DynamicResource BackgroundPrimaryBrush}">
+        <Border Grid.Column="0" Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,0,1,0">
             <Grid x:Name="SidebarNavigationGrid" RowDefinitions="Auto,*,Auto,Auto,Auto" Margin="13,18,13,14">
                 <StackPanel Grid.Row="0" Spacing="4">
                     <Button x:Name="HomeSidebarButton" Classes="SidebarButton" Classes.Active="{Binding IsHomePage}" Command="{Binding ShowHomeCommand}">
@@ -56,11 +31,11 @@
                 <Border Grid.Row="2" Classes="Card" Padding="13" Margin="0,0,0,14"
                         IsVisible="{Binding IsSessionActive}">
                     <StackPanel Spacing="5">
-                        <TextBlock x:Name="SidebarActiveSessionLabel" Text="ACTIVE SESSION" FontSize="11" FontWeight="SemiBold" Foreground="#A0A0A0" TextAlignment="Center" />
+                        <TextBlock x:Name="SidebarActiveSessionLabel" Text="ACTIVE SESSION" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Center" />
                         <TextBlock x:Name="SidebarActiveSessionName" Text="{Binding ActiveWorkspaceName}" FontSize="14" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis" TextAlignment="Center" />
                         <TextBlock x:Name="SidebarActiveSessionTimer" Text="{Binding ActiveSessionRemaining}" FontSize="14" FontWeight="SemiBold" TextAlignment="Center" />
-                        <TextBlock Text="{Binding ActiveBreakStatus}" FontSize="11" Foreground="#B0B0B0"
+                        <TextBlock Text="{Binding ActiveBreakStatus}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding HasActiveBreakStatus}" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="5" IsVisible="{Binding IsCommittedSession}">
                             <Button x:Name="SidebarTakeBreakButton" Grid.Column="0" Content="Take break"
@@ -108,32 +83,32 @@
                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
                               ColumnSpacing="18" RowSpacing="12">
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="5" VerticalAlignment="Center">
-                                <TextBlock Text="Active session" FontSize="11" Foreground="#888888" />
+                                <TextBlock Text="Active session" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="9">
                                     <TextBlock Text="{Binding ActiveWorkspaceName}" FontSize="19" FontWeight="Bold"
-                                               Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" />
-                                    <Border Grid.Column="1" BorderBrush="#444444" BorderThickness="1"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    <Border Grid.Column="1" BorderBrush="{DynamicResource BorderHoverBrush}" BorderThickness="1"
                                             CornerRadius="12" Padding="8,2" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding ActiveSessionMode}" FontSize="11"
-                                                   Foreground="#B0B0B0" />
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
                                     </Border>
                                 </Grid>
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                                 <TextBlock Text="{Binding ActiveSessionRemaining}" FontSize="22"
-                                           FontWeight="Bold" Foreground="#E0E0E0" />
+                                           FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                                 <TextBlock Text="{Binding ActiveSessionEndTime}" FontSize="11"
-                                           Foreground="#888888" />
+                                           Foreground="{DynamicResource TextMutedBrush}" />
                             </StackPanel>
                             <WrapPanel Grid.Row="1" Grid.ColumnSpan="2">
                                 <TextBlock Text="{Binding ActiveBreakPolicy, StringFormat='Break: {0}'}"
-                                           Foreground="#B0B0B0" Margin="0,0,14,4" />
-                                <TextBlock Text="{Binding ActiveBreakStatus}" Foreground="#B0B0B0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,4" />
+                                <TextBlock Text="{Binding ActiveBreakStatus}" Foreground="{DynamicResource TextSecondaryBrush}"
                                            IsVisible="{Binding HasActiveBreakStatus}" Margin="0,0,14,4" />
                                 <TextBlock Text="{Binding ActiveAfterEndBehavior, StringFormat='After end: {0}'}"
-                                           Foreground="#B0B0B0" Margin="0,0,14,4" />
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,14,4" />
                                 <TextBlock Text="{Binding ActiveProtectionStatus}"
-                                           Foreground="{Binding ActiveProtectionBrush}"
+                                           Foreground="{Binding ActiveProtectionType, Converter={StaticResource NotificationTypeToBrushConverter}}"
                                            IsVisible="{Binding IsProtectionAttentionVisible}" Margin="0,0,14,4" />
                             </WrapPanel>
                             <WrapPanel Grid.Row="2" Grid.ColumnSpan="2" HorizontalAlignment="Right"
@@ -155,19 +130,19 @@
                         <Border Classes="Card" Padding="0">
                             <Grid ColumnDefinitions="*,Auto,*,Auto,*">
                                 <StackPanel Grid.Column="0" Spacing="8" Margin="16,14">
-                                    <TextBlock Text="Focus today" FontSize="13" Foreground="#B0B0B0" />
+                                    <TextBlock Text="Focus today" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
                                     <TextBlock Text="{Binding FocusTodayLabel}" FontSize="22" FontWeight="Bold" />
                                 </StackPanel>
-                                <Border Grid.Column="1" BorderBrush="#333333" BorderThickness="1,0,0,0"
+                                <Border Grid.Column="1" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1,0,0,0"
                                         Margin="0,12" />
                                 <StackPanel Grid.Column="2" Spacing="8" Margin="16,14">
-                                    <TextBlock Text="Sessions this week" FontSize="13" Foreground="#B0B0B0" />
+                                    <TextBlock Text="Sessions this week" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
                                     <TextBlock Text="{Binding SessionsThisWeek}" FontSize="22" FontWeight="Bold" />
                                 </StackPanel>
-                                <Border Grid.Column="3" BorderBrush="#333333" BorderThickness="1,0,0,0"
+                                <Border Grid.Column="3" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1,0,0,0"
                                         Margin="0,12" />
                                 <StackPanel Grid.Column="4" Spacing="8" Margin="16,14">
-                                    <TextBlock Text="Focused this week" FontSize="13" Foreground="#B0B0B0" />
+                                    <TextBlock Text="Focused this week" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
                                     <TextBlock Text="{Binding FocusThisWeekLabel}" FontSize="22" FontWeight="Bold" />
                                 </StackPanel>
                             </Grid>
@@ -178,16 +153,16 @@
                         <Grid RowDefinitions="Auto,170" RowSpacing="10">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Text="Focus activity" FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Grid.Column="1" Text="Last 7 days" FontSize="13" Foreground="#888888"
+                                <TextBlock Grid.Column="1" Text="Last 7 days" FontSize="13" Foreground="{DynamicResource TextMutedBrush}"
                                            VerticalAlignment="Center" />
                             </Grid>
                             <Grid Grid.Row="1">
                                 <controls:FocusActivityChart Values="{Binding FocusActivityValues}"
-                                                             Stroke="{DynamicResource SystemAccentBrush}"
-                                                             AxisStroke="{DynamicResource BorderBrush}"
+                                                             Stroke="{DynamicResource AccentPrimaryBrush}"
+                                                             AxisStroke="{DynamicResource BorderPrimaryBrush}"
                                                              AutomationProperties.Name="Focus activity for the last seven days" />
                                 <TextBlock Text="Completed focus sessions will appear here."
-                                           Foreground="#888888" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"
                                            VerticalAlignment="Center" IsVisible="{Binding !HasSessionActivity}" />
                             </Grid>
                         </Grid>
@@ -205,22 +180,22 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="x:String">
-                                            <TextBlock Text="{Binding}" Foreground="#B0B0B0" />
+                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource TextSecondaryBrush}" />
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <TextBlock Text="Completed sessions will appear here."
-                                           Foreground="#888888" IsVisible="{Binding !HasRecentSessions}" />
+                                           Foreground="{DynamicResource TextMutedBrush}" IsVisible="{Binding !HasRecentSessions}" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="1" Classes="Card" Padding="18">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="Next scheduled" FontSize="18" FontWeight="SemiBold" />
                                 <StackPanel Spacing="5" IsVisible="{Binding HasUpcomingSchedule}">
-                                    <TextBlock Text="{Binding NextScheduledPresetName}" Foreground="#D0D0D0" />
-                                    <TextBlock Text="{Binding NextScheduledTime}" Foreground="#888888" />
+                                    <TextBlock Text="{Binding NextScheduledPresetName}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding NextScheduledTime}" Foreground="{DynamicResource TextMutedBrush}" />
                                 </StackPanel>
-                                <TextBlock Text="{Binding UpcomingScheduleStatus}" Foreground="#888888"
+                                <TextBlock Text="{Binding UpcomingScheduleStatus}" Foreground="{DynamicResource TextMutedBrush}"
                                            IsVisible="{Binding !HasUpcomingSchedule}" />
                             </StackPanel>
                         </Border>
@@ -241,12 +216,12 @@
                         <TextBlock Text="No presets yet" FontSize="20" FontWeight="SemiBold"
                                    HorizontalAlignment="Center" />
                         <TextBlock Text="Create your first focus preset to get started."
-                                   Foreground="#888888" HorizontalAlignment="Center" />
+                                   Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" />
                     </StackPanel>
 
-                    <ListBox x:Name="PresetsListBox" x:DataType="vm:MainViewModel"
+                    <ListBox Classes="preset-list" x:Name="PresetsListBox" x:DataType="vm:MainViewModel"
                              ItemsSource="{Binding Presets}"
-                             SelectedItem="{Binding SelectedPreset}" Background="Transparent">
+                             SelectedItem="{Binding SelectedPreset}" Background="{DynamicResource TransparentBrush}">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel />
@@ -261,23 +236,23 @@
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                         <WrapPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal"
                                                    VerticalAlignment="Center">
-                                            <Border BorderBrush="#444444" BorderThickness="1" CornerRadius="12"
+                                            <Border BorderBrush="{DynamicResource BorderHoverBrush}" BorderThickness="1" CornerRadius="12"
                                                     Padding="8,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding CommitmentLabel}" FontSize="11"
-                                                           Foreground="#B0B0B0" />
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
                                             </Border>
-                                            <TextBlock Text="{Binding ModulesSummary}" Foreground="#B0B0B0"
+                                            <TextBlock Text="{Binding ModulesSummary}" Foreground="{DynamicResource TextSecondaryBrush}"
                                                        VerticalAlignment="Center" Margin="0,0,7,0"
                                                        IsVisible="{Binding ModulesSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                            <TextBlock Text="{Binding SessionSummary}" Foreground="#D0D0D0"
+                                            <TextBlock Text="{Binding SessionSummary}" Foreground="{DynamicResource TextPrimaryBrush}"
                                                        VerticalAlignment="Center" />
                                         </WrapPanel>
                                         <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4">
                                             <TextBlock Text="{Binding ScheduleSummary, StringFormat='Schedule: {0}'}"
-                                                       FontSize="13" Foreground="#888888" TextWrapping="Wrap"
+                                                       FontSize="13" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
                                                        IsVisible="{Binding HasSchedule}" />
                                             <TextBlock Text="{Binding ValidationMessage}"
-                                                       Foreground="#FF7777" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource ErrorPrimaryBrush}" TextWrapping="Wrap"
                                                        IsVisible="{Binding HasValidationErrors}" />
                                         </StackPanel>
                                         <StackPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
@@ -291,17 +266,14 @@
                                             <Button x:Name="PresetActionsButton" Width="40" Height="40" Padding="0" Classes="secondary"
                                                     ToolTip.Tip="More actions"
                                                     AutomationProperties.Name="Preset actions">
-                                                <StackPanel Orientation="Horizontal" Spacing="3">
-                                                    <Ellipse Width="4" Height="4" Fill="#D8D8D8" />
-                                                    <Ellipse Width="4" Height="4" Fill="#D8D8D8" />
-                                                    <Ellipse Width="4" Height="4" Fill="#D8D8D8" />
-                                                </StackPanel>
+                                                <PathIcon Width="18" Height="4"
+                                                          Data="M6,10A2,2 0 1,0 6,14A2,2 0 1,0 6,10Z M12,10A2,2 0 1,0 12,14A2,2 0 1,0 12,10Z M18,10A2,2 0 1,0 18,14A2,2 0 1,0 18,10Z" />
                                                 <Button.Flyout>
                                                     <MenuFlyout Placement="Bottom">
                                                         <MenuItem Header="Edit"
                                                                   Command="{Binding #PresetsListBox.DataContext.EditSelectedCommand}"
                                                                   CommandParameter="{Binding}" />
-                                                        <MenuItem Header="Delete" Foreground="#FF5555"
+                                                        <MenuItem Header="Delete" Foreground="{DynamicResource ErrorPrimaryBrush}"
                                                                   Command="{Binding #PresetsListBox.DataContext.DeleteSelectedCommand}"
                                                                   CommandParameter="{Binding}" />
                                                     </MenuFlyout>
@@ -318,37 +290,37 @@
         </Grid>
 
         <Border x:Name="StartDialogOverlay" Grid.Row="0" Grid.RowSpan="1" Grid.ColumnSpan="2"
-                ZIndex="999" Background="#D9000000"
+                ZIndex="999" Background="{DynamicResource OverlayBrush}"
                 IsVisible="{Binding IsStartConfirmationOpen}">
             <ScrollViewer x:Name="StartDialogScrollViewer" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="16">
                 <Border x:Name="StartDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
                         MaxWidth="720" Padding="28" HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                        Background="#111111" BorderBrush="#555555">
+                        Background="{DynamicResource BackgroundSecondaryBrush}" BorderBrush="{DynamicResource BorderHoverBrush}">
                     <StackPanel x:Name="StartDialogContent" Spacing="18" KeyboardNavigation.TabNavigation="Cycle">
                         <StackPanel Spacing="5">
                             <TextBlock Text="{Binding StartReviewTitle}" FontSize="22" FontWeight="Bold" />
                             <TextBlock Text="{Binding StartReviewWorkspaceName}" FontSize="17" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding StartReviewEndTime}" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding StartReviewEndTime}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0" />
+                        <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" />
                         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto"
                               ColumnSpacing="12" RowSpacing="14">
-                            <TextBlock Grid.Row="0" Text="Breaks" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                            <TextBlock Grid.Row="0" Text="Breaks" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StartReviewBreakPolicy}"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
-                            <TextBlock Grid.Row="1" Text="After it ends" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                                       Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="1" Text="After it ends" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
                                        IsVisible="{Binding !IsDestructiveStartReviewAfterEnd}" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StartReviewAfterEnd}"
-                                       Foreground="#E6C878" FontWeight="Bold" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource WarningPrimaryBrush}" FontWeight="Bold" TextWrapping="Wrap"
                                        IsVisible="{Binding IsDestructiveStartReviewAfterEnd}" />
                         </Grid>
                         <TextBlock Text="Strict also limits common Windows bypass tools for the session."
-                                   Foreground="#E6C878" TextWrapping="Wrap" IsVisible="{Binding IsStrictStartReview}" />
+                                   Foreground="{DynamicResource WarningPrimaryBrush}" TextWrapping="Wrap" IsVisible="{Binding IsStrictStartReview}" />
                         <TextBlock Text="{Binding StartCountdownSeconds, StringFormat='Starting in {0} seconds...'}"
-                                   Foreground="#E6C878" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource WarningPrimaryBrush}" HorizontalAlignment="Center"
                                    IsVisible="{Binding IsStartCountdownRunning}" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
                             <Button x:Name="StartConfirmationCancelButton" Content="Cancel" Width="80"
@@ -362,23 +334,23 @@
             </ScrollViewer>
         </Border>
 
-        <Border Grid.Row="0" Grid.RowSpan="1" Grid.ColumnSpan="2" ZIndex="1000" Background="#D9000000"
+        <Border Grid.Row="0" Grid.RowSpan="1" Grid.ColumnSpan="2" ZIndex="1000" Background="{DynamicResource OverlayBrush}"
                 IsVisible="{Binding IsEmergencyUnlockOpen}">
             <ScrollViewer x:Name="EmergencyDialogScrollViewer" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" Margin="16">
                 <Border x:Name="EmergencyDialogCard" Classes="Card" Width="{Binding $parent[ScrollViewer].Bounds.Width}"
                         MaxWidth="520" Padding="28" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Background="#111111" BorderBrush="#555555">
+                        Background="{DynamicResource BackgroundSecondaryBrush}" BorderBrush="{DynamicResource BorderHoverBrush}">
                     <StackPanel x:Name="EmergencyDialogContent" Spacing="16" KeyboardNavigation.TabNavigation="Cycle">
                         <TextBlock Text="Emergency unlock" FontSize="22" FontWeight="Bold"
                                    HorizontalAlignment="Center" />
                         <TextBlock Text="This immediately ends the committed session and restores its temporary protections. Any after-end action is skipped."
-                                   Foreground="#AAAAAA" TextWrapping="Wrap" TextAlignment="Center" />
+                                   Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
                         <ProgressBar Value="{Binding EmergencyUnlockProgress}" Minimum="0" Maximum="1" Height="8"
                                      AutomationProperties.Name="Emergency unlock hold progress" />
                         <TextBlock Text="Hold continuously for 60 seconds. Releasing or losing focus cancels the hold."
-                                   Foreground="#AAAAAA" TextWrapping="Wrap" TextAlignment="Center" />
-                        <TextBlock Text="{Binding EmergencyUnlockError}" Foreground="#EE8888"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" />
+                        <TextBlock Text="{Binding EmergencyUnlockError}" Foreground="{DynamicResource ErrorPrimaryBrush}"
                                    TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding HasEmergencyUnlockError}" />
                         <Button x:Name="EmergencyUnlockHoldButton" Content="Hold to unlock for 60 seconds"
                                 Classes="danger" AutomationProperties.HelpText="Keep holding continuously. Releasing or losing focus resets progress."

@@ -2,7 +2,6 @@
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
-using Avalonia.Media;
 using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
@@ -64,18 +63,18 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     [Reactive(nameof(HasActiveBreakStatus))]
     public partial string ActiveBreakStatus { get; private set; } = string.Empty;
     public bool HasActiveBreakStatus => !string.IsNullOrWhiteSpace(ActiveBreakStatus);
-    [Reactive(nameof(ActiveProtectionBrush), nameof(IsProtectionAttentionVisible))]
+    [Reactive(nameof(ActiveProtectionType), nameof(IsProtectionAttentionVisible))]
     public partial string ActiveProtectionStatus { get; private set; } = "Protection inactive";
     public bool IsProtectionAttentionVisible =>
         ActiveProtectionStatus.StartsWith("Protection failed", StringComparison.Ordinal) ||
         ActiveProtectionStatus.StartsWith("Protection degraded", StringComparison.Ordinal);
-    public IBrush ActiveProtectionBrush => ActiveProtectionStatus switch
+    public NotificationType? ActiveProtectionType => ActiveProtectionStatus switch
     {
-        var status when status.StartsWith("Protection failed", StringComparison.Ordinal) => Brushes.IndianRed,
-        var status when status.StartsWith("Protection degraded", StringComparison.Ordinal) => Brushes.Orange,
-        var status when status.StartsWith("Protection recovered", StringComparison.Ordinal) => Brushes.LightSkyBlue,
-        var status when status.StartsWith("Protection active", StringComparison.Ordinal) => Brushes.LightGreen,
-        _ => Brushes.Gray
+        var status when status.StartsWith("Protection failed", StringComparison.Ordinal) => NotificationType.Error,
+        var status when status.StartsWith("Protection degraded", StringComparison.Ordinal) => NotificationType.Warning,
+        var status when status.StartsWith("Protection recovered", StringComparison.Ordinal) => NotificationType.Info,
+        var status when status.StartsWith("Protection active", StringComparison.Ordinal) => NotificationType.Success,
+        _ => null
     };
     [Reactive]
     public partial bool CanStartBreak { get; private set; }

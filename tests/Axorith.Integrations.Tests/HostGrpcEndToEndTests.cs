@@ -995,11 +995,9 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
         editorViewModel.Triggers.Clear();
         Assert.False(editorView.FindControl<StackPanel>("ScheduleLockPanel")!.IsVisible);
     }
-    public sealed class TestApplication : Application;
-
     public sealed class TestAppBuilder
     {
-        public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<TestApplication>()
+        public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<Axorith.Client.App>()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions());
     }
 
