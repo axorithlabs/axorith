@@ -16,6 +16,7 @@
 
     <UserControl.Resources>
 
+
         <DataTemplate x:Key="InlineActionTemplate" x:DataType="vm:ActionViewModel">
             <Button Content="{Binding Label}" Command="{Binding InvokeCommand}"
                     IsVisible="{Binding IsVisible}"
@@ -85,6 +86,33 @@
         <StreamGeometry x:Key="SleepPcIcon">M12,2A10,10 0 1,0 22,12C22,11.53 21.97,11.07 21.9,10.62A8,8 0 0,1 11.38,2.1C11.58,2.04 11.79,2 12,2M12,20A8,8 0 0,1 8.42,4.84A10,10 0 0,0 19.16,15.58A8,8 0 0,1 12,20Z</StreamGeometry>
         <StreamGeometry x:Key="SignOutIcon">M17,7L15.59,8.41L18.17,11H8V13H18.17L15.59,15.59L17,17L22,12L17,7M4,5H12V3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H12V19H4V5Z</StreamGeometry>
         <StreamGeometry x:Key="PowerIcon">M13,3H11V13H13V3M17.83,6.17L16.41,7.59A8,8 0 1,1 7.59,7.59L6.17,6.17A10,10 0 1,0 17.83,6.17Z</StreamGeometry>
+
+        <DataTemplate x:Key="ScheduledTriggerCardTemplate" x:DataType="vm:TriggerViewModel">
+            <Button Classes="ItemCard" Margin="0,0,0,10" Classes.error="{Binding HasError}"
+                    Command="{Binding $parent[UserControl].DataContext.EditTriggerCommand}"
+                    CommandParameter="{Binding}">
+                <Border>
+                    <Grid ColumnDefinitions="Auto, *, Auto">
+                        <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="6"
+                                Width="40" Height="40" VerticalAlignment="Center">
+                            <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20"
+                                      Foreground="{Binding EditorAccentType, Converter={StaticResource NotificationTypeToBrushConverter}}"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
+                            <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Classes="delete-btn" ToolTip.Tip="Remove"
+                                    Command="{Binding $parent[UserControl].DataContext.RemoveTriggerCommand}"
+                                    CommandParameter="{Binding}">
+                                <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Button>
+        </DataTemplate>
 
         <DataTemplate x:Key="TextSettingTemplate" x:DataType="vm:SettingViewModel">
             <TextBox Text="{Binding StringValue, Mode=TwoWay}"
@@ -520,38 +548,7 @@
                         <StackPanel Spacing="15">
                             <TextBlock Text="Start On..." FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-                            <ItemsControl ItemsSource="{Binding Triggers}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:TriggerViewModel">
-                                        <Button Classes="ItemCard"
-                                                Command="{Binding $parent[ItemsControl].DataContext.EditTriggerCommand}"
-                                                CommandParameter="{Binding}"
-                                                Margin="0,0,0,10">
-                                            <Border>
-                                                <Grid ColumnDefinitions="Auto, *, Auto">
-                                                    <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
-                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="{DynamicResource AccentInfoBrush}"/>
-                                                    </Border>
-
-                                                    <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
-                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
-                                                        <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
-                                                    </StackPanel>
-
-                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                        <Button Classes="delete-btn"
-                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveTriggerCommand}"
-                                                                CommandParameter="{Binding}"
-                                                                ToolTip.Tip="Remove">
-                                                            <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding Triggers}" ItemTemplate="{StaticResource ScheduledTriggerCardTemplate}"/>
 
                             <Button HorizontalAlignment="Stretch"
                                     BorderThickness="1"
@@ -698,39 +695,7 @@
                         <StackPanel Spacing="15">
                             <TextBlock x:Name="StopOnHeading" Text="Stop On..." FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-                            <ItemsControl ItemsSource="{Binding StopTriggers}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:TriggerViewModel">
-                                        <Button Classes="ItemCard"
-                                                Command="{Binding $parent[ItemsControl].DataContext.EditStopTriggerCommand}"
-                                                CommandParameter="{Binding}"
-                                                Margin="0,0,0,10"
-                                                Classes.error="{Binding HasError}">
-                                            <Border>
-                                                <Grid ColumnDefinitions="Auto, *, Auto">
-                                                    <Border Background="{DynamicResource BackgroundSelectedBrush}" CornerRadius="6" Width="40" Height="40" VerticalAlignment="Center">
-                                                        <PathIcon Data="{StaticResource TimerIcon}" Width="20" Height="20" Foreground="{DynamicResource ErrorPrimaryBrush}"/>
-                                                    </Border>
-
-                                                    <StackPanel Grid.Column="1" Margin="15,0" VerticalAlignment="Center" Spacing="2">
-                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
-                                                        <TextBlock Text="{Binding Description}" FontSize="13" Opacity="0.6"/>
-                                                    </StackPanel>
-
-                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                        <Button Classes="delete-btn"
-                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveStopTriggerCommand}"
-                                                                CommandParameter="{Binding}"
-                                                                ToolTip.Tip="Remove">
-                                                            <PathIcon Data="{StaticResource DeleteIcon}" Width="16" Height="16"/>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding StopTriggers}" ItemTemplate="{StaticResource ScheduledTriggerCardTemplate}"/>
 
                             <Button x:Name="AddStopTriggerButton" HorizontalAlignment="Stretch"
                                     BorderThickness="1"

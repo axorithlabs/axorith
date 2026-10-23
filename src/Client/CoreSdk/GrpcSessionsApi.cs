@@ -103,35 +103,17 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
     }
 
     public Task<OperationResult> StartSessionAsync(Guid presetId, Guid sessionInstanceId, CancellationToken ct = default)
-    {
-        return _retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await _client.StartSessionAsync(
-                    new StartSessionRequest
-                    {
-                        PresetId = presetId.ToString(),
-                        SessionInstanceId = sessionInstanceId.ToString(),
-                        StartSource = "manual"
-                    },
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
-    }
+        => GrpcResultMapper.ExecuteAsync(_retryPolicy, () => _client.StartSessionAsync(
+            new StartSessionRequest
+            {
+                PresetId = presetId.ToString(),
+                SessionInstanceId = sessionInstanceId.ToString(),
+                StartSource = "manual"
+            }, cancellationToken: ct));
 
     public Task<OperationResult> StopSessionAsync(CancellationToken ct = default)
-    {
-        return _retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await _client.StopSessionAsync(
-                    new StopSessionRequest(),
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
-    }
+        => GrpcResultMapper.ExecuteAsync(_retryPolicy, () => _client.StopSessionAsync(
+            new StopSessionRequest(), cancellationToken: ct));
 
     public async Task<OperationResult> StartBreakAsync(CancellationToken ct = default)
     {
@@ -141,17 +123,8 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
     }
 
     public Task<OperationResult> PreflightSessionAsync(Guid presetId, CancellationToken ct = default)
-    {
-        return _retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await _client.PreflightSessionAsync(
-                    new PreflightSessionRequest { PresetId = presetId.ToString() },
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
-    }
+        => GrpcResultMapper.ExecuteAsync(_retryPolicy, () => _client.PreflightSessionAsync(
+            new PreflightSessionRequest { PresetId = presetId.ToString() }, cancellationToken: ct));
 
     public async IAsyncEnumerable<EmergencyUnlockProgress> HoldEmergencyUnlockAsync(
         IAsyncEnumerable<bool> heldSignals,

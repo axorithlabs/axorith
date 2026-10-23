@@ -249,12 +249,8 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                         _ = RefreshSessionStateAsync();
                         break;
                     case SessionEventType.Stopped:
-                        _activeSessionStartedAt = null;
-                        _activeSessionName = string.Empty;
                         _ = RefreshSessionStateAsync();
                         ClearActiveSession();
-                        IsEmergencyUnlockOpen = false;
-                        ResetActiveSessionDetails();
                         break;
                     case SessionEventType.ModuleStarted:
                     case SessionEventType.ModuleStopped:
@@ -368,6 +364,11 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         SetActiveSessionPreset(null);
         ActiveFocusCommitmentMode = FocusCommitmentMode.Normal;
         IsSessionActive = false;
+        _activeSessionStartedAt = null;
+        _activeSessionName = string.Empty;
+        IsEmergencyUnlockOpen = false;
+        ResetActiveSessionDetails();
+        UpdateDashboardActivity();
     }
 
     [ReactiveCommand]
@@ -516,15 +517,9 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             ? "No breaks"
             : $"{options.BreakCount} break{(options.BreakCount == 1 ? string.Empty : "s")} | {options.BreakDuration.TotalMinutes:0} min each";
 
-        StartReviewAfterEnd = options.AfterEnd switch
-        {
-            AfterEndBehavior.StartNextWorkspace => $"Start next Workspace: {Presets.FirstOrDefault(p => p.Id == options.NextWorkspaceId)?.Name ?? "not selected"}",
-            AfterEndBehavior.LockPc => "Lock PC",
-            AfterEndBehavior.Sleep => "Sleep",
-            AfterEndBehavior.SignOut => "Sign out",
-            AfterEndBehavior.ShutDownPc => "Shut down PC",
-            _ => "Do nothing"
-        };
+        StartReviewAfterEnd = options.AfterEnd == AfterEndBehavior.StartNextWorkspace
+            ? $"Start next Workspace: {Presets.FirstOrDefault(p => p.Id == options.NextWorkspaceId)?.Name ?? "not selected"}"
+            : ToAfterEndLabel(options.AfterEnd);
         IsDestructiveStartReviewAfterEnd = options.AfterEnd is AfterEndBehavior.SignOut or AfterEndBehavior.ShutDownPc;
     }
 
@@ -634,6 +629,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             SetActiveSessionPreset(presetVm.Id);
             ActiveFocusCommitmentMode = presetVm.Model.FocusCommitment.Mode;
             IsSessionActive = true;
+            _toastService?.Show($"Starting session '{presetVm.Name}'...", NotificationType.Info, "Sessions");
 
             var result = await _sessionsApi.StartSessionAsync(presetVm.Id, sessionInstanceId);
             if (!result.Success)
@@ -644,7 +640,6 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             }
             else
             {
-                _toastService?.Show($"Session '{presetVm.Name}' started.", NotificationType.Success, "Sessions");
                 await RefreshSessionStateAsync();
             }
         }
@@ -933,12 +928,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 }
                 else
                 {
-                    _activeSessionStartedAt = null;
-                    _activeSessionName = string.Empty;
-                    UpdateDashboardActivity(DateTimeOffset.Now);
                     ClearActiveSession();
-                    IsEmergencyUnlockOpen = false;
-                    ResetActiveSessionDetails();
                 }
             });
             await RefreshSessionHistoryAsync();
@@ -955,7 +945,6 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 }
 
                 ClearActiveSession();
-                ResetActiveSessionDetails();
             });
         }
     }

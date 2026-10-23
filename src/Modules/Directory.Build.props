@@ -13,6 +13,7 @@
 
         <IsModuleProject>true</IsModuleProject>
         <IsPackable>false</IsPackable>
+        <EnableDynamicLoading>true</EnableDynamicLoading>
         
         <SkipModulePublish>true</SkipModulePublish>
     </PropertyGroup>

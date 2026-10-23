@@ -39,7 +39,7 @@ internal sealed class Settings : IDisposable
         _categories = Setting.AsMultiChoice(
             key: "Categories",
             label: "Block Categories",
-            defaultValues: ["Gaming", "Social", "Browsers", "Entertainment"],
+            defaultValues: [],
             initialChoices: BuildCategoryChoices(),
             description: "Select categories to block. Apps from selected categories will be automatically terminated."
         );

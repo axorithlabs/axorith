@@ -108,7 +108,7 @@ public abstract class LauncherSettingsBase : IDisposable
                 new KeyValuePair<string, string>("TerminateGraceful", "Try Close (may remain open)"),
                 new KeyValuePair<string, string>("TerminateForce", "Kill Immediately")
             ],
-            description: "What happens to the process when session ends."
+            description: "What happens to applications launched by Axorith when the session ends. Already running applications stay open."
         );
 
         BringToForeground = Setting.AsCheckbox(

@@ -53,8 +53,8 @@ internal sealed class Settings : IDisposable
         BaseUrl = Setting.AsText(
             key: "BaseUrl",
             label: "HA URL",
-            defaultValue: "http://homeassistant.local:8123",
-            description: "The address of your Home Assistant instance."
+            defaultValue: "https://homeassistant.local:8123",
+            description: "An HTTPS Home Assistant address. HTTP is supported only on loopback addresses."
         );
 
         AccessToken = Setting.AsSecret(
@@ -127,10 +127,9 @@ internal sealed class Settings : IDisposable
 
         var baseUrl = BaseUrl.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(baseUrl)) errors[BaseUrl.Key] = "Home Assistant URL is required.";
-        else if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
-                 (uri.Scheme != "http" && uri.Scheme != "https"))
+        else if (!HaClient.IsSecureEndpoint(baseUrl))
         {
-            errors[BaseUrl.Key] = "Invalid URL format. Use http:// or https://";
+            errors[BaseUrl.Key] = "Use HTTPS, or HTTP on a loopback address. URLs must not contain credentials.";
         }
 
         var token = AccessToken.GetCurrentValue();

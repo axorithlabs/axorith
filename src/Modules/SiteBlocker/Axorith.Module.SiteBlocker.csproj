@@ -8,8 +8,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\Sdk\Axorith.Sdk.csproj" />
-        <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
         <ProjectReference Include="..\..\Shared\Utils\Axorith.Shared.Utils.csproj" />
+        <ProjectReference Include="..\..\Shared\Platform\Axorith.Shared.Platform.csproj" />
     </ItemGroup>
 
     <ItemGroup>

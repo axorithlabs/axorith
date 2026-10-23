@@ -10,8 +10,9 @@ namespace Axorith.Host.Services;
 
 public sealed class DesignTimeSandboxManager : IDisposable
 {
-    private sealed class Sandbox(IModule module, ILifetimeScope? scope)
+    private sealed class Sandbox(Guid moduleId, IModule module, ILifetimeScope? scope)
     {
+        public Guid ModuleId { get; } = moduleId;
         public IModule Module { get; } = module;
         public ILifetimeScope? Scope { get; } = scope;
         public DateTime LastAccessUtc { get; set; } = DateTime.UtcNow;
@@ -25,6 +26,9 @@ public sealed class DesignTimeSandboxManager : IDisposable
     private readonly ISessionManager _sessionManager;
 
     private readonly ConcurrentDictionary<Guid, Sandbox> _sandboxes = new();
+    // shortcut: serialize sandbox lifecycles; use per-instance gates if parallel initialization becomes necessary.
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+    private bool _disposed;
     private readonly Timer _evictionTimer;
 
     private readonly TimeSpan _idleTtl;
@@ -52,98 +56,159 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public async Task EnsureAsync(Guid instanceId, Guid moduleId, IReadOnlyDictionary<string, string?> initial,
         CancellationToken ct)
     {
-        var sandbox = _sandboxes.GetOrAdd(instanceId, _ =>
+        await _lifecycleGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            EnsureCapacity();
-            var (module, scope) = _moduleRegistry.CreateInstance(moduleId);
-            if (module == null)
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_sandboxes.TryGetValue(instanceId, out var sandbox))
             {
-                throw new InvalidOperationException($"Failed to create module {moduleId}");
+                EnsureCapacity();
+                var (module, scope) = _moduleRegistry.CreateInstance(moduleId);
+                if (module == null)
+                {
+                    scope?.Dispose();
+                    throw new InvalidOperationException($"Failed to create module {moduleId}");
+                }
+
+                sandbox = new Sandbox(moduleId, module, scope);
+                _sandboxes[instanceId] = sandbox;
+                _logger.LogInformation("Design-time sandbox created for {InstanceId} ({ModuleId})", instanceId, moduleId);
             }
 
-            var sb = new Sandbox(module, scope);
-            _logger.LogInformation("Design-time sandbox created for {InstanceId} ({ModuleId})", instanceId, moduleId);
-            return sb;
-        });
+            if (sandbox.ModuleId != moduleId)
+                throw new InvalidOperationException($"Sandbox {instanceId} belongs to another module.");
 
-        sandbox.LastAccessUtc = DateTime.UtcNow;
-        if (!sandbox.InitDone)
-        {
+            sandbox.LastAccessUtc = DateTime.UtcNow;
+            if (!sandbox.InitDone)
+            {
+                try
+                {
+                    using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    initCts.CancelAfter(TimeSpan.FromSeconds(5));
+                    await sandbox.Module.InitializeAsync(initCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    DisposeSandboxCore(instanceId);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error initializing sandbox {InstanceId} ({ModuleId})", instanceId, moduleId);
+                }
+            }
+
             try
             {
-                using var initCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                initCts.CancelAfter(TimeSpan.FromSeconds(5));
-                await sandbox.Module.InitializeAsync(initCts.Token).ConfigureAwait(false);
+                if (!sandbox.Subscribed)
+                {
+                    SubscribeAll(instanceId, sandbox);
+                    sandbox.Subscribed = true;
+                }
+
+                if (!sandbox.InitDone)
+                {
+                    ApplyAll(sandbox, initial);
+                    sandbox.InitDone = true;
+                }
+
+                BroadcastAll(instanceId, sandbox);
             }
-            catch (Exception ex)
+            catch
             {
-                _logger.LogWarning(ex, "Error initializing sandbox {InstanceId} ({ModuleId})", instanceId, moduleId);
+                DisposeSandboxCore(instanceId);
+                throw;
             }
         }
-
-        if (!sandbox.Subscribed)
+        finally
         {
-            SubscribeAll(instanceId, sandbox);
-            sandbox.Subscribed = true;
+            _lifecycleGate.Release();
         }
-
-        if (!sandbox.InitDone)
-        {
-            ApplyAll(sandbox, initial);
-            sandbox.InitDone = true;
-        }
-
-        BroadcastAll(instanceId, sandbox);
     }
 
     public IModule? GetModule(Guid instanceId)
     {
-        if (_sandboxes.TryGetValue(instanceId, out var sb))
+        _lifecycleGate.Wait();
+        try
         {
-            sb.LastAccessUtc = DateTime.UtcNow;
-            return sb.Module;
-        }
+            if (_sandboxes.TryGetValue(instanceId, out var sb))
+            {
+                sb.LastAccessUtc = DateTime.UtcNow;
+                return sb.Module;
+            }
 
-        return null;
+            return null;
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     public void ApplySetting(Guid instanceId, string key, string? stringValue)
     {
-        if (!_sandboxes.TryGetValue(instanceId, out var sb))
+        _lifecycleGate.Wait();
+        try
         {
-            throw new InvalidOperationException($"Sandbox not found for {instanceId}");
-        }
+            if (!_sandboxes.TryGetValue(instanceId, out var sb))
+                throw new InvalidOperationException($"Sandbox not found for {instanceId}");
 
-        sb.LastAccessUtc = DateTime.UtcNow;
-        var setting = sb.Module.GetSettings().FirstOrDefault(s => s.Key == key);
-        if (setting == null)
+            sb.LastAccessUtc = DateTime.UtcNow;
+            var setting = sb.Module.GetSettings().FirstOrDefault(s => s.Key == key);
+            if (setting == null)
+            {
+                _logger.LogWarning("Setting {Key} not found for sandbox {InstanceId}", key, instanceId);
+                return;
+            }
+
+            setting.SetValueFromString(stringValue);
+        }
+        finally
         {
-            _logger.LogWarning("Setting {Key} not found for sandbox {InstanceId}", key, instanceId);
-            return;
+            _lifecycleGate.Release();
         }
-
-        setting.SetValueFromString(stringValue);
     }
 
     public async Task<bool> TryInvokeActionAsync(Guid instanceId, string actionKey, CancellationToken ct)
     {
-        if (!_sandboxes.TryGetValue(instanceId, out var sb))
-            return false;
-
-        sb.LastAccessUtc = DateTime.UtcNow;
-
-        var action = sb.Module.GetActions().FirstOrDefault(a => a.Key == actionKey);
-        if (action == null)
+        await _lifecycleGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            _logger.LogWarning("Action {ActionKey} not found for sandbox {InstanceId}", actionKey, instanceId);
-            throw new InvalidOperationException($"Action '{actionKey}' not found for design-time sandbox {instanceId}");
-        }
+            if (!_sandboxes.TryGetValue(instanceId, out var sb))
+                return false;
 
-        await action.InvokeAsync().ConfigureAwait(false);
-        return true;
+            sb.LastAccessUtc = DateTime.UtcNow;
+
+            var action = sb.Module.GetActions().FirstOrDefault(a => a.Key == actionKey);
+            if (action == null)
+            {
+                _logger.LogWarning("Action {ActionKey} not found for sandbox {InstanceId}", actionKey, instanceId);
+                throw new InvalidOperationException($"Action '{actionKey}' not found for design-time sandbox {instanceId}");
+            }
+
+            await action.InvokeAsync().ConfigureAwait(false);
+            return true;
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     public void DisposeSandbox(Guid instanceId)
+    {
+        _lifecycleGate.Wait();
+        try
+        {
+            DisposeSandboxCore(instanceId);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private void DisposeSandboxCore(Guid instanceId)
     {
         if (!_sandboxes.TryRemove(instanceId, out var sb))
             return;
@@ -157,8 +222,15 @@ public sealed class DesignTimeSandboxManager : IDisposable
             _logger.LogWarning(ex, "Error unsubscribing module {InstanceId}", instanceId);
         }
 
-        sb.Module.Dispose();
-        sb.Scope?.Dispose();
+        try
+        {
+            if (sb.Scope != null) sb.Scope.Dispose();
+            else sb.Module.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error disposing sandbox {InstanceId}", instanceId);
+        }
         _logger.LogInformation("Design-time sandbox disposed for {InstanceId}", instanceId);
     }
 
@@ -172,14 +244,20 @@ public sealed class DesignTimeSandboxManager : IDisposable
 
     public void ReBroadcast(Guid instanceId)
     {
-        if (!_sandboxes.TryGetValue(instanceId, out var sb))
+        _lifecycleGate.Wait();
+        try
         {
-            throw new InvalidOperationException($"Sandbox not found for {instanceId}");
+            if (!_sandboxes.TryGetValue(instanceId, out var sb))
+                throw new InvalidOperationException($"Sandbox not found for {instanceId}");
+
+            sb.LastAccessUtc = DateTime.UtcNow;
+
+            BroadcastAll(instanceId, sb);
         }
-
-        sb.LastAccessUtc = DateTime.UtcNow;
-
-        BroadcastAll(instanceId, sb);
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     private static void ApplyAll(Sandbox sb, IReadOnlyDictionary<string, string?> initial)
@@ -241,38 +319,45 @@ public sealed class DesignTimeSandboxManager : IDisposable
     {
         while (_sandboxes.Count >= _maxSandboxes)
         {
-            var oldest = _sandboxes.OrderBy(kv => kv.Value.LastAccessUtc).FirstOrDefault();
-            if (oldest.Key == Guid.Empty)
-                break;
-
-            DisposeSandbox(oldest.Key);
+            var oldest = _sandboxes.MinBy(kv => kv.Value.LastAccessUtc);
+            DisposeSandboxCore(oldest.Key);
         }
     }
 
     private void EvictIdle(object? _)
     {
-        var now = DateTime.UtcNow;
-        foreach (var kv in _sandboxes)
+        if (!_lifecycleGate.Wait(0)) return;
+        try
         {
-            if (now - kv.Value.LastAccessUtc > _idleTtl)
+            var now = DateTime.UtcNow;
+            foreach (var kv in _sandboxes)
             {
-                DisposeSandbox(kv.Key);
+                if (now - kv.Value.LastAccessUtc > _idleTtl)
+                    DisposeSandboxCore(kv.Key);
             }
+        }
+        finally
+        {
+            _lifecycleGate.Release();
         }
     }
 
     public void Dispose()
     {
         _evictionTimer.Dispose();
-
-        foreach (var id in _sandboxes.Keys.ToArray())
-        {
-            DisposeSandbox(id);
-        }
-
-        _sandboxes.Clear();
-        GC.SuppressFinalize(this);
         _sessionManager.SessionStarted -= OnSessionStarted;
+        _lifecycleGate.Wait();
+        try
+        {
+            _disposed = true;
+            foreach (var id in _sandboxes.Keys.ToArray())
+                DisposeSandboxCore(id);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+        GC.SuppressFinalize(this);
     }
 
     private void OnSessionStarted(Guid presetId)

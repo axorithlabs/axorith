@@ -13,63 +13,32 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
 
         logger.LogInfo("Starting process {Path} with mode {Mode}", config.ApplicationPath, config.StartMode);
 
-        switch (config.StartMode)
+        if (config.StartMode is ProcessStartMode.AttachExisting or ProcessStartMode.LaunchOrAttach)
         {
-            case ProcessStartMode.AttachExisting:
+            var existing = await AttachToExistingAsync(config.ApplicationPath).ConfigureAwait(false);
+            if (config.StartMode == ProcessStartMode.AttachExisting)
+                return new ProcessStartResult(existing, existing != null);
+            if (existing != null)
             {
-                var attached = await AttachToExistingAsync(config.ApplicationPath).ConfigureAwait(false);
-                return new ProcessStartResult(attached, attached != null);
-            }
-
-            case ProcessStartMode.LaunchOrAttach:
-            {
-                var existing = await AttachToExistingAsync(config.ApplicationPath).ConfigureAwait(false);
-                if (existing != null)
-                {
-                    logger.LogInfo("Attached to existing process {ProcessName} (PID: {ProcessId})",
-                        existing.ProcessName, existing.Id);
-                    return new ProcessStartResult(existing, true);
-                }
-
-                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory)
-                    .ConfigureAwait(false);
-                return new ProcessStartResult(launched, false);
-            }
-
-            case ProcessStartMode.LaunchNew:
-            default:
-            {
-                var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory)
-                    .ConfigureAwait(false);
-                return new ProcessStartResult(launched, false);
+                logger.LogInfo("Attached to existing process {ProcessName} (PID: {ProcessId})",
+                    existing.ProcessName, existing.Id);
+                return new ProcessStartResult(existing, true);
             }
         }
+
+        var launched = await LaunchNewAsync(config.ApplicationPath, config.Arguments, config.WorkingDirectory)
+            .ConfigureAwait(false);
+        return new ProcessStartResult(launched, false);
     }
 
     public Task TerminateAsync(Process process, ProcessLifecycleMode lifecycleMode, bool wasAttached)
     {
         ArgumentNullException.ThrowIfNull(process);
 
-        if (lifecycleMode == ProcessLifecycleMode.KeepRunning)
+        if (wasAttached || lifecycleMode == ProcessLifecycleMode.KeepRunning)
         {
             logger.LogInfo("Keeping process {ProcessName} (PID: {ProcessId}) running",
                 process.ProcessName, process.Id);
-            return Task.CompletedTask;
-        }
-
-        if (wasAttached)
-        {
-            logger.LogWarning("Process was attached from existing. Closing main window only.");
-            try
-            {
-                process.CloseMainWindow();
-                logger.LogInfo("Main window closed for process {ProcessName}", process.ProcessName);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to close main window");
-            }
-
             return Task.CompletedTask;
         }
 
@@ -158,12 +127,8 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
                     TelemetryGuard.SafePath(effectiveWorkingDirectory), TelemetryGuard.SafePath(path));
             }
 
-            var process = new Process
-            {
-                StartInfo = startInfo
-            };
-
-            if (!process.Start())
+            var process = processService.StartProcess(startInfo);
+            if (process == null)
             {
                 logger.LogError(null, "Process.Start() returned false");
                 return Task.FromResult<Process?>(null);

@@ -87,7 +87,7 @@ internal sealed class SpotifyApiService(
         return JsonSerializer.Serialize(new { uris });
     }
 
-    public async Task PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
+    public async Task<bool> PlayAsync(string deviceId, string contextUri, IEnumerable<string>? trackUris = null)
     {
         var request = new PlayerResumePlaybackRequest { DeviceId = deviceId };
         if (trackUris is null)
@@ -96,14 +96,17 @@ internal sealed class SpotifyApiService(
         }
         else request.Uris = trackUris.ToList();
 
-        await ExecuteAsync(client => client.Player.ResumePlayback(request)).ConfigureAwait(false);
+        return await ExecuteAsync(client => client.Player.ResumePlayback(request)).ConfigureAwait(false);
     }
 
-    public async Task PauseAsync()
+    public async Task PauseAsync(string deviceId)
     {
         try
         {
-            await ExecuteAsync(client => client.Player.PausePlayback()).ConfigureAwait(false);
+            var devices = await GetDevicesAsync().ConfigureAwait(false);
+            if (!devices.Any(device => device.Id == deviceId && device.IsActive)) return;
+            await ExecuteAsync(client => client.Player.PausePlayback(new PlayerPausePlaybackRequest { DeviceId = deviceId }))
+                .ConfigureAwait(false);
         }
         catch (APIException ex) when (ex.Response?.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
         {

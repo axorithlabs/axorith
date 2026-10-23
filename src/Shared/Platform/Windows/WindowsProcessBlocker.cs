@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axorith.Shared.Platform.Windows;
 
@@ -11,10 +12,12 @@ namespace Axorith.Shared.Platform.Windows;
 internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 {
     private readonly Lock _lock = new();
+    private readonly int _sessionId = Process.GetCurrentProcess().SessionId;
     private CancellationTokenSource? _pollingScanCts;
     private HashSet<string> _targetProcessNames = [];
     private bool _allowOnlyMode;
     private readonly ConcurrentDictionary<string, string> _originalExecutableNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly WindowsAppDiscoveryService _appDiscovery = new(NullLogger<WindowsAppDiscoveryService>.Instance);
 
     private static readonly HashSet<string> SafeList = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -79,13 +82,21 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
     public List<string> Block(IEnumerable<string> processNames) => ApplyRules(processNames, allowOnly: false);
 
-    public List<string> AllowOnly(IEnumerable<string> processNames) => ApplyRules(processNames, allowOnly: true);
+    public List<string> Block(IEnumerable<string> processNames, bool rejectRunning) =>
+        ApplyRules(processNames, allowOnly: false, rejectRunning);
 
-    private List<string> ApplyRules(IEnumerable<string> processNames, bool allowOnly)
+    public List<string> AllowOnly(IEnumerable<string> processNames) =>
+        ApplyRules(processNames, allowOnly: true, rejectRunning: true);
+
+    public List<string> AllowOnly(IEnumerable<string> processNames, bool rejectRunning) =>
+        ApplyRules(processNames, allowOnly: true, rejectRunning);
+
+    private List<string> ApplyRules(IEnumerable<string> processNames, bool allowOnly, bool rejectRunning = false)
     {
         lock (_lock)
         {
             StopMonitoring();
+            _originalExecutableNames.Clear();
             _targetProcessNames = processNames
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => NormalizeName(name.Trim()))
@@ -98,8 +109,26 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 ? "Applying workspace allowlist with {Count} applications."
                 : "Updating blocker rules. Targets: {Count}", _targetProcessNames.Count);
 
-            var killed = allowOnly ? ScanAndKillOutsideAllowlist(initialScan: true) : ScanAndKillByList(initialScan: true);
-            if (!allowOnly)
+            if (allowOnly && rejectRunning)
+            {
+                var conflicts = ScanAndKillOutsideAllowlist(initialScan: true, checkOnly: true);
+                if (conflicts.Count > 0)
+                    throw new InvalidOperationException("Only allow Workspace apps cannot start. Save your work and close these apps first: " +
+                                                        string.Join(", ", conflicts.Order(StringComparer.OrdinalIgnoreCase)));
+            }
+
+            if (rejectRunning && !allowOnly)
+            {
+                var conflicts = ScanAndKillByList(initialScan: true, checkOnly: true);
+                conflicts.AddRange(ScanAndKillRenamedProcesses(initialScan: true, checkOnly: true));
+                if (conflicts.Count > 0)
+                    throw new InvalidOperationException("Save your work and finish or close these tools before starting Strict protection: " +
+                                                        string.Join(", ", conflicts.Distinct(StringComparer.OrdinalIgnoreCase)
+                                                            .Order(StringComparer.OrdinalIgnoreCase)));
+            }
+
+            var killed = allowOnly || rejectRunning ? [] : ScanAndKillByList(initialScan: true);
+            if (!allowOnly && !rejectRunning)
                 killed.AddRange(ScanAndKillRenamedProcesses(initialScan: true));
 
             StartPollingMonitoring();
@@ -137,32 +166,44 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         _pollingScanCts = new CancellationTokenSource();
         var token = _pollingScanCts.Token;
 
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
             var renamedScanCounter = 0;
-            while (await timer.WaitForNextTickAsync(token))
+            try
             {
-                try
+                while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false))
                 {
-                    if (IsAllowOnlyMode())
+                    lock (_lock)
                     {
-                        ScanAndKillOutsideAllowlist(initialScan: false);
-                    }
-                    else
-                    {
-                        ScanAndKillByList(initialScan: false);
-                        if (++renamedScanCounter == 4)
+                        // Stop/reconfigure cannot return while an old scan is still applying rules.
+                        if (token.IsCancellationRequested) break;
+                        try
                         {
-                            ScanAndKillRenamedProcesses(initialScan: false);
-                            renamedScanCounter = 0;
+                            if (_allowOnlyMode)
+                            {
+                                ScanAndKillOutsideAllowlist(initialScan: false);
+                            }
+                            else
+                            {
+                                ScanAndKillByList(initialScan: false);
+                                if (++renamedScanCounter == 4)
+                                {
+                                    ScanAndKillRenamedProcesses(initialScan: false);
+                                    renamedScanCounter = 0;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogDebug(ex, "Error in polling loop");
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "Error in polling loop");
-                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // Rule removal normally cancels the pending timer tick.
             }
         }, token);
 
@@ -180,9 +221,9 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         }
     }
 
-    private List<string> ScanAndKillByList(bool initialScan = false)
+    private List<string> ScanAndKillByList(bool initialScan = false, bool checkOnly = false)
     {
-        if (IsAllowOnlyMode()) return ScanAndKillOutsideAllowlist(initialScan);
+        if (IsAllowOnlyMode()) return ScanAndKillOutsideAllowlist(initialScan, checkOnly);
 
         var killedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         List<string> targets;
@@ -201,8 +242,14 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
             {
                 try
                 {
-                    if (!p.HasExited)
+                    if (p.SessionId == _sessionId && !p.HasExited)
                     {
+                        if (checkOnly)
+                        {
+                            killedNames.Add(target);
+                            continue;
+                        }
+
                         p.Kill();
                         logger.LogInformation("Blocked process: {Name} (PID: {Pid})", target, p.Id);
 
@@ -233,7 +280,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         return [.. killedNames];
     }
 
-    private List<string> ScanAndKillRenamedProcesses(bool initialScan)
+    private List<string> ScanAndKillRenamedProcesses(bool initialScan, bool checkOnly = false)
     {
         HashSet<string> targets;
         lock (_lock)
@@ -248,12 +295,19 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         {
             try
             {
+                if (process.SessionId != _sessionId) continue;
                 var processName = NormalizeName(process.ProcessName);
                 if (SafeList.Contains(processName) || targets.Contains(processName)) continue;
 
                 var path = process.MainModule?.FileName;
                 var originalName = FindBlockedTarget(processName, path);
                 if (originalName == null || process.HasExited) continue;
+
+                if (checkOnly)
+                {
+                    killedNames.Add(originalName);
+                    continue;
+                }
 
                 process.Kill();
                 logger.LogInformation("Blocked renamed process: {Target} (PID: {Pid}, image: {Image})",
@@ -283,7 +337,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         return [.. killedNames];
     }
 
-    private List<string> ScanAndKillOutsideAllowlist(bool initialScan)
+    private List<string> ScanAndKillOutsideAllowlist(bool initialScan, bool checkOnly = false)
     {
         HashSet<string> allowedNames;
         lock (_lock)
@@ -368,6 +422,12 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                     var processName = NormalizeName(process.ProcessName);
                     if (allowedIds.Contains(processId) || SafeList.Contains(processName) ||
                         AllowlistSupportProcesses.Contains(processName) || process.HasExited) continue;
+
+                    if (checkOnly)
+                    {
+                        killedNames.Add(processName);
+                        continue;
+                    }
 
                     process.Kill();
                     logger.LogInformation("Blocked non-workspace process: {Name} (PID: {Pid})", processName, processId);
@@ -460,14 +520,35 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     {
         if (string.IsNullOrWhiteSpace(imagePath)) return string.Empty;
 
-        return _originalExecutableNames.GetOrAdd(imagePath, static path =>
+        return _originalExecutableNames.GetOrAdd(imagePath, path =>
         {
             try
             {
-                var originalFileName = FileVersionInfo.GetVersionInfo(path).OriginalFilename;
-                return string.IsNullOrWhiteSpace(originalFileName)
-                    ? string.Empty
-                    : NormalizeName(Path.GetFileName(originalFileName));
+                var version = FileVersionInfo.GetVersionInfo(path);
+                var originalFileName = Path.GetFileName(version.OriginalFilename);
+                if (string.IsNullOrWhiteSpace(originalFileName) || string.IsNullOrWhiteSpace(version.ProductName))
+                    return string.Empty;
+
+                var originalName = NormalizeName(originalFileName);
+                if (!_targetProcessNames.Contains(originalName)) return string.Empty;
+
+                // Electron apps share chrome.exe metadata; confirm the product before treating an app as renamed.
+                var candidates = _appDiscovery.GetInstalledApplicationsIndex()
+                    .Select(app => app.ExecutablePath)
+                    .Prepend(Path.Combine(Environment.SystemDirectory, originalFileName))
+                    .Prepend(Path.Combine(Path.GetDirectoryName(path)!, originalFileName));
+                foreach (var candidate in candidates)
+                {
+                    if (!Path.GetFileName(candidate).Equals(originalFileName, StringComparison.OrdinalIgnoreCase) ||
+                        !File.Exists(candidate)) continue;
+
+                    var known = FileVersionInfo.GetVersionInfo(candidate);
+                    if (string.Equals(version.ProductName, known.ProductName, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(version.CompanyName, known.CompanyName, StringComparison.OrdinalIgnoreCase))
+                        return originalName;
+                }
+
+                return string.Empty;
             }
             catch
             {

@@ -44,7 +44,9 @@ internal static class SessionManagerTestFactory
         };
         var builder = new ContainerBuilder();
         builder.RegisterInstance(definition).As<ModuleDefinition>();
+        builder.RegisterInstance(module.Object).As<IModule>();
         var scope = builder.Build();
+        scope.Resolve<IModule>();
         registry.Setup(r => r.CreateInstance(moduleId)).Returns((module.Object, scope));
         return moduleId;
     }

@@ -274,7 +274,8 @@ internal sealed class AuthService : IDisposable
             try
             {
                 _logger.LogInfo("Attempting to open browser for Spotify login.");
-                Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
+                using var process = Axorith.Shared.Platform.PlatformServices.CreateProcessService()
+                    .StartProcess(new ProcessStartInfo(authUrl) { UseShellExecute = true });
                 _notifier.ShowToast("Your browser has been opened to log in to Spotify. Please grant access.", NotificationType.Info, "Spotify");
             }
             catch (Exception ex)

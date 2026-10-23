@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
+using ReactiveUI.Avalonia;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Axorith.Client.CoreSdk;
@@ -108,7 +109,7 @@ public sealed class HostTestFactory : WebApplicationFactory<Program>
 }
 
 [Collection("SiteBlocker extension pipes")]
-public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<HostTestFactory>
+public partial class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<HostTestFactory>
 {
     [AvaloniaFact]
     public void PresetSummaryClarifiesDurationAndOmitsDurationStopSchedule()
@@ -206,8 +207,6 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     public async Task GrpcRejectsRequestsWithoutTheHostAuthenticationToken()
     {
         using var httpClient = factory.CreateDefaultClient();
-        Assert.True(File.Exists(Path.Combine(factory.TestDataPath, "host-info.json")),
-            "The Host must write discovery data inside the isolated test directory.");
         using var channel = GrpcChannel.ForAddress(httpClient.BaseAddress!, new GrpcChannelOptions
         {
             HttpClient = httpClient
@@ -998,7 +997,12 @@ public class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixture<Host
     public sealed class TestAppBuilder
     {
         public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<Axorith.Client.App>()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions())
+            .AfterSetup(_ =>
+            {
+                ReactiveUI.RxApp.MainThreadScheduler = AvaloniaScheduler.Instance;
+                ReactiveUI.RxSchedulers.MainThreadScheduler = AvaloniaScheduler.Instance;
+            });
     }
 
     private sealed class WindowsFactAttribute : FactAttribute

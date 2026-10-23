@@ -12,8 +12,8 @@ using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.SiteBlocker;
 
-public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker browserBlocker) : IModule, ISessionBreakParticipant,
-    ICommittedSessionValidator
+public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessionBreakParticipant,
+    ICommittedSessionValidator, IBrowserBlockingState, IAsyncDisposable
 {
     private static Dictionary<string, string[]>? _categorySites;
     private static readonly Lock _loadLock = new();
@@ -33,8 +33,7 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private readonly Setting<List<string>> _categories = Setting.AsMultiChoice(
         key: "Categories",
         label: "Block Categories",
-        defaultValues:
-        ["Social", "Video", "Streaming", "Gaming", "News", "Shopping", "Adult", "Gambling", "Dating", "Forums"],
+        defaultValues: [],
         initialChoices: GetCategoryChoices(),
         description: "Select categories to block. Sites from selected categories will be automatically added."
     );
@@ -67,8 +66,6 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private readonly HashSet<string> _connectedBrowsers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _browserStatuses = BrowserEndpoints.ToDictionary(
         endpoint => endpoint.Name, _ => "Missing", StringComparer.OrdinalIgnoreCase);
-    private HashSet<string> _fallbackBrowserProcesses = new(StringComparer.OrdinalIgnoreCase);
-    private bool _browserFallbackFailed;
     private bool _disposed;
     private volatile bool _legacyFirefoxProtocol;
     private readonly Action _firefoxExtensionAction =
@@ -78,19 +75,17 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     private bool HasActiveRules => _activeSiteList.Count > 0 || _isAllowList;
 
-    public bool IsProtectionDegraded => _browserFallbackFailed ||
-        (HasActiveRules && !_pausedForBreak && _browserStatuses.Values.Any(status => status != "Connected"));
+    public BrowserBlockingRules? BrowserRules { get; private set; }
+
+    public bool IsProtectionDegraded =>
+        HasActiveRules && !_pausedForBreak && _browserStatuses.Values.Any(status => status != "Connected");
 
     public string ProtectionStatusMessage => !HasActiveRules
         ? "Site Blocker has no configured sites"
         : _pausedForBreak
             ? "Site Blocker paused for break"
             : "Site Blocker · " + string.Join(", ", BrowserEndpoints.Select(endpoint =>
-        {
-            var status = _browserStatuses[endpoint.Name];
-            var isFallbackBlocked = endpoint.Processes.Any(_fallbackBrowserProcesses.Contains);
-            return $"{endpoint.Name} {status}{(isFallbackBlocked ? " (browser blocked)" : string.Empty)}";
-        })) + (_browserFallbackFailed ? " · browser fallback failed" : string.Empty);
+                $"{endpoint.Name} {_browserStatuses[endpoint.Name]}"));
 
     public IReadOnlyList<ISetting> GetSettings() => [_mode, _categories, _customSites];
 
@@ -107,7 +102,8 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
         try
         {
-            Process.Start(new ProcessStartInfo(firefoxExtensionUrl) { UseShellExecute = true });
+            using var process = PlatformServices.CreateProcessService()
+                .StartProcess(new ProcessStartInfo(firefoxExtensionUrl) { UseShellExecute = true });
             notifier.ShowToast("Firefox extension page opened in your browser", NotificationType.Success);
         }
         catch (Exception ex)
@@ -122,10 +118,8 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
 
     public async Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken)
     {
-        var categories = _categories.GetCurrentValue();
-        var custom = _customSites.GetCurrentValue();
         var allowList = _mode.GetCurrentValue() == "AllowList";
-        var noSitesConfigured = categories.Count == 0 && string.IsNullOrWhiteSpace(custom) && !allowList;
+        var noSitesConfigured = GetAllSites().Count == 0;
 
         var extensionResults = await SendToAllExtensionsAsync(new { command = "health" }, cancellationToken)
             .ConfigureAwait(false);
@@ -134,7 +128,9 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         List<string> warnings = [];
         if (noSitesConfigured)
         {
-            warnings.Add("No categories or sites selected. The module will not block anything.");
+            warnings.Add(allowList
+                ? "No categories or sites selected. Allow List mode will block every website."
+                : "No categories or sites selected. The module will not block anything.");
         }
 
         var firefoxExtension = FindInstalledFirefoxExtension();
@@ -171,12 +167,14 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         }
 
         logger.LogInfo("Sending site-block command to supported browsers ({Count} sites).", _activeSiteList.Count);
+        BrowserRules = new BrowserBlockingRules(_isAllowList ? "AllowList" : "BlockList", _activeSiteList.ToArray());
         var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         UpdateBrowserStatuses(results);
     }
 
     public async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
+        BrowserRules = null;
         if (HasActiveRules)
         {
             await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken).ConfigureAwait(false);
@@ -185,28 +183,29 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         _activeSiteList.Clear();
         _isAllowList = false;
         _pausedForBreak = false;
-        ApplyBrowserFallback([]);
     }
 
     public async Task PauseForBreakAsync(CancellationToken cancellationToken)
     {
         if (!HasActiveRules) return;
 
+        BrowserRules = null;
+
         var results = await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken)
             .ConfigureAwait(false);
         UpdateBrowserStatuses(results);
         _pausedForBreak = true;
-        ApplyBrowserFallback([]);
     }
 
     public async Task ResumeAfterBreakAsync(CancellationToken cancellationToken)
     {
         if (!HasActiveRules) return;
 
+        BrowserRules = new BrowserBlockingRules(_isAllowList ? "AllowList" : "BlockList", _activeSiteList.ToArray());
+
         var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         _pausedForBreak = false;
         UpdateBrowserStatuses(results);
-        ApplyBrowserFallback(results.Where(result => result.Status != "Connected"));
     }
 
     public async Task<bool> IsProtectionHealthyAsync(CancellationToken cancellationToken)
@@ -218,7 +217,6 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
             var unblockResults = await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken)
                 .ConfigureAwait(false);
             UpdateBrowserStatuses(unblockResults);
-            ApplyBrowserFallback([]);
             return true;
         }
 
@@ -233,19 +231,11 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         }
 
         UpdateBrowserStatuses(results);
-        ApplyBrowserFallback(results.Where(result => result.Status != "Connected"));
-        return results.Any(result => result.Status == "Connected") && !_browserFallbackFailed;
+        // Extension failures are warnings reported through IsProtectionDegraded, not session startup failures.
+        return true;
     }
 
-    public async Task<bool> CanStartCommittedSessionAsync(CancellationToken cancellationToken)
-    {
-        if (GetAllSites().Count == 0 && _mode.GetCurrentValue() != "AllowList") return true;
-
-        var results = await SendToAllExtensionsAsync(new { command = "health" }, cancellationToken)
-            .ConfigureAwait(false);
-        UpdateBrowserStatuses(results);
-        return results.Any(result => result.Status == "Connected");
-    }
+    public Task<bool> CanStartCommittedSessionAsync(CancellationToken cancellationToken) => Task.FromResult(true);
 
     private object CreateBlockingRequest(string command) => new
     {
@@ -426,30 +416,6 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
         }
     }
 
-    private void ApplyBrowserFallback(IEnumerable<ExtensionResult> unavailable)
-    {
-        var processes = unavailable
-            .Select(result => (result.Endpoint.Name, result.Endpoint.Processes))
-            .Where(browser => !string.Equals(browser.Name, "Firefox", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(browser => browser.Processes)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (processes.SetEquals(_fallbackBrowserProcesses) && !_browserFallbackFailed) return;
-
-        try
-        {
-            if (processes.Count == 0) browserBlocker.UnblockAll();
-            else browserBlocker.Block(processes);
-
-            _fallbackBrowserProcesses = processes;
-            _browserFallbackFailed = false;
-        }
-        catch (Exception ex)
-        {
-            _browserFallbackFailed = true;
-            logger.LogError(ex, "Could not apply browser process fallback for Site Blocker.");
-        }
-    }
-
     private List<string> GetAllSites()
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -583,35 +549,36 @@ public class Module(IModuleLogger logger, INotifier notifier, IProcessBlocker br
     private static bool ReadBoolean(JsonElement element, string propertyName) =>
         element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
 
-    public void Dispose()
+    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+    public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
 
         _disposed = true;
+        BrowserRules = null;
 
         if (HasActiveRules)
         {
             logger.LogWarning(
                 "Disposing module while sites are still blocked. Attempting to send final unblock command.");
-            _ = Task.Run(async () =>
+            try
             {
-                try
-                {
-                    await SendToAllExtensionsAsync(new { command = "unblock" }, CancellationToken.None)
-                        .ConfigureAwait(false);
-                }
-                catch
-                {
-                }
-            });
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await SendToAllExtensionsAsync(new { command = "unblock" }, timeout.Token).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning("Final Site Blocker unblock failed: {0}", ex.Message);
+            }
             _activeSiteList.Clear();
+            _isAllowList = false;
         }
-
-        ApplyBrowserFallback([]);
 
         _mode.Dispose();
         _categories.Dispose();
         _customSites.Dispose();
         _firefoxExtensionAction.Dispose();
+        _chromeExtensionAction.Dispose();
     }
 }

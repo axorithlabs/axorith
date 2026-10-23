@@ -127,30 +127,12 @@ internal class GrpcModulesApi(
     }
 
     public Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
-    {
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.EndEditAsync(new EndEditRequest
-            {
-                ModuleInstanceId = moduleInstanceId.ToString()
-            }, cancellationToken: ct).ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
-    }
+        => GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.EndEditAsync(
+            new EndEditRequest { ModuleInstanceId = moduleInstanceId.ToString() }, cancellationToken: ct));
 
     public Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
-    {
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.SyncEditAsync(new SyncEditRequest
-            {
-                ModuleInstanceId = moduleInstanceId.ToString()
-            }, cancellationToken: ct).ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
-    }
+        => GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.SyncEditAsync(
+            new SyncEditRequest { ModuleInstanceId = moduleInstanceId.ToString() }, cancellationToken: ct));
 
     public Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default)
     {
@@ -171,19 +153,9 @@ internal class GrpcModulesApi(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
 
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.InvokeActionAsync(
-                    new InvokeActionRequest
-                    {
-                        ModuleInstanceId = moduleInstanceId.ToString(),
-                        ActionKey = actionKey
-                    },
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
+        return GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.InvokeActionAsync(
+            new InvokeActionRequest { ModuleInstanceId = moduleInstanceId.ToString(), ActionKey = actionKey },
+            cancellationToken: ct));
     }
 
     public Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId,
@@ -192,20 +164,13 @@ internal class GrpcModulesApi(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
 
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.InvokeDesignTimeActionAsync(
-                    new InvokeDesignTimeActionRequest
-                    {
-                        ModuleId = moduleId.ToString(),
-                        ModuleInstanceId = moduleInstanceId.ToString(),
-                        ActionKey = actionKey
-                    },
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
-        });
+        return GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.InvokeDesignTimeActionAsync(
+            new InvokeDesignTimeActionRequest
+            {
+                ModuleId = moduleId.ToString(),
+                ModuleInstanceId = moduleInstanceId.ToString(),
+                ActionKey = actionKey
+            }, cancellationToken: ct));
     }
 
     public Task<OperationResult> UpdateSettingAsync(Guid moduleInstanceId, string settingKey,
@@ -213,7 +178,7 @@ internal class GrpcModulesApi(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(settingKey);
 
-        return retryPolicy.ExecuteAsync(async () =>
+        return GrpcResultMapper.ExecuteAsync(retryPolicy, () =>
         {
             var request = new UpdateSettingRequest
             {
@@ -223,10 +188,7 @@ internal class GrpcModulesApi(
 
             SettingValueCodec.Set(request, value);
 
-            var response = await client.UpdateSettingAsync(request, cancellationToken: ct)
-                .ConfigureAwait(false);
-
-            return GrpcResultMapper.ToModel(response);
+            return client.UpdateSettingAsync(request, cancellationToken: ct);
         });
     }
 

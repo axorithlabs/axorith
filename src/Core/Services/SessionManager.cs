@@ -59,21 +59,12 @@ public class SessionManager(
         public required ILifetimeScope Scope { get; init; }
         public required ConfiguredModule Configuration { get; init; }
         public required ModuleDefinition Definition { get; init; }
+        public bool StartAttempted { get; set; }
         public bool IsStarted { get; set; }
 
         public string DisplayName => Configuration.CustomName ?? Definition.Name;
 
-        public void Dispose()
-        {
-            try
-            {
-                Instance.Dispose();
-            }
-            finally
-            {
-                Scope.Dispose();
-            }
-        }
+        public void Dispose() => Scope.Dispose();
     }
 
     private readonly List<ActiveModule> _activeModules = [];
@@ -265,17 +256,8 @@ public class SessionManager(
         }
         finally
         {
-            foreach (var module in modules)
-            {
-                try
-                {
-                    module.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Error disposing preflight module '{Name}'.", module.DisplayName);
-                }
-            }
+            DisposeModules(modules, (ex, module) =>
+                logger.LogWarning(ex, "Error disposing preflight module '{Name}'.", module.DisplayName));
 
             _asyncLock.Release();
         }
@@ -420,14 +402,16 @@ public class SessionManager(
                 }
 
                 _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                _activeModules.Clear();
+                lock (_syncLock)
+                    _activeModules.Clear();
 
                 foreach (var configuredModule in snapshot.Modules)
                 {
                     var activeModule = CreateActiveModule(configuredModule);
                     if (activeModule is not null)
                     {
-                        _activeModules.Add(activeModule);
+                        lock (_syncLock)
+                            _activeModules.Add(activeModule);
                         continue;
                     }
 
@@ -500,8 +484,8 @@ public class SessionManager(
         var (instance, scope) = moduleRegistry.CreateInstance(configuration.ModuleId);
         if (instance is null || scope is null)
         {
-            instance?.Dispose();
-            scope?.Dispose();
+            if (scope != null) scope.Dispose();
+            else instance?.Dispose();
             return null;
         }
 
@@ -519,15 +503,7 @@ public class SessionManager(
         }
         catch
         {
-            try
-            {
-                instance.Dispose();
-            }
-            finally
-            {
-                scope.Dispose();
-            }
-
+            scope.Dispose();
             throw;
         }
     }
@@ -648,6 +624,7 @@ public class SessionManager(
             using var startCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             startCts.CancelAfter(startupTimeout);
 
+            module.StartAttempted = true;
             await module.Instance.OnSessionStartAsync(startCts.Token).ConfigureAwait(false);
 
             logger.LogInformation("Module '{InstanceName}' started successfully.", module.DisplayName);
@@ -1029,6 +1006,7 @@ public class SessionManager(
             for (var i = _activeModules.Count - 1; i >= 0; i--)
             {
                 var activeModule = _activeModules[i];
+                if (!activeModule.StartAttempted) continue;
 
                 using var scope = logger.BeginScope(new Dictionary<string, object>
                 {
@@ -1057,21 +1035,19 @@ public class SessionManager(
                 }
             }
 
-            foreach (var activeModule in _activeModules)
+            List<ActiveModule> stoppedModules;
+            lock (_syncLock)
             {
-                try
-                {
-                    activeModule.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error disposing module scope for '{InstanceName}'.", activeModule.DisplayName);
-                }
+                // Snapshot readers must stop seeing modules before their settings are disposed.
+                stoppedModules = _activeModules.ToList();
+                _activeModules.Clear();
             }
+
+            DisposeModules(stoppedModules, (ex, module) =>
+                logger.LogError(ex, "Error disposing module scope for '{InstanceName}'.", module.DisplayName));
 
             var stoppedPreset = ActiveSession;
             var stoppedPresetId = stoppedPreset?.Id ?? Guid.Empty;
-            var stoppedModules = _activeModules.ToList();
             var startedAt = SessionStartedAt;
             var stoppedSessionInstanceId = _sessionInstanceId;
             var stoppedPreviousSessionInstanceId = _previousSessionInstanceId;
@@ -1143,9 +1119,19 @@ public class SessionManager(
         }
     }
 
+    private static void DisposeModules(IEnumerable<ActiveModule> modules, Action<Exception, ActiveModule> logFailure)
+    {
+        foreach (var module in modules)
+        {
+            try { module.Dispose(); }
+            catch (Exception ex) { logFailure(ex, module); }
+        }
+    }
+
     private void CleanupSessionState()
     {
-        _activeModules.Clear();
+        lock (_syncLock)
+            _activeModules.Clear();
         _sessionCts?.Dispose();
         _sessionCts = null;
         ActiveSession = null;
@@ -1177,6 +1163,7 @@ public class SessionManager(
 
         try
         {
+            PresetManager.MigrateObsPasswords(preset, _secureStorage);
             CommittedSessionStateFile.WritePayload(path, JsonSerializer.Serialize(
                 new PersistedCommittedSession(preset, startedAt, endDeadline, _breaksUsed, BreakEndsAt),
                 CommittedSessionJsonOptions));

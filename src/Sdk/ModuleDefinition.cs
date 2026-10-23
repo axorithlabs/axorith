@@ -53,6 +53,12 @@ public record ModuleDefinition
     public string? AssemblyFileName { get; init; }
 
     /// <summary>
+    ///     Gets the required SDK contract major version. Legacy manifests default to API 1.
+    /// </summary>
+    [JsonPropertyName("sdkApiVersion")]
+    public int SdkApiVersion { get; init; } = 1;
+
+    /// <summary>
     ///     Gets or sets the actual <see cref="System.Type" /> of the class implementing <see cref="IModule" />.
     ///     This property is resolved by the ModuleLoader at runtime and is not part of the JSON file.
     /// </summary>

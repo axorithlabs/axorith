@@ -2,6 +2,7 @@
     <PropertyGroup>
         <AssemblyName>Axorith.Sdk</AssemblyName>
         <RootNamespace>Axorith.Sdk</RootNamespace>
+        <AssemblyVersion>1.0.3.0</AssemblyVersion>
         
         <Description>Software Development Kit (SDK) for creating Axorith modules.</Description>
         

@@ -19,12 +19,13 @@ internal sealed class OBSApp : LauncherAppBase
         IModuleLogger logger,
         IAppDiscoveryService appDiscovery,
         INotifier notifier,
+        ISecureStorageService secureStorage,
         IPlatformProcessService processService,
         IPlatformWindowService windowService)
         : base(logger, processService, windowService)
     {
         _notifier = notifier;
-        _settings = new Settings(appDiscovery);
+        _settings = new Settings(appDiscovery, secureStorage);
         _webSocketService = new ObsWebSocketService(logger, _settings);
     }
 

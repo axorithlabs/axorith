@@ -435,7 +435,9 @@ public sealed class SessionPreflightTelemetryTests
 
             var builder = new ContainerBuilder();
             builder.RegisterInstance(_definition).As<ModuleDefinition>();
-            return (new TestModule(failBreakStart, validationResult), builder.Build());
+            builder.Register(_ => new TestModule(failBreakStart, validationResult)).As<IModule>();
+            var scope = builder.Build();
+            return (scope.Resolve<IModule>(), scope);
         }
     }
 

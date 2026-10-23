@@ -4,6 +4,8 @@ namespace Axorith.Shared.Platform;
 
 public interface IPlatformProcessService
 {
+    Process? StartProcess(ProcessStartInfo startInfo) => Process.Start(startInfo);
+
     List<Process> FindProcesses(string processNameOrPath);
 
     bool IsProcessRunning(string processNameOrPath) => FindProcesses(processNameOrPath).Count > 0;

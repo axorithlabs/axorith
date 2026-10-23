@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Collections.Concurrent;
 using Axorith.Contracts;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
@@ -17,10 +16,6 @@ public class ModulesServiceImpl(
     ILogger<ModulesServiceImpl> logger)
     : ModulesService.ModulesServiceBase
 {
-    private sealed record CachedSchema(DateTime? Timestamp, GetModuleSettingsResponse Response);
-
-    private readonly ConcurrentDictionary<Guid, CachedSchema> _schemaCache = new();
-
     public override Task<OperationResult> SyncEdit(SyncEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
@@ -90,15 +85,6 @@ public class ModulesServiceImpl(
             throw new RpcException(new Status(StatusCode.NotFound, $"Module not found: {moduleId}"));
         }
 
-        if (_schemaCache.TryGetValue(moduleId, out var cached) &&
-            cached.Timestamp == definition.AssemblyTimestampUtc)
-        {
-            logger.LogInformation(
-                "Returned cached settings schema for module {ModuleId} (timestamp {Timestamp})",
-                moduleId, definition.AssemblyTimestampUtc?.ToString("O") ?? "<null>");
-            return cached.Response.Clone();
-        }
-
         var (module, scope) = moduleRegistry.CreateInstance(moduleId);
         if (module == null)
         {
@@ -110,8 +96,13 @@ public class ModulesServiceImpl(
         {
             try
             {
-                using var initCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                using var initCts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+                initCts.CancelAfter(TimeSpan.FromSeconds(10));
                 await module.InitializeAsync(initCts.Token);
+            }
+            catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception initEx)
             {
@@ -119,8 +110,6 @@ public class ModulesServiceImpl(
             }
 
             var response = BuildSettingsResponseFromModule(module);
-
-            _schemaCache[moduleId] = new CachedSchema(definition.AssemblyTimestampUtc, response);
 
             logger.LogInformation(
                 "Returned {SettingCount} settings and {ActionCount} actions for module {ModuleId}",
@@ -130,8 +119,8 @@ public class ModulesServiceImpl(
         }
         finally
         {
-            module.Dispose();
-            scope?.Dispose();
+            if (scope != null) scope.Dispose();
+            else module.Dispose();
         }
 
     }
@@ -260,8 +249,8 @@ public class ModulesServiceImpl(
         }
         finally
         {
-            module.Dispose();
-            scope?.Dispose();
+            if (scope != null) scope.Dispose();
+            else module.Dispose();
             logger.LogDebug("Temporary design-time module instance disposed after action completion");
         }
 
@@ -383,13 +372,7 @@ public class ModulesServiceImpl(
                 return response;
             }
 
-            var definition = moduleRegistry.GetDefinitionById(moduleId);
             var schema = BuildSettingsResponseFromModule(module);
-            if (definition != null)
-            {
-                _schemaCache[moduleId] = new CachedSchema(definition.AssemblyTimestampUtc, schema);
-            }
-
             response.Settings.AddRange(schema.Settings);
             response.Actions.AddRange(schema.Actions);
             response.Result = SessionMapper.CreateResult(true, "Design-time edit started");

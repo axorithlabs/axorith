@@ -96,7 +96,7 @@ Browser-specific website blocking requires the Axorith companion extension and i
 
 The project includes browser extension code for Chromium-based browsers and Firefox under `src/Modules/SiteBlocker/BrowserExtension`.
 
-Site Blocker is not a system-wide network firewall. Its protection applies through its supported browser integration and configured fallback behavior.
+Site Blocker blocks websites through its companion browser extension and never closes applications. If an extension is unavailable, Axorith reports degraded website protection.
 
 ## Focus Commitment
 
@@ -168,6 +168,19 @@ Modules use .NET assembly loading mechanisms, including `AssemblyLoadContext`, t
 Axorith provides a C# SDK for developing additional Workspace modules.
 
 A module describes its metadata in `module.json` and implements the `IModule` contract.
+
+The supported contract is SDK API v1 (`sdkApiVersion: 1` in `module.json`; omitted values also mean v1).
+`Axorith.Sdk` keeps assembly version `1.0.3.0` for compatible v1 releases, including existing 1.0.3 binaries. Its existing public signatures
+remain stable; optional capabilities use separate interfaces or default interface implementations.
+Breaking changes require a new API major version, which older hosts reject before creating a module.
+
+The host shares `Axorith.Sdk`, `Axorith.Shared.Platform`, `Axorith.Shared.Utils`, `Axorith.Shared.Exceptions`,
+`Microsoft.Extensions.Http`, and `System.Reactive`. Their assembly culture and public key must match,
+and the host version must have the same major version and be at least the requested version.
+Other dependencies remain private to each module. Build modules with `EnableDynamicLoading=true`
+and distribute their output directory, including `.deps.json` and private dependencies.
+The returned Autofac scope owns each module instance; callers dispose the scope once.
+Module assemblies stay loaded until host shutdown; replacing a module requires restarting the host.
 
 The interface includes settings, user-invokable actions, validation, session-start behavior, session-end behavior, and optional initialization.
 

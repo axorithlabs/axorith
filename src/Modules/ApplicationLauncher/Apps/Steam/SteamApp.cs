@@ -48,7 +48,8 @@ internal sealed class SteamApp(
         try
         {
             Logger.LogInfo("Launching game with AppID {AppId}", appId);
-            Process.Start(new ProcessStartInfo($"steam://rungameid/{appId}") { UseShellExecute = true });
+            using var process = PlatformServices.CreateProcessService()
+                .StartProcess(new ProcessStartInfo($"steam://rungameid/{appId}") { UseShellExecute = true });
         }
         catch (Exception ex)
         {

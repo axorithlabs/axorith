@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.Versioning;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -12,18 +13,17 @@ internal class WindowsSystemNotificationService(ILogger logger) : ISystemNotific
     {
         try
         {
-            // Escape single quotes for PowerShell string literals
-            var safeTitle = title.Replace("'", "''");
-            var safeMessage = message.Replace("'", "''");
-            var expirationSeconds = expiration?.TotalSeconds ?? 10;
+            var safeTitle = Convert.ToBase64String(Encoding.UTF8.GetBytes(title));
+            var safeMessage = Convert.ToBase64String(Encoding.UTF8.GetBytes(message));
+            var expirationSeconds = (expiration?.TotalSeconds ?? 10).ToString(CultureInfo.InvariantCulture);
 
             // PowerShell script using WinRT APIs directly
             var script = $@"
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
 $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
 $textNodes = $template.GetElementsByTagName('text')
-$textNodes.Item(0).AppendChild($template.CreateTextNode('{safeTitle}')) > $null
-$textNodes.Item(1).AppendChild($template.CreateTextNode('{safeMessage}')) > $null
+$textNodes.Item(0).AppendChild($template.CreateTextNode([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{safeTitle}')))) > $null
+$textNodes.Item(1).AppendChild($template.CreateTextNode([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{safeMessage}')))) > $null
 $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
 $toast.ExpirationTime = [DateTimeOffset]::Now.AddSeconds({expirationSeconds})
 $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Axorith')
@@ -36,7 +36,7 @@ $notifier.Show($toast)
 
             var psi = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                FileName = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"),
                 Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedScript}",
                 UseShellExecute = false,
                 CreateNoWindow = true

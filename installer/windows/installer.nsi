@@ -23,8 +23,7 @@
 
 Name "${PRODUCT_NAME}"
 OutFile "..\..\build\Installer\axorith-setup.exe"
-InstallDir "$LOCALAPPDATA\Programs\${PRODUCT_NAME}"
-InstallDirRegKey HKCU "Software\${PRODUCT_NAME}" ""
+InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
@@ -80,12 +79,12 @@ VIAddVersionKey "OriginalFilename" "axorith-setup.exe"
 !include "StrFunc.nsh"
 
 ${StrCase}
+${StrStr}
 ${UnStrCase}
 
 !define MUI_ICON "assets\icon.ico"
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -110,10 +109,46 @@ Var TelemetryFailureStage
 Var TelemetryFailureReported
 Var DesktopRuntimeInstalled
 Var AspNetRuntimeInstalled
+Var MaintenanceDirectory
+Var MaintenanceHost
+
+!macro DefineProtectedRootFunction Prefix
+Function ${Prefix}PrepareProtectedRoot
+    ; Override /D and _? arguments: privileged payloads must stay under Program Files.
+    StrCpy $INSTDIR "$PROGRAMFILES64\${PRODUCT_NAME}"
+    System::Call 'kernel32::GetFileAttributesW(w "$INSTDIR") i.r0'
+    IntOp $1 $0 & 0x400
+    ${If} $0 != -1
+    ${AndIf} $1 != 0
+        MessageBox MB_OK|MB_ICONSTOP "The Axorith installation directory cannot be a reparse point."
+        Abort
+    ${EndIf}
+    CreateDirectory "$INSTDIR"
+    System::Call 'advapi32::ConvertStringSecurityDescriptorToSecurityDescriptorW(w "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;BU)", i 1, *p.r0, p 0) i.r1'
+    ${If} $1 == 0
+        MessageBox MB_OK|MB_ICONSTOP "Could not protect the Axorith installation directory."
+        Abort
+    ${EndIf}
+    System::Call 'advapi32::SetFileSecurityW(w "$INSTDIR", i 0x80000005, p r0) i.r1'
+    System::Call 'kernel32::LocalFree(p r0)'
+    ${If} $1 == 0
+        MessageBox MB_OK|MB_ICONSTOP "Could not protect the Axorith installation directory."
+        Abort
+    ${EndIf}
+FunctionEnd
+!macroend
+
+!insertmacro DefineProtectedRootFunction ""
+!insertmacro DefineProtectedRootFunction "un."
 
 !macro CheckCommittedSession Action AllowedLabel TelemetrySender
-    IfFileExists "$INSTDIR\Axorith.Host\Axorith.Host.exe" 0 ${AllowedLabel}
-    nsExec::ExecToStack '"$INSTDIR\Axorith.Host\Axorith.Host.exe" --check-committed-session'
+    IfFileExists "$INSTDIR\Axorith.Host\Axorith.Host.exe" ${AllowedLabel}_check
+    IfFileExists "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Host\Axorith.Host.exe" ${AllowedLabel}_check
+    IfFileExists "$APPDATA\Axorith\config\committed-session.json" ${AllowedLabel}_check
+    IfFileExists "$APPDATA\Axorith\config\strict-protection.json" ${AllowedLabel}_check
+    IfFileExists "$CommonAppData\Axorith\CommittedSessions\*.*" ${AllowedLabel}_check ${AllowedLabel}
+${AllowedLabel}_check:
+    nsExec::ExecToStack '"$MaintenanceHost" --check-committed-session --environment Production --contentRoot "$MaintenanceDirectory" --Persistence:ConfigPath "$APPDATA\Axorith\config"'
     Pop $0
     Pop $1
     StrCmp $0 "0" ${AllowedLabel}
@@ -156,11 +191,9 @@ Function ${Prefix}InitializeTelemetry
     StrCpy $TelemetryFailureStage "installer_launch"
     StrCpy $TelemetryEventProperties ""
     SetShellVarContext current
-    ReadEnvStr $CommonAppData "ProgramData"
-    StrCmp $CommonAppData "" 0 telemetry_common_appdata_ready
-    ReadEnvStr $CommonAppData "ALLUSERSPROFILE"
-    StrCmp $CommonAppData "" telemetry_identity_done
-    telemetry_common_appdata_ready:
+    SetShellVarContext all
+    StrCpy $CommonAppData $APPDATA
+    SetShellVarContext current
     !if "${Mode}" == "uninstall"
         StrCpy $InstallAttemptId ""
         ReadRegStr $CurrentVersion HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion"
@@ -304,13 +337,24 @@ FunctionEnd
 !insertmacro DefineTelemetrySenderFunction "un."
 
 Function .onInit
+    Call PrepareProtectedRoot
     Call InitializeTelemetry
+    Call GenerateTelemetryGuid
+    Pop $0
+    StrCpy $MaintenanceDirectory "$INSTDIR\.setup-$0"
+    CreateDirectory "$MaintenanceDirectory"
+    SetOutPath "$MaintenanceDirectory"
+    File /r "${BUILD_ROOT}\Axorith.Host\*"
+    StrCpy $MaintenanceHost "$MaintenanceDirectory\Axorith.Host.exe"
     StrCpy $TelemetryEventName "InstallerStarted"
     Call SendTelemetryEvent
     !insertmacro CheckCommittedSession "Installation or update" on_init_allowed SendTelemetryEvent
 FunctionEnd
 
 Function un.onInit
+    Call un.PrepareProtectedRoot
+    StrCpy $MaintenanceDirectory "$INSTDIR\Axorith.Host"
+    StrCpy $MaintenanceHost "$MaintenanceDirectory\Axorith.Host.exe"
     Call un.InitializeTelemetry
     ${GetParameters} $0
     ${GetOptions} $0 "/UPDATE" $1
@@ -419,7 +463,7 @@ FunctionEnd
 
 Function CheckDotNetDesktopRuntime
     StrCpy $DesktopRuntimeInstalled "0"
-    nsExec::ExecToStack 'dotnet --list-runtimes'
+    nsExec::ExecToStack '"$PROGRAMFILES64\dotnet\dotnet.exe" --list-runtimes'
     Pop $0
     Pop $1
     StrCmp $0 "0" 0 done_desktop
@@ -431,7 +475,7 @@ FunctionEnd
 
 Function CheckDotNetAspNetRuntime
     StrCpy $AspNetRuntimeInstalled "0"
-    nsExec::ExecToStack 'dotnet --list-runtimes'
+    nsExec::ExecToStack '"$PROGRAMFILES64\dotnet\dotnet.exe" --list-runtimes'
     Pop $0
     Pop $1
     StrCmp $0 "0" 0 done_aspnet
@@ -444,11 +488,11 @@ FunctionEnd
 !macro InstallDotNetRuntime RuntimeName RuntimeVersion RuntimeUrl InstallerFile
     DetailPrint "Downloading ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_download"
-    SetOutPath "$TEMP"
-    inetc::get /SILENT "${RuntimeUrl}" "$TEMP\${InstallerFile}" /END
+    SetOutPath "$MaintenanceDirectory"
+    inetc::get /SILENT "${RuntimeUrl}" "$MaintenanceDirectory\${InstallerFile}" /END
     Pop $0
     ${If} $0 != "OK"
-        Delete "$TEMP\${InstallerFile}"
+        Delete "$MaintenanceDirectory\${InstallerFile}"
         MessageBox MB_OK|MB_ICONSTOP "Failed to download ${RuntimeName}. Axorith installation cannot continue. Please install it manually from https://dotnet.microsoft.com/download" /SD IDOK
         SetErrorLevel 2
         Abort
@@ -456,16 +500,16 @@ FunctionEnd
     DetailPrint "Installing ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_install"
     ClearErrors
-    ExecWait '"$TEMP\${InstallerFile}" /install /quiet /norestart' $0
+    ExecWait '"$MaintenanceDirectory\${InstallerFile}" /install /quiet /norestart' $0
     ${IfNot} ${Errors}
     ${AndIf} $0 != 0
     ${AndIf} $0 != 3010
-        ExecWait '"$TEMP\${InstallerFile}" /install /passive /norestart' $0
+        ExecWait '"$MaintenanceDirectory\${InstallerFile}" /install /passive /norestart' $0
     ${EndIf}
     ${If} ${Errors}
         StrCpy $0 "launch failed"
     ${EndIf}
-    Delete "$TEMP\${InstallerFile}"
+    Delete "$MaintenanceDirectory\${InstallerFile}"
     ${If} $0 == 3010
         SetRebootFlag true
     ${ElseIf} $0 != 0
@@ -511,28 +555,18 @@ Section "MainSection" SEC_INSTALL
     !insertmacro CheckCommittedSession "Installation or update" install_section_allowed SendTelemetryEvent
 
     IfFileExists "$APPDATA\Axorith\config\clientsettings.json" migrate_client_settings_done
-    IfFileExists "$INSTDIR\Axorith.Client\clientsettings.json" 0 migrate_client_settings_done
+    IfFileExists "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Client\clientsettings.json" 0 migrate_client_settings_done
     CreateDirectory "$APPDATA\Axorith\config"
-    CopyFiles /SILENT "$INSTDIR\Axorith.Client\clientsettings.json" "$APPDATA\Axorith\config"
+    CopyFiles /SILENT "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Client\clientsettings.json" "$APPDATA\Axorith\config"
     migrate_client_settings_done:
 
     StrCpy $TelemetryFailureStage "existing_version_removal"
-    ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString"
-    ${If} $0 != ""
-        DetailPrint "Found existing installation, uninstalling..."
-        
-        nsExec::ExecToStack 'taskkill /F /IM Axorith.Client.exe'
-        Pop $1
-        nsExec::ExecToStack 'taskkill /F /IM Axorith.Host.exe'
-        Pop $1
-        
-        Sleep 1000
-        
-        StrCpy $1 $0 -1 1
-        ExecWait '$1 /S /UPDATE _?=$INSTDIR'
-        
-        Sleep 500
-    ${EndIf}
+    nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Client.exe'
+    Pop $0
+    Pop $1
+    nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Host.exe'
+    Pop $0
+    Pop $1
 
     StrCpy $TelemetryFailureStage "files_copy"
     SetOutPath "$INSTDIR"
@@ -541,6 +575,8 @@ Section "MainSection" SEC_INSTALL
     SetDetailsPrint textonly
   
     File /r "${BUILD_ROOT}\*"
+    SetOutPath "$INSTDIR"
+    RMDir /r "$MaintenanceDirectory"
   
     SetDetailsPrint listonly
 
@@ -550,6 +586,15 @@ Section "MainSection" SEC_INSTALL
     SetOutPath "$INSTDIR"
   
     WriteRegExpandStr HKCU "Environment" "AXORITH_HOST_PATH" "$INSTDIR\Axorith.Host\Axorith.Host.exe"
+    ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+    ${If} $0 != ""
+        ${StrStr} $1 $0 "--tray"
+        ${If} $1 != ""
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\Axorith.Client\Axorith.Client.exe" --tray'
+        ${Else}
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\Axorith.Client\Axorith.Client.exe"'
+        ${EndIf}
+    ${EndIf}
   
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayName" "${PRODUCT_NAME}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion" "${PRODUCT_VERSION}"

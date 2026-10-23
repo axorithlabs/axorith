@@ -25,6 +25,7 @@ public abstract class TriggerViewModel : ReactiveObject
     public abstract string Description { get; }
     public abstract string IconKey { get; }
     public virtual bool HasError => false;
+    public virtual NotificationType EditorAccentType => NotificationType.Info;
 }
 
 public abstract class ScheduledTriggerViewModel : TriggerViewModel
@@ -42,7 +43,6 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
     public override string IconKey => "TimerIcon";
     public abstract string EditorTitle { get; }
     public abstract string TimeLabel { get; }
-    public abstract NotificationType EditorAccentType { get; }
 
     public override string Description
     {
@@ -236,6 +236,7 @@ public sealed class StopAtTimeTriggerViewModel() : TimeTriggerViewModel(new Time
 
 public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
 {
+    public override NotificationType EditorAccentType => NotificationType.Error;
     public override string Title => "Session Duration";
     public override string IconKey => "TimerIcon";
 
@@ -357,6 +358,9 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
     private SessionPreset _preset = new(id: Guid.NewGuid());
     private bool _isExistingPreset;
     private FocusCommitmentOptions _focusCommitment = new();
+    private int _presetLoadVersion;
+    private Task<bool> _scheduleLoadTask = Task.FromResult(false);
+    private bool _isInitialized;
     private bool _disposed;
 
     private readonly ObservableAsPropertyHelper<bool> _isFooterVisible;
@@ -380,7 +384,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                 UpdateAvailablePresetsForNext();
             }
 
-            LoadFromPreset();
+            if (_isInitialized) LoadFromPreset();
         }
     }
 
@@ -516,8 +520,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
     public ReactiveCommand<Unit, Unit> AddStopAtTimeTriggerCommand { get; }
     public ReactiveCommand<Unit, Unit> AddStopAfterDurationTriggerCommand { get; }
-    public ICommand RemoveStopTriggerCommand { get; }
-    public ICommand EditStopTriggerCommand { get; }
+    public ICommand RemoveStopTriggerCommand => RemoveTriggerCommand;
+    public ICommand EditStopTriggerCommand => EditTriggerCommand;
 
     private readonly ObservableAsPropertyHelper<bool> _canAddStopAtTimeTrigger;
     public bool CanAddStopAtTimeTrigger => _canAddStopAtTimeTrigger.Value;
@@ -571,19 +575,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             .ObserveOn(RxApp.MainThreadScheduler)
             .ToProperty(this, x => x.HasValidationErrors);
 
-        var thenTriggersHasError = ThenTriggers
-            .ToObservableChangeSet()
-            .AutoRefresh(t => t.HasError)
-            .ToCollection()
-            .Select(triggers => triggers.Any(t => t.HasError))
-            .StartWith(false);
-
-        var stopTriggersHasError = StopTriggers
-            .ToObservableChangeSet()
-            .AutoRefresh(t => t.HasError)
-            .ToCollection()
-            .Select(triggers => triggers.Any(t => t.HasError))
-            .StartWith(false);
+        var thenTriggersHasError = ObserveTriggerErrors(ThenTriggers);
+        var stopTriggersHasError = ObserveTriggerErrors(StopTriggers);
 
         var canSave = this.WhenAnyValue(vm => vm.Name).CombineLatest(this.WhenAnyValue(vm => vm.HasValidationErrors),
             thenTriggersHasError,
@@ -628,13 +621,19 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         RemoveTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
         {
             Triggers.Remove(t);
+            if (StopTriggers.Remove(t)) ValidateFocusCommitment();
             if (SelectedTrigger == t)
             {
                 SelectedTrigger = null;
             }
+            if (SelectedStopTrigger == t) SelectedStopTrigger = null;
         });
 
-        EditTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedTrigger = t);
+        EditTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
+        {
+            if (StopTriggers.Contains(t)) SelectedStopTrigger = t;
+            else SelectedTrigger = t;
+        });
 
         var canAddStopAtTime = CanAddTrigger<StopAtTimeTriggerViewModel>(StopTriggers);
 
@@ -650,18 +649,6 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
         AddStopAfterDurationTriggerCommand = ReactiveCommand.Create(
             () => AddStopTrigger(new StopAfterDurationTriggerViewModel()), canAddStopAfterDuration);
-
-        RemoveStopTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t =>
-        {
-            StopTriggers.Remove(t);
-            ValidateFocusCommitment();
-            if (SelectedStopTrigger == t)
-            {
-                SelectedStopTrigger = null;
-            }
-        });
-
-        EditStopTriggerCommand = ReactiveCommand.Create<TriggerViewModel>(t => SelectedStopTrigger = t);
 
         var canAddThenAction = ThenTriggers
             .ToObservableChangeSet()
@@ -681,6 +668,13 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
         InitializationTask = InitializeAsync();
     }
+
+    private static IObservable<bool> ObserveTriggerErrors(ObservableCollection<TriggerViewModel> triggers) => triggers
+        .ToObservableChangeSet()
+        .AutoRefresh(trigger => trigger.HasError)
+        .ToCollection()
+        .Select(items => items.Any(trigger => trigger.HasError))
+        .StartWith(false);
 
     private static IObservable<bool> CanAddTrigger<T>(ObservableCollection<TriggerViewModel> triggers) => triggers
         .ToObservableChangeSet()
@@ -721,15 +715,21 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (_disposed) return;
+
                 _availableModules = modules;
+                _isInitialized = true;
                 UpdateAvailablePresetsForNext(presets);
                 LoadFromPreset();
             });
+            await _scheduleLoadTask;
         }
         catch
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (_disposed) return;
+
                 _availableModules = [];
                 AvailablePresetsForNext.Clear();
             });
@@ -738,6 +738,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private void UpdateAvailablePresetsForNext(IReadOnlyList<PresetSummary>? presets = null)
     {
+        if (_disposed) return;
+
         if (presets == null)
         {
             _ = Task.Run(async () =>
@@ -773,6 +775,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private void LoadFromPreset()
     {
+        if (_disposed) return;
+
         _focusCommitment = new FocusCommitmentOptions(_preset.FocusCommitment ?? new FocusCommitmentOptions());
         FocusCommitmentError = null;
         _customBreakBudgetSelected = _focusCommitment.BreakCount > 0 &&
@@ -802,19 +806,21 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
         UpdateModuleLinks();
 
-        _ = LoadSchedulesAsync();
+        _scheduleLoadTask = LoadSchedulesAsync(_preset.Id, ++_presetLoadVersion);
     }
 
-    private async Task LoadSchedulesAsync()
+    private async Task<bool> LoadSchedulesAsync(Guid presetId, int loadVersion)
     {
         try
         {
             var schedules = await _schedulerApi.ListSchedulesAsync();
-            var presetSchedules = schedules.Where(s => s.PresetId == _preset.Id).ToList();
-            var lockStatus = await _schedulerApi.GetConfigurationLockStatusAsync(_preset.Id);
+            var presetSchedules = schedules.Where(s => s.PresetId == presetId).ToList();
+            var lockStatus = await _schedulerApi.GetConfigurationLockStatusAsync(presetId);
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            return await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (_disposed || loadVersion != _presetLoadVersion) return false;
+
                 ScheduledConfigurationLockStatus = lockStatus.IsLocked
                     ? lockStatus.StartsIn is { } startsIn && startsIn > TimeSpan.Zero
                         ? $"Configuration locked · Session starts in {(int)Math.Ceiling(startsIn.TotalMinutes)} min"
@@ -865,11 +871,12 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                 }
 
                 ValidateFocusCommitment();
+                return true;
             });
         }
         catch
         {
-            /* Ignore */
+            return false;
         }
     }
 
@@ -880,6 +887,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             NextPresetId = behavior == AfterEndBehavior.StartNextWorkspace ? nextPresetId : null
         };
 
+        ThenTriggers.Add(trigger);
+
         if (trigger.NextPresetId is { } id)
         {
             if (AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == id) is { } preset)
@@ -888,8 +897,6 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             }
             else _ = LoadThenPresetNameAsync(trigger, id);
         }
-
-        ThenTriggers.Add(trigger);
     }
 
     private async Task LoadThenPresetNameAsync(ThenActionTriggerViewModel trigger, Guid presetId)
@@ -901,6 +908,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
+                    if (_disposed || !ThenTriggers.Contains(trigger)) return;
+
                     var option = new NextPresetOption(presetId, preset.Name);
                     if (AvailablePresetsForNext.All(p => p.PresetId != presetId))
                     {
@@ -928,6 +937,13 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
     private async Task SaveAndCloseAsync()
     {
+        await InitializationTask;
+        if (!_isInitialized || !await _scheduleLoadTask)
+        {
+            ErrorMessage = "Could not load preset configuration. Reopen the preset before saving.";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Name))
         {
             ErrorMessage = "Preset name cannot be empty.";
@@ -988,30 +1004,21 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
             HashSet<Guid> activeTriggerIds = [];
 
-            var thenStartTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
-            var nextPresetId = thenStartTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
-                ? thenStartTrigger.NextPresetId
+            var nextPresetId = thenTrigger is { Behavior: AfterEndBehavior.StartNextWorkspace }
+                ? thenTrigger.NextPresetId
                 : null;
 
             foreach (var trigger in Triggers.Concat(StopTriggers).OfType<ScheduledTriggerViewModel>())
             {
                 var schedule = trigger switch
                 {
-                    ScheduleTriggerViewModel time => new SessionSchedule
+                    TimeTriggerViewModel time => new SessionSchedule
                     {
-                        Type = ScheduleType.Recurring,
-                        Name = $"{Name} Schedule",
+                        Type = time is StopAtTimeTriggerViewModel ? ScheduleType.StopRecurring : ScheduleType.Recurring,
+                        Name = time is StopAtTimeTriggerViewModel ? $"{Name} Stop Schedule" : $"{Name} Schedule",
                         RecurringTime = time.Time,
                         DaysOfWeek = time.GetSelectedDays(),
-                        Use24HourFormat = time.Use24HourFormat
-                    },
-                    StopAtTimeTriggerViewModel time => new SessionSchedule
-                    {
-                        Type = ScheduleType.StopRecurring,
-                        Name = $"{Name} Stop Schedule",
-                        RecurringTime = time.Time,
-                        DaysOfWeek = time.GetSelectedDays(),
-                        NextPresetId = nextPresetId,
+                        NextPresetId = time is StopAtTimeTriggerViewModel ? nextPresetId : null,
                         Use24HourFormat = time.Use24HourFormat
                     },
                     StopAfterDurationTriggerViewModel duration => new SessionSchedule
@@ -1025,11 +1032,12 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                 };
                 schedule.Id = trigger.ExistingScheduleId ?? Guid.NewGuid();
                 schedule.PresetId = _preset.Id;
-                schedule.IsEnabled = true;
                 await SaveScheduleAsync(trigger, schedule, presetSchedules, activeTriggerIds);
             }
 
-            foreach (var s in presetSchedules.Where(s => !activeTriggerIds.Contains(s.Id)))
+            foreach (var s in presetSchedules.Where(s =>
+                         s.Type is ScheduleType.Recurring or ScheduleType.StopRecurring or ScheduleType.StopDuration &&
+                         !activeTriggerIds.Contains(s.Id)))
             {
                 await _schedulerApi.DeleteScheduleAsync(s.Id);
             }
@@ -1065,13 +1073,12 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             }
         }
 
-        if (trigger.ExistingScheduleId.HasValue)
-        {
-            await _schedulerApi.UpdateScheduleAsync(schedule);
-        }
-        else await _schedulerApi.CreateScheduleAsync(schedule);
-
-        activeTriggerIds.Add(schedule.Id);
+        schedule.IsEnabled = existingSchedules.FirstOrDefault(existing => existing.Id == schedule.Id)?.IsEnabled ?? true;
+        var saved = trigger.ExistingScheduleId.HasValue
+            ? await _schedulerApi.UpdateScheduleAsync(schedule)
+            : await _schedulerApi.CreateScheduleAsync(schedule);
+        trigger.ExistingScheduleId = saved.Id;
+        activeTriggerIds.Add(saved.Id);
     }
 
     private bool ValidateFocusCommitment(bool applyOptions = false)
@@ -1104,45 +1111,25 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                 return false;
             }
 
-            switch (StopTriggers[0])
+            if (StopTriggers[0] is not (StopAfterDurationTriggerViewModel or StopAtTimeTriggerViewModel))
             {
-                case StopAfterDurationTriggerViewModel duration:
-                    if (applyOptions)
-                    {
-                        options.EndCondition = FocusEndCondition.Duration;
-                        options.Duration = duration.Duration;
-                        options.EndAtLocalTime = null;
-                        options.EndAtDaysOfWeek = [];
-                    }
-                    break;
-                case StopAtTimeTriggerViewModel fixedTime:
-                    if (applyOptions)
-                    {
-                        options.EndCondition = FocusEndCondition.EndAt;
-                        options.Duration = null;
-                        options.EndAtLocalTime = TimeOnly.FromTimeSpan(fixedTime.Time);
-                        options.EndAtDaysOfWeek = fixedTime.GetSelectedDays();
-                    }
-                    break;
-                default:
-                    FocusCommitmentError = "Choose a Fixed Time or Session Duration Stop Trigger.";
-                    return false;
-            }
-
-        }
-        else
-        {
-            if (applyOptions)
-            {
-                options.EndCondition = FocusEndCondition.None;
-                options.Duration = null;
-                options.EndAtLocalTime = null;
-                options.EndAtDaysOfWeek = [];
+                FocusCommitmentError = "Choose a Fixed Time or Session Duration Stop Trigger.";
+                return false;
             }
         }
 
         if (applyOptions)
         {
+            var stop = options.Mode == FocusCommitmentMode.Normal ? null : StopTriggers[0];
+            options.EndCondition = stop switch
+            {
+                StopAfterDurationTriggerViewModel => FocusEndCondition.Duration,
+                StopAtTimeTriggerViewModel => FocusEndCondition.EndAt,
+                _ => FocusEndCondition.None
+            };
+            options.Duration = (stop as StopAfterDurationTriggerViewModel)?.Duration;
+            options.EndAtLocalTime = stop is StopAtTimeTriggerViewModel fixedTime ? TimeOnly.FromTimeSpan(fixedTime.Time) : null;
+            options.EndAtDaysOfWeek = (stop as StopAtTimeTriggerViewModel)?.GetSelectedDays() ?? [];
             var thenTrigger = ThenTriggers.OfType<ThenActionTriggerViewModel>().FirstOrDefault();
             options.AfterEnd = thenTrigger?.Behavior ?? AfterEndBehavior.DoNothing;
             options.NextWorkspaceId = options.AfterEnd == AfterEndBehavior.StartNextWorkspace

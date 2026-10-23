@@ -18,6 +18,7 @@ internal static class Program
     private static readonly ConcurrentQueue<string> LogQueue = new();
     private static readonly ConcurrentDictionary<string, TaskCompletionSource<string>> PendingResponses = new();
     private static readonly SemaphoreSlim LogSemaphore = new(1, 1);
+    private static readonly Lock OutputLock = new();
     private static CancellationTokenSource? _logFlushCts;
     private static Task? _logFlushTask;
 
@@ -38,6 +39,7 @@ internal static class Program
         var pipeName = GetPipeName(args);
         using var shutdown = new CancellationTokenSource();
         var inputMonitor = MonitorStandardInputAsync(shutdown);
+        var stateSync = SynchronizeBrowserStateAsync(shutdown.Token);
 
         try
         {
@@ -47,7 +49,48 @@ internal static class Program
         {
             shutdown.Cancel();
             await inputMonitor.ConfigureAwait(false);
+            await stateSync.ConfigureAwait(false);
             await StopLogFlusherAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static async Task SynchronizeBrowserStateAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                string message;
+                try
+                {
+                    await using var pipe = new NamedPipeClientStream(".", "axorith-browser-state", PipeDirection.In,
+                        PipeOptions.Asynchronous);
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    timeout.CancelAfter(TimeSpan.FromSeconds(2));
+                    await pipe.ConnectAsync(timeout.Token).ConfigureAwait(false);
+                    using var reader = new StreamReader(pipe, new UTF8Encoding(false));
+                    message = await reader.ReadLineAsync(timeout.Token).ConfigureAwait(false)
+                              ?? throw new IOException("Host closed the browser state pipe.");
+                }
+                catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    message = "{\"command\":\"hostUnavailable\"}";
+                }
+
+                SendMessageToExtension(message);
+                await Task.Delay(2000, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                await LogExceptionAsync(ex, "Browser state synchronization failed").ConfigureAwait(false);
+                try { await Task.Delay(2000, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
+            }
         }
     }
 
@@ -200,10 +243,13 @@ internal static class Program
             var bytes = Encoding.UTF8.GetBytes(jsonMessage);
             var lengthBytes = BitConverter.GetBytes(bytes.Length);
 
-            using var stdout = Console.OpenStandardOutput();
-            stdout.Write(lengthBytes, 0, 4);
-            stdout.Write(bytes, 0, bytes.Length);
-            stdout.Flush();
+            lock (OutputLock)
+            {
+                using var stdout = Console.OpenStandardOutput();
+                stdout.Write(lengthBytes, 0, 4);
+                stdout.Write(bytes, 0, bytes.Length);
+                stdout.Flush();
+            }
         }
         catch (Exception ex)
         {

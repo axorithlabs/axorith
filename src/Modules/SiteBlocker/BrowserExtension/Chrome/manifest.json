@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmWS8gCL98DJCqKbxNjNv4XkttI0HjYsEvtXzG8KiLV2jcsoClr2A5aEeQFB2Y/VQDnQESSvfpBbF5b3I0LWi2TD6sYH0N8Q/1zjC4Bvde+48i+7lve+BN3kZE56teGqJ4LzR1o4RLs7Ophtgaviw+UCbSu1pSzUBqu6oAeRuOvG/X9bGGZSuzk/nM/JZ6i469pm0gq1AO5DyJ6LWFKYRYp/56Dvthic2sIABohz36iomV9Cn+OuIKDhipkBvcVkC1pgXHC4kV1fOzk4skfcjw+VEVLeVFXnP4Oo1KL1MqpYmP3V2EjDhWQYM/Sc1vUO0V1GL7f1wPylJzHOu1qm8XQIDAQAB",
   "name": "Axorith Site Blocker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Companion extension for Axorith.",
   "icons": {
     "48": "icon.png"

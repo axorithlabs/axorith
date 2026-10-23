@@ -192,7 +192,7 @@ $sourceModulesPath = Join-Path $BuildOutputDir "Modules"
 $destModulesPath = Join-Path $StagingDir "Modules"
 if (Test-Path $sourceModulesPath) {
     Write-Host "Syncing modules to staging directory using robocopy..."
-    robocopy $sourceModulesPath $destModulesPath /E /NFL /NDL /NJH /NJS /nc /ns /np
+    robocopy $sourceModulesPath $destModulesPath /E /XD obj publish /NFL /NDL /NJH /NJS /nc /ns /np
     if ($LASTEXITCODE -ge 8) {
         Write-Error "Robocopy failed for modules with exit code $LASTEXITCODE"
         exit 1

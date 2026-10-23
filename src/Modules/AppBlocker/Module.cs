@@ -121,7 +121,7 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
     {
         _pausedForBreak = false;
         if (_settings.IsAllowList)
-            _blocker.AllowOnly(_workspaceApplications);
+            _blocker.AllowOnly(_workspaceApplications, rejectRunning: false);
         else
             _blocker.Block(_settings.GetProcesses());
         _isBlocking = true;
@@ -165,6 +165,7 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
             // Ignore errors during dispose
         }
 
+        _settings.Dispose();
         GC.SuppressFinalize(this);
     }
 }

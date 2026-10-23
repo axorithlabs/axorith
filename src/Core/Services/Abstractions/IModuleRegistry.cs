@@ -9,5 +9,6 @@ public interface IModuleRegistry
 
     ModuleDefinition? GetDefinitionById(Guid moduleId);
 
+    // The returned scope owns the module and its dependencies; dispose the scope once after use.
     (IModule? Instance, ILifetimeScope? Scope) CreateInstance(Guid moduleId);
 }

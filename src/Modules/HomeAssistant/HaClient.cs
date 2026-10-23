@@ -8,6 +8,10 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
 {
     private readonly HttpClient _client = clientFactory.CreateClient("HomeAssistant");
 
+    internal static bool IsSecureEndpoint(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && string.IsNullOrEmpty(uri.UserInfo) &&
+        (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback);
+
     public async Task CallServiceAsync(string baseUrl, string token, string domain, string service, string entityId,
         CancellationToken ct)
     {
@@ -17,11 +21,9 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
             return;
         }
 
+        if (!IsSecureEndpoint(baseUrl))
+            throw new InvalidOperationException("Home Assistant requires HTTPS, or HTTP on a loopback address.");
         baseUrl = baseUrl.TrimEnd('/');
-        if (!baseUrl.StartsWith("http"))
-        {
-            baseUrl = $"http://{baseUrl}";
-        }
 
         var url = $"{baseUrl}/api/services/{domain}/{service}";
 
@@ -53,11 +55,8 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
             return false;
 
+        if (!IsSecureEndpoint(baseUrl)) return false;
         baseUrl = baseUrl.TrimEnd('/');
-        if (!baseUrl.StartsWith("http"))
-        {
-            baseUrl = $"http://{baseUrl}";
-        }
 
         try
         {

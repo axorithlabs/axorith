@@ -144,8 +144,8 @@ public class SettingUpdateBroadcaster : IDisposable
 
         var update = SettingMapper.CreateUpdate(moduleInstanceId, settingKey, property, value);
 
-        _logger.LogDebug("Broadcast setting update: {ModuleId}.{Key}.{Property} = {Value}",
-            moduleInstanceId, settingKey, property, value);
+        _logger.LogDebug("Broadcast setting update: {ModuleId}.{Key}.{Property}",
+            moduleInstanceId, settingKey, property);
 
         _subscribers.Publish(update, subscriberKey =>
         {
@@ -165,52 +165,19 @@ public class SettingUpdateBroadcaster : IDisposable
 
         disposables ??= _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => []);
 
-        setting.ValueAsObject
-            .Skip(1)
-            .Throttle(TimeSpan.FromMilliseconds(_valueBatchWindowMs))
-            .Subscribe(value =>
-            {
-                _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Value, value);
-            })
-            .DisposeWith(disposables);
-
-        setting.Label
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Subscribe(label =>
-            {
-                _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Label, label);
-            })
-            .DisposeWith(disposables);
-
-        setting.IsVisible
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Subscribe(visible =>
-            {
-                _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Visibility, visible);
-            })
-            .DisposeWith(disposables);
-
-        setting.IsReadOnly
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Subscribe(readOnly =>
-            {
-                _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.ReadOnly, readOnly);
-            })
-            .DisposeWith(disposables);
+        SubscribeProperty(moduleInstanceId, setting.Key, SettingProperty.Value,
+            setting.ValueAsObject.Skip(1).Throttle(TimeSpan.FromMilliseconds(_valueBatchWindowMs)), disposables);
+        SubscribeProperty(moduleInstanceId, setting.Key, SettingProperty.Label,
+            setting.Label.Skip(1).DistinctUntilChanged(), disposables);
+        SubscribeProperty(moduleInstanceId, setting.Key, SettingProperty.Visibility,
+            setting.IsVisible.Skip(1).DistinctUntilChanged(), disposables);
+        SubscribeProperty(moduleInstanceId, setting.Key, SettingProperty.ReadOnly,
+            setting.IsReadOnly.Skip(1).DistinctUntilChanged(), disposables);
 
         if (setting.Choices != null)
         {
-            setting.Choices
-                .Skip(1)
-                .Throttle(TimeSpan.FromMilliseconds(_choicesThrottleMs))
-                .Subscribe(choices =>
-                {
-                    _ = BroadcastUpdateAsync(moduleInstanceId, setting.Key, SettingProperty.Choices, choices);
-                })
-                .DisposeWith(disposables);
+            SubscribeProperty(moduleInstanceId, setting.Key, SettingProperty.Choices,
+                setting.Choices.Skip(1).Throttle(TimeSpan.FromMilliseconds(_choicesThrottleMs)), disposables);
         }
     }
 
@@ -220,24 +187,16 @@ public class SettingUpdateBroadcaster : IDisposable
 
         disposables ??= _moduleSubscriptions.GetOrAdd(moduleInstanceId, _ => []);
 
-        action.Label
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Subscribe(label =>
-            {
-                _ = BroadcastUpdateAsync(moduleInstanceId, action.Key, SettingProperty.ActionLabel, label);
-            })
-            .DisposeWith(disposables);
-
-        action.IsEnabled
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Subscribe(enabled =>
-            {
-                _ = BroadcastUpdateAsync(moduleInstanceId, action.Key, SettingProperty.ActionEnabled, enabled);
-            })
-            .DisposeWith(disposables);
+        SubscribeProperty(moduleInstanceId, action.Key, SettingProperty.ActionLabel,
+            action.Label.Skip(1).DistinctUntilChanged(), disposables);
+        SubscribeProperty(moduleInstanceId, action.Key, SettingProperty.ActionEnabled,
+            action.IsEnabled.Skip(1).DistinctUntilChanged(), disposables);
     }
+
+    private void SubscribeProperty<T>(Guid moduleInstanceId, string key, SettingProperty property,
+        IObservable<T> changes, CompositeDisposable disposables) => changes
+        .Subscribe(value => _ = BroadcastUpdateAsync(moduleInstanceId, key, property, value))
+        .DisposeWith(disposables);
 
     public void Dispose()
     {

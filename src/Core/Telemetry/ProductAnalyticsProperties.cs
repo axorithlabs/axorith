@@ -361,7 +361,7 @@ public static partial class ProductAnalyticsProperties
                 properties["webSocketPort"] = webSocketEnabled == true && webSocketPort is >= 1 and <= 65535
                     ? webSocketPort
                     : null;
-                properties["hasWebSocketPassword"] = webSocketEnabled == true && HasValue(settings, "WebSocketPassword");
+                properties["hasWebSocketPassword"] = webSocketEnabled == true && HasObsPassword(settings, secureStorage);
                 properties["sessionStartAction"] = Choice(Value(settings, "SessionStartAction"),
                     ("none", "none"), ("start_streaming", "start_streaming"),
                     ("start_recording", "start_recording"), ("start_both", "start_both"),
@@ -392,6 +392,18 @@ public static partial class ProductAnalyticsProperties
                     NumberStyles.None, CultureInfo.InvariantCulture, out var appId) && appId > 0 ? appId : null;
                 break;
         }
+    }
+
+    private static bool HasObsPassword(IReadOnlyDictionary<string, string> settings, ISecureStorageService? secureStorage)
+    {
+        if (HasValue(settings, "WebSocketPassword")) return true;
+        if (Value(settings, "WebSocketPasswordId") is not { } id) return false;
+        try
+        {
+            return !string.IsNullOrWhiteSpace(secureStorage?.RetrieveSecret(
+                $"9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd:ObsWebSocketPassword:{id}"));
+        }
+        catch { return false; }
     }
 
     private static void AddHomeAssistantProperties(Dictionary<string, object?> properties,
@@ -570,8 +582,13 @@ public static partial class ProductAnalyticsProperties
     private static string[] Values(IReadOnlyDictionary<string, string> settings, string key) =>
         (Value(settings, key) ?? string.Empty).Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private static string? Choice(string? value, params (string Input, string Output)[] choices) =>
-        choices.FirstOrDefault(choice => string.Equals(choice.Input, value, StringComparison.OrdinalIgnoreCase)).Output;
+    private static string? Choice(string? value, params ReadOnlySpan<(string Input, string Output)> choices)
+    {
+        foreach (var choice in choices)
+            if (string.Equals(choice.Input, value, StringComparison.OrdinalIgnoreCase))
+                return choice.Output;
+        return null;
+    }
 
     [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_]{0,63}$")]
     private static partial System.Text.RegularExpressions.Regex EntityDomainRegex();

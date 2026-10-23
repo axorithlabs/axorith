@@ -8,14 +8,6 @@ namespace Axorith.Module.ApplicationLauncher.Apps.Browser;
 
 internal sealed class Settings : LauncherSettingsBase
 {
-    private static readonly string[] BrowserPublishers =
-    [
-        "Google", "Mozilla", "Microsoft", "Brave Software", "Opera Software",
-        "Vivaldi Technologies", "The Chromium Authors", "Waterfox Limited",
-        "LibreWolf", "Ablaze Floorp", "Zen Browser", "Moonchild Productions",
-        "Yandex", "The Browser Company", "Tor Project"
-    ];
-
     public override Setting<string> ApplicationPath => BrowserPath;
 
     public Setting<string> BrowserPath { get; }
@@ -101,26 +93,8 @@ internal sealed class Settings : LauncherSettingsBase
     {
         return Task.Run(() =>
         {
-            List<AppInfo> browsers = [];
-
-            foreach (var publisher in BrowserPublishers)
-            {
-                try
-                {
-                    var publisherApps = _appDiscovery.FindAppsByPublisher(publisher);
-                    browsers.AddRange(publisherApps.Where(ApplicationSelector.IsBrowserApp));
-                }
-                catch
-                {
-                    // Continue with other publishers
-                }
-            }
-
-            var allApps = _appDiscovery.GetInstalledApplicationsIndex();
-            var additionalBrowsers = allApps.Where(ApplicationSelector.IsBrowserApp);
-            browsers.AddRange(additionalBrowsers);
-
-            var uniqueBrowsers = browsers
+            var uniqueBrowsers = _appDiscovery.GetInstalledApplicationsIndex()
+                .Where(ApplicationSelector.IsBrowserApp)
                 .GroupBy(app => Path.GetFileName(app.ExecutablePath), StringComparer.OrdinalIgnoreCase)
                 .Select(PickBestBrowserEntry)
                 .OrderBy(app => app.Name)
@@ -153,13 +127,9 @@ internal sealed class Settings : LauncherSettingsBase
 
     private static AppInfo PickBestBrowserEntry(IGrouping<string, AppInfo> group)
     {
-        var entries = group.ToList();
-        if (entries.Count == 1)
-            return entries[0];
-
         var exeNameWithoutExt = Path.GetFileNameWithoutExtension(group.Key);
 
-        return entries
+        return group
             .OrderByDescending(e => !e.Name.Equals(exeNameWithoutExt, StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(e => e.Name.Contains(' '))
             .ThenBy(e => e.Name.Length)

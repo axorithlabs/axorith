@@ -9,6 +9,8 @@
 // --- Constants ---
 const STORAGE_KEY_BLOCKED_DOMAINS = "axorith_blocked_domains";
 const STORAGE_KEY_MODE = "axorith_blocking_mode";
+const STORAGE_KEY_RULES = "axorith_blocking_rules";
+const STORAGE_KEY_RETAIN = "axorith_retain_on_disconnect";
 const PROTOCOL_VERSION = 1;
 const extensionApi = globalThis.browser ?? globalThis.chrome;
 const browserKind = extensionApi.runtime.getManifest().browser_specific_settings?.gecko ? "firefox" : "chromium";
@@ -17,6 +19,7 @@ const browserKind = extensionApi.runtime.getManifest().browser_specific_settings
 const HOSTS = ["axorith.dev", "axorith"];
 let currentHostIndex = 0;
 let nativePort = null;
+let messageQueue = Promise.resolve();
 
 // --- Native Host Connection ---
 
@@ -32,7 +35,10 @@ function connectToHost() {
         return;
     }
     
-    nativePort.onMessage.addListener(handleNativeMessage);
+    nativePort.onMessage.addListener(message => {
+        messageQueue = messageQueue.then(() => handleNativeMessage(message))
+            .catch(error => console.error("Axorith: Native message failed:", error));
+    });
     
     nativePort.onDisconnect.addListener(() => {
         const error = extensionApi.runtime.lastError;
@@ -70,14 +76,21 @@ async function handleNativeMessage(message) {
 
     try {
         let blocking = false;
-        if (message.command === "block" && Array.isArray(message.sites)) {
+        if (message.command === "sync" && Array.isArray(message.rules)) {
+            await extensionApi.storage.local.set({ [STORAGE_KEY_RETAIN]: message.retainOnDisconnect === true });
+            if (JSON.stringify(await getRules()) !== JSON.stringify(message.rules)) {
+                blocking = await applyRules(message.rules);
+            }
+        } else if (message.command === "hostUnavailable") {
+            const state = await extensionApi.storage.local.get(STORAGE_KEY_RETAIN);
+            if (!state[STORAGE_KEY_RETAIN]) await unblockSites();
+        } else if (message.command === "block" && Array.isArray(message.sites)) {
             blocking = await blockSites(message.sites, message.mode || "BlockList");
         } else if (message.command === "unblock") {
             await unblockSites();
         } else if (message.command === "health") {
-            const state = await extensionApi.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
-            blocking = sameSites(state[STORAGE_KEY_BLOCKED_DOMAINS], message.sites) &&
-                state[STORAGE_KEY_MODE] === message.mode;
+            const rules = await getRules();
+            blocking = rules.some(rule => sameSites(rule.sites, message.sites) && rule.mode === message.mode);
         }
 
         if (message.requestId && nativePort) {
@@ -118,38 +131,35 @@ async function blockSites(domains, mode) {
 
     console.log(`Axorith: Activating ${mode} for ${domains.length} domains.`);
     
-    await extensionApi.storage.local.set({ 
-        [STORAGE_KEY_BLOCKED_DOMAINS]: domains,
-        [STORAGE_KEY_MODE]: mode
-    });
-
-    const tabs = await extensionApi.tabs.query({});
-    const results = await Promise.all(tabs
-        .filter(tab => shouldBlockUrl(tab.url, domains, mode))
-        .map(tab => injectBlocker(tab.id)));
-    return results.every(Boolean);
+    return applyRules([{ sites: domains, mode }]);
 }
 
 async function unblockSites() {
     console.log("Axorith: Deactivating all blocks.");
-    
-    const storage = await extensionApi.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
-    const blockedDomains = storage[STORAGE_KEY_BLOCKED_DOMAINS];
-    const mode = storage[STORAGE_KEY_MODE];
-    
-    if (!blockedDomains) {
-        return;
-    }
+    await applyRules([]);
+}
 
+async function applyRules(rules) {
+    await extensionApi.storage.local.set({ [STORAGE_KEY_RULES]: rules });
     await extensionApi.storage.local.remove([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
-
     const tabs = await extensionApi.tabs.query({});
-    for (const tab of tabs) {
-        if (shouldBlockUrl(tab.url, blockedDomains, mode)) {
-            console.log(`Axorith: Reloading previously blocked tab ${tab.id} (${tab.url})`);
-            extensionApi.tabs.reload(tab.id).catch(e => console.warn(`Could not reload tab ${tab.id}: ${e.message}`));
-        }
-    }
+    const results = await Promise.all(tabs.map(tab =>
+        rules.some(rule => shouldBlockUrl(tab.url, rule.sites, rule.mode))
+            ? injectBlocker(tab.id) : removeBlocker(tab.id)));
+    return results.every(Boolean);
+}
+
+async function getRules() {
+    const state = await extensionApi.storage.local.get([STORAGE_KEY_RULES, STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
+    return state[STORAGE_KEY_RULES] ?? (state[STORAGE_KEY_BLOCKED_DOMAINS]
+        ? [{ sites: state[STORAGE_KEY_BLOCKED_DOMAINS], mode: state[STORAGE_KEY_MODE] }] : []);
+}
+
+function removeBlocker(tabId) {
+    return extensionApi.scripting.executeScript({
+        target: { tabId },
+        func: () => globalThis.axorithSiteBlocker?.remove()
+    }).then(() => true).catch(() => true);
 }
 
 function injectBlocker(tabId) {
@@ -175,17 +185,13 @@ function sameSites(left, right) {
 // --- Event Listeners ---
 
 extensionApi.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.status !== 'complete' || !tab.url) {
+    if ((changeInfo.status !== 'complete' && !changeInfo.url) || !tab.url) {
         return;
     }
 
-    const storage = await extensionApi.storage.local.get([STORAGE_KEY_BLOCKED_DOMAINS, STORAGE_KEY_MODE]);
-    const domains = storage[STORAGE_KEY_BLOCKED_DOMAINS];
-    const mode = storage[STORAGE_KEY_MODE];
-
-    if (domains && shouldBlockUrl(tab.url, domains, mode)) {
-        injectBlocker(tabId);
-    }
+    const rules = await getRules();
+    if (rules.some(rule => shouldBlockUrl(tab.url, rule.sites, rule.mode))) await injectBlocker(tabId);
+    else await removeBlocker(tabId);
 });
 
 

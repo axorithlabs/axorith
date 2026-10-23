@@ -1,12 +1,14 @@
 using System.Text.Json;
 using Axorith.Core.Models;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Sdk.Services;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Axorith.Core.Services;
 
-public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger) : IPresetManager
+public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger,
+    ISecureStorageService? secureStorage = null) : IPresetManager
 {
     private sealed record LegacyLauncherMigration(string PathKey, string ModuleKey);
 
@@ -89,6 +91,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
 
     public async Task SavePresetAsync(SessionPreset preset, CancellationToken cancellationToken)
     {
+        MigrateObsPasswords(preset, secureStorage);
         var filePath = Path.Combine(presetsDirectory, $"{preset.Id}.json");
         var tempFilePath = Path.Combine(presetsDirectory, $"{preset.Id}.json.tmp");
         logger.LogInformation("Saving preset '{PresetName}' to {FilePath}", preset.Name,
@@ -167,18 +170,49 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             return null;
         }
 
-        await using var stream = File.OpenRead(filePath);
-        var preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
-            .ConfigureAwait(false);
-        if (preset is not { Version: < CurrentPresetVersion })
-            return preset;
+        SessionPreset? preset;
+        await using (var stream = File.OpenRead(filePath))
+            preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
+                .ConfigureAwait(false);
+        if (preset == null) return null;
 
-        logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
-            preset.Name, preset.Version, CurrentPresetVersion);
-        MigratePreset(preset);
-        preset.Version = CurrentPresetVersion;
-        await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
+        var changed = preset.Version < CurrentPresetVersion;
+        if (changed)
+        {
+            logger.LogInformation("Migrating preset '{PresetName}' from version {OldVersion} to {NewVersion}",
+                preset.Name, preset.Version, CurrentPresetVersion);
+            MigratePreset(preset);
+            preset.Version = CurrentPresetVersion;
+        }
+
+        if (MigrateObsPasswords(preset, secureStorage) || changed)
+            await SavePresetAsync(preset, cancellationToken).ConfigureAwait(false);
         return preset;
+    }
+
+    internal static bool MigrateObsPasswords(SessionPreset preset, ISecureStorageService? secureStorage)
+    {
+        var changed = false;
+        var legacyObsId = Guid.Parse("4f083ec9-518f-460a-883e-c9518fc60a28");
+        foreach (var module in preset.Modules)
+        {
+            if (module.ModuleId != ApplicationLauncherId && module.ModuleId != legacyObsId ||
+                !module.Settings.TryGetValue("WebSocketPassword", out var password)) continue;
+
+            var storage = secureStorage ?? throw new InvalidOperationException(
+                "Secure storage is required to migrate an OBS WebSocket password.");
+            if (!module.Settings.TryGetValue("WebSocketPasswordId", out var id) || !Guid.TryParse(id, out _))
+                id = Guid.NewGuid().ToString("D");
+
+            var key = $"{ApplicationLauncherId}:ObsWebSocketPassword:{id}";
+            if (string.IsNullOrWhiteSpace(password)) storage.DeleteSecret(key);
+            else storage.StoreSecret(key, password);
+            module.Settings["WebSocketPasswordId"] = id;
+            module.Settings.Remove("WebSocketPassword");
+            changed = true;
+        }
+
+        return changed;
     }
 
     private void MigratePreset(SessionPreset preset)

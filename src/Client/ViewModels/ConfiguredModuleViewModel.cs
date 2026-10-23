@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Reactive;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using Avalonia.Threading;
 using Axorith.Client.Adapters;
@@ -24,13 +25,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 {
     private readonly IModulesApi _modulesApi;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IDisposable _settingUpdatesSubscription;
+    private readonly CompositeDisposable _subscriptions = [];
     private readonly ILogger<ConfiguredModuleViewModel>? _logger;
     private readonly ITelemetryService? _telemetry;
     private readonly Guid? _presetId;
     private IDisposable? _settingStreamHandle;
-    private IDisposable? _validationSubscription;
-    private readonly List<IDisposable> _extensionSubscriptions = [];
 
     [Reactive]
     public partial bool IsChromeExtensionDialogOpen { get; set; }
@@ -73,11 +72,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
             this.RaiseAndSetIfChanged(ref field, value);
 
             Model.StartDelay = TimeSpan.FromSeconds(Math.Max(0, seconds));
-            this.RaisePropertyChanged(nameof(HasDelay));
         }
     }
 
-    public bool HasDelay => Model.StartDelay > TimeSpan.Zero;
+    [Reactive]
+    public partial bool HasDelay { get; private set; }
 
     [Reactive]
     public partial ConfiguredModuleViewModel? NextModule { get; set; }
@@ -129,22 +128,29 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         _telemetry = serviceProvider.GetService<ITelemetryService>();
         _presetId = presetId;
 
-        _settingUpdatesSubscription = _modulesApi.SettingUpdates
+        _subscriptions.Add(_modulesApi.SettingUpdates
             .Where(update => update.ModuleInstanceId == Model.InstanceId)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(HandleSettingUpdate);
+            .Subscribe(HandleSettingUpdate));
 
         StartDelaySecondsString = model.StartDelay.TotalSeconds.ToString("G29");
+        HasDelay = model.StartDelay > TimeSpan.Zero;
 
         AddDelayCommand = ReactiveCommand.Create(() =>
         {
             if (NextModule is { } nextModule)
+            {
                 nextModule.StartDelaySecondsString = "1";
+                nextModule.HasDelay = true;
+            }
         });
         RemoveDelayCommand = ReactiveCommand.Create(() =>
         {
             if (NextModule is { } nextModule)
+            {
                 nextModule.StartDelaySecondsString = "0";
+                nextModule.HasDelay = false;
+            }
         });
 
         _ = LoadSettingsAndActionsAsync();
@@ -154,27 +160,31 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     private async Task LoadSettingsAndActionsAsync()
     {
         IDisposable? streamHandle = null;
+        Task<IDisposable>? streamTask = null;
         try
         {
             IsLoading = true;
 
-            var initialSnapshot = new Dictionary<string, object?>();
-            foreach (var kv in Model.Settings)
-            {
-                initialSnapshot[kv.Key] = kv.Value;
-            }
+            var initialSnapshot = Model.Settings.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
 
-            var streamTask = _modulesApi.SubscribeToSettingUpdatesAsync(Model.InstanceId);
-            var beginResult = await _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot)
-                .ConfigureAwait(false);
-
+            streamTask = _modulesApi.SubscribeToSettingUpdatesAsync(Model.InstanceId);
+            var beginTask = _modulesApi.BeginEditAsync(Definition.Id, Model.InstanceId, initialSnapshot);
+            await Task.WhenAll(streamTask, beginTask).ConfigureAwait(false);
+            var beginResult = await beginTask.ConfigureAwait(false);
             streamHandle = await streamTask.ConfigureAwait(false);
             _settingStreamHandle = streamHandle;
+            if (_disposed)
+            {
+                streamHandle.Dispose();
+                await EndEditSafelyAsync().ConfigureAwait(false);
+                return;
+            }
 
             var settingsInfo = beginResult.SettingsInfo;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (_disposed) return;
                 Settings.Clear();
                 Actions.Clear();
                 LauncherBaseSettings.Clear();
@@ -186,6 +196,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                     var adaptedSetting = new ModuleSettingAdapter(setting, savedValue);
 
                     var vm = new SettingViewModel(adaptedSetting, Definition.Id, Model.InstanceId, _modulesApi, _serviceProvider);
+                    _subscriptions.Add(adaptedSetting);
                     Settings.Add(vm);
                 }
 
@@ -238,7 +249,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                         _presetId);
                     var actionViewModel = new ActionViewModel(adaptedAction);
                     if (action.Key == "InstallExtension.Chrome")
-                        _extensionSubscriptions.Add(adaptedAction.Invoked
+                        _subscriptions.Add(adaptedAction.Invoked
                             .ObserveOn(RxApp.MainThreadScheduler)
                             .Subscribe(unit => _ = DownloadChromeExtensionAsync()));
                     if (action.SettingKey is not null)
@@ -259,7 +270,8 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 SetupValidation();
             });
 
-            await ValidateAsync();
+            if (_disposed) await EndEditSafelyAsync().ConfigureAwait(false);
+            else await ValidateAsync();
         }
         catch (Exception ex)
         {
@@ -267,6 +279,7 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 "Failed to load settings/actions for module {ModuleId} instance {InstanceId}",
                 Definition.Id, Model.InstanceId);
 
+            streamHandle ??= streamTask is { IsCompletedSuccessfully: true } ? streamTask.Result : null;
             if (streamHandle != null)
             {
                 try
@@ -303,8 +316,6 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
     private void SetupValidation()
     {
-        _validationSubscription?.Dispose();
-
         var observables = Settings.Select(s =>
             Observable.FromEventPattern(
                 h => s.ValueChanged += h,
@@ -316,11 +327,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         var changes = observables.Merge();
 
-        _validationSubscription = changes
+        _subscriptions.Add(changes
             .Throttle(TimeSpan.FromMilliseconds(300))
             .ObserveOn(RxApp.MainThreadScheduler)
             .SelectMany(_ => ValidateAsync())
-            .Subscribe();
+            .Subscribe());
     }
 
     [ReactiveCommand]
@@ -364,37 +375,20 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     {
         try
         {
-            var snapshot = new Dictionary<string, object?>();
-            foreach (var setting in Settings)
-            {
-                snapshot[setting.Setting.Key] = setting.Setting.GetCurrentValueAsObject();
-            }
+            var snapshot = Settings.ToDictionary(setting => setting.Setting.Key,
+                setting => setting.Setting.GetCurrentValueAsObject());
 
             var result = await _modulesApi.ValidateSettingsAsync(Definition.Id, Model.InstanceId, snapshot);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                var hasErrors = result.Status == ValidationStatus.Error;
-                HasErrors = hasErrors;
+                if (_disposed) return;
+                HasErrors = result.Status == ValidationStatus.Error;
                 HasWarnings = result.Status == ValidationStatus.Warning;
                 WarningMessage = HasWarnings ? result.Message : null;
 
                 foreach (var setting in Settings)
-                {
-                    setting.Error = null;
-                }
-
-                if (!hasErrors || result.FieldErrors.Count <= 0) return;
-
-                {
-                    foreach (var (key, error) in result.FieldErrors)
-                    {
-                        var setting = Settings.FirstOrDefault(s => s.Setting.Key == key);
-                        setting?.Error = error;
-                    }
-                }
-                // If global error but no field errors, maybe show on module level?
-                // For now, we rely on HasErrors flag which parent VM can use.
+                    setting.Error = HasErrors ? result.FieldErrors.GetValueOrDefault(setting.Setting.Key) : null;
             });
         }
         catch
@@ -474,7 +468,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
     {
         foreach (var settingVm in Settings)
         {
-            if (settingVm.Setting.Persistence != SettingPersistence.Persisted) continue;
+            if (settingVm.Setting.Persistence != SettingPersistence.Persisted)
+            {
+                Model.Settings.Remove(settingVm.Setting.Key);
+                continue;
+            }
 
             Model.Settings[settingVm.Setting.Key] = settingVm.Setting.GetValueAsString();
         }
@@ -486,10 +484,8 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         _disposed = true;
 
-        _settingUpdatesSubscription.Dispose();
+        _subscriptions.Dispose();
         _settingStreamHandle?.Dispose();
-        _validationSubscription?.Dispose();
-        foreach (var subscription in _extensionSubscriptions) subscription.Dispose();
 
         AddDelayCommand.Dispose();
         RemoveDelayCommand.Dispose();

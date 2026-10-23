@@ -129,8 +129,16 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
         }
         catch (TimeoutException)
         {
-            logger.LogWarning("Process {ProcessName} window did not appear in time.", process.ProcessName);
+            logger.LogWarning("Process {ProcessId} window did not appear in time.", process.Id);
             throw;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (InvalidOperationException ex) when (process.HasExited)
+        {
+            throw new TimeoutException($"Process {process.Id} exited during window configuration.", ex);
         }
         catch (Exception ex)
         {

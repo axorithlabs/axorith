@@ -7,6 +7,21 @@ namespace Axorith.Integrations.Tests;
 
 public sealed class ToastViewModelTests
 {
+    [Fact]
+    public async Task ShutdownCompletesNotificationsAndIgnoresLateBackgroundMessages()
+    {
+        using var service = new Axorith.Client.Services.ToastNotificationService();
+        List<string> messages = [];
+        var completed = false;
+        using var subscription = service.Notifications.Subscribe(
+            notification => messages.Add(notification.Message), () => completed = true);
+        service.Show("before shutdown");
+        service.Dispose();
+        await Task.Run(() => service.Show("late background notification"));
+        Assert.True(completed);
+        Assert.Equal(["before shutdown"], messages);
+    }
+
     [Theory]
     [InlineData(NotificationType.Success, "Presets", "Preset saved successfully")]
     [InlineData(NotificationType.Error, "Sessions", "Failed to start session: unavailable")]

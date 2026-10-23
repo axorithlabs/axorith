@@ -32,7 +32,7 @@ public sealed class Module : LauncherAppBase, IModule
         _modules = new Dictionary<string, LauncherAppBase>
         {
             ["Browser"] = new BrowserApp(logger, appDiscovery, processService, windowService),
-            ["OBS"] = new ObsApp(logger, appDiscovery, notifier, processService, windowService),
+            ["OBS"] = new ObsApp(logger, appDiscovery, notifier, secureStorage, processService, windowService),
             ["Discord"] = new DiscordApp(logger, appDiscovery, processService, windowService),
             ["VSCode"] = new VsCodeApp(logger, appDiscovery, processService, windowService),
             ["JetBrainsIDE"] = new JetBrainsApp(logger, appDiscovery, processService, windowService),

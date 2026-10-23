@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Drawing.Imaging;
 using System.Runtime.Versioning;
 using System.Collections.ObjectModel;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Avalonia.Media.Imaging;
@@ -33,10 +35,10 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
     private bool _isUserEditing;
     private IReadOnlyList<KeyValuePair<string, string>> _rawChoices = [];
 
-    private Timer? _stringDebounceTimer;
-    private Timer? _numberThrottleTimer;
-    private string? _pendingStringValue;
-    private object? _pendingNumberValue;
+    private readonly CompositeDisposable _subscriptions = [];
+    private Timer? _updateTimer;
+    private object? _pendingValue;
+    private bool _disposed;
 
     public ISetting Setting { get; }
     public string PickerWatermark => Setting.ControlType == SettingControlType.DirectoryPicker
@@ -129,11 +131,10 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             Setting.SetValueFromString(value);
             this.RaisePropertyChanged();
 
-            HandleStringUpdate(value);
+            ScheduleUpdate(value, IsTextBasedSetting() ? _inputConfig.TextDebounceMs : ChoiceThrottleMs);
             ValueChanged?.Invoke(this, EventArgs.Empty);
             TryAddToHistory(value);
 
-            UpdateDisplayedChoices();
         }
     }
 
@@ -182,7 +183,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             Setting.SetValueFromObject(boxedValue);
             this.RaisePropertyChanged();
 
-            HandleNumberUpdate(boxedValue);
+            ScheduleUpdate(boxedValue, _inputConfig.NumberThrottleMs);
             ValueChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -248,10 +249,12 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
         ClickCommand = ReactiveCommand.Create(() => BoolValue = true);
 
-        Setting.Label.Subscribe(value => RunOnUiThread(() => Label = value));
-        Setting.IsVisible.Subscribe(value => RunOnUiThread(() => IsVisible = value));
-        Setting.IsReadOnly.Subscribe(value => RunOnUiThread(() => IsReadOnly = value));
-        Setting.ValueAsObject.Subscribe(_ =>
+        _rawChoices = setting.GetCurrentChoices() ?? [];
+        _applicationInputText = GetSelectedApplicationName();
+        _subscriptions.Add(Setting.Label.Subscribe(value => RunOnUiThread(() => Label = value)));
+        _subscriptions.Add(Setting.IsVisible.Subscribe(value => RunOnUiThread(() => IsVisible = value)));
+        _subscriptions.Add(Setting.IsReadOnly.Subscribe(value => RunOnUiThread(() => IsReadOnly = value)));
+        _subscriptions.Add(Setting.ValueAsObject.Skip(1).Subscribe(_ =>
         {
             if (_isUserEditing && IsTextBasedSetting()) return;
             RunOnUiThread(() =>
@@ -259,41 +262,17 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
                 this.RaisePropertyChanged(nameof(StringValue));
                 this.RaisePropertyChanged(nameof(BoolValue));
                 this.RaisePropertyChanged(nameof(DecimalValue));
-                UpdateDisplayedChoices();
-                UpdateMultiChoices();
-                RefreshApplicationInputText();
+                RefreshChoices();
             });
-        });
+        }));
 
-        if (setting.GetCurrentChoices() is { } initialChoices) _rawChoices = initialChoices;
-
-        _applicationInputText = GetSelectedApplicationName();
-
-        if (Dispatcher.UIThread.CheckAccess())
-        {
-            UpdateDisplayedChoices();
-            UpdateMultiChoices();
-        }
-        else
-        {
-            Dispatcher.UIThread.Post(() =>
+        if (Setting.Choices is { } choices)
+            _subscriptions.Add(choices.Skip(1).Subscribe(value =>
             {
-                UpdateDisplayedChoices();
-                UpdateMultiChoices();
-                RefreshApplicationInputText();
-            });
-        }
-
-        Setting.Choices?.Subscribe(choices =>
-        {
-            _rawChoices = choices;
-            RunOnUiThread(() =>
-            {
-                UpdateDisplayedChoices();
-                UpdateMultiChoices();
-                RefreshApplicationInputText();
-            });
-        });
+                _rawChoices = value;
+                RunOnUiThread(RefreshChoices);
+            }));
+        RunOnUiThread(RefreshChoices);
     }
 
     [ReactiveCommand]
@@ -366,35 +345,23 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             SetApplicationInputText(GetSelectedApplicationName());
     }
 
-    private void HandleStringUpdate(string value)
+    private void RefreshChoices()
     {
-        _pendingStringValue = value;
-
-        var delay = IsTextBasedSetting() ? _inputConfig.TextDebounceMs : ChoiceThrottleMs;
-
-        _stringDebounceTimer?.Dispose();
-        _stringDebounceTimer = new Timer(_ =>
-        {
-            var valueToSend = _pendingStringValue;
-            if (valueToSend != null)
-            {
-                _ = SendSettingUpdateAsync(valueToSend);
-
-                if (IsTextBasedSetting()) Dispatcher.UIThread.Post(() => _isUserEditing = false);
-            }
-        }, null, delay, Timeout.Infinite);
+        UpdateDisplayedChoices();
+        UpdateMultiChoices();
+        RefreshApplicationInputText();
     }
 
-    private void HandleNumberUpdate(object value)
+    private void ScheduleUpdate(object value, int delay)
     {
-        _pendingNumberValue = value;
-
-        _numberThrottleTimer?.Dispose();
-        _numberThrottleTimer = new Timer(_ =>
+        _pendingValue = value;
+        _updateTimer?.Dispose();
+        _updateTimer = new Timer(_ =>
         {
-            var valueToSend = _pendingNumberValue;
+            var valueToSend = _pendingValue;
             if (valueToSend != null) _ = SendSettingUpdateAsync(valueToSend);
-        }, null, _inputConfig.NumberThrottleMs, Timeout.Infinite);
+            if (IsTextBasedSetting()) Dispatcher.UIThread.Post(() => _isUserEditing = false);
+        }, null, delay, Timeout.Infinite);
     }
 
     private void UpdateDisplayedChoices()
@@ -449,7 +416,8 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         foreach (var item in newDisplayList)
         {
             DisplayedChoices.Add(item);
-            ApplicationChoices.Add(new ApplicationChoiceViewModel(item, SelectChoiceCommand, SelectorItemActionLabel));
+            if (IsApplicationSelector)
+                ApplicationChoices.Add(new ApplicationChoiceViewModel(item, SelectChoiceCommand, SelectorItemActionLabel));
         }
 
         this.RaisePropertyChanged(nameof(SelectedChoice));
@@ -497,7 +465,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         Setting.SetValueFromObject(selectedKeys);
 
         var serialized = string.Join("|", selectedKeys);
-        HandleStringUpdate(serialized);
+        ScheduleUpdate(serialized, ChoiceThrottleMs);
         ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -577,10 +545,11 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         _uiSettingsStore.Save(_uiConfig);
     }
 
-    private static void RunOnUiThread(Action action)
+    private void RunOnUiThread(Action action)
     {
+        if (_disposed) return;
         if (Dispatcher.UIThread.CheckAccess()) action();
-        else Dispatcher.UIThread.Post(action);
+        else Dispatcher.UIThread.Post(() => { if (!_disposed) action(); });
     }
 
     private bool IsTextBasedSetting()
@@ -607,6 +576,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
         if (_isUserEditing && _inputConfig.FlushOnFocusLoss)
         {
+            _updateTimer?.Dispose();
             var currentValue = Setting.GetCurrentValueAsObject() as string;
             _ = SendSettingUpdateAsync(currentValue);
         }
@@ -616,6 +586,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     private async Task SendSettingUpdateAsync(object? value)
     {
+        if (_disposed) return;
         try
         {
             await _modulesApi.UpdateSettingAsync(_moduleInstanceId, Setting.Key, value).ConfigureAwait(false);
@@ -629,8 +600,9 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
-        _stringDebounceTimer?.Dispose();
-        _numberThrottleTimer?.Dispose();
+        _disposed = true;
+        _updateTimer?.Dispose();
+        _subscriptions.Dispose();
     }
 }
 

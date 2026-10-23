@@ -251,7 +251,10 @@ try
     builder.Services.AddSingleton<HostAuthenticationService>();
 
     if (!isTestRun)
+    {
         builder.Services.AddHostedService<NativeMessagingRegistrar>();
+        builder.Services.AddHostedService<BrowserExtensionSyncService>();
+    }
 
     builder.Services.AddGrpc(options =>
     {
@@ -607,7 +610,7 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
             var presetsDirectory = config.Persistence.ResolvePresetsPath();
             var logger = ctx.Resolve<ILogger<PresetManager>>();
 
-            return new PresetManager(presetsDirectory, logger);
+            return new PresetManager(presetsDirectory, logger, ctx.Resolve<ISecureStorageService>());
         })
         .As<IPresetManager>()
         .SingleInstance()
@@ -670,16 +673,7 @@ static void RegisterCoreServices(ContainerBuilder builder, bool secureCommitment
         .SingleInstance()
         .PreserveExistingDefaults();
 
-    builder.Register(ctx =>
-        {
-            var sessionManager = ctx.Resolve<ISessionManager>();
-            var presetManager = ctx.Resolve<IPresetManager>();
-            var notifier = ctx.Resolve<INotifier>();
-            var logger = ctx.Resolve<ILogger<SessionAutoStopService>>();
-            var telemetryService = ctx.Resolve<ITelemetryService>();
-
-            return new SessionAutoStopService(sessionManager, presetManager, notifier, logger, telemetryService);
-        })
+    builder.RegisterType<SessionAutoStopService>()
         .As<ISessionAutoStopService>()
         .SingleInstance()
         .PreserveExistingDefaults();

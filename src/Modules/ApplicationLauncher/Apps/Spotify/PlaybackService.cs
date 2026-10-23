@@ -18,6 +18,7 @@ internal sealed class PlaybackService : IDisposable
     private readonly TimeSpan _choicesTtl = TimeSpan.FromMinutes(15);
     private readonly Lock _refreshLoopLock = new();
     private CancellationTokenSource? _refreshLoopCts;
+    private string? _playbackDeviceId;
 
     private List<KeyValuePair<string, string>> _cachedPlaylists = [];
     private List<KeyValuePair<string, string>> _cachedAlbums = [];
@@ -272,9 +273,9 @@ internal sealed class PlaybackService : IDisposable
 
     public Task OnSessionEndAsync()
     {
-        if (!_settings.EnablePlayback.GetCurrentValue()) return Task.CompletedTask;
-
-        return !_authService.HasRefreshToken() ? Task.CompletedTask : _apiService.PauseAsync();
+        var deviceId = _playbackDeviceId;
+        _playbackDeviceId = null;
+        return deviceId == null ? Task.CompletedTask : _apiService.PauseAsync(deviceId);
     }
 
     private async Task LoadDynamicChoicesAsync(bool force = false)
@@ -371,12 +372,14 @@ internal sealed class PlaybackService : IDisposable
             {
                 var uris = JsonSerializer.Deserialize<JsonElement>(context).GetProperty("uris").EnumerateArray()
                     .Select(e => e.GetString()).ToList();
-                await _apiService.PlayAsync(deviceId, string.Empty, uris!);
+                if (await _apiService.PlayAsync(deviceId, string.Empty, uris!))
+                    _playbackDeviceId = deviceId;
             }
             else
             {
                 var spotifyUri = ConvertUrlToUri(context);
-                await _apiService.PlayAsync(deviceId, spotifyUri);
+                if (await _apiService.PlayAsync(deviceId, spotifyUri))
+                    _playbackDeviceId = deviceId;
             }
 
             _logger.LogInfo("Spotify 'play' command sent successfully.");

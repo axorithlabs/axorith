@@ -1,5 +1,7 @@
+using System.Reactive.Linq;
 using Axorith.Sdk;
 using Axorith.Sdk.Actions;
+using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.ApplicationLauncher;
 using Axorith.Shared.Platform;
@@ -30,13 +32,16 @@ internal sealed class Settings : LauncherSettingsBase
     public Setting<bool> EnableWebSocket { get; }
     public Setting<int> WebSocketPort { get; }
     public Setting<string> WebSocketPassword { get; }
+    private readonly Setting<string> _webSocketPasswordId;
+    private readonly IDisposable _passwordSubscription;
+    private readonly IDisposable _passwordIdSubscription;
 
     public Setting<string> SessionStartAction { get; }
     public Setting<string> SessionEndAction { get; }
 
     private readonly IAppDiscoveryService _appDiscovery;
 
-    public Settings(IAppDiscoveryService appDiscovery)
+    public Settings(IAppDiscoveryService appDiscovery, ISecureStorageService secureStorage)
     {
         _appDiscovery = appDiscovery;
 
@@ -64,14 +69,23 @@ internal sealed class Settings : LauncherSettingsBase
             isVisible: false
         );
 
-        WebSocketPassword = Setting.AsText(
+        _webSocketPasswordId = Setting.AsText("WebSocketPasswordId", "WebSocket Password Reference",
+            Guid.NewGuid().ToString("D"), isVisible: false);
+        WebSocketPassword = Setting.AsSecret(
             key: "WebSocketPassword",
             label: "WebSocket Password",
-            defaultValue: string.Empty,
             description:
             "OBS WebSocket password. Find it in OBS: Tools → WebSocket Server Settings → Show Connect Info.",
             isVisible: false
         );
+        _passwordSubscription = WebSocketPassword.Value.Skip(1).Subscribe(password =>
+        {
+            var key = $"ObsWebSocketPassword:{_webSocketPasswordId.GetCurrentValue()}";
+            if (string.IsNullOrWhiteSpace(password)) secureStorage.DeleteSecret(key);
+            else secureStorage.StoreSecret(key, password);
+        });
+        _passwordIdSubscription = _webSocketPasswordId.Value.Skip(1).Subscribe(id =>
+            WebSocketPassword.SetValue(secureStorage.RetrieveSecret($"ObsWebSocketPassword:{id}") ?? string.Empty));
 
         SessionStartAction = Setting.AsChoice(
             key: "SessionStartAction",
@@ -117,7 +131,15 @@ internal sealed class Settings : LauncherSettingsBase
         SetupBaseReactiveVisibility();
     }
 
-    protected override IEnumerable<ISetting> GetAdditionalSettings() => [EnableWebSocket, WebSocketPort, WebSocketPassword, SessionStartAction, SessionEndAction];
+    protected override IEnumerable<ISetting> GetAdditionalSettings() => [EnableWebSocket, WebSocketPort,
+        _webSocketPasswordId, WebSocketPassword, SessionStartAction, SessionEndAction];
+
+    public override void Dispose()
+    {
+        _passwordSubscription.Dispose();
+        _passwordIdSubscription.Dispose();
+        base.Dispose();
+    }
 
     protected override Task InitializeAdditionalAsync() => RefreshPathAsync();
 

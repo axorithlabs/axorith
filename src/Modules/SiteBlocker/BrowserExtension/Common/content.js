@@ -1,59 +1,39 @@
-/**
- * @file content.js
- * @description This script is injected into tabs that are designated for blocking.
- * Its primary responsibility is to immediately halt all page activity (scripts, media)
- * and replace the page's content with the Axorith blocker UI, including its styles.
- */
-
-(async function() {
+/** Reversible blocking UI; the page and its unsaved state remain in place. */
+(function () {
     'use strict';
+    if (globalThis.axorithSiteBlocker) return;
 
-    // --- Main Execution ---
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('aria-label', 'Site blocked by Axorith');
+    const styles = {
+        display: 'block', position: 'fixed', inset: '0', margin: '0', padding: '0',
+        width: '100vw', height: '100vh', 'max-width': 'none', 'max-height': 'none',
+        border: '0', background: '#101010', overflow: 'hidden'
+    };
+    for (const [name, value] of Object.entries(styles)) dialog.style.setProperty(name, value, 'important');
+    const frame = document.createElement('iframe');
+    frame.src = (globalThis.browser ?? globalThis.chrome).runtime.getURL('blocked.html');
+    frame.title = 'Axorith Site Blocker';
+    frame.style.cssText = 'width:100%;height:100%;border:0;display:block';
+    dialog.append(frame);
+    dialog.addEventListener('cancel', event => event.preventDefault());
 
-    // Immediately stop everything. This is critical to prevent audio/video from playing
-    // and further scripts from executing.
-    window.stop();
+    const pauseMedia = event => {
+        if (event.target instanceof HTMLMediaElement) event.target.pause();
+    };
+    document.addEventListener('play', pauseMedia, true);
+    for (const media of document.querySelectorAll('audio, video')) media.pause();
 
-    // Fetch the blocker page content from the extension's resources.
-    const blockerUrl = (globalThis.browser ?? globalThis.chrome).runtime.getURL('blocked.html');
-    let blockerHtml;
-    try {
-        const response = await fetch(blockerUrl);
-        if (!response.ok) {
-            console.error(`Axorith: Failed to fetch blocker HTML. Status: ${response.status}`);
-            return;
+    const focused = document.activeElement;
+    document.documentElement.append(dialog);
+    dialog.showModal();
+    globalThis.axorithSiteBlocker = {
+        remove() {
+            document.removeEventListener('play', pauseMedia, true);
+            dialog.close();
+            dialog.remove();
+            if (focused?.isConnected) focused.focus({ preventScroll: true });
+            delete globalThis.axorithSiteBlocker;
         }
-        blockerHtml = await response.text();
-    } catch (error) {
-        console.error('Axorith: Error fetching blocker HTML.', error);
-        return;
-    }
-
-    // Parse the fetched HTML to extract both styles and body content.
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(blockerHtml, 'text/html');
-    
-    // Extract styles
-    const styles = doc.head.querySelector('style')?.textContent;
-    
-    // --- DOM Manipulation ---
-
-    // 1. Clear the existing document content to remove conflicting styles and scripts.
-    // Using replaceChildren() is safer and faster than innerHTML = ''
-    document.head.replaceChildren();
-    document.body.replaceChildren();
-
-    // 2. Inject the styles into the now-empty head.
-    if (styles) {
-        const styleElement = document.createElement('style');
-        styleElement.textContent = styles;
-        document.head.appendChild(styleElement);
-    }
-
-    // 3. Inject the blocker UI into the now-empty body.
-    // Instead of innerHTML, we move the nodes from the parsed document.
-    // This satisfies the "Unsafe assignment" warning.
-    const newBodyNodes = Array.from(doc.body.children);
-    document.body.append(...newBodyNodes);
-
+    };
 })();

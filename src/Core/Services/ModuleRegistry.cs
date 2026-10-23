@@ -46,6 +46,12 @@ public class ModuleRegistry(
                 def.Id,
                 def.Name, def.AssemblyFileName,
                 existing.Name, existing.AssemblyFileName);
+            if (!ReferenceEquals(def, existing))
+            {
+                def.LoadContext?.Unload();
+                def.LoadContext = null;
+                def.ModuleType = null;
+            }
         }
 
         _definitions = definitionsMap;
@@ -96,12 +102,16 @@ public class ModuleRegistry(
 
     private async Task MonitorUnloadingAsync(List<(string Name, WeakReference<AssemblyLoadContext> Ref)> contexts)
     {
-        const int maxChecks = 10;
+        const int maxChecks = 3;
         const int delayMs = 500;
 
         for (var i = 0; i < maxChecks; i++)
         {
             await Task.Delay(delayMs);
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
 
             contexts.RemoveAll(c => !c.Ref.TryGetTarget(out _));
 
@@ -114,8 +124,8 @@ public class ModuleRegistry(
         var leaks = string.Join(", ", contexts.Select(c => c.Name));
         logger.LogWarning(
             "The following modules have not unloaded after {Timeout}s: {Modules}. " +
-            "This may indicate a memory leak (e.g. static event handlers, running threads). " +
-            "They will be collected by GC eventually if no strong references remain.",
+            "Contexts remain reachable after full GC. Inspect GC roots with dotnet-dump/SOS " +
+            "for subscriptions, timers, running tasks, or references to module types.",
             maxChecks * delayMs / 1000.0, leaks);
     }
 
@@ -136,9 +146,10 @@ public class ModuleRegistry(
         EnsureInitialized();
         if (_definitions.TryGetValue(moduleId, out var definition) && definition.ModuleType != null)
         {
+            ILifetimeScope? moduleScope = null;
             try
             {
-                var moduleScope = rootScope.BeginLifetimeScope(builder =>
+                Action<ContainerBuilder> configure = builder =>
                 {
                     builder.RegisterInstance(definition).As<ModuleDefinition>();
 
@@ -173,7 +184,11 @@ public class ModuleRegistry(
                         .InstancePerLifetimeScope();
 
                     builder.RegisterType(definition.ModuleType).As<IModule>();
-                });
+                };
+
+                moduleScope = definition.LoadContext is { IsCollectible: true } loadContext
+                    ? rootScope.BeginLoadContextLifetimeScope(loadContext, configure)
+                    : rootScope.BeginLifetimeScope(configure);
 
                 var instance = moduleScope.Resolve<IModule>();
 
@@ -183,6 +198,14 @@ public class ModuleRegistry(
             {
                 logger.LogError(ex, "Failed to create module instance for {ModuleName} due to an exception",
                     definition.Name);
+                try
+                {
+                    moduleScope?.Dispose();
+                }
+                catch (Exception disposeEx)
+                {
+                    logger.LogWarning(disposeEx, "Failed to dispose scope for {ModuleName}", definition.Name);
+                }
                 return (null, null);
             }
         }

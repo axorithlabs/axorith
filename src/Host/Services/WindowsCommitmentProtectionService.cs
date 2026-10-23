@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using System.Security.Principal;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
@@ -76,6 +77,31 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         {
             throw new InvalidOperationException($"Axorith cannot write the current user's Windows policies: {ex.Message}", ex);
         }
+
+        using var currentProcess = Process.GetCurrentProcess();
+        var conflicts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in BlockedProcessNames)
+        {
+            foreach (var process in Process.GetProcessesByName(name))
+            {
+                using (process)
+                {
+                    try
+                    {
+                        if (process.SessionId == currentProcess.SessionId && !process.HasExited)
+                            conflicts.Add(name);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // The process exited during preflight.
+                    }
+                }
+            }
+        }
+
+        if (conflicts.Count > 0)
+            throw new InvalidOperationException("Save your work and finish or close these tools before starting Strict protection: " +
+                                                string.Join(", ", conflicts.Order(StringComparer.OrdinalIgnoreCase)));
 
         return Task.CompletedTask;
     }
@@ -195,7 +221,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
             }
 
             _processBlocker ??= PlatformServices.CreateProcessBlocker(logger);
-            _processBlocker.Block(BlockedProcessNames);
+            _processBlocker.Block(BlockedProcessNames, rejectRunning: true);
             NotifyPolicyChanged();
             logger.LogInformation("Enabled reversible current-user Windows restrictions for a Strict session.");
         }

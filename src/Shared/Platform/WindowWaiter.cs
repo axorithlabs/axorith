@@ -9,8 +9,20 @@ internal static class WindowWaiter
     {
         var timeout = TimeSpan.FromMilliseconds(timeoutMs);
         var started = Stopwatch.GetTimestamp();
-        while (!hasWindow(process))
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (process.HasExited)
+                    throw new TimeoutException($"Process {process.Id} exited before its window appeared.");
+                if (hasWindow(process)) return;
+            }
+            catch (InvalidOperationException ex) when (process.HasExited)
+            {
+                throw new TimeoutException($"Process {process.Id} exited before its window appeared.", ex);
+            }
+
             if (Stopwatch.GetElapsedTime(started) > timeout)
                 throw new TimeoutException($"Process window did not appear within {timeoutMs}ms");
 

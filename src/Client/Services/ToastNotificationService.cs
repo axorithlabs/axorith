@@ -7,7 +7,7 @@ namespace Axorith.Client.Services;
 
 public class ToastNotificationService : IToastNotificationService, IDisposable
 {
-    private readonly Subject<ToastNotification> _notifications = new();
+    private readonly ISubject<ToastNotification> _notifications = Subject.Synchronize(new Subject<ToastNotification>());
 
     public IObservable<ToastNotification> Notifications => _notifications.AsObservable();
 
@@ -19,7 +19,7 @@ public class ToastNotificationService : IToastNotificationService, IDisposable
 
     public void Dispose()
     {
-        _notifications.Dispose();
+        _notifications.OnCompleted();
         GC.SuppressFinalize(this);
     }
 }

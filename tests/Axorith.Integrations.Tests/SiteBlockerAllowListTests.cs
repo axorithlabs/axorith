@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
-using Axorith.Shared.Platform;
 using Xunit;
 
 namespace Axorith.Integrations.Tests;
@@ -17,10 +16,31 @@ public sealed class SiteBlockerExtensionPipeCollection
 public sealed class SiteBlockerAllowListTests
 {
     [Fact]
+    public async Task DisposeWaitsForTheBrowserUnblockCommand()
+    {
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier());
+        module.GetSettings().Single(setting => setting.Key == "Mode").SetValueFromString("AllowList");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var server = ServeChromeExtensionAsync(timeout.Token);
+        try
+        {
+            await module.OnSessionStartAsync(timeout.Token);
+            module.Dispose();
+        }
+        finally
+        {
+            timeout.Cancel();
+        }
+
+        var requests = await server;
+        Assert.Contains(requests, request => request.Command == "block");
+        Assert.Equal("unblock", requests.Last().Command);
+    }
+
+    [Fact]
     public void BrowserInstallActionsAreAvailableInModuleSettings()
     {
-        using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier());
         var actions = module.GetActions();
 
         try
@@ -38,8 +58,7 @@ public sealed class SiteBlockerAllowListTests
     [Fact]
     public void CategorySettingLoadsChoicesFromModuleData()
     {
-        using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier());
 
         var categories = module.GetSettings().Single(setting => setting.Key == "Categories");
         var choices = categories.GetCurrentChoices();
@@ -53,8 +72,7 @@ public sealed class SiteBlockerAllowListTests
     [Fact]
     public async Task MissingBrowserExtensionConnectionProducesAWarning()
     {
-        using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier());
 
         var validation = await module.ValidateSettingsAsync(CancellationToken.None);
 
@@ -65,8 +83,7 @@ public sealed class SiteBlockerAllowListTests
     [Fact]
     public async Task EmptyAllowListIsValidatedAndSentToBrowserExtensions()
     {
-        using var blocker = new RecordingProcessBlocker();
-        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier(), blocker);
+        using var module = new Axorith.Module.SiteBlocker.Module(new TestModuleLogger(), new NoopNotifier());
         ((Setting<string>)module.GetSettings().Single(setting => setting.Key == "Mode")).SetValue("AllowList");
         ((Setting<List<string>>)module.GetSettings().Single(setting => setting.Key == "Categories")).SetValue([]);
         ((Setting<string>)module.GetSettings().Single(setting => setting.Key == "CustomSites")).SetValue(string.Empty);
@@ -78,7 +95,8 @@ public sealed class SiteBlockerAllowListTests
         try
         {
             var validation = await module.ValidateSettingsAsync(timeout.Token);
-            Assert.Equal(ValidationStatus.Ok, validation.Status);
+            Assert.Equal(ValidationStatus.Warning, validation.Status);
+            Assert.Contains("Allow List mode will block every website", validation.Message);
             Assert.True(await module.CanStartCommittedSessionAsync(timeout.Token), module.ProtectionStatusMessage);
             await module.OnSessionStartAsync(timeout.Token);
             for (var check = 0; check < 3; check++)
@@ -106,7 +124,6 @@ public sealed class SiteBlockerAllowListTests
         });
         Assert.Contains(requests, request => request.Command == "health");
         Assert.Contains(requests, request => request.Command == "unblock");
-        Assert.DoesNotContain(blocker.BlockedProcesses, name => name.Contains("firefox", StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<List<ExtensionRequest>> ServeChromeExtensionAsync(CancellationToken cancellationToken)
@@ -167,27 +184,4 @@ public sealed class SiteBlockerAllowListTests
         new("axorith-nm-pipe-chrome", PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
     private sealed record ExtensionRequest(string Command, string? Mode, string[] Sites);
-
-    private sealed class RecordingProcessBlocker : IProcessBlocker
-    {
-        public List<string> BlockedProcesses { get; } = [];
-        public bool IsMonitoring { get; private set; }
-        public event Action<string>? ProcessBlocked
-        {
-            add { }
-            remove { }
-        }
-
-        public List<string> Block(IEnumerable<string> processNames)
-        {
-            BlockedProcesses.AddRange(processNames);
-            IsMonitoring = true;
-            return [];
-        }
-
-        public List<string> AllowOnly(IEnumerable<string> processNames) => [];
-        public void Unblock(string processName) { }
-        public void UnblockAll() => IsMonitoring = false;
-        public void Dispose() => UnblockAll();
-    }
 }

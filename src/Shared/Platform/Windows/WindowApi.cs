@@ -37,6 +37,9 @@ internal static class WindowApi
     private static extern bool EnumDisplayDevices(string? lpDevice, uint iDevNum, ref DisplayDevice lpDisplayDevice,
         uint dwFlags);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
+
     private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -46,6 +49,17 @@ internal static class WindowApi
         public int Top;
         public int Right;
         public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public Rect Bounds;
+        public Rect WorkArea;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -78,8 +92,6 @@ internal static class WindowApi
     private const int SwShowmaximized = 3;
     private const int SwRestore = 9;
 
-    private const int DisplayDeviceActive = 0x00000001;
-
     public static Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
         CancellationToken cancellationToken = default) =>
         WindowWaiter.WaitAsync(process, HasWindow, timeoutMs, cancellationToken);
@@ -93,19 +105,22 @@ internal static class WindowApi
     public static void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex)
     {
         var targetMonitor = GetMonitor(monitorIndex);
-        var targetX = targetMonitor.Left + 50;
-        var targetY = targetMonitor.Top + 50;
+        var targetX = targetMonitor.Bounds.Left + 50;
+        var targetY = targetMonitor.Bounds.Top + 50;
 
+        if (IsZoomed(windowHandle) || IsIconic(windowHandle))
+            ShowWindow(windowHandle, SwRestore);
         SetWindowPos(windowHandle, IntPtr.Zero, targetX, targetY, 0, 0, SwpNosize | SwpNozorder);
     }
 
-    private static List<Rect> GetMonitors()
+    private static List<MonitorInfo> GetMonitors()
     {
-        List<Rect> monitors = [];
+        List<MonitorInfo> monitors = [];
         EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
-            (_, _, ref rect, _) =>
+            (handle, _, ref rect, _) =>
             {
-                monitors.Add(rect);
+                var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>(), Bounds = rect };
+                if (GetMonitorInfo(handle, ref info)) monitors.Add(info);
                 return true;
             }, IntPtr.Zero);
         return monitors;
@@ -113,32 +128,32 @@ internal static class WindowApi
 
     public static List<Process> FindProcesses(string processNameOrPath)
     {
-        List<Process> results = [];
-
         var processName = Path.GetFileNameWithoutExtension(processNameOrPath);
-        results.AddRange(Process.GetProcessesByName(processName));
-
-        if (!File.Exists(processNameOrPath)) return results;
-
-        var allProcesses = Process.GetProcesses();
-        foreach (var process in allProcesses)
+        var hasPath = Path.IsPathRooted(processNameOrPath) || processNameOrPath.Contains(Path.DirectorySeparatorChar) ||
+                      processNameOrPath.Contains(Path.AltDirectorySeparatorChar);
+        var fullPath = hasPath ? Path.GetFullPath(processNameOrPath) : null;
+        using var currentProcess = Process.GetCurrentProcess();
+        List<Process> results = [];
+        foreach (var process in Process.GetProcessesByName(processName))
         {
+            var matched = false;
             try
             {
-                if (process.MainModule?.FileName.Equals(processNameOrPath, StringComparison.OrdinalIgnoreCase) !=
-                    true)
-                {
-                    continue;
-                }
-
-                if (results.All(p => p.Id != process.Id))
+                if (process.SessionId == currentProcess.SessionId &&
+                    (fullPath == null || string.Equals(process.MainModule?.FileName, fullPath,
+                        StringComparison.OrdinalIgnoreCase)))
                 {
                     results.Add(process);
+                    matched = true;
                 }
             }
             catch
             {
                 // Process may not be accessible, skip
+            }
+            finally
+            {
+                if (!matched) process.Dispose();
             }
         }
 
@@ -196,11 +211,11 @@ internal static class WindowApi
 
     public static (int X, int Y, int Width, int Height) GetMonitorBounds(int monitorIndex)
     {
-        var target = GetMonitor(monitorIndex);
+        var target = GetMonitor(monitorIndex).Bounds;
         return (target.Left, target.Top, target.Right - target.Left, target.Bottom - target.Top);
     }
 
-    private static Rect GetMonitor(int monitorIndex)
+    private static MonitorInfo GetMonitor(int monitorIndex)
     {
         var monitors = GetMonitors();
         if (monitorIndex < 0 || monitorIndex >= monitors.Count)
@@ -212,31 +227,50 @@ internal static class WindowApi
 
     public static string GetMonitorName(int monitorIndex)
     {
+        var monitors = GetMonitors();
+        if (monitorIndex < 0 || monitorIndex >= monitors.Count) return $"Monitor {monitorIndex + 1}";
+        var info = monitors[monitorIndex];
+        var monitor = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
+        if (!EnumDisplayDevices(info.DeviceName, 0, ref monitor, 1))
+            return $"Monitor {monitorIndex + 1}";
+
         try
         {
-            var monitorNames = GetMonitorNamesFromEdid();
-            if (monitorIndex >= 0 && monitorIndex < monitorNames.Count) return monitorNames[monitorIndex];
+            // Join by device identity: WMI enumeration order does not match EnumDisplayMonitors.
+            var deviceParts = monitor.DeviceId.Split('#');
+            if (deviceParts.Length >= 3)
+            {
+                var instanceName = $"DISPLAY\\{deviceParts[1]}\\{deviceParts[2]}";
+                var name = GetMonitorNameFromEdid(instanceName);
+                if (!string.IsNullOrWhiteSpace(name)) return name;
+            }
         }
         catch
         {
             // Fall through to fallback
         }
 
-        return GetMonitorNameFallback(monitorIndex);
+        return !string.IsNullOrWhiteSpace(monitor.DeviceString) &&
+               !monitor.DeviceString.Contains("Generic", StringComparison.OrdinalIgnoreCase)
+            ? monitor.DeviceString
+            : $"Monitor {monitorIndex + 1}";
     }
 
-    private static List<string> GetMonitorNamesFromEdid()
+    private static string? GetMonitorNameFromEdid(string instanceName)
     {
-        List<string> names = [];
-
         using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM WmiMonitorID");
         foreach (var obj in searcher.Get())
         {
+            using var monitor = obj;
+            var deviceInstance = monitor["InstanceName"] as string;
+            if (deviceInstance == null ||
+                !(deviceInstance.Equals(instanceName, StringComparison.OrdinalIgnoreCase) ||
+                  deviceInstance.StartsWith(instanceName + "_", StringComparison.OrdinalIgnoreCase))) continue;
+
             var userFriendlyName = DecodeUshortArray(obj["UserFriendlyName"] as ushort[]);
             if (!string.IsNullOrWhiteSpace(userFriendlyName))
             {
-                names.Add(userFriendlyName);
-                continue;
+                return userFriendlyName;
             }
 
             var manufacturerName = obj["ManufacturerName"] as ushort[];
@@ -247,15 +281,11 @@ internal static class WindowApi
 
             if (!string.IsNullOrWhiteSpace(manufacturer) || !string.IsNullOrWhiteSpace(productCode))
             {
-                names.Add($"{manufacturer} {productCode}".Trim());
-            }
-            else
-            {
-                names.Add($"Monitor {names.Count + 1}");
+                return $"{manufacturer} {productCode}".Trim();
             }
         }
 
-        return names;
+        return null;
     }
 
     private static string DecodeUshortArray(ushort[]? arr)
@@ -271,43 +301,5 @@ internal static class WindowApi
         }
 
         return sb.ToString().Trim();
-    }
-
-    private static string GetMonitorNameFallback(int monitorIndex)
-    {
-        var adapter = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
-        var monitor = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
-
-        var foundIndex = 0;
-        uint adapterNum = 0;
-
-        while (EnumDisplayDevices(null, adapterNum, ref adapter, 0))
-        {
-            var isActive = (adapter.StateFlags & DisplayDeviceActive) != 0;
-
-            if (isActive)
-            {
-                if (foundIndex == monitorIndex)
-                {
-                    if (EnumDisplayDevices(adapter.DeviceName, 0, ref monitor, 0))
-                    {
-                        if (!string.IsNullOrWhiteSpace(monitor.DeviceString) &&
-                            !monitor.DeviceString.Contains("Generic", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return monitor.DeviceString;
-                        }
-                    }
-
-                    return $"Monitor {monitorIndex + 1}";
-                }
-
-                foundIndex++;
-            }
-
-            adapterNum++;
-            adapter = new DisplayDevice { cb = Marshal.SizeOf<DisplayDevice>() };
-        }
-
-        return $"Monitor {monitorIndex + 1}";
     }
 }

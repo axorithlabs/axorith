@@ -102,6 +102,13 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                         continue;
                     }
 
+                    if (definition.SdkApiVersion != 1)
+                    {
+                        logger.LogError("Module '{ModuleName}' requires SDK API {SdkApiVersion}; this host supports API 1. Skipping",
+                            definition.Name, definition.SdkApiVersion);
+                        continue;
+                    }
+
                     if (!definition.Platforms.Contains(currentPlatform))
                     {
                         logger.LogDebug(
@@ -154,6 +161,7 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
                     {
                         loadContext = new ModuleAssemblyLoadContext(dllFile);
                         var assembly = loadContext.LoadFromAssemblyPath(dllFile);
+                        loadContext.ValidateSharedReferences(assembly.GetReferencedAssemblies());
                         var moduleType = assembly.GetExportedTypes()
                             .FirstOrDefault(t =>
                                 typeof(IModule).IsAssignableFrom(t) && t is { IsInterface: false, IsAbstract: false });
