@@ -190,6 +190,7 @@ public class GrpcCoreConnection : ICoreConnection
         if (_sessionsApi is IDisposable sessionsDisposable) sessionsDisposable.Dispose();
 
         if (_modulesApi is IDisposable modulesDisposable) modulesDisposable.Dispose();
+        _updatesApi?.Dispose();
 
         _presetsApi = null;
         _sessionsApi = null;
@@ -197,6 +198,7 @@ public class GrpcCoreConnection : ICoreConnection
         _diagnosticsApi = null;
         _schedulerApi = null;
         _notificationApi = null;
+        _updatesApi = null;
 
         if (_channel != null)
         {

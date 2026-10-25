@@ -43,7 +43,8 @@ public interface ISessionManager : IAsyncDisposable
 
     Task StopCurrentSessionAsync(CancellationToken cancellationToken = default);
 
-    Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default);
+    Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default,
+        SessionPreset? expectedSession = null);
 
     Task StartBreakAsync(CancellationToken cancellationToken = default);
 

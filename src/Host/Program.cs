@@ -14,7 +14,6 @@ using Axorith.Host.Interceptors;
 using Axorith.Host.Services;
 using Axorith.Host.Streaming;
 using Axorith.Sdk.Services;
-using Axorith.Shared.Licensing;
 using Axorith.Shared.Platform;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
@@ -218,8 +217,8 @@ try
     builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 
     builder.Services.AddSingleton(_ => telemetry ?? NoopTelemetryService.Instance);
-    builder.Services.AddSingleton<UserRegistrationService>();
     builder.Services.AddSingleton<UpdateService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdateService>());
     builder.Services.Configure<Configuration>(builder.Configuration);
 
     var config = builder.Configuration.Get<Configuration>() ?? new Configuration();
@@ -293,25 +292,6 @@ try
         Log.Fatal(ex, "Failed to initialize authentication service. Host cannot start securely.");
         return 1;
     }
-
-    _ = Task.Run(async () =>
-    {
-        try
-        {
-            var registrationService = app.Services.GetRequiredService<UserRegistrationService>();
-            var registration = await registrationService.GetOrCreateAsync(app.Lifetime.ApplicationStopping)
-                .ConfigureAwait(false);
-
-            Log.Information("User registration initialized: MachineId={MachineId}, FirstSeen={FirstSeen}",
-                registration.MachineId[..8] + "...",
-                registration.FirstSeenUtc);
-
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to initialize user registration");
-        }
-    }, app.Lifetime.ApplicationStopping);
 
     var moduleRegistryInitTask = Task.Run(async () =>
     {

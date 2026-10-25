@@ -651,14 +651,15 @@ public class SessionManager(
     public Task StopCurrentSessionAsync(CancellationToken cancellationToken = default) =>
         StopSessionAsync(SessionEndReason.UserStop, cancellationToken);
 
-    public Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default)
+    public Task<bool> EndCommittedSessionAsync(SessionEndReason reason, CancellationToken cancellationToken = default,
+        SessionPreset? expectedSession = null)
     {
         if (reason is not (SessionEndReason.NaturalCompletion or SessionEndReason.EmergencyUnlock))
         {
             throw new ArgumentOutOfRangeException(nameof(reason));
         }
 
-        return StopSessionAsync(reason, cancellationToken);
+        return StopSessionAsync(reason, cancellationToken, expectedSession);
     }
 
     public async Task StartBreakAsync(CancellationToken cancellationToken = default)
@@ -963,11 +964,15 @@ public class SessionManager(
         ? MonotonicTime.RemainingUntil(deadline)
         : TimeSpan.Zero;
 
-    private async Task<bool> StopSessionAsync(SessionEndReason reason, CancellationToken cancellationToken)
+    private async Task<bool> StopSessionAsync(SessionEndReason reason, CancellationToken cancellationToken,
+        SessionPreset? expectedSession = null)
     {
         await _asyncLock.WaitAsync(cancellationToken);
         try
         {
+            // Recheck under the stop lock: a queued completion must not end a replacement session.
+            if (expectedSession is not null && !ReferenceEquals(ActiveSession, expectedSession)) return false;
+
             if (reason == SessionEndReason.UserStop &&
                 ActiveSession?.FocusCommitment.IsCommitted == true)
             {

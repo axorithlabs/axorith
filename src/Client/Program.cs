@@ -17,10 +17,7 @@ internal static class Program
 {
     internal static ITelemetryService? Telemetry { get; private set; }
     internal static IConfigurationRoot? RuntimeConfiguration { get; private set; }
-    private static readonly string PendingInstallationPath = Path.Combine(ApplicationPaths.Config, "pending-install.json");
-    private static PendingInstallation? _pendingInstallation;
     private static SingleInstanceManager? _singleInstanceManager;
-    private static int _applicationReadyHandled;
 
     [STAThread]
     public static int Main(string[] args)
@@ -79,14 +76,6 @@ internal static class Program
             };
 
         Telemetry = isTestRun ? NoopTelemetryService.Instance : new TelemetryService(telemetrySettings);
-        _pendingInstallation = LoadPendingInstallation();
-        if ((_pendingInstallation is null && File.Exists(PendingInstallationPath)) ||
-            (_pendingInstallation is { } pending &&
-             !IsPendingInstallationEligible(Telemetry.IsEnabled, pending.InstallationId,
-                 DeviceIdProvider.GetDeviceId())))
-        {
-            DiscardPendingInstallation();
-        }
 
         TelemetryRuntime.LogConfiguration("Client", telemetrySettings, Telemetry.IsEnabled);
         if (!telemetrySettings.IsActive && !telemetrySettings.Enabled)
@@ -162,66 +151,6 @@ internal static class Program
             });
     }
 
-    internal static void ConfirmPendingInstallation()
-    {
-        if (_pendingInstallation is not { } pending)
-        {
-            return;
-        }
-
-        if (!IsPendingInstallationEligible(Telemetry is { IsEnabled: true }, pending.InstallationId,
-                DeviceIdProvider.GetDeviceId()))
-        {
-            DiscardPendingInstallation();
-            return;
-        }
-
-        try
-        {
-            Telemetry?.TrackEvent("InstallationConfirmed", new Dictionary<string, object?>
-            {
-                ["installAttemptId"] = pending.InstallAttemptId,
-                ["installMode"] = pending.InstallMode,
-                ["currentVersion"] = pending.CurrentVersion,
-                ["previousVersion"] = pending.PreviousVersion
-            });
-            File.Delete(PendingInstallationPath);
-            _pendingInstallation = null;
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Could not clear pending installation telemetry state");
-        }
-    }
-
-    private static void DiscardPendingInstallation()
-    {
-        _pendingInstallation = null;
-        try
-        {
-            File.Delete(PendingInstallationPath);
-        }
-        catch
-        {
-            // A stale pending attempt must never be retried after telemetry is disabled.
-        }
-    }
-
-    internal static bool IsPendingInstallationEligible(bool telemetryEnabled, Guid pendingInstallationId,
-        string? currentInstallationId) =>
-        telemetryEnabled && Guid.TryParse(currentInstallationId, out var parsedInstallationId) &&
-        pendingInstallationId == parsedInstallationId;
-
-    internal static void MarkApplicationReady()
-    {
-        if (Interlocked.Exchange(ref _applicationReadyHandled, 1) != 0)
-        {
-            return;
-        }
-
-        ConfirmPendingInstallation();
-    }
-
     private static bool LoadLegacyTelemetryEnabledSetting()
     {
         try
@@ -251,32 +180,4 @@ internal static class Program
         }
     }
 
-    private static PendingInstallation? LoadPendingInstallation()
-    {
-        try
-        {
-            if (!File.Exists(PendingInstallationPath)) return null;
-            using var document = JsonDocument.Parse(File.ReadAllText(PendingInstallationPath));
-            var root = document.RootElement;
-            if (!Guid.TryParse(root.GetProperty("installationId").GetString(), out var installationId))
-                return null;
-            if (!Guid.TryParse(root.GetProperty("installAttemptId").GetString(), out var installAttemptId))
-                return null;
-            return new PendingInstallation(
-                installationId,
-                installAttemptId,
-                root.GetProperty("installMode").GetString() ?? string.Empty,
-                root.GetProperty("currentVersion").GetString() ?? string.Empty,
-                root.TryGetProperty("previousVersion", out var previousVersion) && previousVersion.ValueKind == JsonValueKind.String
-                    ? previousVersion.GetString()
-                    : null);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private sealed record PendingInstallation(Guid InstallationId, Guid InstallAttemptId, string InstallMode,
-        string CurrentVersion, string? PreviousVersion);
 }

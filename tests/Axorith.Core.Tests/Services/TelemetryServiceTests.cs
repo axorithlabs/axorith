@@ -10,16 +10,88 @@ namespace Axorith.Core.Tests.Services;
 public sealed class TelemetryServiceTests
 {
     [Fact]
+    public async Task NewInstall_UsesWindowsIdentityAndDoesNotEmitMigration()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 16299)) return;
+
+        var directory = Directory.CreateTempSubdirectory("axorith-new-identity-");
+        try
+        {
+            await using var server = new PostHogTestServer();
+            var expectedId = Axorith.Shared.Utils.DeviceIdProvider.GetDeviceId();
+            for (var launch = 0; launch < 2; launch++)
+            {
+                await using var telemetry = CreateTelemetry(server, "Axorith.Client", string.Empty);
+                LegacyTelemetryIdentity.Migrate(telemetry, expectedId,
+                    Path.Combine(directory.FullName, "installation-id.txt"));
+                telemetry.TrackEvent("ApplicationStarted");
+                await telemetry.FlushAsync();
+            }
+
+            var events = ReadEvents(server).ToArray();
+            Assert.Equal(2, events.Count(item => item.GetProperty("event").GetString() == "ApplicationStarted"));
+            Assert.All(events, item => Assert.Equal(expectedId, item.GetProperty("distinct_id").GetString()));
+            Assert.DoesNotContain(events, item => item.GetProperty("event").GetString() ==
+                                                  TelemetryConstants.IdentityMigratedEvent);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("1.0.3", "registration.json")]
+    [InlineData("1.0.4", "installation-id.txt")]
+    [InlineData("1.0.5", "installation-id.txt")]
+    public async Task LegacyIdentity_MigratesToWindowsIdentityAndRemovesOldStorage(string version, string fileName)
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 16299)) return;
+
+        var directory = Directory.CreateTempSubdirectory("axorith-legacy-identity-");
+        try
+        {
+            await using var server = new PostHogTestServer();
+            var oldId = Guid.NewGuid();
+            var newId = Axorith.Shared.Utils.DeviceIdProvider.GetDeviceId();
+            await using var telemetry = CreateTelemetry(server, "Axorith.Host", newId);
+            var path = Path.Combine(directory.FullName, fileName);
+            await File.WriteAllTextAsync(path, fileName.EndsWith(".json", StringComparison.Ordinal)
+                ? JsonSerializer.Serialize(new { machineId = oldId, appVersion = version })
+                : oldId.ToString("D"));
+
+            LegacyTelemetryIdentity.Migrate(telemetry, newId, path);
+            LegacyTelemetryIdentity.Migrate(telemetry, newId, path);
+            Assert.False(File.Exists(path));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (!ReadEvents(server).Any(item =>
+                       item.GetProperty("event").GetString() == TelemetryConstants.IdentityMigratedEvent))
+                await Task.Delay(10, timeout.Token);
+            await telemetry.FlushAsync();
+
+            var migration = ReadEvents(server).Single(item =>
+                item.GetProperty("event").GetString() == TelemetryConstants.IdentityMigratedEvent);
+            Assert.Equal(newId, migration.GetProperty("distinct_id").GetString());
+            var properties = migration.GetProperty("properties");
+            Assert.Equal(oldId.ToString("D"), properties.GetProperty("oldId").GetString());
+            Assert.Equal(newId, properties.GetProperty("newId").GetString());
+            Assert.Empty(Directory.GetFiles(directory.FullName));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task FlushAsync_SendsQueuedEventsAndKeepsWhitelistedProperties()
     {
         await using var server = new PostHogTestServer();
         var distinctId = Guid.NewGuid().ToString("D");
         await using var telemetry = CreateTelemetry(server, "Axorith.Client", distinctId);
 
-        var installAttemptId = Guid.NewGuid();
-        telemetry.TrackEvent("InstallationConfirmed", new Dictionary<string, object?>
+        telemetry.TrackEvent("InstallerCompleted", new Dictionary<string, object?>
         {
-            ["installAttemptId"] = installAttemptId,
             ["installMode"] = "update",
             ["currentVersion"] = "1.2.3",
             ["previousVersion"] = "1.2.2",
@@ -30,11 +102,10 @@ public sealed class TelemetryServiceTests
         await telemetry.FlushAsync(flushCts.Token);
 
         var sentEvent = ReadEvents(server)
-            .Single(item => item.GetProperty("event").GetString() == "InstallationConfirmed");
+            .Single(item => item.GetProperty("event").GetString() == "InstallerCompleted");
         var properties = sentEvent.GetProperty("properties");
 
         Assert.Equal(distinctId, sentEvent.GetProperty("distinct_id").GetString());
-        Assert.Equal(installAttemptId.ToString("D"), properties.GetProperty("installAttemptId").GetString());
         Assert.Equal("update", properties.GetProperty("installMode").GetString());
         Assert.Equal("1.2.3", properties.GetProperty("currentVersion").GetString());
         Assert.Equal("1.2.2", properties.GetProperty("previousVersion").GetString());

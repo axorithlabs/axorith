@@ -148,10 +148,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
 
             var saved = _settingsStore.Save(_config);
             _telemetry.SetEnabled(_telemetryEnabled);
-            if (saved && _telemetryEnabled)
-            {
-                Program.ConfirmPendingInstallation();
-            }
 
             if (_autoStartEnabled)
             {

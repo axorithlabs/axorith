@@ -290,7 +290,16 @@ public class ScheduleManager(
                 var isStop = schedule.Type == ScheduleType.StopRecurring;
                 if (isStop)
                 {
-                    if (sessionManager.ActiveSession?.FocusCommitment.IsCommitted == true)
+                    var activeSession = sessionManager.ActiveSession;
+                    if (activeSession?.Id != schedule.PresetId)
+                    {
+                        if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
+                            TrackScheduleSkipOnce(schedule, runTime, "stop",
+                                activeSession is null ? "session_not_running" : "preset_mismatch");
+                        continue;
+                    }
+
+                    if (activeSession.FocusCommitment.IsCommitted)
                     {
                         if (IsTriggerWindow(timeLeft) && IsScheduleReadyToRun(schedule, now))
                             TrackScheduleSkipOnce(schedule, runTime, "stop", "committed_session");
@@ -322,10 +331,14 @@ public class ScheduleManager(
 
         foreach (var (schedule, runTime) in toStop)
         {
+            var expectedSession = sessionManager.ActiveSession;
             var sessionInstanceId = sessionManager.CurrentSessionInstanceId;
-            if (!sessionManager.IsSessionRunning)
+            var skipReason = expectedSession is null ? "session_not_running"
+                : expectedSession.Id != schedule.PresetId ? "preset_mismatch"
+                : expectedSession.FocusCommitment.IsCommitted ? "committed_session" : null;
+            if (skipReason is not null)
             {
-                TrackScheduleTriggered(schedule, "stop", "skipped", skipReason: "session_not_running");
+                TrackScheduleTriggered(schedule, "stop", "skipped", skipReason: skipReason);
                 await UpdateLastRunAsync(schedule, now, ct);
                 continue;
             }
@@ -339,22 +352,13 @@ public class ScheduleManager(
 
                 await notifier.ShowSystemAsync("Session Scheduler", "Stopping session now...", category: "Session Scheduler");
 
-                var expectedSession = sessionManager.ActiveSession;
-                if (expectedSession == null)
+                var stopped = await autoStopService.CompleteNaturallyAsync(expectedSession!,
+                    schedule.NextPresetId, ct, schedule).ConfigureAwait(false);
+                triggerReported = true;
+                if (!stopped)
                 {
-                    TrackScheduleTriggered(schedule, "stop", "skipped", skipReason: "session_not_running");
-                    triggerReported = true;
-                }
-                else
-                {
-                    var stopped = await autoStopService.CompleteNaturallyAsync(expectedSession,
-                        schedule.NextPresetId, ct, schedule).ConfigureAwait(false);
-                    triggerReported = true;
-                    if (!stopped)
-                    {
-                        logger.LogInformation("Session ended before stop schedule '{Name}' could acquire the natural-end gate.",
-                            schedule.Name);
-                    }
+                    logger.LogInformation("Session changed or ended before stop schedule '{Name}' could complete it.",
+                        schedule.Name);
                 }
 
                 await UpdateLastRunAsync(schedule, now, ct);

@@ -20,6 +20,9 @@
 !ifndef POSTHOG_API_HOST
   !define POSTHOG_API_HOST "https://us.i.posthog.com"
 !endif
+!ifndef BUILD_SHA
+  !define BUILD_SHA ""
+!endif
 
 Name "${PRODUCT_NAME}"
 OutFile "..\..\build\Installer\axorith-setup.exe"
@@ -82,6 +85,10 @@ ${StrCase}
 ${StrStr}
 ${UnStrCase}
 
+!include "WindowsDeviceIdentity.nsh"
+!insertmacro DefineWindowsDeviceIdentityFunction ""
+!insertmacro DefineWindowsDeviceIdentityFunction "un."
+
 !define MUI_ICON "assets\icon.ico"
 
 !insertmacro MUI_PAGE_WELCOME
@@ -95,11 +102,10 @@ ${UnStrCase}
 !insertmacro MUI_LANGUAGE "English"
 
 Var TelemetryEnabled
-Var InstallAttemptId
 Var InstallerDistinctId
-Var InstallationId
+Var InstallAttemptId
+Var UninstallAttemptId
 Var CommonAppData
-Var InstallationIdPersisted
 Var InstallMode
 Var CurrentVersion
 Var PreviousVersion
@@ -169,24 +175,17 @@ ${AllowedLabel}_check:
 ${AllowedLabel}:
 !macroend
 
-!macro DefineTelemetryGuidFunction Prefix
-Function ${Prefix}GenerateTelemetryGuid
+Function GenerateMaintenanceSuffix
     System::Call 'ole32::CoCreateGuid(g .s)'
     Pop $0
     StrCpy $0 $0 36 1
-    !if "${Prefix}" == "un."
-        ${UnStrCase} $0 $0 "L"
-    !else
-        ${StrCase} $0 $0 "L"
-    !endif
+    ${StrCase} $0 $0 "L"
     Push $0
 FunctionEnd
-!macroend
 
 !macro DefineTelemetryInitFunction Prefix Mode
 Function ${Prefix}InitializeTelemetry
     StrCpy $TelemetryEnabled "0"
-    StrCpy $InstallationIdPersisted "0"
     StrCpy $TelemetryFailureReported "0"
     StrCpy $TelemetryFailureStage "installer_launch"
     StrCpy $TelemetryEventProperties ""
@@ -195,11 +194,17 @@ Function ${Prefix}InitializeTelemetry
     StrCpy $CommonAppData $APPDATA
     SetShellVarContext current
     !if "${Mode}" == "uninstall"
-        StrCpy $InstallAttemptId ""
+        System::Call 'ole32::CoCreateGuid(g .s)'
+        Pop $UninstallAttemptId
+        StrCpy $UninstallAttemptId $UninstallAttemptId 36 1
         ReadRegStr $CurrentVersion HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion"
         StrCpy $PreviousVersion ""
         StrCpy $InstallMode "uninstall"
     !else
+        System::Call 'ole32::CoCreateGuid(g .s)'
+        Pop $InstallAttemptId
+        StrCpy $InstallAttemptId $InstallAttemptId 36 1
+        ${StrCase} $InstallAttemptId $InstallAttemptId "L"
         ReadRegStr $PreviousVersion HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion"
         StrCpy $CurrentVersion "${PRODUCT_VERSION}"
         StrCmp $PreviousVersion "" telemetry_fresh_install
@@ -208,83 +213,12 @@ Function ${Prefix}InitializeTelemetry
         telemetry_fresh_install:
         StrCpy $InstallMode "fresh"
         telemetry_mode_done:
-        Call ${Prefix}GenerateTelemetryGuid
-        Pop $InstallAttemptId
     !endif
 
-    CreateDirectory "$APPDATA\Axorith\config"
-    !if "${Mode}" != "uninstall"
-        CreateDirectory "$CommonAppData\Axorith\config"
-        Delete "$APPDATA\Axorith\config\pending-install.json"
-    !endif
-    !if "${Mode}" == "uninstall"
-        IfFileExists "$CommonAppData\Axorith\config\installation-id.txt" 0 telemetry_uninstall_read_legacy_id
-        FileOpen $1 "$CommonAppData\Axorith\config\installation-id.txt" r
-        IfErrors telemetry_uninstall_read_legacy_id
-        FileRead $1 $InstallationId
-        FileClose $1
-        StrCpy $InstallationId $InstallationId 36
-        StrLen $2 $InstallationId
-        IntCmp $2 36 telemetry_uninstall_valid_id telemetry_uninstall_read_legacy_id telemetry_uninstall_read_legacy_id
-        telemetry_uninstall_read_legacy_id:
-        IfFileExists "$APPDATA\Axorith\config\installation-id.txt" 0 telemetry_uninstall_generate_id
-        FileOpen $1 "$APPDATA\Axorith\config\installation-id.txt" r
-        IfErrors telemetry_uninstall_generate_id
-        FileRead $1 $InstallationId
-        FileClose $1
-        StrCpy $InstallationId $InstallationId 36
-        StrLen $2 $InstallationId
-        IntCmp $2 36 telemetry_uninstall_valid_id telemetry_uninstall_generate_id telemetry_uninstall_generate_id
-        telemetry_uninstall_valid_id:
-        StrCpy $InstallerDistinctId $InstallationId
-        StrCpy $InstallationIdPersisted "1"
-        Goto telemetry_identity_done
-        telemetry_uninstall_generate_id:
-        Call ${Prefix}GenerateTelemetryGuid
-        Pop $InstallerDistinctId
-    !else
-        IfFileExists "$CommonAppData\Axorith\config\installation-id.txt" 0 telemetry_read_legacy_installation_id
-        FileOpen $1 "$CommonAppData\Axorith\config\installation-id.txt" r
-        IfErrors telemetry_read_legacy_installation_id
-        FileRead $1 $InstallationId
-        FileClose $1
-        StrCpy $InstallationId $InstallationId 36
-        StrLen $2 $InstallationId
-        IntCmp $2 36 telemetry_installation_id_loaded telemetry_read_legacy_installation_id telemetry_read_legacy_installation_id
-        telemetry_installation_id_loaded:
-        StrCpy $InstallerDistinctId $InstallationId
-        StrCpy $InstallationIdPersisted "1"
-        Goto telemetry_identity_done
-        telemetry_read_legacy_installation_id:
-        IfFileExists "$APPDATA\Axorith\config\installation-id.txt" 0 telemetry_generate_installation_id
-        FileOpen $1 "$APPDATA\Axorith\config\installation-id.txt" r
-        IfErrors telemetry_generate_installation_id
-        FileRead $1 $InstallationId
-        FileClose $1
-        StrCpy $InstallationId $InstallationId 36
-        StrLen $2 $InstallationId
-        IntCmp $2 36 telemetry_write_machine_installation_id telemetry_generate_installation_id telemetry_generate_installation_id
-        telemetry_generate_installation_id:
-        Call ${Prefix}GenerateTelemetryGuid
-        Pop $InstallationId
-        telemetry_write_machine_installation_id:
-        StrCpy $InstallerDistinctId $InstallationId
-        ClearErrors
-        FileOpen $1 "$CommonAppData\Axorith\config\installation-id.txt" w
-        IfErrors telemetry_identity_done
-        FileWrite $1 "$InstallationId"
-        FileClose $1
-        IfErrors telemetry_identity_done
-        StrCpy $InstallationIdPersisted "1"
-    !endif
-    telemetry_identity_done:
-    !if "${Mode}" != "uninstall"
-        StrCmp $InstallationIdPersisted "1" 0 telemetry_legacy_identity_done
-        Delete "$APPDATA\Axorith\config\installation-id.txt"
-        telemetry_legacy_identity_done:
-    !endif
+    Call ${Prefix}GetWindowsDeviceIdentity
+    Pop $InstallerDistinctId
     !if "${POSTHOG_API_KEY}" != ""
-        StrCmp $InstallationIdPersisted "1" 0 telemetry_preference_done
+        StrCmp $InstallerDistinctId "" telemetry_preference_done
         StrCpy $TelemetryEnabled "1"
         IfFileExists "$APPDATA\Axorith\config\telemetry-preference.txt" 0 telemetry_preference_done
         FileOpen $0 "$APPDATA\Axorith\config\telemetry-preference.txt" r
@@ -306,20 +240,36 @@ Function ${Prefix}SendTelemetryEvent
     Push $3
     Push $4
     Push $5
+    Push $6
     StrCmp $TelemetryEnabled "1" 0 telemetry_send_done
+    ${GetTime} "" "LS" $0 $1 $2 $3 $4 $5 $6
+    StrCpy $4 "$2-$1-$0T$4:$5:$6Z"
+    ; INetC can resend an accepted HTTPS POST after a receive timeout.
+    System::Call 'ole32::CoCreateGuid(g .s)'
+    Pop $3
+    StrCpy $3 $3 36 1
     StrCpy $1 ""
     StrCmp $TelemetryEventProperties "" telemetry_extra_done
     StrCpy $1 ",$TelemetryEventProperties"
     telemetry_extra_done:
     StrCpy $2 "$\"application$\":$\"Axorith.Installer$\",$\"source$\":$\"installer$\",$\"platform$\":$\"windows$\",$\"architecture$\":$\"x64$\",$\"$$geoip_disable$\":true"
-    StrCmp $InstallMode "uninstall" telemetry_no_install_attempt_id
+    StrCpy $2 "$2,$\"axorith_version$\":$\"$CurrentVersion$\",$\"release_version$\":$\"$CurrentVersion$\""
+    !if "${BUILD_SHA}" != ""
+        StrCpy $2 "$2,$\"build_sha$\":$\"${BUILD_SHA}$\""
+    !endif
+    StrCmp $InstallMode "uninstall" telemetry_uninstall_attempt
     StrCpy $2 "$2,$\"installAttemptId$\":$\"$InstallAttemptId$\""
-    telemetry_no_install_attempt_id:
-    StrCpy $0 "{$\"api_key$\":$\"${POSTHOG_API_KEY}$\",$\"event$\":$\"$TelemetryEventName$\",$\"distinct_id$\":$\"$InstallerDistinctId$\",$\"properties$\":{$2,$\"installMode$\":$\"$InstallMode$\",$\"currentVersion$\":$\"$CurrentVersion$\",$\"previousVersion$\":$\"$PreviousVersion$\"$1}}"
-    inetc::post "$0" /HEADER "Content-Type: application/json" /CONNECTTIMEOUT 1 /RECEIVETIMEOUT 1 /SILENT /NOCANCEL "${POSTHOG_API_HOST}/capture" "$TEMP\axorith-telemetry-$InstallerDistinctId.txt" /END
+    Goto telemetry_attempt_done
+    telemetry_uninstall_attempt:
+    StrCpy $2 "$2,$\"uninstallAttemptId$\":$\"$UninstallAttemptId$\""
+    telemetry_attempt_done:
+    StrCpy $0 "{$\"api_key$\":$\"${POSTHOG_API_KEY}$\",$\"uuid$\":$\"$3$\",$\"timestamp$\":$\"$4$\",$\"event$\":$\"$TelemetryEventName$\",$\"distinct_id$\":$\"$InstallerDistinctId$\",$\"properties$\":{$2,$\"installMode$\":$\"$InstallMode$\",$\"currentVersion$\":$\"$CurrentVersion$\",$\"previousVersion$\":$\"$PreviousVersion$\"$1}}"
+    InitPluginsDir
+    inetc::post "$0" /HEADER "Content-Type: application/json" /CONNECTTIMEOUT 1 /RECEIVETIMEOUT 1 /SILENT /NOCANCEL "${POSTHOG_API_HOST}/capture" "$PLUGINSDIR\telemetry-response.txt" /END
     Pop $5
-    Delete "$TEMP\axorith-telemetry-$InstallerDistinctId.txt"
+    Delete "$PLUGINSDIR\telemetry-response.txt"
     telemetry_send_done:
+    Pop $6
     Pop $5
     Pop $4
     Pop $3
@@ -329,8 +279,6 @@ Function ${Prefix}SendTelemetryEvent
 FunctionEnd
 !macroend
 
-!insertmacro DefineTelemetryGuidFunction ""
-!insertmacro DefineTelemetryGuidFunction "un."
 !insertmacro DefineTelemetryInitFunction "" "install"
 !insertmacro DefineTelemetryInitFunction "un." "uninstall"
 !insertmacro DefineTelemetrySenderFunction ""
@@ -339,7 +287,7 @@ FunctionEnd
 Function .onInit
     Call PrepareProtectedRoot
     Call InitializeTelemetry
-    Call GenerateTelemetryGuid
+    Call GenerateMaintenanceSuffix
     Pop $0
     StrCpy $MaintenanceDirectory "$INSTDIR\.setup-$0"
     CreateDirectory "$MaintenanceDirectory"
@@ -357,8 +305,9 @@ Function un.onInit
     StrCpy $MaintenanceHost "$MaintenanceDirectory\Axorith.Host.exe"
     Call un.InitializeTelemetry
     ${GetParameters} $0
+    ClearErrors
     ${GetOptions} $0 "/UPDATE" $1
-    StrCmp $1 "" un_user_uninstall
+    IfErrors un_user_uninstall
     StrCpy $TelemetryEnabled "0"
     Goto un_start_event_done
     un_user_uninstall:
@@ -372,6 +321,17 @@ Function InstallerUserAbort
     StrCpy $TelemetryEventName "InstallerCancelled"
     StrCpy $TelemetryEventProperties "$\"stage$\":$\"$TelemetryFailureStage$\""
     Call SendTelemetryEvent
+FunctionEnd
+
+Function .onGUIEnd
+    SetOutPath "$TEMP"
+    ${GetParent} "$MaintenanceDirectory" $0
+    ${GetFileName} "$MaintenanceDirectory" $1
+    StrCpy $1 $1 7
+    ${If} $0 == $INSTDIR
+    ${AndIf} $1 == ".setup-"
+        RMDir /r "$MaintenanceDirectory"
+    ${EndIf}
 FunctionEnd
 
 Function un.InstallerUserAbort
@@ -401,14 +361,6 @@ Function .onInstSuccess
     Call CheckDotNetDesktopRuntime
     Call CheckDotNetAspNetRuntime
     StrCpy $TelemetryFailureStage "registration"
-    CreateDirectory "$APPDATA\Axorith\config"
-    StrCmp $TelemetryEnabled "1" 0 install_pending_written
-    ClearErrors
-    FileOpen $0 "$APPDATA\Axorith\config\pending-install.json" w
-    IfErrors install_pending_written
-    FileWrite $0 "{$\"installationId$\":$\"$InstallationId$\",$\"installAttemptId$\":$\"$InstallAttemptId$\",$\"installMode$\":$\"$InstallMode$\",$\"currentVersion$\":$\"$CurrentVersion$\",$\"previousVersion$\":$\"$PreviousVersion$\"}"
-    FileClose $0
-    install_pending_written:
     StrCmp $DesktopRuntimeInstalled "1" desktop_runtime_present
     StrCpy $0 "false"
     Goto desktop_runtime_result
@@ -554,13 +506,19 @@ Section "MainSection" SEC_INSTALL
     SetShellVarContext current
     !insertmacro CheckCommittedSession "Installation or update" install_section_allowed SendTelemetryEvent
 
+    StrCpy $TelemetryFailureStage "existing_version_removal"
     IfFileExists "$APPDATA\Axorith\config\clientsettings.json" migrate_client_settings_done
     IfFileExists "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Client\clientsettings.json" 0 migrate_client_settings_done
     CreateDirectory "$APPDATA\Axorith\config"
+    ClearErrors
     CopyFiles /SILENT "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Client\clientsettings.json" "$APPDATA\Axorith\config"
+    ${If} ${Errors}
+        MessageBox MB_OK|MB_ICONSTOP "Could not preserve your Axorith settings. Please close Axorith and try again." /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
     migrate_client_settings_done:
 
-    StrCpy $TelemetryFailureStage "existing_version_removal"
     nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Client.exe'
     Pop $0
     Pop $1
@@ -574,7 +532,21 @@ Section "MainSection" SEC_INSTALL
     SetOverwrite on
     SetDetailsPrint textonly
   
+    ClearErrors
     File /r "${BUILD_ROOT}\*"
+    ${If} ${Errors}
+        MessageBox MB_OK|MB_ICONSTOP "Could not copy the Axorith files. Please close Axorith and try again." /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
+    ${GetFileVersion} "$INSTDIR\Axorith.Client\Axorith.Client.dll" $0
+    ${GetFileVersion} "$INSTDIR\Axorith.Host\Axorith.Host.dll" $1
+    ${If} $0 != "${PRODUCT_VERSION_NUMERIC}"
+    ${OrIf} $1 != "${PRODUCT_VERSION_NUMERIC}"
+        MessageBox MB_OK|MB_ICONSTOP "The installed Axorith files do not match this update. Please close Axorith and run the installer again." /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
     SetOutPath "$INSTDIR"
     RMDir /r "$MaintenanceDirectory"
   
@@ -603,7 +575,7 @@ Section "MainSection" SEC_INSTALL
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "Comments" "${PRODUCT_DESCRIPTION}"
 
-    System::Call 'USER32::SendMessageTimeoutA(i ${HWND_BROADCAST},i ${WM_SETTINGCHANGE},i 0,t "Environment",i 0x0002,i .r0)'
+    System::Call 'USER32::SendMessageTimeoutW(p ${HWND_BROADCAST}, i ${WM_SETTINGCHANGE}, p 0, w "Environment", i 0x0002, i 5000, *p .r0) p .r1'
   
     WriteUninstaller "$INSTDIR\uninstall.exe"
 SectionEnd

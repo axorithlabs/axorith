@@ -6,7 +6,7 @@ namespace Axorith.Telemetry;
 internal static partial class TelemetryEventSanitizer
 {
     private static readonly HashSet<string> GuidProperties = [
-        "installAttemptId", "presetId", "sessionInstanceId", "moduleId", "instanceId", "scheduleId",
+        "oldId", "installAttemptId", "uninstallAttemptId", "presetId", "sessionInstanceId", "moduleId", "instanceId", "scheduleId",
         "nextWorkspaceId", "nextPresetId", "previousSessionInstanceId"];
     private static readonly HashSet<string> NumberProperties = [
         "durationMs", "plannedDurationMs", "breakDurationMs", "latencyMs", "moduleCount", "breakCount", "breaksUsed",
@@ -52,7 +52,7 @@ internal static partial class TelemetryEventSanitizer
             "session_already_running", "invalid_settings", "network_error", "preset_not_found", "validation_warning",
             "unknown"],
         ["skipReason"] = ["session_already_running", "session_not_running", "committed_session",
-            "session_ended_before_stop", "session_changed", "concurrent_stop"],
+            "session_ended_before_stop", "session_changed", "concurrent_stop", "preset_mismatch"],
         ["scheduleType"] = ["one_time", "recurring_start", "recurring_stop", "duration_stop", "unknown"],
         ["triggerAction"] = ["start", "stop"],
         ["blockingMode"] = ["block_list", "allow_list"],
@@ -87,7 +87,7 @@ internal static partial class TelemetryEventSanitizer
     };
 
     private static readonly HashSet<string> StringProperties = [
-        "currentVersion", "previousVersion", "releaseVersion", "axorith_version", "exceptionType", "fingerprint", "diagnostic",
+        "currentVersion", "previousVersion", "releaseVersion", "axorith_version", "release_version", "build_sha", "exceptionType", "fingerprint", "diagnostic",
         "os_version", "build_channel", "environment", "application", "installMode", "launchSource", "source",
         "startSource", "commitmentMode", "endConditionType", "afterEndAction", "stopReason", "changeType",
         "result", "stage", "failureReason", "subsystem", "operation", "severity", "protectionState",
@@ -125,6 +125,10 @@ internal static partial class TelemetryEventSanitizer
             return Guid.TryParse(value.ToString(), out id) ? id.ToString() : null;
         }
 
+        if (key == "newId")
+            return value is string identity && identity.Length is > 0 and <= 256 && identity.Length % 2 == 0 &&
+                   identity.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f') ? identity : null;
+
         if (NumberProperties.Contains(key))
         {
             return value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
@@ -157,7 +161,8 @@ internal static partial class TelemetryEventSanitizer
 
         return key switch
         {
-            "currentVersion" or "previousVersion" or "releaseVersion" or "axorith_version" => VersionRegex().IsMatch(text) ? text : null,
+            "currentVersion" or "previousVersion" or "releaseVersion" or "axorith_version" or "release_version" => VersionRegex().IsMatch(text) ? text : null,
+            "build_sha" => BuildShaRegex().IsMatch(text) ? text : null,
             "exceptionType" => SafeIdentifier(text, 128),
             "fingerprint" => FingerprintRegex().IsMatch(text) ? text : null,
             "diagnostic" => SafeIdentifier(text, 160),
@@ -217,6 +222,9 @@ internal static partial class TelemetryEventSanitizer
         "Gaming", "Social", "Browsers", "Entertainment", "Productivity", "Email", "Development", "Design", "Office",
         "Video", "Streaming", "News", "Shopping", "Music", "Work", "Adult", "Gambling", "Dating", "Forums"];
     private static readonly HashSet<string> DayValues = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+    [GeneratedRegex("^[0-9a-fA-F]{7,64}$")]
+    private static partial Regex BuildShaRegex();
 
     [GeneratedRegex("^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$")]
     private static partial Regex VersionRegex();

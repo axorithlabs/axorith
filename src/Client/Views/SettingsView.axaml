@@ -123,6 +123,11 @@
                                         <TextBlock Text="{Binding MainViewModel.UpdateVersion, StringFormat='Available: {0}'}"
                                                    FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                                    IsVisible="{Binding MainViewModel.UpdateAvailable}" />
+                                        <TextBlock Text="{Binding MainViewModel.UpdateStatus}" FontSize="12" MaxWidth="430"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding MainViewModel.DownloadProgress}"
+                                                     IsVisible="{Binding MainViewModel.IsDownloadingUpdate}" Height="4"
+                                                     AutomationProperties.Name="Update download progress" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
                                                 VerticalAlignment="Center">
@@ -156,7 +161,7 @@
                             <Border BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,1,0,0" Padding="0,12">
                                 <StackPanel Spacing="7">
                                     <TextBlock Text="Data collected" FontWeight="SemiBold" />
-                                    <TextBlock Text="Usage events include app/OS versions, a pseudonymous installation ID, Workspace/module/session/schedule IDs and types, lifecycle and update events, selected non-secret configuration options, and sanitized error details.&#x0a;Allowlisted details may include custom process names, site/browser/Home Assistant domains, launcher types and executable basenames, selected categories, schedule times, and public Steam App IDs. Secret values such as tokens and passwords are not sent; presence flags may be sent.&#x0a;Workspace and schedule names, custom module/action names, full paths and URLs, raw browser profile names, arbitrary settings dictionaries, raw error messages, and stack traces are not sent. Paths and profile names may be represented by keyed HMAC hashes. Client and Host telemetry requests may let PostHog infer coarse location from network metadata; Axorith does not send an IP property."
+                                    <TextBlock Text="Usage events include app/OS versions, a pseudonymous Windows device ID that persists across app reinstalls, Workspace/module/session/schedule IDs and types, lifecycle and update events, selected non-secret configuration options, and sanitized error details.&#x0a;Allowlisted details may include custom process names, site/browser/Home Assistant domains, launcher types and executable basenames, selected categories, schedule times, and public Steam App IDs. Secret values such as tokens and passwords are not sent; presence flags may be sent.&#x0a;Workspace and schedule names, custom module/action names, full paths and URLs, raw browser profile names, arbitrary settings dictionaries, raw error messages, and stack traces are not sent. Paths and profile names may be represented by keyed HMAC hashes. Client and Host telemetry requests may let PostHog infer coarse location from network metadata; Axorith does not send an IP property."
                                                FontSize="12" Foreground="{DynamicResource TextMutedBrush}" LineHeight="20" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>

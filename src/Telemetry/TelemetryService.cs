@@ -43,6 +43,7 @@ public sealed partial class TelemetryService : ITelemetryService
     private readonly Dictionary<string, ErrorAggregate> _errors = new(StringComparer.Ordinal);
     private Task? _flushTask;
     private readonly string _distinctId = string.Empty;
+    private readonly bool _migrateLegacyIdentity;
     private string? _appVersion;
     private string? _osVersion;
     private int _enabled;
@@ -59,9 +60,19 @@ public sealed partial class TelemetryService : ITelemetryService
         _baseProperties = new Dictionary<string, object?>();
         if (!resolved.IsConfigured) return;
 
-        _distinctId = string.IsNullOrWhiteSpace(resolved.DistinctId)
-            ? DeviceIdProvider.GetDeviceId()
-            : resolved.DistinctId;
+        try
+        {
+            _distinctId = string.IsNullOrWhiteSpace(resolved.DistinctId)
+                ? DeviceIdProvider.GetDeviceId()
+                : resolved.DistinctId;
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Windows device identity could not be read; telemetry is disabled");
+            return;
+        }
+        _migrateLegacyIdentity = string.IsNullOrWhiteSpace(resolved.DistinctId) &&
+                                 string.Equals(resolved.ApplicationName, "Axorith.Host", StringComparison.Ordinal);
 
         var assembly = typeof(TelemetryService).Assembly;
         var version = string.IsNullOrWhiteSpace(resolved.AppVersion)
@@ -136,11 +147,21 @@ public sealed partial class TelemetryService : ITelemetryService
 
         if (identify)
         {
+            if (_migrateLegacyIdentity)
+                LegacyTelemetryIdentity.Migrate(this, _distinctId,
+                    Path.Combine(ApplicationPaths.MachineConfig, "installation-id.txt"),
+                    Path.Combine(ApplicationPaths.Config, "installation-id.txt"),
+                    Path.Combine(ApplicationPaths.MachineRoot, "registration.json"),
+                    Path.Combine(ApplicationPaths.LocalRoot, "registration.json"),
+                    Path.Combine(ApplicationPaths.Config, "pending-install.json"));
+
             TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
             {
                 [TelemetryConstants.Properties.Set] = new Dictionary<string, object?>
                 {
                     [TelemetryConstants.Properties.AxorithVersion] = _appVersion,
+                    [TelemetryConstants.Properties.ReleaseVersion] = _baseProperties.GetValueOrDefault(TelemetryConstants.Properties.ReleaseVersion),
+                    [TelemetryConstants.Properties.BuildSha] = _baseProperties.GetValueOrDefault(TelemetryConstants.Properties.BuildSha),
                     [TelemetryConstants.Properties.OsVersion] = _osVersion
                 }
             });
@@ -162,14 +183,14 @@ public sealed partial class TelemetryService : ITelemetryService
                     ? new Dictionary<string, object?>()
                     : TelemetryEventSanitizer.SanitizeProperties(properties);
                 var eventProperties = new Dictionary<string, object>(StringComparer.Ordinal);
-                if (!string.Equals(name, TelemetryConstants.IdentifyEvent, StringComparison.OrdinalIgnoreCase))
-                    AddProperties(eventProperties, _baseProperties);
+                AddProperties(eventProperties, _baseProperties);
 
                 AddProperties(eventProperties, safeProperties);
                 eventProperties[TelemetryConstants.Properties.PreferenceGeneration] =
                     Volatile.Read(ref _preferenceGeneration);
                 _client!.Capture(_distinctId, name, eventProperties, groups: null, flags: null,
                     timestamp: DateTimeOffset.UtcNow);
+                if (name == TelemetryConstants.IdentityMigratedEvent) _ = _client.FlushAsync();
             }
         }
         catch (Exception ex)
@@ -366,10 +387,17 @@ public sealed partial class TelemetryService : ITelemetryService
     private static IReadOnlyDictionary<string, object?> BuildBaseProperties(TelemetrySettings settings,
         string appVersion, string osVersion)
     {
+        var versionParts = appVersion.Split('+', 2);
+        var releaseVersion = versionParts[0];
+        if (Version.TryParse(releaseVersion, out var numericVersion) && numericVersion.Revision == 0)
+            releaseVersion = numericVersion.ToString(3);
+
         var baseValues = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             [TelemetryConstants.Properties.OsVersion] = osVersion,
             [TelemetryConstants.Properties.AxorithVersion] = appVersion,
+            [TelemetryConstants.Properties.ReleaseVersion] = releaseVersion,
+            [TelemetryConstants.Properties.BuildSha] = versionParts.Length > 1 ? versionParts[1] : null,
             [TelemetryConstants.Properties.Application] = settings.ApplicationName,
             [TelemetryConstants.Properties.BuildChannel] = settings.BuildChannel,
             [TelemetryConstants.Properties.Environment] = settings.EnvironmentOverride

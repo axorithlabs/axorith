@@ -16,21 +16,38 @@ public class GrpcUpdatesService : UpdatesService.UpdatesServiceBase
 
     public override async Task<UpdateInfoResponse> GetUpdateInfo(Empty request, ServerCallContext context)
     {
-        // Wait for initial check to complete (with timeout)
         await _updateService.WaitForInitialCheckAsync(context.CancellationToken);
+        if (_updateService.LatestUpdate is null && _updateService.LastCheckError is { } error)
+            throw new RpcException(new Status(StatusCode.Unavailable, error));
 
+        return CreateResponse();
+    }
+
+    public override async Task<UpdateInfoResponse> CheckForUpdates(Empty request, ServerCallContext context)
+    {
+        await _updateService.CheckForUpdatesAsync(context.CancellationToken);
+        if (_updateService.LastCheckError is { } error)
+            throw new RpcException(new Status(StatusCode.Unavailable, error));
+
+        return CreateResponse();
+    }
+
+    private UpdateInfoResponse CreateResponse()
+    {
+        var update = _updateService.LatestUpdate;
         var response = new UpdateInfoResponse
         {
-            UpdateAvailable = _updateService.UpdateAvailable,
+            UpdateAvailable = update is not null,
             CurrentVersion = _updateService.CurrentVersion
         };
 
-        if (_updateService.LatestUpdate != null)
+        if (update is not null)
         {
-            response.LatestVersion = _updateService.LatestUpdate.Version;
-            response.DownloadUrl = _updateService.LatestUpdate.DownloadUrl;
-            response.ReleaseNotes = _updateService.LatestUpdate.ReleaseNotes;
-            response.PublishedAt = Timestamp.FromDateTime(_updateService.LatestUpdate.PublishedAt.ToUniversalTime());
+            response.LatestVersion = update.Version;
+            response.DownloadUrl = update.DownloadUrl;
+            response.ReleaseNotes = update.ReleaseNotes;
+            response.PublishedAt = Timestamp.FromDateTime(update.PublishedAt.ToUniversalTime());
+            response.Sha256Hash = update.Sha256Hash;
         }
 
         return response;

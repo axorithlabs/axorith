@@ -2,7 +2,7 @@ namespace Axorith.Client.CoreSdk.Abstractions;
 
 public interface IUpdatesApi
 {
-    Task<UpdateInfoDto?> GetUpdateInfoAsync(CancellationToken ct = default);
+    Task<UpdateInfoDto?> GetUpdateInfoAsync(CancellationToken ct = default, bool forceCheck = false);
 
     Task<string> DownloadUpdateAsync(UpdateInfoDto updateInfo, IProgress<double>? progress = null,
         CancellationToken ct = default);

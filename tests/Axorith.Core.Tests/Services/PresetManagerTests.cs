@@ -188,8 +188,9 @@ public class PresetManagerTests : IDisposable
 
         var migrated = Assert.Single(await _manager.LoadAllPresetsAsync(CancellationToken.None));
 
-        Assert.Equal(3, migrated.Version);
+        Assert.Equal(4, migrated.Version);
         Assert.Equal(applicationLauncherId, migrated.Modules[0].ModuleId);
+        Assert.Equal("OBS Studio", migrated.Modules[0].CustomName);
         Assert.Equal(@"C:\Apps\obs64.exe", migrated.Modules[0].Settings["ApplicationPath"]);
         Assert.Equal("OBS", migrated.Modules[0].Settings["LegacyLauncherModuleKey"]);
         Assert.False(migrated.Modules[0].Settings.ContainsKey("ObsPath"));
@@ -197,7 +198,8 @@ public class PresetManagerTests : IDisposable
         Assert.Equal(@"C:\Apps\my-editor.exe", migrated.Modules[1].Settings["CustomPath"]);
 
         var persisted = Assert.Single(await _manager.LoadAllPresetsAsync(CancellationToken.None));
-        Assert.Equal(3, persisted.Version);
+        Assert.Equal(4, persisted.Version);
+        Assert.Equal("OBS Studio", persisted.Modules[0].CustomName);
         Assert.Equal("OBS", persisted.Modules[0].Settings["LegacyLauncherModuleKey"]);
     }
 

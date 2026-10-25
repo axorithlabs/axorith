@@ -3,6 +3,7 @@ namespace Axorith.Telemetry;
 public static class TelemetryConstants
 {
     public const string IdentifyEvent = "$identify";
+    public const string IdentityMigratedEvent = "TelemetryIdentityMigrated";
 
     public const string DefaultEvent = "event";
 
@@ -20,6 +21,10 @@ public static class TelemetryConstants
         public const string Application = "application";
 
         public const string AxorithVersion = "axorith_version";
+
+        public const string ReleaseVersion = "release_version";
+
+        public const string BuildSha = "build_sha";
 
         public const string OsVersion = "os_version";
 

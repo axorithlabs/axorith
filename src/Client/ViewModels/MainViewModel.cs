@@ -10,6 +10,7 @@ using Axorith.Core.Models;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
+using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
 using ReactiveUI;
 using ReactiveUI.SourceGenerators;
@@ -137,6 +138,11 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     private DateTimeOffset? _activeSessionStartedAt;
     private string _activeSessionName = string.Empty;
     private bool _isPresetsPage;
+    private readonly CancellationTokenSource _updateCts = new();
+    private DateTimeOffset _lastUpdateStatePoll = DateTimeOffset.MinValue;
+    private readonly SemaphoreSlim _updateRefreshLock = new(1);
+    private bool _updateCheckFailureNotified;
+    private bool _isDisposed;
 
     [Reactive]
     public partial bool UpdateAvailable { get; private set; }
@@ -144,8 +150,20 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     [Reactive]
     public partial string? UpdateVersion { get; private set; }
 
-    [Reactive]
+    [Reactive(nameof(UpdateButtonText), nameof(IsUpdateBusy))]
     public partial bool IsDownloadingUpdate { get; private set; }
+
+    [Reactive(nameof(UpdateButtonText), nameof(IsUpdateBusy))]
+    public partial bool IsInstallingUpdate { get; private set; }
+
+    [Reactive]
+    public partial bool IsCheckingForUpdates { get; private set; }
+
+    [Reactive]
+    public partial string UpdateStatus { get; private set; } = "Updates are checked automatically.";
+
+    public bool IsUpdateBusy => IsDownloadingUpdate || IsInstallingUpdate;
+    public string UpdateButtonText => IsInstallingUpdate ? "Installer running…" : IsDownloadingUpdate ? "Downloading…" : "Update";
 
     [Reactive]
     public partial double DownloadProgress { get; private set; }
@@ -205,6 +223,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     public ICommand OpenSettingsCommand { get; }
 
     public ICommand InstallUpdateCommand { get; }
+    public ICommand CheckForUpdatesCommand { get; }
 
     public ICommand OpenEmergencyUnlockCommand { get; }
     public ICommand CloseEmergencyUnlockCommand { get; }
@@ -220,6 +239,12 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         _serviceProvider = serviceProvider;
         _telemetry = serviceProvider.GetService<ITelemetryService>();
         _toastService = serviceProvider.GetService<IToastNotificationService>();
+        var hasBeenShown = false;
+        _disposables.Add(_shell.WhenAnyValue(shellVm => shellVm.Content).Subscribe(content =>
+        {
+            if (ReferenceEquals(content, this)) hasBeenShown = true;
+            else if (hasBeenShown && content is MainViewModel or LoadingViewModel or ErrorViewModel) Dispose();
+        }));
         _activeSessionClock.Tick += (_, _) =>
         {
             UpdateActiveSessionClock();
@@ -230,6 +255,8 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 _lastSessionStatePoll = DateTimeOffset.UtcNow;
                 _ = RefreshSessionStateForClockAsync();
             }
+            if (DateTimeOffset.UtcNow - _lastUpdateStatePoll >= TimeSpan.FromSeconds(30))
+                _ = RefreshUpdatesAsync(forceCheck: false);
         };
         _activeSessionClock.Start();
 
@@ -314,10 +341,13 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             () => _shell.NavigateTo(_serviceProvider.GetRequiredService<SettingsViewModel>()),
             this.WhenAnyValue(vm => vm.IsOverlayOpen, overlayOpen => !overlayOpen));
         var canInstallUpdate = this
-            .WhenAnyValue(vm => vm.UpdateAvailable, vm => vm.IsDownloadingUpdate, vm => vm.IsCommittedSession,
-                (available, downloading, committed) => available && !downloading && !committed)
+            .WhenAnyValue(vm => vm.UpdateAvailable, vm => vm.IsUpdateBusy, vm => vm.IsCommittedSession,
+                (available, busy, committed) => available && !busy && !committed)
             .ObserveOn(RxApp.MainThreadScheduler);
         InstallUpdateCommand = ReactiveCommand.CreateFromTask(InstallUpdateAsync, canInstallUpdate);
+        CheckForUpdatesCommand = ReactiveCommand.CreateFromTask(() => RefreshUpdatesAsync(forceCheck: true),
+            this.WhenAnyValue(vm => vm.IsCheckingForUpdates, vm => vm.IsUpdateBusy,
+                (checking, busy) => !checking && !busy));
 
         StartBreakCommand = ReactiveCommand.CreateFromTask(StartBreakAsync,
             this.WhenAnyValue(vm => vm.CanStartBreak, vm => vm.IsOverlayOpen,
@@ -329,7 +359,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     {
         await LoadPresetsAsync();
         await RefreshSessionStateAsync();
-        await CheckForUpdatesAsync();
+        _ = RefreshUpdatesAsync(forceCheck: false);
     }
 
     [ReactiveCommand]
@@ -371,15 +401,32 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         UpdateDashboardActivity();
     }
 
-    [ReactiveCommand]
-    private async Task CheckForUpdatesAsync()
+    private async Task RefreshUpdatesAsync(bool forceCheck)
     {
+        if (_isDisposed || IsUpdateBusy) return;
+        var ct = _updateCts.Token;
+        var entered = false;
         try
         {
-            var updateInfo = await _updatesApi.GetUpdateInfoAsync();
-            _availableUpdate = updateInfo;
-            UpdateAvailable = updateInfo != null;
-            UpdateVersion = updateInfo?.Version;
+            entered = await _updateRefreshLock.WaitAsync(forceCheck ? Timeout.Infinite : 0, ct);
+            if (!entered) return;
+            _lastUpdateStatePoll = DateTimeOffset.UtcNow;
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_isDisposed) return;
+                IsCheckingForUpdates = true;
+                if (forceCheck) UpdateStatus = "Checking for updates…";
+            });
+            var updateInfo = await _updatesApi.GetUpdateInfoAsync(ct, forceCheck).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_isDisposed) return;
+                _availableUpdate = updateInfo;
+                UpdateAvailable = updateInfo is not null;
+                UpdateVersion = updateInfo?.Version;
+                UpdateStatus = updateInfo is null ? "You're up to date." : $"Version {updateInfo.Version} is available.";
+                _updateCheckFailureNotified = false;
+            });
             if (updateInfo is not null && _telemetry is { IsEnabled: true } &&
                 TryTrackUpdateAvailable(updateInfo.Version))
             {
@@ -389,9 +436,35 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 });
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (RpcException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (_isDisposed) return;
+                UpdateStatus = ex switch
+                {
+                    RpcException { StatusCode: StatusCode.Unimplemented } => "Restart Axorith Host to enable update checks.",
+                    InvalidDataException => ex.Message,
+                    _ => "Could not check for updates. Check your connection and try again."
+                };
+                if (forceCheck || !_updateCheckFailureNotified)
+                    _toastService?.Show(UpdateStatus, NotificationType.Warning, "Updates");
+                _updateCheckFailureNotified = true;
+            });
             _telemetry?.TrackError(ex, "update", "update_check", "warning", handled: true, fatal: false);
+        }
+        finally
+        {
+            if (entered)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!_isDisposed) IsCheckingForUpdates = false;
+                });
+                _updateRefreshLock.Release();
+            }
         }
     }
 
@@ -400,45 +473,81 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     private async Task InstallUpdateAsync()
     {
-        if (_availableUpdate == null) return;
+        var update = _availableUpdate;
+        if (update is null || IsUpdateBusy || IsCommittedSession || _isDisposed) return;
 
         var stage = "update_download";
+        var ct = _updateCts.Token;
         try
         {
             IsDownloadingUpdate = true;
             DownloadProgress = 0;
+            UpdateStatus = "Downloading update…";
             _telemetry?.TrackEvent("UpdateDownloadStarted", new Dictionary<string, object?>
             {
-                ["releaseVersion"] = _availableUpdate.Version
+                ["releaseVersion"] = update.Version
             });
 
-            var progress = new Progress<double>(value => { DownloadProgress = value; });
+            var progress = new Progress<double>(value => Dispatcher.UIThread.Post(() =>
+            {
+                if (!_isDisposed) DownloadProgress = value;
+            }));
 
-            var installerPath = await _updatesApi.DownloadUpdateAsync(_availableUpdate, progress);
+            var installerPath = await _updatesApi.DownloadUpdateAsync(update, progress, ct);
             _telemetry?.TrackEvent("UpdateDownloadCompleted", new Dictionary<string, object?>
             {
-                ["releaseVersion"] = _availableUpdate.Version
+                ["releaseVersion"] = update.Version
             });
 
             stage = "update_install";
+            if (IsCommittedSession)
+                throw new InvalidOperationException("Install the update after your committed session ends.");
+            IsDownloadingUpdate = false;
+            IsInstallingUpdate = true;
+            UpdateStatus = "Installer opened. Follow its instructions to finish updating.";
             _telemetry?.TrackEvent("UpdateInstallStarted", new Dictionary<string, object?>
             {
-                ["releaseVersion"] = _availableUpdate.Version
+                ["releaseVersion"] = update.Version
             });
-            await _updatesApi.InstallUpdateAsync(installerPath);
+            await _updatesApi.InstallUpdateAsync(installerPath, ct);
+            UpdateStatus = "Update installed. Restart Axorith to use the new version.";
+        }
+        catch (OperationCanceledException)
+        {
+            _telemetry?.TrackEvent(stage == "update_download" ? "UpdateDownloadCancelled" : "UpdateInstallCancelled",
+                new Dictionary<string, object?>
+                {
+                    ["releaseVersion"] = update.Version,
+                    ["stage"] = stage,
+                    ["result"] = "cancelled"
+                });
+            if (!_isDisposed)
+            {
+                UpdateStatus = "Update cancelled. You can try again.";
+                _toastService?.Show(UpdateStatus, NotificationType.Info, "Updates");
+            }
         }
         catch (Exception ex)
         {
-            IsDownloadingUpdate = false;
+            UpdateStatus = ex is InvalidDataException ? ex.Message
+                : stage == "update_download" ? "Update download failed. Check your connection and try again."
+                : IsCommittedSession ? "Install the update after your committed session ends."
+                : "Update installation failed. Please try again.";
+            _toastService?.Show(UpdateStatus, NotificationType.Error, "Updates");
             var eventName = stage == "update_download" ? "UpdateDownloadFailed" : "UpdateInstallFailed";
             _telemetry?.TrackEvent(eventName, new Dictionary<string, object?>
             {
-                ["releaseVersion"] = _availableUpdate.Version,
+                ["releaseVersion"] = update.Version,
                 ["stage"] = stage,
                 ["result"] = "failed"
             });
             _telemetry?.TrackError(ex, "update", stage, "error", handled: true, fatal: false,
-                new Dictionary<string, object?> { ["releaseVersion"] = _availableUpdate.Version });
+                new Dictionary<string, object?> { ["releaseVersion"] = update.Version });
+        }
+        finally
+        {
+            IsDownloadingUpdate = false;
+            IsInstallingUpdate = false;
         }
     }
 
@@ -951,6 +1060,10 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
+        if (_isDisposed) return;
+        _isDisposed = true;
+        _updateCts.Cancel();
+        _updateCts.Dispose();
         EndEmergencyUnlockHold();
         _activeSessionClock.Stop();
         _disposables.Dispose();

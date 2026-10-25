@@ -6,6 +6,7 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+$env:AVALONIA_TELEMETRY_OPTOUT = '1'
 
 try {
     $PSScriptRoot = $MyInvocation.MyCommand.Path | Split-Path
@@ -143,49 +144,63 @@ if (-not $NsisPath) {
 }
 
 Write-Host "--- Publishing product projects in Release mode ---" -ForegroundColor Cyan
-if (Test-Path $DistDir) { Remove-Item -Recurse -Force $DistDir }
-if (Test-Path $StagingDir) { Remove-Item -Recurse -Force $StagingDir }
+$buildRoot = [IO.Path]::GetFullPath((Join-Path $SolutionDir 'build')).TrimEnd('\') + '\'
+foreach ($outputDirectory in @($DistDir, $StagingDir)) {
+    $resolvedOutput = [IO.Path]::GetFullPath($outputDirectory)
+    if (-not $resolvedOutput.StartsWith($buildRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Output directory is outside the build root: $resolvedOutput"
+    }
+    if (Test-Path -LiteralPath $resolvedOutput) { Remove-Item -LiteralPath $resolvedOutput -Recurse -Force }
+}
 New-Item -ItemType Directory -Force $StagingDir | Out-Null
 New-Item -ItemType Directory -Force $DistDir | Out-Null
 
 $publishProjects = Get-ChildItem -Path (Join-Path $SolutionDir "src") -Filter "*.csproj" -File -Recurse
+$publishedFolders = @{}
 foreach ($project in $publishProjects) {
     Write-Host "Publishing $($project.FullName)..." -ForegroundColor Cyan
-    & dotnet publish $project.FullName --configuration Release "-p:Version=$Version"
+    $publishFolder = & dotnet publish $project.FullName --configuration Release "-p:Version=$Version" '-getProperty:PublishDir' --verbosity quiet
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Publish failed for $($project.FullName)."
         exit 1
     }
+    $publishedPath = [IO.Path]::GetFullPath(([string]$publishFolder).Trim())
+    if (-not $publishedPath.StartsWith([IO.Path]::GetFullPath($BuildOutputDir).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -or
+        -not (Test-Path -LiteralPath $publishedPath -PathType Container)) {
+        throw "Unexpected publish directory for $($project.Name): $publishedPath"
+    }
+    $publishedFolders[$project.BaseName] = $publishedPath
 }
 Write-Host "Product projects published successfully."
 
 Write-Host "--- Aggregating published artifacts into staging directory ---" -ForegroundColor Cyan
 
-$publishFolders = Get-ChildItem -Path $BuildOutputDir -Directory -Recurse -Filter "publish"
-
-foreach ($folder in $publishFolders) {
-    $relativePath = $folder.FullName.Substring($BuildOutputDir.Length + 1)
-    $parts = $relativePath -split '\\'
-    $topFolder = $parts[0]
-
-    if ($topFolder -eq "Tests") {
-        Write-Host "Skipping test artifacts in: $relativePath" -ForegroundColor Gray
-        continue
-    }
-
-    if ($topFolder -eq "Modules") {
-        continue
-    }
+foreach ($project in $publishProjects) {
+    if ($project.DirectoryName.StartsWith((Join-Path $SolutionDir 'src\Modules') + '\', [StringComparison]::OrdinalIgnoreCase)) { continue }
+    $topFolder = $project.BaseName
+    $publishedPath = $publishedFolders[$topFolder]
 
     $destinationPath = Join-Path $StagingDir $topFolder
     New-Item -ItemType Directory -Force $destinationPath | Out-Null
 
-    Write-Host "Syncing '$($folder.FullName)' to '$destinationPath' using robocopy..."
-    robocopy $folder.FullName $destinationPath /E /NFL /NDL /NJH /NJS /nc /ns /np
+    Write-Host "Syncing '$publishedPath' to '$destinationPath' using robocopy..."
+    robocopy $publishedPath $destinationPath /E /NFL /NDL /NJH /NJS /nc /ns /np
     if ($LASTEXITCODE -ge 8) {
         Write-Error "Robocopy failed with exit code $LASTEXITCODE"
         exit 1
     }
+}
+
+$numericVersion = [version]($Version -split '-', 2)[0]
+foreach ($product in @('Axorith.Client', 'Axorith.Host', 'Axorith.Shim')) {
+    $productDirectory = Join-Path $StagingDir $product
+    $assemblyPath = Join-Path $productDirectory "$product.dll"
+    $productVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($assemblyPath).ProductVersion.Split('+')[0]
+    $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($assemblyPath).Version
+    if ($productVersion -ne $Version -or $assemblyVersion.ToString(3) -ne $numericVersion.ToString(3)) {
+        throw "Refusing to package $product version $productVersion ($assemblyVersion) as $Version."
+    }
+    Write-Host "Verified $product version $productVersion" -ForegroundColor Green
 }
 
 $sourceModulesPath = Join-Path $BuildOutputDir "Modules"
@@ -221,10 +236,15 @@ else {
 }
 
 Write-Host "--- Compiling the NSIS installer ---" -ForegroundColor Cyan
+$buildSha = & git -C $SolutionDir rev-parse HEAD 2>$null
+if ($LASTEXITCODE -ne 0 -or $buildSha -notmatch '^[0-9a-fA-F]{40,64}$') {
+    $buildSha = ''
+}
 $nsisArgs = @(
     "/V2",
     "/DPRODUCT_VERSION=$Version",
-    "/DBUILD_ROOT=$StagingDir"
+    "/DBUILD_ROOT=$StagingDir",
+    "/DBUILD_SHA=$buildSha"
 )
 if (-not [string]::IsNullOrWhiteSpace($env:POSTHOG_API_KEY)) {
     $posthogApiHost = $env:POSTHOG_API_HOST

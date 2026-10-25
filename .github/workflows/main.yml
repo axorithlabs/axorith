@@ -15,6 +15,7 @@ env:
   DOTNET_VERSION: '10.0.x'
   SOLUTION_PATH: './Axorith.sln'
   Configuration: Release
+  AVALONIA_TELEMETRY_OPTOUT: '1'
 
 jobs:
   tests:

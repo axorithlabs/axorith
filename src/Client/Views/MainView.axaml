@@ -13,7 +13,7 @@
 
     <Grid RowDefinitions="*" ColumnDefinitions="220,*" Background="{DynamicResource BackgroundPrimaryBrush}">
         <Border Grid.Column="0" Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="0,0,1,0">
-            <Grid x:Name="SidebarNavigationGrid" RowDefinitions="Auto,*,Auto,Auto,Auto" Margin="13,18,13,14">
+            <Grid x:Name="SidebarNavigationGrid" RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="13,18,13,14">
                 <StackPanel Grid.Row="0" Spacing="4">
                     <Button x:Name="HomeSidebarButton" Classes="SidebarButton" Classes.Active="{Binding IsHomePage}" Command="{Binding ShowHomeCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="13">
@@ -66,11 +66,14 @@
                     <StackPanel Orientation="Horizontal" Spacing="9">
                         <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" Width="16" Height="16" />
                         <StackPanel Spacing="1" VerticalAlignment="Center">
-                            <TextBlock Text="Update" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding UpdateButtonText}" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding UpdateVersion}" FontSize="11" Opacity="0.8" />
                         </StackPanel>
                     </StackPanel>
                 </Button>
+                <ProgressBar Grid.Row="5" Minimum="0" Maximum="100" Value="{Binding DownloadProgress}"
+                             IsVisible="{Binding IsDownloadingUpdate}" Height="4" Margin="0,5,0,0"
+                             AutomationProperties.Name="Update download progress" />
             </Grid>
         </Border>
 

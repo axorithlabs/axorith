@@ -10,20 +10,20 @@ namespace Axorith.Core.Services;
 public class PresetManager(string presetsDirectory, ILogger<PresetManager> logger,
     ISecureStorageService? secureStorage = null) : IPresetManager
 {
-    private sealed record LegacyLauncherMigration(string PathKey, string ModuleKey);
+    private sealed record LegacyLauncherMigration(string PathKey, string ModuleKey, string Name);
 
-    private const int CurrentPresetVersion = 3;
+    private const int CurrentPresetVersion = 4;
     private static readonly Guid ApplicationLauncherId = Guid.Parse("9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd");
     private static readonly IReadOnlyDictionary<Guid, LegacyLauncherMigration> LegacyLauncherMigrations =
         new Dictionary<Guid, LegacyLauncherMigration>
     {
-        [Guid.Parse("6072c5d0-68eb-483c-b2c5-d068eb783c9e")] = new("BrowserPath", "Browser"),
-        [Guid.Parse("4f083ec9-518f-460a-883e-c9518fc60a28")] = new("ObsPath", "OBS"),
-        [Guid.Parse("30741589-7dba-42a2-b415-897dba32a2ef")] = new("DiscordPath", "Discord"),
-        [Guid.Parse("6b3271d3-3eae-41f4-b271-d33eaea1f40a")] = new("CodePath", "VSCode"),
-        [Guid.Parse("c5f5e7b2-9d2b-4e1a-9f4b-3f4b7e8c5a21")] = new("IDEPath", "JetBrainsIDE"),
-        [Guid.Parse("f4996a05-373d-4fa4-996a-05373d8fa4ea")] = new("SteamPath", "Steam"),
-        [Guid.Parse("04399d2f-43c9-4182-b99d-2f43c97182a6")] = new("SpotifyPath", "Spotify")
+        [Guid.Parse("6072c5d0-68eb-483c-b2c5-d068eb783c9e")] = new("BrowserPath", "Browser", "Browser"),
+        [Guid.Parse("4f083ec9-518f-460a-883e-c9518fc60a28")] = new("ObsPath", "OBS", "OBS Studio"),
+        [Guid.Parse("30741589-7dba-42a2-b415-897dba32a2ef")] = new("DiscordPath", "Discord", "Discord"),
+        [Guid.Parse("6b3271d3-3eae-41f4-b271-d33eaea1f40a")] = new("CodePath", "VSCode", "VS Code"),
+        [Guid.Parse("c5f5e7b2-9d2b-4e1a-9f4b-3f4b7e8c5a21")] = new("IDEPath", "JetBrainsIDE", "JetBrains IDE"),
+        [Guid.Parse("f4996a05-373d-4fa4-996a-05373d8fa4ea")] = new("SteamPath", "Steam", "Steam"),
+        [Guid.Parse("04399d2f-43c9-4182-b99d-2f43c97182a6")] = new("SpotifyPath", "Spotify", "Spotify")
     };
     private const long MaxPresetFileSizeBytes = 10 * 1024 * 1024; // 10 MB max
 
@@ -219,26 +219,29 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
     {
         foreach (var module in preset.Modules)
         {
-            if (module.ModuleId == ApplicationLauncherId &&
+            if (preset.Version < 3 && module.ModuleId == ApplicationLauncherId &&
                 module.Settings.TryGetValue("ApplicationPath", out var legacyApplicationPath) &&
                 !string.IsNullOrWhiteSpace(legacyApplicationPath))
             {
                 module.Settings["ApplicationPath"] = "custom-app";
                 module.Settings["CustomPath"] = legacyApplicationPath;
-                continue;
             }
-
-            if (!LegacyLauncherMigrations.TryGetValue(module.ModuleId, out var migration))
-                continue;
-
-            if (module.Settings.TryGetValue(migration.PathKey, out var appPath))
+            else if (LegacyLauncherMigrations.TryGetValue(module.ModuleId, out var migration))
             {
-                module.Settings.Remove(migration.PathKey);
-                module.Settings["ApplicationPath"] = appPath;
+                if (module.Settings.TryGetValue(migration.PathKey, out var appPath))
+                {
+                    module.Settings.Remove(migration.PathKey);
+                    module.Settings["ApplicationPath"] = appPath;
+                }
+
+                module.Settings["LegacyLauncherModuleKey"] = migration.ModuleKey;
+                module.ModuleId = ApplicationLauncherId;
             }
 
-            module.Settings["LegacyLauncherModuleKey"] = migration.ModuleKey;
-            module.ModuleId = ApplicationLauncherId;
+            if (module.ModuleId == ApplicationLauncherId && string.IsNullOrWhiteSpace(module.CustomName) &&
+                module.Settings.TryGetValue("LegacyLauncherModuleKey", out var moduleKey) &&
+                LegacyLauncherMigrations.Values.FirstOrDefault(launcher => launcher.ModuleKey == moduleKey) is { } launcher)
+                module.CustomName = launcher.Name;
         }
 
         logger.LogDebug("Preset migration completed for '{PresetName}'", preset.Name);

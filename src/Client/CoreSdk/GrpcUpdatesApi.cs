@@ -1,8 +1,10 @@
+using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
@@ -10,217 +12,159 @@ using Microsoft.Extensions.Logging;
 
 namespace Axorith.Client.CoreSdk;
 
-public class GrpcUpdatesApi : IUpdatesApi
+public sealed class GrpcUpdatesApi : IUpdatesApi, IDisposable
 {
     private readonly UpdatesService.UpdatesServiceClient _client;
     private readonly ILogger<GrpcUpdatesApi> _logger;
     private readonly HttpClient _httpClient;
+    private readonly ConcurrentDictionary<string, string> _verifiedInstallers = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan DownloadIdleTimeout = TimeSpan.FromSeconds(30);
 
-    public GrpcUpdatesApi(UpdatesService.UpdatesServiceClient client, ILogger<GrpcUpdatesApi> logger)
+    public GrpcUpdatesApi(UpdatesService.UpdatesServiceClient client, ILogger<GrpcUpdatesApi> logger, HttpClient? httpClient = null)
     {
         _client = client;
         _logger = logger;
-        _httpClient = new HttpClient();
+        _httpClient = httpClient ?? new HttpClient { Timeout = DownloadIdleTimeout };
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "Axorith-Client");
     }
 
-    public async Task<UpdateInfoDto?> GetUpdateInfoAsync(CancellationToken ct = default)
+    public async Task<UpdateInfoDto?> GetUpdateInfoAsync(CancellationToken ct = default, bool forceCheck = false)
     {
         try
         {
-            var response = await _client.GetUpdateInfoAsync(new Empty(), cancellationToken: ct);
+            var response = forceCheck
+                ? await _client.CheckForUpdatesAsync(new Empty(), cancellationToken: ct)
+                : await _client.GetUpdateInfoAsync(new Empty(), cancellationToken: ct);
+            if (!response.UpdateAvailable) return null;
 
-            if (!response.UpdateAvailable)
-                return null;
-
-            return new UpdateInfoDto(
-                response.LatestVersion,
-                response.DownloadUrl,
-                response.ReleaseNotes,
-                response.PublishedAt.ToDateTime(),
-                response.Sha256Hash);
+            UpdateInstallerSource.ValidateDownloadUrl(response.LatestVersion, response.DownloadUrl);
+            return new UpdateInfoDto(response.LatestVersion, response.DownloadUrl, response.ReleaseNotes,
+                response.PublishedAt.ToDateTime(), UpdateInstallerSource.NormalizeSha256(response.Sha256Hash));
         }
         catch (RpcException ex)
         {
-            _logger.LogError(ex, "Failed to get update info");
-            return null;
+            _logger.LogWarning(ex, "Failed to get update info");
+            throw;
         }
     }
 
     public async Task<string> DownloadUpdateAsync(UpdateInfoDto updateInfo, IProgress<double>? progress = null,
         CancellationToken ct = default)
     {
+        UpdateInstallerSource.ValidateDownloadUrl(updateInfo.Version, updateInfo.DownloadUrl);
+        var expectedHash = UpdateInstallerSource.NormalizeSha256(updateInfo.Sha256Hash);
+        var directory = Directory.CreateTempSubdirectory("Axorith-Update-").FullName;
+        var path = Path.Combine(directory, "axorith-setup.exe");
         try
         {
-            var tempPath = Path.Combine(Path.GetTempPath(), $"Axorith-Setup-{updateInfo.Version}.exe");
-
-            _logger.LogInformation("Downloading update from {Url} to {Path}", updateInfo.DownloadUrl,
-                TelemetryGuard.SafePath(tempPath));
-
-            using var response =
-                await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = response.Content.Headers.ContentLength ?? 0;
-            var downloadedBytes = 0L;
-
-            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream =
-                new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-
-            var buffer = new byte[8192];
-            int bytesRead;
-
-            using var sha256 = SHA256.Create();
-            while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
+            for (var attempt = 1; ; attempt++)
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                sha256.TransformBlock(buffer, 0, bytesRead, null, 0);
-                downloadedBytes += bytesRead;
-
-                if (totalBytes > 0)
+                try
                 {
-                    var percentage = (double)downloadedBytes / totalBytes * 100;
-                    progress?.Report(percentage);
+                    progress?.Report(0);
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    timeout.CancelAfter(DownloadIdleTimeout);
+                    using var response = await _httpClient.GetAsync(updateInfo.DownloadUrl,
+                        HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                    response.EnsureSuccessStatusCode();
+                    var total = response.Content.Headers.ContentLength;
+                    long downloaded = 0;
+                    using var sha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                    await using (var content = await response.Content.ReadAsStreamAsync(timeout.Token))
+                    await using (var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                    {
+                        var buffer = new byte[81920];
+                        int read;
+                        while ((read = await content.ReadAsync(buffer, timeout.Token)) > 0)
+                        {
+                            await file.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
+                            sha256.AppendData(buffer, 0, read);
+                            downloaded += read;
+                            timeout.CancelAfter(DownloadIdleTimeout);
+                            if (total > 0) progress?.Report(Math.Min(99, (double)downloaded / total.Value * 100));
+                        }
+                    }
+
+                    if (total.HasValue && downloaded != total.Value)
+                        throw new IOException("The update download was incomplete.");
+                    if (!string.Equals(Convert.ToHexString(sha256.GetHashAndReset()), expectedHash, StringComparison.Ordinal))
+                        throw new InvalidDataException("Update verification failed. The installer was not saved; please try again.");
+
+                    _verifiedInstallers[path] = expectedHash;
+                    progress?.Report(100);
+                    _logger.LogInformation("Update downloaded and SHA256 verified: {Path}", TelemetryGuard.SafePath(path));
+                    return path;
+                }
+                catch (Exception ex) when (attempt < 3 && !ct.IsCancellationRequested &&
+                                           (ex is HttpRequestException or IOException or OperationCanceledException) &&
+                                           ex is not InvalidDataException)
+                {
+                    _logger.LogWarning(ex, "Update download attempt {Attempt} failed; retrying", attempt);
+                    await Task.Delay(TimeSpan.FromSeconds(attempt), ct);
                 }
             }
-
-            sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-            var computedHash = Convert.ToHexString(sha256.Hash!);
-
-            _logger.LogInformation("Update downloaded successfully. SHA256: {Hash}", computedHash);
-
-            if (!string.IsNullOrWhiteSpace(updateInfo.Sha256Hash))
-            {
-                if (!string.Equals(computedHash, updateInfo.Sha256Hash, StringComparison.OrdinalIgnoreCase))
-                {
-                    File.Delete(tempPath);
-                    throw new InvalidOperationException(
-                        $"Update file integrity check failed. Expected: {updateInfo.Sha256Hash}, Got: {computedHash}");
-                }
-
-                _logger.LogInformation("Update file integrity verified successfully");
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "No SHA256 hash provided for update verification. Proceeding without integrity check.");
-            }
-
-            if (OperatingSystem.IsWindows())
-            {
-                if (!VerifyAuthenticodeSignature(tempPath))
-                {
-                    File.Delete(tempPath);
-                    throw new InvalidOperationException(
-                        "Update file signature verification failed. The installer is not signed by a trusted publisher.");
-                }
-
-                _logger.LogInformation("Authenticode signature verified successfully");
-            }
-
-            return tempPath;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to download update");
+            DeleteDownload(path);
+            _logger.LogWarning(ex, "Failed to download update");
             throw;
         }
     }
 
-    private bool VerifyAuthenticodeSignature(string filePath)
+    public async Task InstallUpdateAsync(string installerPath, CancellationToken ct = default)
     {
+        if (!_verifiedInstallers.TryGetValue(installerPath, out var expectedHash))
+            throw new InvalidOperationException("Download and verify the update before installing it.");
+
         try
         {
-            using var cert2 = X509CertificateLoader.LoadCertificateFromFile(filePath);
+            using var installer = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
+            var hash = Convert.ToHexString(await SHA256.HashDataAsync(installer, ct));
+            if (!string.Equals(hash, expectedHash, StringComparison.Ordinal))
+                throw new InvalidDataException("The installer changed after verification. Download it again.");
 
-            var expectedSubjects = new[]
-            {
-                "CN=Axorith Labs",
-                "CN=AxorithLabs",
-                "O=Axorith Labs"
-            };
-
-            var subjectMatches = expectedSubjects.Any(expected =>
-                cert2.Subject.Contains(expected, StringComparison.OrdinalIgnoreCase));
-
-            if (!subjectMatches)
-            {
-                _logger.LogError("Certificate subject mismatch. Expected one of: {Expected}, Got: {Actual}",
-                    string.Join(", ", expectedSubjects), cert2.Subject);
-                return false;
-            }
-
-            var chain = new X509Chain
-            {
-                ChainPolicy =
-                {
-                    RevocationMode = X509RevocationMode.Online,
-                    RevocationFlag = X509RevocationFlag.EntireChain,
-                    VerificationFlags = X509VerificationFlags.NoFlag
-                }
-            };
-
-            var isValid = chain.Build(cert2);
-
-            if (!isValid)
-            {
-                _logger.LogError("Certificate chain validation failed. Status: {Status}",
-                    string.Join(", ", chain.ChainStatus.Select(s => s.StatusInformation)));
-                return false;
-            }
-
-            var now = DateTime.Now;
-            if (now < cert2.NotBefore || now > cert2.NotAfter)
-            {
-                _logger.LogError("Certificate is expired or not yet valid. Valid from {From} to {To}",
-                    cert2.NotBefore, cert2.NotAfter);
-                return false;
-            }
-
-            return true;
-        }
-        catch (CryptographicException ex)
-        {
-            _logger.LogError(ex, "File is not signed or signature is invalid");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to verify Authenticode signature");
-            return false;
-        }
-    }
-
-    public Task InstallUpdateAsync(string installerPath, CancellationToken ct = default)
-    {
-        try
-        {
-            if (!File.Exists(installerPath)) throw new FileNotFoundException("Installer not found", installerPath);
-
-            _logger.LogInformation("Starting installer: {Path}", TelemetryGuard.SafePath(installerPath));
-
-            var startInfo = new ProcessStartInfo
+            ct.ThrowIfCancellationRequested();
+            using var process = Process.Start(new ProcessStartInfo
             {
                 FileName = installerPath,
                 UseShellExecute = true,
                 Verb = "runas"
-            };
+            }) ?? throw new InvalidOperationException("Windows could not start the update installer.");
 
-            Process.Start(startInfo);
+            // The installer closes Client and Host only when it is ready to replace their files.
+            await process.WaitForExitAsync(ct);
+            if (process.ExitCode == 1) throw new OperationCanceledException("Update installation was cancelled.");
+            if (process.ExitCode != 0) throw new InvalidOperationException($"Update installer failed (exit code {process.ExitCode}).");
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            throw new OperationCanceledException("Update installation was cancelled.", ex);
+        }
+        finally
+        {
+            _verifiedInstallers.TryRemove(installerPath, out _);
+            DeleteDownload(installerPath);
+        }
+    }
 
-            Task.Run(async () =>
-            {
-                await Task.Delay(2000);
-                Environment.Exit(0);
-            });
-
-            return Task.CompletedTask;
+    private void DeleteDownload(string path)
+    {
+        try
+        {
+            File.Delete(path);
+            Directory.Delete(Path.GetDirectoryName(path)!);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to install update");
-            throw;
+            _logger.LogWarning(ex, "Could not remove temporary update: {Path}", TelemetryGuard.SafePath(path));
         }
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
+        foreach (var path in _verifiedInstallers.Keys)
+            if (_verifiedInstallers.TryRemove(path, out _)) DeleteDownload(path);
     }
 }

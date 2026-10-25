@@ -280,13 +280,20 @@ public class SessionAutoStopService(
                 return false;
             }
 
-            var currentPreset = expectedSession;
-            Guid? trackedSessionInstanceId;
-            lock (_stateLock)
+            if (schedule is not null && schedule.PresetId != expectedSession.Id)
             {
-                trackedSessionInstanceId = _currentSessionInstanceId;
+                TrackScheduleTriggered(schedule, "skipped", skipReason: "preset_mismatch");
+                return false;
             }
-            var currentSessionInstanceId = trackedSessionInstanceId ?? sessionManager.CurrentSessionInstanceId;
+
+            if (schedule?.Type == ScheduleType.StopRecurring && expectedSession.FocusCommitment.IsCommitted)
+            {
+                TrackScheduleTriggered(schedule, "skipped", skipReason: "committed_session");
+                return false;
+            }
+
+            var currentPreset = expectedSession;
+            var currentSessionInstanceId = sessionManager.CurrentSessionInstanceId;
 
             logger.LogInformation("Auto-stopping session '{PresetName}' (instance: {SessionInstanceId})",
                 currentPreset.Name, currentSessionInstanceId);
@@ -300,15 +307,10 @@ public class SessionAutoStopService(
                 _ => null
             };
 
-            lock (_stateLock)
-            {
-                ClearTrackingStateLocked();
-            }
-
             try
             {
                 var ended = await sessionManager.EndCommittedSessionAsync(SessionEndReason.NaturalCompletion,
-                    CancellationToken.None).ConfigureAwait(false);
+                    CancellationToken.None, expectedSession).ConfigureAwait(false);
                 if (!ended)
                 {
                     logger.LogInformation("Session ended before its natural completion handler acquired the stop lock.");
@@ -332,7 +334,11 @@ public class SessionAutoStopService(
             {
                 lock (_stateLock)
                 {
-                    _loopCts?.Cancel();
+                    if (_currentSessionInstanceId == currentSessionInstanceId)
+                    {
+                        ClearTrackingStateLocked();
+                        _loopCts?.Cancel();
+                    }
                 }
             }
 
