@@ -50,35 +50,35 @@ internal class ModuleActionAdapter(
             var result = await modulesApi.InvokeDesignTimeActionAsync(moduleId, designTimeId, Key);
             if (result.Success)
                 _invokedSubject.OnNext(Unit.Default);
-            TrackActionInvocation(result.Success ? "success" : "failed");
+            TrackActionInvocation(result.Success ? "success" : "failed", failure: result.Success ? null : result);
         }
         catch (Exception ex)
         {
-            TrackActionInvocation("failed");
+            TrackActionInvocation("failed", ex);
             TrackActionError(ex);
             if (throwOnError)
                 throw;
         }
     }
 
-    private void TrackActionInvocation(string result) => telemetry?.TrackEvent("ModuleActionInvoked",
+    private void TrackActionInvocation(string result, Exception? exception = null, OperationResult? failure = null) =>
+        telemetry?.TrackEvent("ModuleActionInvoked",
         new Dictionary<string, object?>
         {
-            ["moduleId"] = moduleId,
-            ["moduleName"] = moduleName,
-            ["instanceId"] = designTimeId,
-            ["presetId"] = presetId,
+            ["module"] = ProductAnalyticsProperties.ModuleReference(moduleId, designTimeId, moduleName),
+            ["preset"] = ProductAnalyticsProperties.PresetReference(presetId),
             ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey(Key),
-            ["result"] = result
+            ["result"] = result,
+            ["exception"] = exception,
+            ["errorMessage"] = failure?.Message,
+            ["errors"] = failure?.Errors
         });
 
     private void TrackActionError(Exception exception) => telemetry?.TrackError(exception, "module",
         "design_time_action", "error", handled: true, fatal: false, properties: new Dictionary<string, object?>
         {
-            ["moduleId"] = moduleId,
-            ["moduleName"] = moduleName,
-            ["instanceId"] = designTimeId,
-            ["presetId"] = presetId,
+            ["module"] = ProductAnalyticsProperties.ModuleReference(moduleId, designTimeId, moduleName),
+            ["preset"] = ProductAnalyticsProperties.PresetReference(presetId),
             ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey(Key)
         });
 

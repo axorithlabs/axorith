@@ -96,6 +96,10 @@
         <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="{StaticResource TransparentColor}" />
         <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="{StaticResource BorderSecondaryColor}" />
         <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{StaticResource TextDisabledColor}" />
+        <SolidColorBrush x:Key="RepeatButtonBackgroundPointerOver" Color="{StaticResource BackgroundHoverColor}" />
+        <SolidColorBrush x:Key="RepeatButtonBackgroundPressed" Color="{StaticResource BackgroundPressedColor}" />
+        <SolidColorBrush x:Key="RepeatButtonBackgroundDisabled" Color="{StaticResource TransparentColor}" />
+        <SolidColorBrush x:Key="RepeatButtonForegroundDisabled" Color="{StaticResource TextDisabledColor}" />
         <SolidColorBrush x:Key="AccentButtonBackground" Color="{StaticResource AccentPrimaryColor}" />
         <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="{StaticResource AccentPrimaryColor}" />
         <SolidColorBrush x:Key="AccentButtonForeground" Color="{StaticResource TextOnAccentColor}" />
@@ -590,9 +594,8 @@
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
-    <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ RepeatButton">
-        <Setter Property="Background" Value="{DynamicResource TransparentBrush}" />
-        <Setter Property="BorderThickness" Value="0" />
+    <Style Selector="NumericUpDown /template/ ButtonSpinner /template/ Border">
+        <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
     <Style Selector="ComboBox">

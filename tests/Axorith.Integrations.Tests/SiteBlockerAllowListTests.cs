@@ -78,6 +78,11 @@ public sealed class SiteBlockerAllowListTests
 
         Assert.Equal(ValidationStatus.Warning, validation.Status);
         Assert.Contains("extension", validation.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(validation.ReasonCode, new[]
+        {
+            "no_sites_configured", "extension_not_connected", "extension_disabled",
+            "extension_inactive", "native_messaging_unavailable"
+        });
     }
 
     [Fact]

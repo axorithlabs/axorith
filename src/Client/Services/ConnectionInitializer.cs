@@ -109,6 +109,8 @@ public sealed class ConnectionInitializer
         catch (Exception ex)
         {
             logger.LogError(ex, "Fatal initialization error");
+            app.Services.GetService<ITelemetryService>()?.TrackError(ex, "client", "connection_initialize",
+                "error", handled: true, fatal: false);
             await ShowFatalErrorAsync(app, config, loggerFactory, logger, ex.Message);
         }
     }

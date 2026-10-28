@@ -6,7 +6,7 @@ namespace Axorith.Integrations.Tests;
 public sealed class UpdateAvailableTelemetryTests
 {
     [Fact]
-    public void TryTrackUpdateAvailable_TracksEachReleaseVersionOnlyOncePerProcess()
+    public void TryTrackUpdateAvailable_TracksEachTargetVersionOnlyOncePerProcess()
     {
         var version = $"1.2.3+{Guid.NewGuid():N}";
 

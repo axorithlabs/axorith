@@ -17,6 +17,15 @@ public static partial class ProductAnalyticsProperties
     private static readonly HashSet<string> SiteBlockerCategories =
         ["Social", "Video", "Streaming", "Gaming", "News", "Shopping", "Music", "Work", "Adult", "Gambling", "Dating", "Forums"];
 
+    public static Dictionary<string, object?> PresetReference(Guid? presetId) => new() { ["presetId"] = presetId };
+
+    public static Dictionary<string, object?> ModuleReference(Guid moduleId, Guid instanceId, string moduleName) => new()
+    {
+        ["moduleId"] = moduleId,
+        ["instanceId"] = instanceId,
+        ["type"] = NormalizeModuleName(moduleName)
+    };
+
     public static Dictionary<string, object?> FocusCommitment(FocusCommitmentOptions options)
     {
         var hasNextWorkspace = options is { AfterEnd: AfterEndBehavior.StartNextWorkspace, NextWorkspaceId: not null };
@@ -74,22 +83,24 @@ public static partial class ProductAnalyticsProperties
         properties["presetId"] = preset.Id;
         properties["presetVersion"] = preset.Version;
         properties["moduleCount"] = modules.Length;
-        properties["moduleIds"] = preset.Modules.Select(module => module.ModuleId.ToString()).ToArray();
-        properties["moduleTypes"] = modules.Select(module => (string)module["moduleName"]!).Distinct().ToArray();
         properties["modules"] = modules;
-        return properties;
+        return new Dictionary<string, object?> { ["preset"] = properties };
     }
 
     public static Dictionary<string, object?> ModuleConfigurationSaved(SessionPreset preset,
         ConfiguredModule module, string moduleName, string presetChangeType,
         ISecureStorageService? secureStorage = null, bool configurationChanged = true)
     {
-        var properties = Module(module, moduleName,
+        var moduleProperties = Module(module, moduleName,
             HasHomeAssistantAccessToken(module, moduleName, secureStorage), secureStorage);
-        properties["presetId"] = preset.Id;
-        properties["presetChangeType"] = presetChangeType;
-        properties["moduleConfigurationChanged"] = configurationChanged;
-        return properties;
+        var presetProperties = PresetReference(preset.Id);
+        presetProperties["modules"] = new[] { moduleProperties };
+        return new Dictionary<string, object?>
+        {
+            ["preset"] = presetProperties,
+            ["presetChangeType"] = presetChangeType,
+            ["moduleConfigurationChanged"] = configurationChanged
+        };
     }
 
     public static Dictionary<string, object?> Module(ConfiguredModule module, string moduleName,
@@ -101,7 +112,7 @@ public static partial class ProductAnalyticsProperties
         {
             ["moduleId"] = module.ModuleId,
             ["instanceId"] = module.InstanceId,
-            ["moduleName"] = name,
+            ["type"] = name,
             ["startDelayMs"] = (long)module.StartDelay.TotalMilliseconds
         };
 
@@ -174,24 +185,25 @@ public static partial class ProductAnalyticsProperties
             ["hasNextPreset"] = canChain && schedule.NextPresetId.HasValue,
             ["nextPresetId"] = canChain ? schedule.NextPresetId : null,
             ["oneTimeMinuteOfDay"] = null,
-            ["oneTimeDayOfWeek"] = null,
-            ["oneTimeLeadTimeMs"] = null
+            ["oneTimeDayOfWeek"] = null
         };
-        if (changeType is not null) properties["changeType"] = changeType;
+        var eventProperties = new Dictionary<string, object?> { ["schedule"] = properties };
+        if (changeType is not null) eventProperties["changeType"] = changeType;
 
         if (schedule is { Type: ScheduleType.OneTime, OneTimeDate: { } oneTime })
         {
             var local = oneTime.ToLocalTime();
             properties["oneTimeMinuteOfDay"] = local.Hour * 60 + local.Minute;
             properties["oneTimeDayOfWeek"] = DayKey(local.DayOfWeek);
-            properties["oneTimeLeadTimeMs"] = (long)Math.Max(0, (oneTime - DateTimeOffset.UtcNow).TotalMilliseconds);
+            eventProperties["oneTimeLeadTimeMs"] = (long)Math.Max(0, (oneTime - DateTimeOffset.UtcNow).TotalMilliseconds);
         }
 
-        return properties;
+        return eventProperties;
     }
 
     public static Dictionary<string, object?> ScheduleTriggered(SessionSchedule schedule, string triggerAction,
-        string result, Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null)
+        string result, Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null,
+        Exception? exception = null)
     {
         var properties = Schedule(schedule);
         properties["triggerAction"] = triggerAction;
@@ -199,6 +211,8 @@ public static partial class ProductAnalyticsProperties
         if (sessionInstanceId.HasValue) properties["sessionInstanceId"] = sessionInstanceId.Value;
         if (failureReason is not null) properties["failureReason"] = failureReason;
         if (skipReason is not null) properties["skipReason"] = skipReason;
+        if (exception is not null) properties["exception"] = exception;
+        else if (failureReason == "preset_not_found") properties["errorMessage"] = "Preset not found";
         return properties;
     }
 
@@ -220,6 +234,9 @@ public static partial class ProductAnalyticsProperties
     {
         OperationCanceledException => "cancelled",
         TimeoutException => "timeout",
+        HttpRequestException => "network_error",
+        SessionException when exception.InnerException is TimeoutException => "timeout",
+        SessionException when exception.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) => "timeout",
         InvalidSettingsException => "invalid_settings",
         SessionException when exception.Message.Contains("already running", StringComparison.OrdinalIgnoreCase) =>
             "session_already_running",

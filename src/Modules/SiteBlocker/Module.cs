@@ -126,6 +126,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
         UpdateBrowserStatuses(extensionResults);
 
         List<string> warnings = [];
+        var reasonCode = "no_sites_configured";
         if (noSitesConfigured)
         {
             warnings.Add(allowList
@@ -140,6 +141,13 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
         var anyExtensionConnected = extensionResults.Any(result => result.Status == "Connected");
         if (!firefoxConnected && (firefoxRunning || !anyExtensionConnected))
         {
+            reasonCode = firefoxExtension switch
+            {
+                { UserDisabled: true } or { AppDisabled: true } => "extension_disabled",
+                { Active: false } => "extension_inactive",
+                not null => "native_messaging_unavailable",
+                _ => "extension_not_connected"
+            };
             var firefoxWarning = firefoxExtension switch
             {
                 { UserDisabled: true } => "The Firefox Site Blocker extension is disabled. Enable it in Firefox Add-ons to connect to Axorith.",
@@ -152,7 +160,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
             warnings.Add(firefoxWarning);
         }
 
-        return warnings.Count == 0 ? ValidationResult.Success : ValidationResult.Warn(string.Join(" ", warnings));
+        return warnings.Count == 0 ? ValidationResult.Success : ValidationResult.Warn(string.Join(" ", warnings), reasonCode);
     }
 
     public async Task OnSessionStartAsync(CancellationToken cancellationToken)

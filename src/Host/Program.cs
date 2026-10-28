@@ -179,8 +179,9 @@ try
         if (!isTestRun)
             telemetryPreferenceWatcher = TelemetryPreference.Watch(enabled =>
             {
+                var wasEnabled = telemetry?.IsEnabled == true;
                 telemetry?.SetEnabled(enabled);
-                if (enabled && refreshTelemetryProductState is { } refresh)
+                if (enabled && !wasEnabled && refreshTelemetryProductState is { } refresh)
                     _ = Task.Run(refresh);
             });
     }
@@ -278,7 +279,7 @@ try
         RegisterBroadcasters(containerBuilder);
     });
 
-    var app = builder.Build();
+    await using var app = builder.Build();
     hostInfoPath = app.Services.GetRequiredService<IOptions<Configuration>>()
         .Value.Persistence.ResolveHostInfoPath();
 

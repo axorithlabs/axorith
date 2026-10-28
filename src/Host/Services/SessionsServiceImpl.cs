@@ -1,5 +1,6 @@
 ﻿using Axorith.Contracts;
 using Axorith.Core.Models;
+using Axorith.Core.Telemetry;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Host.Mappers;
 using Axorith.Host.Streaming;
@@ -153,7 +154,7 @@ public class SessionsServiceImpl(
 
         if (!Guid.TryParse(request.PresetId, out var presetId))
         {
-            TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), null, "validation_failed");
+            TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), null, "validation_failed", "Invalid preset ID");
             var result = SessionMapper.CreateResult(false, "Invalid preset ID",
                 [$"Could not parse preset ID: {request.PresetId}"]);
             return result;
@@ -166,7 +167,7 @@ public class SessionsServiceImpl(
 
         if (preset == null)
         {
-            TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), presetId, "unknown");
+            TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), presetId, "preset_not_found", "Preset not found");
             return SessionMapper.CreateResult(false, "Preset not found",
                 [$"No preset found with ID: {presetId}"]);
         }
@@ -195,16 +196,17 @@ public class SessionsServiceImpl(
         _ => throw new ArgumentOutOfRangeException(nameof(exception))
     };
 
-    private void TrackSessionStartFailure(Guid sessionInstanceId, Guid? presetId, string failureReason)
+    private void TrackSessionStartFailure(Guid sessionInstanceId, Guid? presetId, string failureReason, string errorMessage)
     {
         _telemetry.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
         {
             ["sessionInstanceId"] = sessionInstanceId,
-            ["presetId"] = presetId,
+            ["preset"] = ProductAnalyticsProperties.PresetReference(presetId),
             ["startSource"] = "manual",
             ["stage"] = "rpc_request",
             ["failureReason"] = failureReason,
-            ["result"] = "failed"
+            ["result"] = "failed",
+            ["errorMessage"] = errorMessage
         });
     }
 
@@ -225,6 +227,13 @@ public class SessionsServiceImpl(
         catch (Exception ex) when (ex is SessionException or InvalidSettingsException)
         {
             logger.LogWarning(ex, "Session preflight failed: {Message}", ex.Message);
+            _telemetry.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
+                new Dictionary<string, object?>
+                {
+                    ["preset"] = ProductAnalyticsProperties.PresetReference(presetId),
+                    ["stage"] = "preflight",
+                    ["failureReason"] = ProductAnalyticsProperties.FailureReason(ex)
+                });
             return MapSessionFailure(ex);
         }
     }

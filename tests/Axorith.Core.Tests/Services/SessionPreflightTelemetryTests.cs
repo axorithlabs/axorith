@@ -80,12 +80,27 @@ public sealed class SessionPreflightTelemetryTests
                 .GetProperty("properties");
             var stopped = events.Single(item => item.GetProperty("event").GetString() == "SessionStopped")
                 .GetProperty("properties");
-            Assert.Equal(60_000, started.GetProperty("plannedDurationMs").GetInt64());
-            Assert.Equal(15, started.GetProperty("scheduleLockMinutes").GetInt32());
-            Assert.Equal(360_000, started.GetProperty("breakDurationMs").GetInt64());
-            Assert.True(started.GetProperty("hasNextWorkspace").GetBoolean());
-            Assert.Equal("start_next_workspace", stopped.GetProperty("afterEndAction").GetString());
-            Assert.Equal(15, stopped.GetProperty("scheduleLockMinutes").GetInt32());
+            Assert.Equal(presetId.ToString(), started.GetProperty("preset").GetProperty("presetId").GetString());
+            Assert.False(started.TryGetProperty("session", out _));
+            Assert.False(started.TryGetProperty("modules", out _));
+            Assert.False(started.TryGetProperty("plannedDurationMs", out _));
+            Assert.False(started.TryGetProperty("moduleIds", out _));
+            Assert.False(started.TryGetProperty("moduleTypes", out _));
+            var modules = started.GetProperty("preset").GetProperty("modules").EnumerateArray().ToArray();
+            Assert.Equal(moduleId.ToString(), Assert.Single(modules).GetProperty("moduleId").GetString());
+            Assert.Equal("custom", modules[0].GetProperty("type").GetString());
+            var error = events.Single(item => item.GetProperty("event").GetString() == "ErrorOccurred")
+                .GetProperty("properties");
+            Assert.Equal("SessionException", error.GetProperty("exceptionType").GetString());
+            Assert.Equal(sessionInstanceId.ToString(), error.GetProperty("sessionInstanceId").GetString());
+            Assert.Equal(presetId.ToString(), error.GetProperty("preset").GetProperty("presetId").GetString());
+            Assert.Equal("preflight", error.GetProperty("stage").GetString());
+            Assert.Equal(60_000, started.GetProperty("preset").GetProperty("plannedDurationMs").GetInt64());
+            Assert.Equal(15, started.GetProperty("preset").GetProperty("scheduleLockMinutes").GetInt32());
+            Assert.Equal(360_000, started.GetProperty("preset").GetProperty("breakDurationMs").GetInt64());
+            Assert.True(started.GetProperty("preset").GetProperty("hasNextWorkspace").GetBoolean());
+            Assert.Equal("start_next_workspace", stopped.GetProperty("preset").GetProperty("afterEndAction").GetString());
+            Assert.Equal(15, stopped.GetProperty("preset").GetProperty("scheduleLockMinutes").GetInt32());
         }
         finally
         {
@@ -104,13 +119,19 @@ public sealed class SessionPreflightTelemetryTests
 
             var moduleId = Guid.NewGuid();
             var scheduleId = Guid.NewGuid();
+            var unavailableModuleId = Guid.NewGuid();
             var preset = new SessionPreset(Guid.NewGuid())
             {
-                Modules = [new ConfiguredModule { ModuleId = moduleId }]
+                Modules =
+                [
+                    new ConfiguredModule { ModuleId = moduleId },
+                    new ConfiguredModule { ModuleId = unavailableModuleId }
+                ]
             };
             await using var sessionManager = CreateSessionManager(moduleId, telemetry, directory.FullName);
 
             await sessionManager.StartSessionAsync(preset, startSource: "schedule", scheduleId: scheduleId);
+            Assert.Single(sessionManager.GetCurrentSnapshot()!.Modules);
             await sessionManager.StopCurrentSessionAsync();
             using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await telemetry.FlushAsync(flushCts.Token);
@@ -123,7 +144,15 @@ public sealed class SessionPreflightTelemetryTests
                 .GetProperty("sessionInstanceId").GetString()).Distinct().ToArray();
             Assert.Single(instanceIds);
             Assert.All(events, item => Assert.Equal(scheduleId.ToString("D"),
-                item.GetProperty("properties").GetProperty("scheduleId").GetString()));
+                item.GetProperty("properties").GetProperty("schedule").GetProperty("scheduleId").GetString()));
+            Assert.All(events, item =>
+            {
+                var configuration = item.GetProperty("properties").GetProperty("preset");
+                Assert.Equal(2, configuration.GetProperty("moduleCount").GetInt32());
+                Assert.Equal(new[] { moduleId.ToString(), unavailableModuleId.ToString() },
+                    configuration.GetProperty("modules").EnumerateArray()
+                        .Select(module => module.GetProperty("moduleId").GetString()).ToArray());
+            });
         }
         finally
         {
@@ -219,13 +248,13 @@ public sealed class SessionPreflightTelemetryTests
             var stopTrigger = events.Single(item => item.GetProperty("event").GetString() == "ScheduleTriggered")
                 .GetProperty("properties");
             var previousStopped = events.Single(item => item.GetProperty("event").GetString() == "SessionStopped" &&
-                item.GetProperty("properties").GetProperty("presetId").GetString() == currentPreset.Id.ToString("D"))
+                item.GetProperty("properties").GetProperty("preset").GetProperty("presetId").GetString() == currentPreset.Id.ToString("D"))
                 .GetProperty("properties");
             var chainedStarted = events.Single(item => item.GetProperty("event").GetString() == "SessionStarted" &&
-                item.GetProperty("properties").GetProperty("presetId").GetString() == nextPreset.Id.ToString("D"))
+                item.GetProperty("properties").GetProperty("preset").GetProperty("presetId").GetString() == nextPreset.Id.ToString("D"))
                 .GetProperty("properties");
             var chainedStopped = events.Single(item => item.GetProperty("event").GetString() == "SessionStopped" &&
-                item.GetProperty("properties").GetProperty("presetId").GetString() == nextPreset.Id.ToString("D"))
+                item.GetProperty("properties").GetProperty("preset").GetProperty("presetId").GetString() == nextPreset.Id.ToString("D"))
                 .GetProperty("properties");
 
             Assert.Equal(previousSessionInstanceId.ToString("D"),
@@ -236,6 +265,64 @@ public sealed class SessionPreflightTelemetryTests
                 chainedStarted.GetProperty("previousSessionInstanceId").GetString());
             Assert.Equal(previousSessionInstanceId.ToString("D"),
                 chainedStopped.GetProperty("previousSessionInstanceId").GetString());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task BreakRoundtrip_ReportsPresetBudgetAndFlatUsage()
+    {
+        await using var server = new PostHogTestServer();
+        var directory = Directory.CreateTempSubdirectory("axorith-break-telemetry-");
+        try
+        {
+            await using var telemetry = CreateTelemetry(server, Guid.NewGuid().ToString("D"));
+            var moduleId = Guid.NewGuid();
+            await using var manager = CreateSessionManager(moduleId, telemetry, directory.FullName);
+            var preset = new SessionPreset(Guid.NewGuid())
+            {
+                Modules = [new ConfiguredModule { ModuleId = moduleId }],
+                FocusCommitment = new FocusCommitmentOptions
+                {
+                    Mode = FocusCommitmentMode.Locked,
+                    EndCondition = FocusEndCondition.Duration,
+                    Duration = TimeSpan.FromMinutes(20),
+                    BreakCount = 2,
+                    BreakDuration = TimeSpan.FromMinutes(1)
+                }
+            };
+            await manager.StartSessionAsync(preset);
+            var sessionId = manager.CurrentSessionInstanceId!.Value;
+            await manager.StartBreakAsync();
+            Assert.NotNull(manager.BreakEndsAt);
+            Assert.Equal(1, manager.BreaksRemaining);
+            await manager.EndBreakAsync();
+            Assert.Null(manager.BreakEndsAt);
+            Assert.Equal(1, manager.BreaksRemaining);
+            Assert.True(await manager.EndCommittedSessionAsync(SessionEndReason.NaturalCompletion));
+            await telemetry.FlushAsync();
+
+            var events = ReadEvents(server).ToArray();
+            var started = events.Single(item => item.GetProperty("event").GetString() == "SessionBreakStarted")
+                .GetProperty("properties");
+            var ended = events.Single(item => item.GetProperty("event").GetString() == "SessionBreakEnded")
+                .GetProperty("properties");
+            Assert.Equal(2, started.GetProperty("preset").GetProperty("breakCount").GetInt32());
+            Assert.Equal(60_000, started.GetProperty("preset").GetProperty("breakDurationMs").GetInt32());
+            Assert.False(started.TryGetProperty("breakCount", out _));
+            Assert.False(started.TryGetProperty("session", out _));
+            foreach (var properties in new[] { started, ended })
+            {
+                Assert.Equal(sessionId.ToString(), properties.GetProperty("sessionInstanceId").GetString());
+                Assert.Equal(preset.Id.ToString(), properties.GetProperty("preset").GetProperty("presetId").GetString());
+                Assert.Equal(1, properties.GetProperty("breaksUsed").GetInt32());
+                Assert.False(properties.GetProperty("preset").TryGetProperty("breaksUsed", out _));
+            }
+            Assert.Equal("started", started.GetProperty("result").GetString());
+            Assert.Equal("completed", ended.GetProperty("result").GetString());
         }
         finally
         {
@@ -317,9 +404,9 @@ public sealed class SessionPreflightTelemetryTests
             var warning = ReadEvents(server).Single(item =>
                 item.GetProperty("event").GetString() == "SessionValidationWarning").GetProperty("properties");
             Assert.Equal(sessionInstanceId.ToString("D"), warning.GetProperty("sessionInstanceId").GetString());
-            Assert.Equal(moduleId.ToString("D"), warning.GetProperty("moduleId").GetString());
-            Assert.Equal(moduleInstanceId.ToString("D"), warning.GetProperty("instanceId").GetString());
-            Assert.Equal("custom", warning.GetProperty("moduleName").GetString());
+            Assert.Equal(moduleId.ToString("D"), warning.GetProperty("module").GetProperty("moduleId").GetString());
+            Assert.Equal(moduleInstanceId.ToString("D"), warning.GetProperty("module").GetProperty("instanceId").GetString());
+            Assert.Equal("custom", warning.GetProperty("module").GetProperty("type").GetString());
             Assert.Equal("module_validation", warning.GetProperty("stage").GetString());
             Assert.Equal("warning", warning.GetProperty("result").GetString());
             Assert.Equal("validation_warning", warning.GetProperty("failureReason").GetString());
@@ -381,7 +468,7 @@ public sealed class SessionPreflightTelemetryTests
             var events = ReadEvents(server).ToArray();
             var skipped = events.Single(item => item.GetProperty("event").GetString() == "ScheduleTriggered")
                 .GetProperty("properties");
-            Assert.Equal("duration_stop", skipped.GetProperty("scheduleType").GetString());
+            Assert.Equal("duration_stop", skipped.GetProperty("schedule").GetProperty("scheduleType").GetString());
             Assert.Equal("stop", skipped.GetProperty("triggerAction").GetString());
             Assert.Equal("skipped", skipped.GetProperty("result").GetString());
             Assert.Equal("committed_session", skipped.GetProperty("skipReason").GetString());

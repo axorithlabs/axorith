@@ -9,6 +9,7 @@
         
         SystemDecorations="None"
         ShowInTaskbar="False"
+        ShowActivated="False"
         Topmost="True"
         CanResize="False"
         SizeToContent="Height"
@@ -67,21 +68,24 @@
                     </Button>
                 </Grid>
 
-                <StackPanel Grid.Row="1" Margin="20,8,20,24" Spacing="4">
-                    <TextBlock Text="{Binding DesktopTitle}"
-                               Foreground="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}"
-                               FontSize="16"
-                               FontWeight="Bold"
-                               LetterSpacing="0.5"
-                               TextWrapping="Wrap"/>
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20,8,20,24" Spacing="4">
+                        <TextBlock Text="{Binding DesktopTitle}"
+                                   Foreground="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   LetterSpacing="0.5"
+                                   TextWrapping="Wrap"/>
 
-                    <TextBlock Text="{Binding Body}"
-                               Foreground="{DynamicResource TextPrimaryBrush}"
-                               FontSize="14"
-                               LineHeight="20"
-                               TextWrapping="Wrap"
-                               Opacity="0.9"/>
-                </StackPanel>
+                        <TextBlock Text="{Binding Body}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   FontSize="14"
+                                   LineHeight="20"
+                                   TextWrapping="Wrap"
+                                   Opacity="0.9"/>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Grid>
     </Border>

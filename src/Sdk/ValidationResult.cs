@@ -16,6 +16,11 @@ public class ValidationResult
     public string Message { get; }
 
     /// <summary>
+    ///     A stable diagnostic code that does not contain user configuration.
+    /// </summary>
+    public string? ReasonCode { get; }
+
+    /// <summary>
     ///     Specific errors associated with setting keys.
     ///     Key: Setting Key, Value: Error Message.
     /// </summary>
@@ -45,10 +50,18 @@ public class ValidationResult
     /// </summary>
     public static ValidationResult Warn(string warningMessage) => new ValidationResult(ValidationStatus.Warning, warningMessage);
 
-    private ValidationResult(ValidationStatus status, string message, IDictionary<string, string>? fieldErrors = null)
+    /// <summary>
+    ///     Creates a warning with a stable diagnostic code.
+    /// </summary>
+    public static ValidationResult Warn(string warningMessage, string reasonCode) =>
+        new(ValidationStatus.Warning, warningMessage, reasonCode: reasonCode);
+
+    private ValidationResult(ValidationStatus status, string message, IDictionary<string, string>? fieldErrors = null,
+        string? reasonCode = null)
     {
         Status = status;
         Message = message;
+        ReasonCode = reasonCode;
         FieldErrors = fieldErrors?.ToDictionary(k => k.Key, v => v.Value) ?? new();
     }
 }

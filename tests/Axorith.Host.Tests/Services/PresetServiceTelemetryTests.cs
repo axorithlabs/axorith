@@ -77,9 +77,11 @@ public sealed class PresetServiceTelemetryTests
             await service.DeletePreset(new DeletePresetRequest { PresetId = preset.Id.ToString("D") },
                 GrpcTestContext.Create());
             var deleted = telemetry.Events.Single(item => item.Name == "PresetDeleted").Properties;
-            Assert.Equal("strict", deleted["commitmentMode"]);
-            Assert.Equal(1, deleted["moduleCount"]);
-            Assert.Equal(new[] { "custom" }, (string[])deleted["moduleTypes"]!);
+            var deletedPreset = (Dictionary<string, object?>)deleted["preset"]!;
+            Assert.Equal("strict", deletedPreset["commitmentMode"]);
+            Assert.Equal(1, deletedPreset["moduleCount"]);
+            var modules = (Dictionary<string, object?>[])deletedPreset["modules"]!;
+            Assert.Equal("custom", Assert.Single(modules)["type"]);
             var state = (Dictionary<string, object?>)deleted["$set"]!;
             Assert.Equal(0, state["presetCount"]);
         }

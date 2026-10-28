@@ -113,7 +113,7 @@ public sealed class ClientOnboardingService(
             {
                 logger.LogWarning(ex, "Failed to create preset {PresetName}", preset.Name);
                 result.SkippedPresets.Add(preset.Name);
-                result.Errors.Add($"Failed to create {preset.Name}: {ex.Message}");
+                result.Errors.Add($"Failed to create '{preset.Name}': {ex.Message}");
                 return;
             }
         }

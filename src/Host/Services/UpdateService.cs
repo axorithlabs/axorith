@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Net;
 using System.Text.Json;
 using Axorith.Shared.Utils;
+using Axorith.Telemetry;
 
 namespace Axorith.Host.Services;
 
@@ -9,6 +10,7 @@ public sealed class UpdateService : BackgroundService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<UpdateService> _logger;
+    private readonly ITelemetryService _telemetry;
     private readonly bool _isEnabled;
     private readonly object _checkLock = new();
     private readonly TaskCompletionSource _initialCheckComplete = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -24,9 +26,11 @@ public sealed class UpdateService : BackgroundService
     public bool UpdateAvailable => LatestUpdate is not null;
     public string? LastCheckError => _lastCheckError;
 
-    public UpdateService(ILogger<UpdateService> logger, IHttpClientFactory httpClientFactory)
+    public UpdateService(ILogger<UpdateService> logger, IHttpClientFactory httpClientFactory,
+        ITelemetryService? telemetry = null)
     {
         _logger = logger;
+        _telemetry = telemetry ?? NoopTelemetryService.Instance;
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         CurrentVersion = version?.ToString(3) ?? "0.0.0";
         _httpClient = httpClientFactory.CreateClient("updates");
@@ -145,20 +149,23 @@ public sealed class UpdateService : BackgroundService
         {
             throw;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             _lastCheckError = "The update check timed out. Check your connection and try again.";
             _logger.LogWarning("Update check timed out after {Timeout}s", HttpTimeout.TotalSeconds);
+            _telemetry.TrackError(new TimeoutException(_lastCheckError, ex), "update", "update_check", "warning", true, false);
         }
         catch (HttpRequestException ex)
         {
             _lastCheckError = "Could not reach the update server. Check your connection and try again.";
             _logger.LogWarning(ex, "Network error while checking for updates");
+            _telemetry.TrackError(ex, "update", "update_check", "warning", true, false);
         }
         catch (Exception ex)
         {
             _lastCheckError = "Could not read the update release. Please try again later.";
             _logger.LogWarning(ex, "Invalid update release metadata");
+            _telemetry.TrackError(ex, "update", "update_check", "warning", true, false);
         }
 
         return LatestUpdate;

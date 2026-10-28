@@ -32,6 +32,12 @@ public partial class DesktopToastWindow : Window
         _autoCloseTimer.Start();
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        _autoCloseTimer.Stop();
+        base.OnClosed(e);
+    }
+
     private void OnCloseClicked(object? sender, RoutedEventArgs e)
     {
         _autoCloseTimer.Stop();

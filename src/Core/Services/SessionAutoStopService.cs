@@ -327,7 +327,7 @@ public class SessionAutoStopService(
                 await notifier.ShowSystemAsync("Auto-Stop Error",
                     $"Failed to stop session '{currentPreset.Name}': {ex.Message}", category: "Session Auto-Stop").ConfigureAwait(false);
                 TrackScheduleTriggered(schedule, "failed", sessionInstanceId: currentSessionInstanceId,
-                    failureReason: ProductAnalyticsProperties.FailureReason(ex));
+                    failureReason: ProductAnalyticsProperties.FailureReason(ex), exception: ex);
                 return false;
             }
             finally
@@ -392,11 +392,11 @@ public class SessionAutoStopService(
     }
 
     private void TrackScheduleTriggered(SessionSchedule? schedule, string result, Guid? sessionInstanceId = null,
-        string? failureReason = null, string? skipReason = null)
+        string? failureReason = null, string? skipReason = null, Exception? exception = null)
     {
         if (schedule is null) return;
         _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
-            "stop", result, sessionInstanceId ?? sessionManager.CurrentSessionInstanceId, failureReason, skipReason));
+            "stop", result, sessionInstanceId ?? sessionManager.CurrentSessionInstanceId, failureReason, skipReason, exception));
     }
 
 

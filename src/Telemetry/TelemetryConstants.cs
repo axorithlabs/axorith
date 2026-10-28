@@ -20,9 +20,7 @@ public static class TelemetryConstants
 
         public const string Application = "application";
 
-        public const string AxorithVersion = "axorith_version";
-
-        public const string ReleaseVersion = "release_version";
+        public const string Version = "version";
 
         public const string BuildSha = "build_sha";
 
@@ -31,5 +29,7 @@ public static class TelemetryConstants
         public const string BuildChannel = "build_channel";
 
         public const string Environment = "environment";
+
+        public const string DevMode = "dev_mode";
     }
 }

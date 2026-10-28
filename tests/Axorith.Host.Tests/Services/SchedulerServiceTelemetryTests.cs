@@ -58,7 +58,7 @@ public sealed class SchedulerServiceTelemetryTests
         var scheduleChanged = Assert.Single(ReadEvents(handler),
             item => item.GetProperty("event").GetString() == "ScheduleChanged");
         Assert.Equal("update", scheduleChanged.GetProperty("properties").GetProperty("changeType").GetString());
-        Assert.Equal(570, scheduleChanged.GetProperty("properties").GetProperty("scheduledMinuteOfDay").GetInt32());
+        Assert.Equal(570, scheduleChanged.GetProperty("properties").GetProperty("schedule").GetProperty("scheduledMinuteOfDay").GetInt32());
         var state = scheduleChanged.GetProperty("properties").GetProperty("$set");
         Assert.Equal(1, state.GetProperty("presetCount").GetInt32());
         Assert.Equal(1, state.GetProperty("scheduleCount").GetInt32());

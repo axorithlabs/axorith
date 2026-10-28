@@ -41,14 +41,16 @@ public sealed class ModuleActionTelemetryTests
 
         var invoked = ReadEvents(handler).Single(item => item.GetProperty("event").GetString() == "ModuleActionInvoked");
         var properties = invoked.GetProperty("properties");
-        Assert.Equal(moduleId.ToString("D"), properties.GetProperty("moduleId").GetString());
-        Assert.Equal(instanceId.ToString("D"), properties.GetProperty("instanceId").GetString());
-        Assert.Equal(presetId.ToString("D"), properties.GetProperty("presetId").GetString());
+        var module = properties.GetProperty("module");
+        Assert.Equal(moduleId.ToString("D"), module.GetProperty("moduleId").GetString());
+        Assert.Equal(instanceId.ToString("D"), module.GetProperty("instanceId").GetString());
+        Assert.Equal(presetId.ToString("D"), properties.GetProperty("preset").GetProperty("presetId").GetString());
+        Assert.Equal("Application Launcher", module.GetProperty("type").GetString());
         Assert.Equal("refresh_games", properties.GetProperty("actionKey").GetString());
         Assert.Equal("success", properties.GetProperty("result").GetString());
     }
 
-    private static JsonElement[] ReadEvents(CapturingHttpHandler handler) => handler.Payloads
+    internal static JsonElement[] ReadEvents(CapturingHttpHandler handler) => handler.Payloads
         .SelectMany(body =>
         {
             using var payload = JsonDocument.Parse(body);
@@ -130,12 +132,12 @@ public sealed class ModuleActionTelemetryTests
         public List<AppInfo> GetInstalledApplicationsIndex() => [];
     }
 
-    private sealed class CapturingHttpClientFactory(CapturingHttpHandler handler) : IHttpClientFactory
+    internal sealed class CapturingHttpClientFactory(CapturingHttpHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
-    private sealed class CapturingHttpHandler : HttpMessageHandler
+    internal sealed class CapturingHttpHandler : HttpMessageHandler
     {
         public ConcurrentQueue<string> Payloads { get; } = new();
 

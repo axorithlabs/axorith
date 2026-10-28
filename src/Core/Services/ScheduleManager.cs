@@ -369,7 +369,7 @@ public class ScheduleManager(
                 {
                     TrackScheduleTriggered(schedule, "stop", "failed",
                         sessionInstanceId: sessionInstanceId,
-                        failureReason: ProductAnalyticsProperties.FailureReason(ex));
+                        failureReason: ProductAnalyticsProperties.FailureReason(ex), exception: ex);
                 }
                 logger.LogError(ex, "Failed to execute stop schedule '{Name}'", schedule.Name);
                 await notifier.ShowSystemAsync("Schedule Error", $"Failed to stop session: {ex.Message}", category: "Session Scheduler");
@@ -428,7 +428,7 @@ public class ScheduleManager(
             catch (Exception ex)
             {
                 TrackScheduleTriggered(schedule, "start", "failed", sessionInstanceId,
-                    failureReason: ProductAnalyticsProperties.FailureReason(ex));
+                    failureReason: ProductAnalyticsProperties.FailureReason(ex), exception: ex);
                 logger.LogError(ex, "Failed to execute start schedule '{Name}'", schedule.Name);
                 await notifier.ShowSystemAsync("Schedule Error", $"Failed to start '{schedule.Name}': {ex.Message}", category: "Session Scheduler");
                 await UpdateLastRunAsync(schedule, now, ct);
@@ -457,11 +457,12 @@ public class ScheduleManager(
     }
 
     private void TrackScheduleTriggered(SessionSchedule schedule, string triggerAction, string result,
-        Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null) =>
+        Guid? sessionInstanceId = null, string? failureReason = null, string? skipReason = null,
+        Exception? exception = null) =>
         _telemetry.TrackEvent("ScheduleTriggered", ProductAnalyticsProperties.ScheduleTriggered(schedule,
             triggerAction, result,
             sessionInstanceId ?? (triggerAction == "stop" ? sessionManager.CurrentSessionInstanceId : null),
-            failureReason, skipReason));
+            failureReason, skipReason, exception));
 
     private void TrackScheduleSkipOnce(SessionSchedule schedule, DateTimeOffset runTime,
         string triggerAction, string skipReason)

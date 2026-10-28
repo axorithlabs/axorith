@@ -35,15 +35,7 @@ SetCompressor /SOLID lzma
     !ifndef _VERSION_NUM
         !define _VERSION_NUM "${VERSION_IN}"
     !endif
-    !searchparse /noerrors "${_VERSION_NUM}" _V_MAJOR "." _V_MINOR "." _V_PATCH
-    !ifndef _V_PATCH
-        !searchparse /noerrors "${_VERSION_NUM}" _V_MAJOR "." _V_MINOR
-        !ifndef _V_MINOR
-            !define _V_MAJOR "${_VERSION_NUM}"
-            !define _V_MINOR "0"
-        !endif
-        !define _V_PATCH "0"
-    !endif
+    !searchparse /noerrors "${_VERSION_NUM}" "" _V_MAJOR "." _V_MINOR "." _V_PATCH
     !ifndef _V_MAJOR
         !define _V_MAJOR "0"
     !endif
@@ -83,7 +75,9 @@ VIAddVersionKey "OriginalFilename" "axorith-setup.exe"
 
 ${StrCase}
 ${StrStr}
+${StrTok}
 ${UnStrCase}
+${UnStrTok}
 
 !include "WindowsDeviceIdentity.nsh"
 !insertmacro DefineWindowsDeviceIdentityFunction ""
@@ -113,6 +107,8 @@ Var TelemetryEventName
 Var TelemetryEventProperties
 Var TelemetryFailureStage
 Var TelemetryFailureReported
+Var TelemetryErrorMessage
+Var TelemetryErrorCode
 Var DesktopRuntimeInstalled
 Var AspNetRuntimeInstalled
 Var MaintenanceDirectory
@@ -162,6 +158,11 @@ ${AllowedLabel}_check:
         StrCpy $1 "Axorith could not verify whether a committed session is active."
     ${EndIf}
     StrCpy $TelemetryFailureStage "installer_launch"
+    StrCpy $TelemetryErrorMessage "Committed session safety check failed. Maintenance action was blocked."
+    IntOp $TelemetryErrorCode $0 + 0
+    ${If} $TelemetryErrorCode == 0
+        StrCpy $TelemetryErrorCode ""
+    ${EndIf}
     !if "${Action}" == "Uninstall"
         StrCpy $TelemetryEventName "UninstallFailed"
     !else
@@ -189,6 +190,8 @@ Function ${Prefix}InitializeTelemetry
     StrCpy $TelemetryFailureReported "0"
     StrCpy $TelemetryFailureStage "installer_launch"
     StrCpy $TelemetryEventProperties ""
+    StrCpy $TelemetryErrorMessage "Could not initialize the installer."
+    StrCpy $TelemetryErrorCode ""
     SetShellVarContext current
     SetShellVarContext all
     StrCpy $CommonAppData $APPDATA
@@ -252,18 +255,40 @@ Function ${Prefix}SendTelemetryEvent
     StrCmp $TelemetryEventProperties "" telemetry_extra_done
     StrCpy $1 ",$TelemetryEventProperties"
     telemetry_extra_done:
-    StrCpy $2 "$\"application$\":$\"Axorith.Installer$\",$\"source$\":$\"installer$\",$\"platform$\":$\"windows$\",$\"architecture$\":$\"x64$\",$\"$$geoip_disable$\":true"
-    StrCpy $2 "$2,$\"axorith_version$\":$\"$CurrentVersion$\",$\"release_version$\":$\"$CurrentVersion$\""
+    ${If} $TelemetryEventName == "InstallerFailed"
+    ${OrIf} $TelemetryEventName == "UninstallFailed"
+        ; Error text is a source constant; never insert unescaped process output into JSON.
+        StrCpy $1 "$1,$\"result$\":$\"failed$\",$\"errorMessage$\":$\"$TelemetryErrorMessage$\""
+        ${If} $TelemetryErrorCode != ""
+            StrCpy $1 "$1,$\"errorCode$\":$TelemetryErrorCode"
+        ${EndIf}
+    ${EndIf}
+    ReadEnvStr $0 "AXORITH_DEV"
+    ${If} $0 == "1"
+        StrCpy $0 "true"
+    ${Else}
+        StrCpy $0 "false"
+    ${EndIf}
+    !if "${Prefix}" == "un."
+        ${UnStrTok} $5 "$CurrentVersion" "+" "0" "0"
+        ${UnStrTok} $6 "$PreviousVersion" "+" "0" "0"
+    !else
+        ${StrTok} $5 "$CurrentVersion" "+" "0" "0"
+        ${StrTok} $6 "$PreviousVersion" "+" "0" "0"
+    !endif
+    StrCpy $2 "$\"$$geoip_disable$\":true,$\"application$\":{$\"name$\":$\"Axorith.Installer$\",$\"platform$\":$\"windows$\",$\"architecture$\":$\"x64$\",$\"dev_mode$\":$0"
+    StrCpy $2 "$2,$\"version$\":$\"$5$\""
     !if "${BUILD_SHA}" != ""
         StrCpy $2 "$2,$\"build_sha$\":$\"${BUILD_SHA}$\""
     !endif
+    StrCpy $2 "$2},$\"installMode$\":$\"$InstallMode$\",$\"previousVersion$\":$\"$6$\""
     StrCmp $InstallMode "uninstall" telemetry_uninstall_attempt
     StrCpy $2 "$2,$\"installAttemptId$\":$\"$InstallAttemptId$\""
     Goto telemetry_attempt_done
     telemetry_uninstall_attempt:
     StrCpy $2 "$2,$\"uninstallAttemptId$\":$\"$UninstallAttemptId$\""
     telemetry_attempt_done:
-    StrCpy $0 "{$\"api_key$\":$\"${POSTHOG_API_KEY}$\",$\"uuid$\":$\"$3$\",$\"timestamp$\":$\"$4$\",$\"event$\":$\"$TelemetryEventName$\",$\"distinct_id$\":$\"$InstallerDistinctId$\",$\"properties$\":{$2,$\"installMode$\":$\"$InstallMode$\",$\"currentVersion$\":$\"$CurrentVersion$\",$\"previousVersion$\":$\"$PreviousVersion$\"$1}}"
+    StrCpy $0 "{$\"api_key$\":$\"${POSTHOG_API_KEY}$\",$\"uuid$\":$\"$3$\",$\"timestamp$\":$\"$4$\",$\"event$\":$\"$TelemetryEventName$\",$\"distinct_id$\":$\"$InstallerDistinctId$\",$\"properties$\":{$2$1}}"
     InitPluginsDir
     inetc::post "$0" /HEADER "Content-Type: application/json" /CONNECTTIMEOUT 1 /RECEIVETIMEOUT 1 /SILENT /NOCANCEL "${POSTHOG_API_HOST}/capture" "$PLUGINSDIR\telemetry-response.txt" /END
     Pop $5
@@ -378,68 +403,38 @@ Function .onInstSuccess
     Call SendTelemetryEvent
 FunctionEnd
 
-Function StrContainsFunc
-    Exch $R1
-    Exch
-    Exch $R2
-    Push $R3
-    Push $R4
-    Push $R5
-    StrLen $R3 $R1
-    StrCpy $R4 0
-    loop:
-        StrCpy $R5 $R2 $R3 $R4
-        StrCmp $R5 $R1 found
-        StrCmp $R5 "" notfound
-        IntOp $R4 $R4 + 1
-        Goto loop
-    found:
-        StrCpy $R1 $R5
-        Goto done
-    notfound:
-        StrCpy $R1 ""
-    done:
-    Pop $R5
-    Pop $R4
-    Pop $R3
-    Pop $R2
-    Exch $R1
+!macro DefineRuntimeCheck Name Framework RuntimeFile InstalledFlag
+Function ${Name}
+    ; Inspect installed files: nsExec truncates --list-runtimes on machines with many runtimes.
+    StrCpy ${InstalledFlag} "0"
+    IfFileExists "$PROGRAMFILES64\dotnet\dotnet.exe" runtime_check_start
+    Return
+    runtime_check_start:
+    FindFirst $0 $1 "$PROGRAMFILES64\dotnet\shared\${Framework}\10.*"
+    runtime_check_next:
+    StrCmp $1 "" runtime_check_done
+    ${StrStr} $2 $1 "-"
+    ${If} $2 == ""
+        IfFileExists "$PROGRAMFILES64\dotnet\shared\${Framework}\$1\${RuntimeFile}" 0 runtime_check_continue
+        StrCpy ${InstalledFlag} "1"
+        Goto runtime_check_done
+    ${EndIf}
+    runtime_check_continue:
+    FindNext $0 $1
+    Goto runtime_check_next
+    runtime_check_done:
+    FindClose $0
 FunctionEnd
-
-!macro StrContains ResultVar String SubString
-    Push "${String}"
-    Push "${SubString}"
-    Call StrContainsFunc
-    Pop "${ResultVar}"
 !macroend
 
-Function CheckDotNetDesktopRuntime
-    StrCpy $DesktopRuntimeInstalled "0"
-    nsExec::ExecToStack '"$PROGRAMFILES64\dotnet\dotnet.exe" --list-runtimes'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" 0 done_desktop
-    !insertmacro StrContains $0 $1 "Microsoft.WindowsDesktop.App 10."
-    StrCmp $0 "" done_desktop
-    StrCpy $DesktopRuntimeInstalled "1"
-    done_desktop:
-FunctionEnd
+!insertmacro DefineRuntimeCheck CheckDotNetDesktopRuntime Microsoft.WindowsDesktop.App PresentationFramework.dll $DesktopRuntimeInstalled
+!insertmacro DefineRuntimeCheck CheckDotNetAspNetRuntime Microsoft.AspNetCore.App Microsoft.AspNetCore.dll $AspNetRuntimeInstalled
 
-Function CheckDotNetAspNetRuntime
-    StrCpy $AspNetRuntimeInstalled "0"
-    nsExec::ExecToStack '"$PROGRAMFILES64\dotnet\dotnet.exe" --list-runtimes'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" 0 done_aspnet
-    !insertmacro StrContains $0 $1 "Microsoft.AspNetCore.App 10."
-    StrCmp $0 "" done_aspnet
-    StrCpy $AspNetRuntimeInstalled "1"
-    done_aspnet:
-FunctionEnd
-
-!macro InstallDotNetRuntime RuntimeName RuntimeVersion RuntimeUrl InstallerFile
+!macro InstallDotNetRuntime RuntimeName RuntimeVersion RuntimeUrl InstallerFile CheckFunction InstalledFlag
     DetailPrint "Downloading ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_download"
+    StrCpy $TelemetryErrorMessage "Failed to download ${RuntimeName}."
+    StrCpy $TelemetryErrorCode ""
     SetOutPath "$MaintenanceDirectory"
     inetc::get /SILENT "${RuntimeUrl}" "$MaintenanceDirectory\${InstallerFile}" /END
     Pop $0
@@ -451,6 +446,7 @@ FunctionEnd
     ${EndIf}
     DetailPrint "Installing ${RuntimeName} ${RuntimeVersion}..."
     StrCpy $TelemetryFailureStage "prerequisite_install"
+    StrCpy $TelemetryErrorMessage "Failed to install ${RuntimeName}."
     ClearErrors
     ExecWait '"$MaintenanceDirectory\${InstallerFile}" /install /quiet /norestart' $0
     ${IfNot} ${Errors}
@@ -459,7 +455,10 @@ FunctionEnd
         ExecWait '"$MaintenanceDirectory\${InstallerFile}" /install /passive /norestart' $0
     ${EndIf}
     ${If} ${Errors}
+        StrCpy $TelemetryErrorMessage "Could not launch the ${RuntimeName} installer."
         StrCpy $0 "launch failed"
+    ${Else}
+        StrCpy $TelemetryErrorCode $0
     ${EndIf}
     Delete "$MaintenanceDirectory\${InstallerFile}"
     ${If} $0 == 3010
@@ -469,14 +468,22 @@ FunctionEnd
         SetErrorLevel 2
         Abort
     ${EndIf}
+    Call ${CheckFunction}
+    ${If} ${InstalledFlag} != "1"
+        StrCpy $TelemetryErrorMessage "${RuntimeName} was not detected after installation."
+        StrCpy $TelemetryErrorCode ""
+        MessageBox MB_OK|MB_ICONSTOP "${RuntimeName} is still unavailable. Please restart Windows or install it manually, then run Axorith setup again." /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
 !macroend
 
 Function InstallDotNetDesktopRuntime
-    !insertmacro InstallDotNetRuntime ".NET Desktop Runtime" "${DOTNET_DESKTOP_RUNTIME_VERSION}" "${DOTNET_DESKTOP_RUNTIME_URL}" "dotnet-desktop-runtime.exe"
+    !insertmacro InstallDotNetRuntime ".NET Desktop Runtime" "${DOTNET_DESKTOP_RUNTIME_VERSION}" "${DOTNET_DESKTOP_RUNTIME_URL}" "dotnet-desktop-runtime.exe" CheckDotNetDesktopRuntime $DesktopRuntimeInstalled
 FunctionEnd
 
 Function InstallDotNetAspNetRuntime
-    !insertmacro InstallDotNetRuntime "ASP.NET Core Runtime" "${DOTNET_ASPNET_RUNTIME_VERSION}" "${DOTNET_ASPNET_RUNTIME_URL}" "aspnetcore-runtime.exe"
+    !insertmacro InstallDotNetRuntime "ASP.NET Core Runtime" "${DOTNET_ASPNET_RUNTIME_VERSION}" "${DOTNET_ASPNET_RUNTIME_URL}" "aspnetcore-runtime.exe" CheckDotNetAspNetRuntime $AspNetRuntimeInstalled
 FunctionEnd
 
 Section "Prerequisites" SEC_PREREQ
@@ -507,6 +514,8 @@ Section "MainSection" SEC_INSTALL
     !insertmacro CheckCommittedSession "Installation or update" install_section_allowed SendTelemetryEvent
 
     StrCpy $TelemetryFailureStage "existing_version_removal"
+    StrCpy $TelemetryErrorMessage "Could not preserve existing Axorith settings."
+    StrCpy $TelemetryErrorCode ""
     IfFileExists "$APPDATA\Axorith\config\clientsettings.json" migrate_client_settings_done
     IfFileExists "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Client\clientsettings.json" 0 migrate_client_settings_done
     CreateDirectory "$APPDATA\Axorith\config"
@@ -527,6 +536,8 @@ Section "MainSection" SEC_INSTALL
     Pop $1
 
     StrCpy $TelemetryFailureStage "files_copy"
+    StrCpy $TelemetryErrorMessage "Could not copy the Axorith files."
+    StrCpy $TelemetryErrorCode ""
     SetOutPath "$INSTDIR"
   
     SetOverwrite on
@@ -543,6 +554,7 @@ Section "MainSection" SEC_INSTALL
     ${GetFileVersion} "$INSTDIR\Axorith.Host\Axorith.Host.dll" $1
     ${If} $0 != "${PRODUCT_VERSION_NUMERIC}"
     ${OrIf} $1 != "${PRODUCT_VERSION_NUMERIC}"
+        StrCpy $TelemetryErrorMessage "Installed Axorith files do not match the expected version."
         MessageBox MB_OK|MB_ICONSTOP "The installed Axorith files do not match this update. Please close Axorith and run the installer again." /SD IDOK
         SetErrorLevel 2
         Abort
@@ -553,6 +565,7 @@ Section "MainSection" SEC_INSTALL
     SetDetailsPrint listonly
 
     StrCpy $TelemetryFailureStage "registration"
+    StrCpy $TelemetryErrorMessage "Could not register the Axorith installation."
     SetOutPath "$INSTDIR\Axorith.Client"
     CreateShortCut "$smprograms\${PRODUCT_NAME}.lnk" "$INSTDIR\Axorith.Client\Axorith.Client.exe" "" "$INSTDIR\Axorith.Client\Assets\icon.ico" 0 SW_SHOWNORMAL "" "Launch ${PRODUCT_NAME}"
     SetOutPath "$INSTDIR"
@@ -583,13 +596,24 @@ SectionEnd
 Section "Uninstall"
     !insertmacro CheckCommittedSession "Uninstall" uninstall_section_allowed un.SendTelemetryEvent
     StrCpy $TelemetryFailureStage "uninstall_cleanup"
+    StrCpy $TelemetryErrorMessage "Could not remove the Axorith files."
+    nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Client.exe'
+    Pop $0
+    Pop $1
+    nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Host.exe'
+    Pop $0
+    Pop $1
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     Delete "$smprograms\${PRODUCT_NAME}.lnk"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
     IfFileExists "$INSTDIR\Axorith.Shim\Axorith.Shim.exe" 0 uninstaller_skip_legacy_firefox_policy
     nsExec::ExecToStack '"$INSTDIR\Axorith.Shim\Axorith.Shim.exe" --remove-legacy-firefox-policy'
     Pop $0
+    Pop $1
     uninstaller_skip_legacy_firefox_policy:
+    nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Shim.exe'
+    Pop $0
+    Pop $1
     DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith"
     DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith.dev"
     DeleteRegKey /ifempty HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith"
@@ -599,18 +623,24 @@ Section "Uninstall"
     DeleteRegKey /ifempty HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith"
     DeleteRegKey /ifempty HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith.dev"
     DeleteRegValue HKCU "Environment" "AXORITH_HOST_PATH"
+    SetOutPath "$TEMP"
+    ClearErrors
     RMDir /r "$INSTDIR"
+    ${If} ${Errors}
+        Goto uninstall_cleanup_failed
+    ${EndIf}
+    IfFileExists "$INSTDIR\*.*" uninstall_cleanup_failed
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
-    IfFileExists "$INSTDIR\Axorith.Client\Axorith.Client.exe" uninstall_cleanup_failed
-    IfFileExists "$INSTDIR\Axorith.Host\Axorith.Host.exe" uninstall_cleanup_failed
     StrCpy $TelemetryEventName "UninstallCompleted"
     StrCpy $TelemetryEventProperties ""
     Call un.SendTelemetryEvent
     Goto uninstall_telemetry_done
     uninstall_cleanup_failed:
+    SetErrorLevel 2
     StrCpy $TelemetryEventName "UninstallFailed"
     StrCpy $TelemetryEventProperties "$\"stage$\":$\"$TelemetryFailureStage$\""
     Call un.SendTelemetryEvent
     StrCpy $TelemetryFailureReported "1"
+    MessageBox MB_OK|MB_ICONSTOP "Some Axorith files could not be removed. Close Axorith and your browsers, then run the uninstaller again." /SD IDOK
     uninstall_telemetry_done:
 SectionEnd

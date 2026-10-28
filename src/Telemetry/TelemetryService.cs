@@ -44,10 +44,8 @@ public sealed partial class TelemetryService : ITelemetryService
     private Task? _flushTask;
     private readonly string _distinctId = string.Empty;
     private readonly bool _migrateLegacyIdentity;
-    private string? _appVersion;
-    private string? _osVersion;
     private int _enabled;
-    private int _identified;
+    private string? _lastIdentifyPayload;
     private int _preferenceGeneration;
     private int _acceptingEvents = 1;
     private volatile bool _disposed;
@@ -83,8 +81,6 @@ public sealed partial class TelemetryService : ITelemetryService
             ? Environment.OSVersion.VersionString
             : resolved.OsVersion;
         _baseProperties = BuildBaseProperties(resolved, version, osVersion);
-        _appVersion = version;
-        _osVersion = osVersion;
 
         var flushAt = Math.Max(1, resolved.BatchSize);
         var options = new PostHogOptions
@@ -111,61 +107,39 @@ public sealed partial class TelemetryService : ITelemetryService
     {
         if (_client is null) return;
 
-        bool wasEnabled;
-        bool identify;
         lock (_consentLock)
         {
             if (_disposed || Volatile.Read(ref _acceptingEvents) == 0) return;
 
-            wasEnabled = Volatile.Read(ref _enabled) != 0;
-            if (wasEnabled != enabled)
+            var wasEnabled = Volatile.Read(ref _enabled) != 0;
+            if (wasEnabled == enabled) return;
+            if (enabled)
             {
-                if (enabled)
+                Interlocked.Increment(ref _preferenceGeneration);
+                Volatile.Write(ref _enabled, 1);
+            }
+            else
+            {
+                Volatile.Write(ref _enabled, 0);
+                Interlocked.Increment(ref _preferenceGeneration);
+                lock (_errorLock)
                 {
-                    Interlocked.Increment(ref _preferenceGeneration);
-                    Volatile.Write(ref _enabled, 1);
-                }
-                else
-                {
-                    Volatile.Write(ref _enabled, 0);
-                    Interlocked.Increment(ref _preferenceGeneration);
-                    lock (_errorLock)
+                    foreach (var error in _errors.Values)
                     {
-                        foreach (var error in _errors.Values)
-                        {
-                            error.PendingCount = 0;
-                            error.PendingFatal = false;
-                        }
+                        error.PendingCount = 0;
+                        error.PendingFatal = false;
                     }
                 }
             }
-
-            identify = enabled && (!wasEnabled || Interlocked.Exchange(ref _identified, 1) == 0);
         }
 
-        if (!enabled) return;
-
-        if (identify)
-        {
-            if (_migrateLegacyIdentity)
-                LegacyTelemetryIdentity.Migrate(this, _distinctId,
-                    Path.Combine(ApplicationPaths.MachineConfig, "installation-id.txt"),
-                    Path.Combine(ApplicationPaths.Config, "installation-id.txt"),
-                    Path.Combine(ApplicationPaths.MachineRoot, "registration.json"),
-                    Path.Combine(ApplicationPaths.LocalRoot, "registration.json"),
-                    Path.Combine(ApplicationPaths.Config, "pending-install.json"));
-
-            TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
-            {
-                [TelemetryConstants.Properties.Set] = new Dictionary<string, object?>
-                {
-                    [TelemetryConstants.Properties.AxorithVersion] = _appVersion,
-                    [TelemetryConstants.Properties.ReleaseVersion] = _baseProperties.GetValueOrDefault(TelemetryConstants.Properties.ReleaseVersion),
-                    [TelemetryConstants.Properties.BuildSha] = _baseProperties.GetValueOrDefault(TelemetryConstants.Properties.BuildSha),
-                    [TelemetryConstants.Properties.OsVersion] = _osVersion
-                }
-            });
-        }
+        if (enabled && _migrateLegacyIdentity)
+            LegacyTelemetryIdentity.Migrate(this, _distinctId,
+                Path.Combine(ApplicationPaths.MachineConfig, "installation-id.txt"),
+                Path.Combine(ApplicationPaths.Config, "installation-id.txt"),
+                Path.Combine(ApplicationPaths.MachineRoot, "registration.json"),
+                Path.Combine(ApplicationPaths.LocalRoot, "registration.json"),
+                Path.Combine(ApplicationPaths.Config, "pending-install.json"));
     }
 
     public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null)
@@ -184,12 +158,25 @@ public sealed partial class TelemetryService : ITelemetryService
                     : TelemetryEventSanitizer.SanitizeProperties(properties);
                 var eventProperties = new Dictionary<string, object>(StringComparer.Ordinal);
                 AddProperties(eventProperties, _baseProperties);
-
                 AddProperties(eventProperties, safeProperties);
                 eventProperties[TelemetryConstants.Properties.PreferenceGeneration] =
                     Volatile.Read(ref _preferenceGeneration);
+                string? identifyPayload = null;
+                if (name == TelemetryConstants.IdentifyEvent)
+                {
+                    var personProperties = safeProperties.TryGetValue(TelemetryConstants.Properties.Set, out var value) &&
+                                           value is IReadOnlyDictionary<string, object?> set
+                        ? new Dictionary<string, object?>(set)
+                        : new Dictionary<string, object?>();
+                    foreach (var (key, baseValue) in _baseProperties) personProperties[key] = baseValue;
+                    eventProperties[TelemetryConstants.Properties.Set] = ToPostHogValue(personProperties)!;
+                    // The consent generation lets an unchanged profile be sent again after opting back in.
+                    identifyPayload = JsonSerializer.Serialize(eventProperties);
+                    if (identifyPayload == _lastIdentifyPayload) return;
+                }
                 _client!.Capture(_distinctId, name, eventProperties, groups: null, flags: null,
                     timestamp: DateTimeOffset.UtcNow);
+                if (identifyPayload is not null) _lastIdentifyPayload = identifyPayload;
                 if (name == TelemetryConstants.IdentityMigratedEvent) _ = _client.FlushAsync();
             }
         }
@@ -208,7 +195,7 @@ public sealed partial class TelemetryService : ITelemetryService
         var (fingerprint, diagnostic) = Describe(exception);
         var details = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["exceptionType"] = exception.GetType().Name,
+            ["exception"] = exception,
             ["fingerprint"] = fingerprint,
             ["diagnostic"] = diagnostic,
             ["subsystem"] = subsystem,
@@ -225,12 +212,13 @@ public sealed partial class TelemetryService : ITelemetryService
         var safeDetails = TelemetryEventSanitizer.SanitizeProperties(details)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         safeDetails["occurrenceCount"] = 1;
+        var aggregateKey = JsonSerializer.Serialize(safeDetails);
         var now = DateTimeOffset.UtcNow;
         lock (_errorLock)
         {
-            if (!_errors.TryGetValue(fingerprint, out var aggregate))
+            if (!_errors.TryGetValue(aggregateKey, out var aggregate))
             {
-                _errors[fingerprint] = new ErrorAggregate(safeDetails);
+                _errors[aggregateKey] = new ErrorAggregate(safeDetails);
                 TrackEvent("ErrorOccurred", safeDetails);
                 return;
             }
@@ -388,21 +376,23 @@ public sealed partial class TelemetryService : ITelemetryService
         string appVersion, string osVersion)
     {
         var versionParts = appVersion.Split('+', 2);
-        var releaseVersion = versionParts[0];
-        if (Version.TryParse(releaseVersion, out var numericVersion) && numericVersion.Revision == 0)
-            releaseVersion = numericVersion.ToString(3);
+        var version = versionParts[0];
+        if (Version.TryParse(version, out var numericVersion) && numericVersion.Revision == 0)
+            version = numericVersion.ToString(3);
 
-        var baseValues = new Dictionary<string, object?>(StringComparer.Ordinal)
+        return TelemetryEventSanitizer.SanitizeProperties(new Dictionary<string, object?>
         {
-            [TelemetryConstants.Properties.OsVersion] = osVersion,
-            [TelemetryConstants.Properties.AxorithVersion] = appVersion,
-            [TelemetryConstants.Properties.ReleaseVersion] = releaseVersion,
-            [TelemetryConstants.Properties.BuildSha] = versionParts.Length > 1 ? versionParts[1] : null,
-            [TelemetryConstants.Properties.Application] = settings.ApplicationName,
-            [TelemetryConstants.Properties.BuildChannel] = settings.BuildChannel,
-            [TelemetryConstants.Properties.Environment] = settings.EnvironmentOverride
-        };
-        return TelemetryEventSanitizer.SanitizeProperties(baseValues);
+            [TelemetryConstants.Properties.Application] = new Dictionary<string, object?>
+            {
+                ["name"] = settings.ApplicationName,
+                [TelemetryConstants.Properties.Version] = version,
+                [TelemetryConstants.Properties.BuildSha] = versionParts.Length > 1 ? versionParts[1] : null,
+                [TelemetryConstants.Properties.OsVersion] = osVersion,
+                [TelemetryConstants.Properties.BuildChannel] = settings.BuildChannel,
+                [TelemetryConstants.Properties.Environment] = settings.EnvironmentOverride,
+                [TelemetryConstants.Properties.DevMode] = Environment.GetEnvironmentVariable("AXORITH_DEV") == "1"
+            }
+        });
     }
 
     [System.Text.RegularExpressions.GeneratedRegex("^\\$?[A-Za-z][A-Za-z0-9]{0,79}$")]

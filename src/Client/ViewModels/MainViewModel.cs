@@ -7,6 +7,7 @@ using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Core.Models;
+using Axorith.Core.Telemetry;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
@@ -432,7 +433,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             {
                 _telemetry?.TrackEvent("UpdateAvailable", new Dictionary<string, object?>
                 {
-                    ["releaseVersion"] = updateInfo.Version
+                    ["targetVersion"] = updateInfo.Version
                 });
             }
         }
@@ -468,8 +469,8 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         }
     }
 
-    internal static bool TryTrackUpdateAvailable(string releaseVersion) =>
-        TrackedUpdateVersions.TryAdd(releaseVersion, 0);
+    internal static bool TryTrackUpdateAvailable(string targetVersion) =>
+        TrackedUpdateVersions.TryAdd(targetVersion, 0);
 
     private async Task InstallUpdateAsync()
     {
@@ -485,7 +486,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             UpdateStatus = "Downloading update…";
             _telemetry?.TrackEvent("UpdateDownloadStarted", new Dictionary<string, object?>
             {
-                ["releaseVersion"] = update.Version
+                ["targetVersion"] = update.Version
             });
 
             var progress = new Progress<double>(value => Dispatcher.UIThread.Post(() =>
@@ -496,7 +497,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             var installerPath = await _updatesApi.DownloadUpdateAsync(update, progress, ct);
             _telemetry?.TrackEvent("UpdateDownloadCompleted", new Dictionary<string, object?>
             {
-                ["releaseVersion"] = update.Version
+                ["targetVersion"] = update.Version
             });
 
             stage = "update_install";
@@ -507,7 +508,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             UpdateStatus = "Installer opened. Follow its instructions to finish updating.";
             _telemetry?.TrackEvent("UpdateInstallStarted", new Dictionary<string, object?>
             {
-                ["releaseVersion"] = update.Version
+                ["targetVersion"] = update.Version
             });
             await _updatesApi.InstallUpdateAsync(installerPath, ct);
             UpdateStatus = "Update installed. Restart Axorith to use the new version.";
@@ -517,7 +518,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             _telemetry?.TrackEvent(stage == "update_download" ? "UpdateDownloadCancelled" : "UpdateInstallCancelled",
                 new Dictionary<string, object?>
                 {
-                    ["releaseVersion"] = update.Version,
+                    ["targetVersion"] = update.Version,
                     ["stage"] = stage,
                     ["result"] = "cancelled"
                 });
@@ -537,12 +538,14 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             var eventName = stage == "update_download" ? "UpdateDownloadFailed" : "UpdateInstallFailed";
             _telemetry?.TrackEvent(eventName, new Dictionary<string, object?>
             {
-                ["releaseVersion"] = update.Version,
+                ["targetVersion"] = update.Version,
                 ["stage"] = stage,
-                ["result"] = "failed"
+                ["result"] = "failed",
+                ["failureReason"] = ProductAnalyticsProperties.FailureReason(ex),
+                ["exception"] = ex
             });
             _telemetry?.TrackError(ex, "update", stage, "error", handled: true, fatal: false,
-                new Dictionary<string, object?> { ["releaseVersion"] = update.Version });
+                new Dictionary<string, object?> { ["targetVersion"] = update.Version });
         }
         finally
         {
@@ -565,7 +568,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             var result = await _sessionsApi.PreflightSessionAsync(presetVm.Id);
             if (!result.Success)
             {
-                TrackSessionStartFailed(presetVm, sessionInstanceId, "preflight", "validation_failed");
+                TrackSessionStartFailed(presetVm, sessionInstanceId, "preflight", "validation_failed", failure: result);
                 var error = $"{presetVm.Model.FocusCommitment.Mode} Session cannot start: {result.Message}";
                 _toastService?.Show(error, NotificationType.Error, "Sessions");
                 return;
@@ -586,25 +589,29 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     }
 
     private void TrackSessionStartFailed(SessionPresetViewModel preset, Guid sessionInstanceId, string stage,
-        string failureReason) => _telemetry?.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
+        string failureReason, Exception? exception = null, OperationResult? failure = null) =>
+        _telemetry?.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
         {
             ["sessionInstanceId"] = sessionInstanceId,
-            ["presetId"] = preset.Id,
+            ["preset"] = ProductAnalyticsProperties.PresetReference(preset.Id),
             ["startSource"] = "manual",
             ["stage"] = stage,
             ["failureReason"] = failureReason,
-            ["result"] = "failed"
+            ["result"] = "failed",
+            ["exception"] = exception,
+            ["errorMessage"] = failure?.Message,
+            ["errors"] = failure?.Errors
         });
 
     private void TrackSessionStartError(SessionPresetViewModel preset, Guid sessionInstanceId,
         string failureReason, Exception exception)
     {
-        TrackSessionStartFailed(preset, sessionInstanceId, "preflight", failureReason);
+        TrackSessionStartFailed(preset, sessionInstanceId, "preflight", failureReason, exception);
         _telemetry?.TrackError(exception, "session", "session_start", "error", handled: true, fatal: false,
             properties: new Dictionary<string, object?>
             {
                 ["sessionInstanceId"] = sessionInstanceId,
-                ["presetId"] = preset.Id,
+                ["preset"] = ProductAnalyticsProperties.PresetReference(preset.Id),
                 ["stage"] = "preflight"
             });
     }
@@ -672,7 +679,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             cts.Token.ThrowIfCancellationRequested();
             if (!preflight.Success)
             {
-                TrackSessionStartFailed(preset, sessionInstanceId, "preflight", "validation_failed");
+                TrackSessionStartFailed(preset, sessionInstanceId, "preflight", "validation_failed", failure: preflight);
                 var error = $"{preset.Model.FocusCommitment.Mode} Session cannot start: {preflight.Message}";
                 _pendingStartPreset = null;
                 _pendingStartSessionInstanceId = null;
@@ -716,7 +723,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             _telemetry?.TrackEvent("SessionStartCancelled", new Dictionary<string, object?>
             {
                 ["sessionInstanceId"] = sessionInstanceId,
-                ["presetId"] = preset.Id,
+                ["preset"] = ProductAnalyticsProperties.PresetReference(preset.Id),
                 ["startSource"] = "manual",
                 ["result"] = "cancelled"
             });
@@ -756,13 +763,13 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         {
             if (ex is not Grpc.Core.RpcException { StatusCode: Grpc.Core.StatusCode.Internal })
             {
-                TrackSessionStartFailed(presetVm, sessionInstanceId, "rpc_request", "network_error");
+                TrackSessionStartFailed(presetVm, sessionInstanceId, "rpc_request", "network_error", ex);
             }
             _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
                 properties: new Dictionary<string, object?>
                 {
                     ["sessionInstanceId"] = sessionInstanceId,
-                    ["presetId"] = presetVm.Id,
+                    ["preset"] = ProductAnalyticsProperties.PresetReference(presetVm.Id),
                     ["stage"] = "rpc_request"
                 });
             var error = $"Failed to start session: {ex.Message}";
@@ -840,9 +847,12 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 break;
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // Expected when the user releases the hold or leaves the window.
+        }
+        catch (RpcException ex) when (token.IsCancellationRequested && ex.StatusCode == StatusCode.Cancelled)
+        {
         }
         catch (Exception ex)
         {

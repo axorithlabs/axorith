@@ -243,7 +243,10 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
             {
                 _telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
                 {
-                    ["stage"] = "onboarding"
+                    ["stage"] = "onboarding",
+                    ["result"] = "failed",
+                    ["errorMessage"] = result.ErrorMessage ?? result.Errors.FirstOrDefault(),
+                    ["errors"] = result.Errors
                 });
                 _toastService?.Show(
                     $"Setup completed with errors: {result.Errors.FirstOrDefault() ?? result.ErrorMessage}",
@@ -256,7 +259,9 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
             _telemetry.TrackError(ex, "onboarding", "onboarding_create", "error", handled: true, fatal: false);
             _telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
             {
-                ["stage"] = "onboarding"
+                ["stage"] = "onboarding",
+                ["result"] = "failed",
+                ["exception"] = ex
             });
             _toastService?.Show($"Setup failed: {ex.Message}", NotificationType.Error, "Settings");
         }

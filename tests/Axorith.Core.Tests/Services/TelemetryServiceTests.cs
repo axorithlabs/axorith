@@ -93,9 +93,20 @@ public sealed class TelemetryServiceTests
         telemetry.TrackEvent("InstallerCompleted", new Dictionary<string, object?>
         {
             ["installMode"] = "update",
-            ["currentVersion"] = "1.2.3",
             ["previousVersion"] = "1.2.2",
+            ["session"] = new Dictionary<string, object?> { ["token"] = "must be removed" },
             ["privateValue"] = "must be removed"
+        });
+        telemetry.TrackEvent("UpdateDownloadFailed", new Dictionary<string, object?>
+        {
+            ["targetVersion"] = "2.0.0",
+            ["releaseVersion"] = "must be removed",
+            ["stage"] = "update_download",
+            ["result"] = "failed"
+        });
+        telemetry.TrackEvent("SettingsChanged", new Dictionary<string, object?>
+        {
+            ["changedCategories"] = new[] { "startup", "telemetry" }
         });
 
         using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -106,14 +117,255 @@ public sealed class TelemetryServiceTests
         var properties = sentEvent.GetProperty("properties");
 
         Assert.Equal(distinctId, sentEvent.GetProperty("distinct_id").GetString());
+        var application = properties.GetProperty("application");
         Assert.Equal("update", properties.GetProperty("installMode").GetString());
-        Assert.Equal("1.2.3", properties.GetProperty("currentVersion").GetString());
+        Assert.Equal("1.2.3", application.GetProperty("version").GetString());
         Assert.Equal("1.2.2", properties.GetProperty("previousVersion").GetString());
-        Assert.Equal("Axorith.Client", properties.GetProperty("application").GetString());
+        Assert.Equal("Axorith.Client", application.GetProperty("name").GetString());
         Assert.False(properties.TryGetProperty("privateValue", out _));
+        Assert.False(properties.TryGetProperty("session", out _));
+        Assert.False(application.TryGetProperty("installMode", out _));
 
-        var identify = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "$identify");
-        Assert.False(identify.GetProperty("properties").GetProperty("$set").TryGetProperty("application", out _));
+        var update = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "UpdateDownloadFailed")
+            .GetProperty("properties");
+        Assert.Equal("1.2.3", update.GetProperty("application").GetProperty("version").GetString());
+        Assert.Equal("2.0.0", update.GetProperty("targetVersion").GetString());
+        Assert.Equal("failed", update.GetProperty("result").GetString());
+        Assert.Equal("update_download", update.GetProperty("stage").GetString());
+        Assert.False(update.TryGetProperty("releaseVersion", out _));
+        Assert.False(update.GetProperty("application").TryGetProperty("targetVersion", out _));
+        var settings = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "SettingsChanged")
+            .GetProperty("properties");
+        Assert.Equal(new[] { "startup", "telemetry" }, settings.GetProperty("changedCategories").EnumerateArray()
+            .Select(value => value.GetString()).ToArray());
+
+        Assert.DoesNotContain(ReadEvents(server), item => item.GetProperty("event").GetString() == "$identify");
+    }
+
+    [Theory]
+    [InlineData(null, false, "Axorith.Client", "1.2.3", "1.2.3")]
+    [InlineData("0", false, "Axorith.Host", "1.2.3.0", "1.2.3")]
+    [InlineData("1", true, "Axorith.Client", "1.2.3-beta.2", "1.2.3-beta.2")]
+    [InlineData("1", true, "Axorith.Host", "1.2.3", "1.2.3")]
+    [InlineData("true", false, "Axorith.Host", "1.2.3", "1.2.3")]
+    public async Task ApplicationMetadata_IsNestedAndSeparatesTheBuildFromTheVersion(string? devValue,
+        bool expectedDevMode, string applicationName, string version, string expectedVersion)
+    {
+        var previousDevValue = Environment.GetEnvironmentVariable("AXORITH_DEV");
+        const string sha = "f62acce7fcb374e96811c0e72f99026916a81ffe";
+        try
+        {
+            Environment.SetEnvironmentVariable("AXORITH_DEV", devValue);
+            await using var server = new PostHogTestServer();
+            await using var telemetry = CreateTelemetry(server, applicationName, appVersion: $"{version}+{sha}");
+            telemetry.TrackEvent(TelemetryConstants.IdentifyEvent);
+            telemetry.TrackEvent("ApplicationStarted");
+            await telemetry.FlushAsync();
+
+            var events = ReadEvents(server).ToArray();
+            Assert.Equal(2, events.Length);
+            Assert.All(events, item =>
+            {
+                var properties = item.GetProperty("properties");
+                var application = properties.GetProperty("application");
+                Assert.Equal(applicationName, application.GetProperty("name").GetString());
+                Assert.Equal(expectedVersion, application.GetProperty("version").GetString());
+                Assert.False(application.TryGetProperty("release_version", out _));
+                Assert.False(application.TryGetProperty("axorith_version", out _));
+                Assert.Equal(sha, application.GetProperty("build_sha").GetString());
+                Assert.Equal(expectedDevMode, application.GetProperty("dev_mode").GetBoolean());
+                Assert.Equal("Windows 11", application.GetProperty("os_version").GetString());
+                Assert.False(properties.TryGetProperty("axorith_version", out _));
+                Assert.False(properties.TryGetProperty("build_sha", out _));
+                Assert.False(properties.TryGetProperty("dev_mode", out _));
+            });
+            var identify = events.Single(item => item.GetProperty("event").GetString() == "$identify")
+                .GetProperty("properties").GetProperty("$set").GetProperty("application");
+            Assert.Equal(expectedVersion, identify.GetProperty("version").GetString());
+            Assert.Equal(sha, identify.GetProperty("build_sha").GetString());
+            Assert.Equal(expectedDevMode, identify.GetProperty("dev_mode").GetBoolean());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AXORITH_DEV", previousDevValue);
+        }
+    }
+
+    [Fact]
+    public async Task ClientAndHost_SendOneCompleteHostIdentifyAndKeepClientEvents()
+    {
+        await using var server = new PostHogTestServer();
+        var distinctId = Guid.NewGuid().ToString();
+        await using var client = CreateTelemetry(server, "Axorith.Client", distinctId);
+        await using var host = CreateTelemetry(server, "Axorith.Host", distinctId);
+        client.SetEnabled(true);
+        client.SetEnabled(true);
+        host.SetEnabled(true);
+        host.SetEnabled(true);
+        client.TrackEvent("ApplicationStarted");
+        var preset = new SessionPreset(Guid.NewGuid());
+        var schedule = new SessionSchedule { Id = Guid.NewGuid(), PresetId = preset.Id, IsEnabled = false };
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+            host.TrackEvent(TelemetryConstants.IdentifyEvent, new Dictionary<string, object?>
+            {
+                ["$set"] = ProductAnalyticsProperties.ProductState([preset], [schedule])
+            }))));
+        await client.FlushAsync();
+        await host.FlushAsync();
+
+        var events = ReadEvents(server).ToArray();
+        Assert.Equal(2, events.Length);
+        Assert.All(events, item => Assert.Equal(distinctId, item.GetProperty("distinct_id").GetString()));
+        var identify = events.Single(item => item.GetProperty("event").GetString() == "$identify")
+            .GetProperty("properties");
+        Assert.True(identify.GetProperty("$is_server").GetBoolean());
+        Assert.Equal("Axorith.Host", identify.GetProperty("application").GetProperty("name").GetString());
+        var person = identify.GetProperty("$set");
+        Assert.Equal("Axorith.Host", person.GetProperty("application").GetProperty("name").GetString());
+        Assert.Equal("1.2.3", person.GetProperty("application").GetProperty("version").GetString());
+        Assert.Equal(1, person.GetProperty("presetCount").GetInt32());
+        Assert.Equal(1, person.GetProperty("scheduleCount").GetInt32());
+        Assert.Equal(0, person.GetProperty("enabledScheduleCount").GetInt32());
+        var started = events.Single(item => item.GetProperty("event").GetString() == "ApplicationStarted")
+            .GetProperty("properties");
+        Assert.Equal("Axorith.Client", started.GetProperty("application").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Identify_AfterOptInOrChangedState_IsSentWithoutReplayingOptedOutEvents()
+    {
+        await using var server = new PostHogTestServer();
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
+        var initial = new Dictionary<string, object?> { ["$set"] = ProductAnalyticsProperties.ProductState([], []) };
+        var updated = new Dictionary<string, object?>
+        {
+            ["$set"] = ProductAnalyticsProperties.ProductState([new SessionPreset(Guid.NewGuid())], [])
+        };
+        telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, initial);
+        telemetry.SetEnabled(false);
+        telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, updated);
+        telemetry.SetEnabled(true);
+        telemetry.SetEnabled(true);
+        telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, initial);
+        telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, initial);
+        telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, updated);
+        telemetry.TrackEvent(TelemetryConstants.IdentifyEvent, updated);
+        await telemetry.FlushAsync();
+
+        var events = ReadEvents(server).ToArray();
+        Assert.Equal(2, events.Length);
+        Assert.All(events, item => Assert.Equal("$identify", item.GetProperty("event").GetString()));
+        Assert.Equal(new[] { 0, 1 }, events.Select(item => item.GetProperty("properties").GetProperty("$set")
+            .GetProperty("presetCount").GetInt32()).ToArray());
+    }
+
+    [Fact]
+    public async Task RepeatedErrors_KeepEachRunAndModuleContextAndFilterNestedSecrets()
+    {
+        await using var server = new PostHogTestServer();
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
+        var exception = new InvalidOperationException("Access denied for 'private-error-message'.");
+        var runs = Enumerable.Range(0, 2).Select(_ => new
+        {
+            SessionId = Guid.NewGuid(), PresetId = Guid.NewGuid(), ModuleId = Guid.NewGuid(), InstanceId = Guid.NewGuid()
+        }).ToArray();
+        foreach (var run in runs)
+        {
+            var preset = ProductAnalyticsProperties.PresetReference(run.PresetId);
+            preset["name"] = "private-preset-name";
+            preset["modules"] = new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["moduleId"] = run.ModuleId,
+                    ["type"] = "App Blocker",
+                    ["password"] = "private-password",
+                    ["settings"] = new Dictionary<string, object?> { ["token"] = "private-token" }
+                }
+            };
+            var details = new Dictionary<string, object?>
+            {
+                ["sessionInstanceId"] = run.SessionId,
+                ["preset"] = preset,
+                ["module"] = ProductAnalyticsProperties.ModuleReference(run.ModuleId, run.InstanceId, "App Blocker"),
+                ["stage"] = "module_startup",
+                ["latencyMs"] = double.NaN
+            };
+            telemetry.TrackError(exception, "module", "module_execution", "error", true, false, details);
+            telemetry.TrackError(exception, "module", "module_execution", "error", true, false, details);
+        }
+        await telemetry.FlushAsync();
+
+        var errors = ReadEvents(server).Where(item => item.GetProperty("event").GetString() == "ErrorOccurred")
+            .Select(item => item.GetProperty("properties")).ToArray();
+        Assert.Equal(4, errors.Length);
+        Assert.Single(errors.Select(error => error.GetProperty("fingerprint").GetString()).Distinct());
+        foreach (var run in runs)
+        {
+            var runErrors = errors.Where(error => error.GetProperty("sessionInstanceId").GetString() == run.SessionId.ToString())
+                .ToArray();
+            Assert.Equal(2, runErrors.Sum(error => error.GetProperty("occurrenceCount").GetInt32()));
+            Assert.All(runErrors, error =>
+            {
+                Assert.Equal(run.PresetId.ToString(), error.GetProperty("preset").GetProperty("presetId").GetString());
+                Assert.Equal(run.ModuleId.ToString(), error.GetProperty("module").GetProperty("moduleId").GetString());
+                Assert.Equal(run.InstanceId.ToString(), error.GetProperty("module").GetProperty("instanceId").GetString());
+                Assert.Equal("module_startup", error.GetProperty("stage").GetString());
+                Assert.Equal("Access denied for [redacted].", error.GetProperty("errorMessage").GetString());
+                Assert.False(error.TryGetProperty("latencyMs", out _));
+                Assert.False(error.TryGetProperty("session", out _));
+                Assert.False(error.GetProperty("preset").TryGetProperty("name", out _));
+                Assert.False(error.GetProperty("preset").GetProperty("modules")[0].TryGetProperty("password", out _));
+            });
+        }
+        var payload = string.Join("\n", server.Payloads);
+        foreach (var secret in new[] { "private-error-message", "private-preset-name", "private-password", "private-token" })
+            Assert.DoesNotContain(secret, payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FileFailure_SendsRedactedMessageAndOriginalCauseOnErrorAndFailureEvents()
+    {
+        await using var server = new PostHogTestServer();
+        await using var telemetry = CreateTelemetry(server, "Axorith.Host");
+        var privatePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "private-document.txt");
+        var cause = await Assert.ThrowsAsync<DirectoryNotFoundException>(() => File.ReadAllTextAsync(privatePath));
+        var error = new SessionException("Module 'private-module 'nested-secret' work' failed to start.", cause);
+        telemetry.TrackError(error, "module", "module_execution", "error", true, false);
+        telemetry.TrackEvent("ModuleStartFailed", new Dictionary<string, object?> { ["exception"] = error });
+        telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
+        {
+            ["errorMessage"] = "Request failed: https://user:secret@private.example/api?token=private-token",
+            ["errors"] = new[]
+            {
+                "Access denied: password=private-password token=private-token",
+                "Cannot connect to 192.168.1.45 or [2001:db8::1] as private@email.example",
+                "Read failed: /home/private-user/private-file.txt",
+                "Module 'private-module 'nested-secret' work' validation failed: Device Name is required when 'Specific Device Name' mode is selected.",
+                new string('x', 5000)
+            }
+        });
+        await telemetry.FlushAsync();
+
+        var events = ReadEvents(server).Where(item => item.GetProperty("event").GetString() is
+            "ErrorOccurred" or "ModuleStartFailed").ToArray();
+        Assert.Equal(2, events.Length);
+        Assert.All(events, item =>
+        {
+            var properties = item.GetProperty("properties");
+            Assert.Equal("SessionException", properties.GetProperty("exceptionType").GetString());
+            Assert.Equal("DirectoryNotFoundException", properties.GetProperty("innerExceptionType").GetString());
+            Assert.Equal("Module [redacted] failed to start.", properties.GetProperty("errorMessage").GetString());
+            Assert.True(properties.TryGetProperty("errorCode", out _));
+            Assert.False(properties.TryGetProperty("exception", out _));
+        });
+        var validation = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "OnboardingFailed")
+            .GetProperty("properties").GetProperty("errors")[3].GetString();
+        Assert.Equal("Module [redacted] validation failed: Device Name is required when [redacted] mode is selected.", validation);
+        var payload = string.Join("\n", server.Payloads);
+        foreach (var secret in new[] { "private-module", "nested-secret", "private-document", "private-token", "private-password",
+                     "private.example", "private@email", "192.168.1.45", "2001:db8::1", "private-user", "private-file" })
+            Assert.DoesNotContain(secret, payload);
     }
 
     [Fact]
@@ -237,8 +489,7 @@ public sealed class TelemetryServiceTests
             preset, preset.Modules[0], "App Blocker", "create"));
         foreach (var eventName in new[] { "SessionStarted", "SessionStopped" })
         {
-            var properties = ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment);
-            properties["presetId"] = preset.Id;
+            var properties = ProductAnalyticsProperties.Preset(preset, moduleNames);
             properties["sessionInstanceId"] = Guid.NewGuid();
             if (eventName == "SessionStopped")
             {
@@ -291,7 +542,7 @@ public sealed class TelemetryServiceTests
         telemetry.TrackEvent("OneTimeScheduleChanged", ProductAnalyticsProperties.Schedule(oneTimeSchedule, "create"));
         telemetry.TrackEvent("ModuleActionInvoked", new Dictionary<string, object?>
         {
-            ["moduleName"] = "App Blocker",
+            ["module"] = ProductAnalyticsProperties.ModuleReference(appBlockerId, preset.Modules[0].InstanceId, "App Blocker"),
             ["actionKey"] = ProductAnalyticsProperties.NormalizeActionKey("AddApp"),
             ["result"] = "success"
         });
@@ -301,7 +552,7 @@ public sealed class TelemetryServiceTests
 
         var events = ReadEvents(server).ToDictionary(item => item.GetProperty("event").GetString()!, item => item.GetProperty("properties"));
 
-        var presetProperties = events["PresetCreated"];
+        var presetProperties = events["PresetCreated"].GetProperty("preset");
         Assert.Equal(presetId.ToString("D"), presetProperties.GetProperty("presetId").GetString());
         Assert.Equal(3, presetProperties.GetProperty("presetVersion").GetInt32());
         Assert.Equal("strict", presetProperties.GetProperty("commitmentMode").GetString());
@@ -311,8 +562,14 @@ public sealed class TelemetryServiceTests
             .Select(day => day.GetString()).ToArray());
         Assert.True(presetProperties.GetProperty("hasNextWorkspace").GetBoolean());
         Assert.Equal(15, presetProperties.GetProperty("scheduleLockMinutes").GetInt32());
+        Assert.False(events["PresetCreated"].TryGetProperty("presetId", out _));
+        Assert.False(events["PresetCreated"].TryGetProperty("modules", out _));
+        Assert.False(events["PresetCreated"].TryGetProperty("moduleIds", out _));
+        Assert.False(events["PresetCreated"].TryGetProperty("moduleTypes", out _));
         var modules = presetProperties.GetProperty("modules").EnumerateArray().ToArray();
-        var appBlocker = modules.Single(module => module.GetProperty("moduleName").GetString() == "App Blocker");
+        Assert.Equal(preset.Modules.Select(module => module.ModuleId.ToString()),
+            modules.Select(module => module.GetProperty("moduleId").GetString()));
+        var appBlocker = modules.Single(module => module.GetProperty("type").GetString() == "App Blocker");
         Assert.Equal("block_list", appBlocker.GetProperty("blockingMode").GetString());
         Assert.Equal(new[] { "Gaming" }, appBlocker.GetProperty("categories").EnumerateArray()
             .Select(category => category.GetString()).ToArray());
@@ -322,7 +579,7 @@ public sealed class TelemetryServiceTests
         Assert.Equal(3000, appBlocker.GetProperty("startDelayMs").GetInt32());
         Assert.False(appBlocker.TryGetProperty("CustomProcessList", out _));
 
-        var siteBlocker = modules.Single(module => module.GetProperty("moduleName").GetString() == "Site Blocker");
+        var siteBlocker = modules.Single(module => module.GetProperty("type").GetString() == "Site Blocker");
         Assert.Equal("allow_list", siteBlocker.GetProperty("blockingMode").GetString());
         Assert.Equal(new[] { "Adult", "Forums" }, siteBlocker.GetProperty("categories").EnumerateArray()
             .Select(category => category.GetString()).ToArray());
@@ -330,7 +587,7 @@ public sealed class TelemetryServiceTests
         Assert.Equal(new[] { "private.example", "secret.example" }, siteBlocker.GetProperty("customSiteDomains")
             .EnumerateArray().Select(value => value.GetString()).ToArray());
 
-        var launcher = modules.Single(module => module.GetProperty("moduleName").GetString() == "Application Launcher");
+        var launcher = modules.Single(module => module.GetProperty("type").GetString() == "Application Launcher");
         Assert.Equal("obs", launcher.GetProperty("launcherAppType").GetString());
         Assert.Equal("launch_or_attach", launcher.GetProperty("processMode").GetString());
         Assert.True(launcher.GetProperty("webSocketPortIsDefault").GetBoolean());
@@ -342,7 +599,7 @@ public sealed class TelemetryServiceTests
         Assert.False(launcher.TryGetProperty("ApplicationPath", out _));
         Assert.False(launcher.TryGetProperty("WebSocketPassword", out _));
 
-        var homeAssistant = modules.Single(module => module.GetProperty("moduleName").GetString() == "Home Assistant");
+        var homeAssistant = modules.Single(module => module.GetProperty("type").GetString() == "Home Assistant");
         Assert.True(homeAssistant.GetProperty("hasAccessToken").GetBoolean());
         Assert.True(homeAssistant.GetProperty("usesHttps").GetBoolean());
         Assert.False(homeAssistant.TryGetProperty("BaseUrl", out _));
@@ -350,18 +607,18 @@ public sealed class TelemetryServiceTests
         Assert.False(homeAssistant.TryGetProperty("StartEntityId", out _));
 
         var scheduleProperties = events["ScheduleChanged"];
-        Assert.Equal("recurring_start", scheduleProperties.GetProperty("scheduleType").GetString());
-        Assert.False(scheduleProperties.GetProperty("hasNextPreset").GetBoolean());
-        Assert.Equal(575, scheduleProperties.GetProperty("scheduledMinuteOfDay").GetInt32());
-        Assert.Equal(2, scheduleProperties.GetProperty("daysCount").GetInt32());
+        Assert.Equal("recurring_start", scheduleProperties.GetProperty("schedule").GetProperty("scheduleType").GetString());
+        Assert.False(scheduleProperties.GetProperty("schedule").GetProperty("hasNextPreset").GetBoolean());
+        Assert.Equal(575, scheduleProperties.GetProperty("schedule").GetProperty("scheduledMinuteOfDay").GetInt32());
+        Assert.Equal(2, scheduleProperties.GetProperty("schedule").GetProperty("daysCount").GetInt32());
         Assert.False(scheduleProperties.TryGetProperty("OneTimeDate", out _));
         var recurringStopProperties = events["RecurringStopScheduleChanged"];
-        Assert.Equal("recurring_stop", recurringStopProperties.GetProperty("scheduleType").GetString());
-        Assert.Equal(1095, recurringStopProperties.GetProperty("scheduledMinuteOfDay").GetInt32());
-        Assert.Equal("tue", recurringStopProperties.GetProperty("daysOfWeek")[0].GetString());
+        Assert.Equal("recurring_stop", recurringStopProperties.GetProperty("schedule").GetProperty("scheduleType").GetString());
+        Assert.Equal(1095, recurringStopProperties.GetProperty("schedule").GetProperty("scheduledMinuteOfDay").GetInt32());
+        Assert.Equal("tue", recurringStopProperties.GetProperty("schedule").GetProperty("daysOfWeek")[0].GetString());
         var oneTimeProperties = events["OneTimeScheduleChanged"];
         var oneTimeLocal = oneTimeSchedule.OneTimeDate!.Value.ToLocalTime();
-        Assert.Equal(oneTimeLocal.Hour * 60 + oneTimeLocal.Minute, oneTimeProperties.GetProperty("oneTimeMinuteOfDay").GetInt32());
+        Assert.Equal(oneTimeLocal.Hour * 60 + oneTimeLocal.Minute, oneTimeProperties.GetProperty("schedule").GetProperty("oneTimeMinuteOfDay").GetInt32());
         var expectedOneTimeDay = oneTimeLocal.DayOfWeek switch
         {
             DayOfWeek.Monday => "mon",
@@ -372,20 +629,26 @@ public sealed class TelemetryServiceTests
             DayOfWeek.Saturday => "sat",
             _ => "sun"
         };
-        Assert.Equal(expectedOneTimeDay, oneTimeProperties.GetProperty("oneTimeDayOfWeek").GetString());
+        Assert.Equal(expectedOneTimeDay, oneTimeProperties.GetProperty("schedule").GetProperty("oneTimeDayOfWeek").GetString());
         Assert.True(oneTimeProperties.GetProperty("oneTimeLeadTimeMs").GetInt64() > 0);
         Assert.False(oneTimeProperties.TryGetProperty("OneTimeDate", out _));
         Assert.Equal("add_app", events["ModuleActionInvoked"].GetProperty("actionKey").GetString());
-        Assert.Equal("create", events["ModuleConfigurationSaved"].GetProperty("presetChangeType").GetString());
-        Assert.True(events["SessionStarted"].GetProperty("endAtConfigured").GetBoolean());
-        Assert.Equal(15, events["SessionStarted"].GetProperty("scheduleLockMinutes").GetInt32());
-        Assert.Equal("start_next_workspace", events["SessionStopped"].GetProperty("afterEndAction").GetString());
-        Assert.Equal("duration_stop", events["ScheduleTriggered"].GetProperty("scheduleType").GetString());
-        Assert.Equal(720_000, events["ScheduleTriggered"].GetProperty("autoStopDurationMs").GetInt32());
-        Assert.True(events["ScheduleTriggered"].GetProperty("hasNextPreset").GetBoolean());
-        Assert.Equal(nextPresetId.ToString("D"), events["ScheduleTriggered"].GetProperty("nextPresetId").GetString());
-        Assert.Equal("duration", events["PresetUpdated"].GetProperty("endConditionType").GetString());
-        Assert.Equal(1_500_000, events["PresetUpdated"].GetProperty("plannedDurationMs").GetInt32());
+        var moduleConfiguration = events["ModuleConfigurationSaved"];
+        Assert.Equal("create", moduleConfiguration.GetProperty("presetChangeType").GetString());
+        Assert.Equal(presetId.ToString(), moduleConfiguration.GetProperty("preset").GetProperty("presetId").GetString());
+        Assert.Equal("App Blocker", moduleConfiguration.GetProperty("preset").GetProperty("modules")[0].GetProperty("type").GetString());
+        Assert.True(moduleConfiguration.GetProperty("moduleConfigurationChanged").GetBoolean());
+        Assert.Equal("block_list", moduleConfiguration.GetProperty("preset").GetProperty("modules")[0].GetProperty("blockingMode").GetString());
+        Assert.False(moduleConfiguration.TryGetProperty("moduleId", out _));
+        Assert.True(events["SessionStarted"].GetProperty("preset").GetProperty("endAtConfigured").GetBoolean());
+        Assert.Equal(15, events["SessionStarted"].GetProperty("preset").GetProperty("scheduleLockMinutes").GetInt32());
+        Assert.Equal("start_next_workspace", events["SessionStopped"].GetProperty("preset").GetProperty("afterEndAction").GetString());
+        Assert.Equal("duration_stop", events["ScheduleTriggered"].GetProperty("schedule").GetProperty("scheduleType").GetString());
+        Assert.Equal(720_000, events["ScheduleTriggered"].GetProperty("schedule").GetProperty("autoStopDurationMs").GetInt32());
+        Assert.True(events["ScheduleTriggered"].GetProperty("schedule").GetProperty("hasNextPreset").GetBoolean());
+        Assert.Equal(nextPresetId.ToString("D"), events["ScheduleTriggered"].GetProperty("schedule").GetProperty("nextPresetId").GetString());
+        Assert.Equal("duration", events["PresetUpdated"].GetProperty("preset").GetProperty("endConditionType").GetString());
+        Assert.Equal(1_500_000, events["PresetUpdated"].GetProperty("preset").GetProperty("plannedDurationMs").GetInt32());
 
         var payloadText = string.Join("\n", server.Payloads);
         foreach (var sensitiveValue in new[]
@@ -443,13 +706,13 @@ public sealed class TelemetryServiceTests
                 "Application Launcher")
         };
 
-        telemetry.TrackEvent("PresetUpdated", new Dictionary<string, object?> { ["modules"] = modules });
+        telemetry.TrackEvent("PresetUpdated", new Dictionary<string, object?> { ["preset"] = new Dictionary<string, object?> { ["modules"] = modules } });
         using var flushCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await telemetry.FlushAsync(flushCts.Token);
 
         var payloadText = string.Join("\n", server.Payloads);
         var presetEvent = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "PresetUpdated");
-        var safeModules = presetEvent.GetProperty("properties").GetProperty("modules").EnumerateArray().ToArray();
+        var safeModules = presetEvent.GetProperty("properties").GetProperty("preset").GetProperty("modules").EnumerateArray().ToArray();
         var browser = safeModules.Single(module => module.GetProperty("launcherAppType").GetString() == "browser");
         Assert.Equal("chromium", browser.GetProperty("browserFamily").GetString());
         Assert.Equal("private.example", browser.GetProperty("startUrlDomain").GetString());
@@ -525,16 +788,19 @@ public sealed class TelemetryServiceTests
 
         telemetry.TrackEvent("PresetCreated", new Dictionary<string, object?>
         {
-            ["modules"] = new[] { appBlocker, siteBlocker, customLauncher, browser, obs, steam, homeAssistant }
+            ["preset"] = new Dictionary<string, object?>
+            {
+                ["modules"] = new[] { appBlocker, siteBlocker, customLauncher, browser, obs, steam, homeAssistant }
+            }
         });
         await telemetry.FlushAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
 
         var eventPayload = ReadEvents(server).Single(item => item.GetProperty("event").GetString() == "PresetCreated");
-        var modules = eventPayload.GetProperty("properties").GetProperty("modules").EnumerateArray().ToArray();
-        var safeAppBlocker = modules.Single(module => module.GetProperty("moduleName").GetString() == "App Blocker");
+        var modules = eventPayload.GetProperty("properties").GetProperty("preset").GetProperty("modules").EnumerateArray().ToArray();
+        var safeAppBlocker = modules.Single(module => module.GetProperty("type").GetString() == "App Blocker");
         Assert.Equal(new[] { "discord", "slack" }, safeAppBlocker.GetProperty("customProcessNames")
             .EnumerateArray().Select(value => value.GetString()).ToArray());
-        var safeSiteBlocker = modules.Single(module => module.GetProperty("moduleName").GetString() == "Site Blocker");
+        var safeSiteBlocker = modules.Single(module => module.GetProperty("type").GetString() == "Site Blocker");
         Assert.Equal(new[] { "example.org", "reddit.com" }, safeSiteBlocker.GetProperty("customSiteDomains")
             .EnumerateArray().Select(value => value.GetString()).ToArray());
 
@@ -556,7 +822,7 @@ public sealed class TelemetryServiceTests
         var safeSteam = modules.Single(module => module.TryGetProperty("launcherAppType", out var appType) &&
                                                  appType.GetString() == "steam");
         Assert.Equal(570, safeSteam.GetProperty("selectedSteamAppId").GetInt32());
-        var safeHomeAssistant = modules.Single(module => module.GetProperty("moduleName").GetString() == "Home Assistant");
+        var safeHomeAssistant = modules.Single(module => module.GetProperty("type").GetString() == "Home Assistant");
         Assert.Equal("light", safeHomeAssistant.GetProperty("startEntityDomain").GetString());
         Assert.Equal("scene", safeHomeAssistant.GetProperty("endEntityDomain").GetString());
         Assert.True(safeHomeAssistant.GetProperty("hasAccessToken").GetBoolean());
@@ -584,7 +850,10 @@ public sealed class TelemetryServiceTests
         {
             ["$set"] = ProductAnalyticsProperties.ProductState([preset], [schedule])
         });
-        telemetry.TrackEvent("PresetCreated", ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment));
+        telemetry.TrackEvent("PresetCreated", new Dictionary<string, object?>
+        {
+            ["preset"] = ProductAnalyticsProperties.FocusCommitment(preset.FocusCommitment)
+        });
         telemetry.TrackEvent("OnboardingCompleted", new Dictionary<string, object?>
         {
             ["createdCount"] = 3,
@@ -593,7 +862,7 @@ public sealed class TelemetryServiceTests
         await telemetry.FlushAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
 
         var events = ReadEvents(server).ToArray();
-        var identifyProperties = events.Last(item => item.GetProperty("event").GetString() == "$identify")
+        var identifyProperties = events.Single(item => item.GetProperty("event").GetString() == "$identify")
             .GetProperty("properties").GetProperty("$set");
         Assert.Equal(1, identifyProperties.GetProperty("presetCount").GetInt32());
         Assert.Equal(1, identifyProperties.GetProperty("scheduleCount").GetInt32());
@@ -601,7 +870,7 @@ public sealed class TelemetryServiceTests
         Assert.True(identifyProperties.GetProperty("hasScheduler").GetBoolean());
         Assert.False(identifyProperties.GetProperty("hasCommittedPreset").GetBoolean());
         Assert.False(events.Single(item => item.GetProperty("event").GetString() == "PresetCreated")
-            .GetProperty("properties").TryGetProperty("breakDurationMs", out _));
+            .GetProperty("properties").GetProperty("preset").TryGetProperty("breakDurationMs", out _));
         Assert.Equal(new[] { "Developer", "Gamer", "Streamer" }, events.Single(item =>
                 item.GetProperty("event").GetString() == "OnboardingCompleted")
             .GetProperty("properties").GetProperty("createdModuleTypes").EnumerateArray()
@@ -617,14 +886,14 @@ public sealed class TelemetryServiceTests
         public void DeleteSecret(string key) => _values.Remove(key);
     }
     private static TelemetryService CreateTelemetry(PostHogTestServer server, string applicationName,
-        string? distinctId = null) => new(new TelemetrySettings
+        string? distinctId = null, string appVersion = "1.2.3") => new(new TelemetrySettings
     {
         Enabled = true,
         PostHogApiKey = "test-project-key",
         PostHogHost = server.Host,
         DistinctId = distinctId ?? Guid.NewGuid().ToString("D"),
         ApplicationName = applicationName,
-        AppVersion = "1.2.3",
+        AppVersion = appVersion,
         OsVersion = "Windows 11",
         BatchSize = 100,
         FlushInterval = TimeSpan.FromHours(1)
