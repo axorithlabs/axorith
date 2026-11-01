@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Automatize o ambiente Windows com agendamentos e bloqueadores | Axorith</title>
+<meta content="Crie um ambiente Windows repetível que abre apps e projetos, bloqueia distrações, segue horários e passa para o próximo espaço de trabalho." name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/pt/blog/automate-work-setup-windows/" rel="canonical"/>
+<meta content="Automatize o ambiente Windows com agendamentos e bloqueadores | Axorith" property="og:title"/>
+<meta content="Crie um ambiente Windows repetível que abre apps e projetos, bloqueia distrações, segue horários e passa para o próximo espaço de trabalho." property="og:description"/>
+<meta content="article" property="og:type"/>
+<meta content="https://axorith.com/pt/blog/automate-work-setup-windows/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Automatize o ambiente Windows com agendamentos e bloqueadores | Axorith" name="twitter:title"/>
+<meta content="Crie um ambiente Windows repetível que abre apps e projetos, bloqueia distrações, segue horários e passa para o próximo espaço de trabalho." name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Automatize seu ambiente de trabalho no Windows","description":"Crie um ambiente Windows repetível que abre apps e projetos, bloqueia distrações, segue horários e passa para o próximo espaço de trabalho.","url":"https://axorith.com/pt/blog/automate-work-setup-windows/","mainEntityOfPage":"https://axorith.com/pt/blog/automate-work-setup-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-04","dateModified":"2026-10-04","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/pt/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/pt/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/pt/","inLanguage":"pt"},"inLanguage":"pt"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/pt/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://axorith.com/pt/blog/"},{"@type":"ListItem","position":3,"name":"Automatize seu ambiente de trabalho no Windows","item":"https://axorith.com/pt/blog/automate-work-setup-windows/"}]}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="pt_BR"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/automate-work-setup-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-content-slug="automate-work-setup-windows" data-page-type="blog-post">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Página inicial do Axorith" class="brand" href="/pt/">Axorith</a>
+<nav aria-label="Navegação principal" class="desktop-nav">
+<a href="/pt/#workflow">Como funciona</a>
+<a href="/pt/#schedule">Agendamentos</a>
+<a class="is-current" href="/pt/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar</a>
+<button aria-expanded="false" aria-label="Abrir navegação" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Navegação móvel" class="mobile-nav">
+<a href="/pt/#workflow">Como funciona</a>
+<a href="/pt/#schedule">Agendamentos</a>
+<a href="/pt/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar para Windows</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Idioma: Português">PT</summary>
+<nav aria-label="Idioma">
+<a href="/blog/automate-work-setup-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/automate-work-setup-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/automate-work-setup-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/automate-work-setup-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/automate-work-setup-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/automate-work-setup-windows/" hreflang="pt" lang="pt" aria-current="page">Português</a>
+<a href="/es/blog/automate-work-setup-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/automate-work-setup-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/automate-work-setup-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/automate-work-setup-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/automate-work-setup-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero">
+<div class="blog-post-hero__inner">
+<nav aria-label="Trilha de navegação" class="breadcrumbs">
+<a href="/pt/">Axorith</a><span>/</span><a href="/pt/blog/">Blog</a>
+</nav>
+<p class="blog-kicker">Automação do espaço de trabalho</p>
+<h1>Automatize seu ambiente de trabalho no Windows</h1>
+<p class="blog-post-dek">Transforme a preparação repetitiva para trabalho, estudo ou programação em uma predefinição que roda sozinha.</p>
+<div class="blog-post-hero__actions">
+<a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar para Windows</a>
+<a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+<article class="blog-post-layout">
+<div class="blog-post-content">
+<section class="blog-post-section blog-post-lead">
+<p>Um ambiente Windows repetível vai além de iniciar apps. Ele também fecha ou bloqueia distrações, abre o projeto correto, aplica as regras da sessão e sabe quando o espaço deve terminar. O Axorith guarda tudo em uma predefinição.</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Antes do Axorith</p>
+<h2>A mesma preparação se repete todos os dias.</h2>
+<p>Abrir a IDE. Encontrar o projeto. Abrir o navegador. Fechar Steam e Discord. Ligar a música certa e o bloqueador. Com Home Assistant, ajustar também a cena do ambiente. São passos simples, mas juntos viram um ritual a cada mudança de atividade.</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Predefinição</p>
+<h2>Descreva o estado desejado uma vez.</h2>
+<p>Uma predefinição pode reunir inicialização de apps, bloqueadores de apps e sites e módulos opcionais como Spotify ou Home Assistant. Ela também contém as regras da sessão, incluindo proteção contra encerramento antecipado e condições de parada.</p>
+<div aria-label="Exemplo de predefinição de trabalho do Axorith" class="blog-post-inline-flow">
+<span>09:00</span><strong>Programação</strong><span>CLion</span><span>Navegador</span><span>Bloqueio de aplicativos</span><span>Bloqueador de sites</span>
+</div>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Agendador</p>
+<h2>De um inicializador a uma rotina de verdade.</h2>
+<p>O agendamento transforma a predefinição em rotina. Programação pode começar às 09:00 nos dias úteis, terminar às 18:00 e dar lugar a Descanso. A segunda predefinição pode iniciar outros apps com outras regras de bloqueio.</p>
+<p>O agendamento faz parte da definição do espaço. Não é preciso manter um script separado do Agendador de Tarefas sincronizado com os bloqueadores.</p>
+</section>
+<figure class="blog-post-figure reveal">
+<img alt="Interface de agendamento de uma predefinição do Axorith" decoding="async" loading="lazy" src="/assets/Axorith.Client_4.png"/>
+<figcaption>O agendamento pertence à predefinição, sem uma tarefa separada do Windows para manter.</figcaption>
+</figure>
+<section class="blog-post-section">
+<p class="blog-kicker">Proteção da sessão</p>
+<h2>Escolha o nível de proteção contra o encerramento antecipado da sessão.</h2>
+<p>Algumas sessões precisam só de estrutura; outras, de maior compromisso. O Axorith guarda essas regras na predefinição: como a sessão termina, se há pausas e o que acontece depois.</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Home Assistant</p>
+<h2>O ambiente físico pode acompanhar as mudanças do espaço de trabalho.</h2>
+<p>O módulo Home Assistant pode acionar entidades configuradas ao iniciar ou encerrar uma sessão. Luzes e cenas acompanham o espaço digital sem levar o restante do Axorith para a nuvem.</p>
+</section>
+<section class="blog-post-cta reveal">
+<div>
+<p class="blog-kicker">AXORITH PARA WINDOWS</p>
+<h2>Inicie o ambiente em vez de montá-lo novamente.</h2>
+<p>Crie o espaço uma vez e inicie manualmente ou deixe o agendamento cuidar disso.</p>
+</div>
+<div class="blog-post-cta__actions">
+<a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar para Windows</a>
+<a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">Ver código no GitHub</a>
+</div>
+</section>
+</div>
+<aside aria-label="Sobre o Axorith" class="blog-post-rail">
+<div class="blog-post-rail__inner">
+<span class="blog-post-rail__label">Axorith</span>
+<p>Organização local do espaço Windows: apps, bloqueadores, horários e regras da sessão em uma predefinição.</p>
+<a href="/pt/#workflow">Ver como funciona</a>
+<a href="/pt/#schedule">Ver agendamentos</a>
+<a href="/pt/blog/">Todos os artigos</a>
+</div>
+</aside>
+</article>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/pt/">Axorith</a><span>Código-fonte disponível sob BSL 1.1</span></div>
+<nav aria-label="Navegação do rodapé">
+<a href="/pt/download/">Baixar</a>
+<a href="/pt/blog/">Blog</a>
+<a href="/pt/privacy/">Privacidade</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

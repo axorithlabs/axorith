@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Автоматизация рабочего окружения Windows: расписания и блокировка | Axorith</title>
+<meta content="Создайте рабочее окружение Windows, которое можно запускать повторно: с приложениями и проектами, блокировкой отвлечений, расписанием и переходом к следующему рабочему пространству." name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/ru/blog/automate-work-setup-windows/" rel="canonical"/>
+<meta content="Автоматизация рабочего окружения Windows: расписания и блокировка | Axorith" property="og:title"/>
+<meta content="Создайте рабочее окружение Windows, которое можно запускать повторно: с приложениями и проектами, блокировкой отвлечений, расписанием и переходом к следующему рабочему пространству." property="og:description"/>
+<meta content="article" property="og:type"/>
+<meta content="https://axorith.com/ru/blog/automate-work-setup-windows/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Автоматизация рабочего окружения Windows: расписания и блокировка | Axorith" name="twitter:title"/>
+<meta content="Создайте рабочее окружение Windows, которое можно запускать повторно: с приложениями и проектами, блокировкой отвлечений, расписанием и переходом к следующему рабочему пространству." name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Автоматизируйте рабочее окружение в Windows","description":"Создайте рабочее окружение Windows, которое можно запускать повторно: с приложениями и проектами, блокировкой отвлечений, расписанием и переходом к следующему рабочему пространству.","url":"https://axorith.com/ru/blog/automate-work-setup-windows/","mainEntityOfPage":"https://axorith.com/ru/blog/automate-work-setup-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-04","dateModified":"2026-10-04","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ru/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ru/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/ru/","inLanguage":"ru"},"inLanguage":"ru"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/ru/"},{"@type":"ListItem","position":2,"name":"Блог","item":"https://axorith.com/ru/blog/"},{"@type":"ListItem","position":3,"name":"Автоматизируйте рабочее окружение в Windows","item":"https://axorith.com/ru/blog/automate-work-setup-windows/"}]}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="ru_RU"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/automate-work-setup-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-content-slug="automate-work-setup-windows" data-page-type="blog-post">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Главная Axorith" class="brand" href="/ru/">Axorith</a>
+<nav aria-label="Основная навигация" class="desktop-nav">
+<a href="/ru/#workflow">Как это работает</a>
+<a href="/ru/#schedule">Расписания</a>
+<a class="is-current" href="/ru/blog/">Блог</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Скачать</a>
+<button aria-expanded="false" aria-label="Открыть навигацию" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Мобильная навигация" class="mobile-nav">
+<a href="/ru/#workflow">Как это работает</a>
+<a href="/ru/#schedule">Расписания</a>
+<a href="/ru/blog/">Блог</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Скачать для Windows</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Язык: Русский">RU</summary>
+<nav aria-label="Язык">
+<a href="/blog/automate-work-setup-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/automate-work-setup-windows/" hreflang="ru" lang="ru" aria-current="page">Русский</a>
+<a href="/zh-Hans/blog/automate-work-setup-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/automate-work-setup-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/automate-work-setup-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/automate-work-setup-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/automate-work-setup-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/automate-work-setup-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/automate-work-setup-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/automate-work-setup-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/automate-work-setup-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero">
+<div class="blog-post-hero__inner">
+<nav aria-label="Навигационная цепочка" class="breadcrumbs">
+<a href="/ru/">Axorith</a><span>/</span><a href="/ru/blog/">Блог</a>
+</nav>
+<p class="blog-kicker">Автоматизация рабочего пространства</p>
+<h1>Автоматизируйте рабочее окружение в Windows</h1>
+<p class="blog-post-dek">Превратите повторяющуюся подготовку к работе, учёбе или программированию в пресет, который запускается сам.</p>
+<div class="blog-post-hero__actions">
+<a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Скачать для Windows</a>
+<a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+<article class="blog-post-layout">
+<div class="blog-post-content">
+<section class="blog-post-section blog-post-lead">
+<p>Повторяемое рабочее окружение в Windows — это больше, чем запуск приложений. Оно также закрывает или блокирует отвлекающие программы, открывает нужный проект, применяет правила сеанса и определяет момент его завершения. Axorith сохраняет всё это в пресете.</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">До Axorith</p>
+<h2>Каждый день приходится повторять одни и те же действия по подготовке рабочего окружения.</h2>
+<p>Открыть IDE. Найти проект. Запустить браузер. Закрыть Steam и Discord. Включить нужную музыку и блокировщик. Если используете Home Assistant — настроить сцену в комнате. По отдельности эти шаги просты, но вместе превращаются в ритуал при каждой смене занятия.</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Пресет</p>
+<h2>Опишите нужное состояние один раз.</h2>
+<p>Пресет может содержать запуск приложений, блокировщики приложений и сайтов, а также дополнительные модули: Spotify или Home Assistant. В нём же хранятся правила сеанса, включая защиту от досрочного завершения и условия остановки.</p>
+<div aria-label="Пример рабочего пресета Axorith" class="blog-post-inline-flow">
+<span>09:00</span><strong>Программирование</strong><span>CLion</span><span>Браузер</span><span>Блокировка приложений</span><span>Блокировщик сайтов</span>
+</div>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Планировщик</p>
+<h2>От простого запуска приложений к полноценному рабочему процессу.</h2>
+<p>С расписанием пресет становится частью распорядка. Например, «Программирование» запускается по будням в 09:00, завершается в 18:00 и передаёт управление пресету «Отдых». Второй пресет может запускать другие приложения с другими правилами блокировки.</p>
+<p>Расписание — часть определения рабочего пространства. Отдельный скрипт планировщика задач, который нужно согласовывать с блокировщиками, не требуется.</p>
+</section>
+<figure class="blog-post-figure reveal">
+<img alt="Интерфейс расписания пресета Axorith" decoding="async" loading="lazy" src="/assets/Axorith.Client_4.png"/>
+<figcaption>Расписание хранится в пресете, а не в отдельной задаче планировщика Windows.</figcaption>
+</figure>
+<section class="blog-post-section">
+<p class="blog-kicker">Защита сеанса</p>
+<h2>Определите, насколько сложно будет досрочно завершить сеанс.</h2>
+<p>Одним сеансам достаточно структуры, другим нужна более строгая защита. Axorith хранит эти правила в пресете: как завершается сеанс, доступны ли перерывы и что происходит после завершения.</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Home Assistant</p>
+<h2>Освещение и другие устройства в комнате могут переключаться вместе с рабочим окружением.</h2>
+<p>Модуль Home Assistant может управлять настроенными сущностями при начале и завершении сеанса. Освещение стола и сцены переключаются вместе с цифровым рабочим пространством, а остальная часть Axorith остаётся локальной.</p>
+</section>
+<section class="blog-post-cta reveal">
+<div>
+<p class="blog-kicker">AXORITH ДЛЯ WINDOWS</p>
+<h2>Запускайте готовое окружение вместо повторной настройки.</h2>
+<p>Создайте рабочее пространство один раз, затем запускайте его вручную или по расписанию.</p>
+</div>
+<div class="blog-post-cta__actions">
+<a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Скачать для Windows</a>
+<a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">Исходный код на GitHub</a>
+</div>
+</section>
+</div>
+<aside aria-label="Об Axorith" class="blog-post-rail">
+<div class="blog-post-rail__inner">
+<span class="blog-post-rail__label">Axorith</span>
+<p>Локальное управление рабочим пространством Windows: приложения, блокировщики, расписания и правила сеанса в одном пресете.</p>
+<a href="/ru/#workflow">Узнать, как это работает</a>
+<a href="/ru/#schedule">Посмотреть расписания</a>
+<a href="/ru/blog/">Все статьи</a>
+</div>
+</aside>
+</article>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/ru/">Axorith</a><span>Исходный код доступен по лицензии BSL 1.1</span></div>
+<nav aria-label="Навигация внизу страницы">
+<a href="/ru/download/">Скачать</a>
+<a href="/ru/blog/">Блог</a>
+<a href="/ru/privacy/">Конфиденциальность</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

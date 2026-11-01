@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith — Windows 工作区自动化与应用、网站屏蔽</title>
+<meta content="在 Windows 本地启动工作应用和项目、屏蔽干扰应用和网站，并安排专注时段时间。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<link href="https://axorith.com/zh-Hans/" rel="canonical"/>
+<meta content="Axorith — Windows 工作区自动化与应用、网站屏蔽" property="og:title"/>
+<meta content="在 Windows 本地启动工作应用和项目、屏蔽干扰应用和网站，并安排专注时段时间。" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/zh-Hans/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith — Windows 工作区自动化与应用、网站屏蔽" name="twitter:title"/>
+<meta content="在 Windows 本地启动工作应用和项目、屏蔽干扰应用和网站，并安排专注时段时间。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script defer="" src="/js/posthog.js"></script>
+<script defer="" src="/js/main.js"></script>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/><meta content="#0b0c0e" name="theme-color"/><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/zh-Hans/","downloadUrl":"https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe","image":"https://axorith.com/assets/og_banner.jpg","operatingSystem":"Windows","applicationCategory":"ProductivityApplication","applicationSubCategory":"工作区自动化与干扰屏蔽","description":"一款在 Windows 本地管理工作区的工具：可启动工作应用和项目、屏蔽干扰应用与网站、按计划执行专注时段，并自动衔接不同工作区。","license":"https://github.com/axorithlabs/axorith/blob/main/LICENSE.md","sameAs":["https://github.com/axorithlabs/axorith"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"依据 BSL 1.1 许可，个人及非商业使用免费。"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/zh-Hans/"},"inLanguage":"zh-Hans"}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="zh_CN"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="home-page" data-content-slug="home" data-page-type="home">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith 首页" class="brand" href="/zh-Hans/">Axorith</a>
+<nav aria-label="主导航" class="desktop-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a href="/zh-Hans/blog/">博客</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载</a>
+<button aria-expanded="false" aria-label="打开导航" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="移动端导航" class="mobile-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a href="/zh-Hans/blog/">博客</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="语言: 简体中文">简中</summary>
+<nav aria-label="语言">
+<a href="/" hreflang="en" lang="en">English</a>
+<a href="/ru/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/" hreflang="zh-Hans" lang="zh-Hans" aria-current="page">简体中文</a>
+<a href="/zh-Hant/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/" hreflang="es" lang="es">Español</a>
+<a href="/de/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="hero hero-v3">
+<div class="hero-v3__copy reveal">
+<h1>不用再在每次开工前重新搭建工作区。</h1>
+<p>将应用、屏蔽设置和专注时段规则保存为预设，手动或按计划启动。</p>
+<div class="hero__actions">
+<a class="button button--primary" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+<a class="button button--secondary" href="https://github.com/axorithlabs/axorith">在 GitHub 查看</a>
+</div>
+</div>
+<div aria-label="Axorith 预设界面预览" class="hero-app reveal">
+<div class="ax-window">
+<div class="ax-titlebar">
+<span class="ax-titlebar__name">Axorith</span>
+<span aria-hidden="true" class="ax-titlebar__controls"><i></i><i></i><i></i></span>
+</div>
+<div class="ax-shell">
+<aside aria-hidden="true" class="ax-sidebar">
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--home"></span>首页</div>
+<div class="ax-navitem is-active"><span class="ax-navicon ax-navicon--presets"></span>预设列表</div>
+<div class="ax-nav-spacer"></div>
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--settings"></span>设置</div>
+</aside>
+<div class="ax-presets">
+<div class="ax-presets__head">
+<h2>预设列表</h2>
+<button tabindex="-1" type="button">新建预设</button>
+</div>
+<article class="ax-preset ax-preset--primary">
+<div class="ax-preset__content">
+<div class="ax-preset__name">编程</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">锁定</span>
+<span>启动 CLion 和浏览器、屏蔽干扰网站，另有 2 项</span>
+<span class="ax-dot">·</span>
+<span>直到 18:00</span>
+</div>
+<div class="ax-preset__schedule">计划：周一、周二、周三、周四、周五 09:00</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">开始</button>
+<button aria-label="更多操作" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">休息</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">普通</span>
+<span>启动 Steam、Discord、Spotify</span>
+<span class="ax-dot">·</span>
+<span>直到手动停止</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">开始</button>
+<button aria-label="更多操作" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">学习</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">严格</span>
+<span>浏览器、网站屏蔽、应用屏蔽</span>
+<span class="ax-dot">·</span>
+<span>专注时段时长：120 分钟</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">开始</button>
+<button aria-label="更多操作" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="ritual" id="workflow">
+<div class="ritual__intro reveal">
+<h2>一个预设，替代每天重复的准备。</h2>
+<p>将应用、屏蔽设置和专注时段规则一次保存。之后，开始工作只需启动预设。</p>
+</div>
+<div aria-label="“编程”预设替代重复的准备步骤" class="ritual-compress reveal">
+<div aria-hidden="true" class="ritual-compress__source ritual-compress__source--v2">
+<div><span>启动</span><strong>CLion</strong></div>
+<div><span>启动</span><strong>浏览器</strong></div>
+<div><span>启动</span><strong>Spotify</strong></div>
+<div><span>屏蔽</span><strong>干扰应用</strong></div>
+<div><span>屏蔽</span><strong>干扰网站</strong></div>
+<div><span>专注时段模式</span><strong>锁定</strong></div>
+</div>
+<div aria-hidden="true" class="ritual-compress__bridge"><i></i></div>
+<article class="preset-light-card preset-light-card--v2">
+<div class="preset-light-card__head">
+<div><span>预设</span><strong>编程</strong></div>
+<span class="preset-light-card__mode">锁定</span>
+</div>
+<div class="preset-light-card__chips">
+<span>CLion</span><span>浏览器</span><span>Spotify</span><span>应用屏蔽</span><span>网站屏蔽</span>
+</div>
+<div class="preset-light-card__footer"><button tabindex="-1" type="button">开始</button></div>
+</article>
+</div>
+</section>
+<section aria-label="Axorith 预设编辑器" class="editor-screenshot-section reveal">
+<div class="editor-screenshot-section__copy">
+<h2>在同一个编辑器中配置整个专注时段。</h2>
+<p>设置专注时段保护、启动方式、模块顺序、停止条件和后续操作。</p>
+</div>
+<img alt="Axorith 编辑器：预设名称、专注时段保护、启动条件、应用屏蔽、停止条件及后续操作" src="/assets/preset-editor.png"/>
+</section>
+<section class="blockers-chapter">
+<div class="blockers-chapter__copy reveal">
+<h2>保留工作区，移除其他干扰。</h2>
+<p>屏蔽选定的应用和网站，或只允许运行当前工作区中配置的应用。</p>
+</div>
+<div aria-label="屏蔽设置预览" class="blocker-visual reveal">
+<div class="blocker-column">
+<span class="blocker-column__label">应用屏蔽</span>
+<strong>仅允许工作区应用</strong>
+<div class="allowed-list">
+<span>CLion</span><span>浏览器</span><span>Spotify</span>
+</div>
+<div class="blocked-list"><span>Steam</span><span>Discord</span><span>其他应用</span></div>
+</div>
+<div class="blocker-column">
+<span class="blocker-column__label">网站屏蔽</span>
+<strong>屏蔽选定类别</strong>
+<div class="category-list">
+<span>社交</span><span>视频</span><span>流媒体</span><span>游戏</span><span>新闻</span><span>购物</span>
+</div>
+</div>
+</div>
+</section>
+<section class="schedule-story" id="schedule">
+<div class="schedule-story__copy reveal">
+<h2>09:00 编程，18:00 休息。</h2>
+<p>Axorith 可按计划启动预设，在指定时间结束，再自动切换到下一个预设。</p>
+</div>
+<div aria-label="18:00 从“编程”预设切换到“休息”预设" class="preset-handoff reveal">
+<article class="handoff-preset handoff-preset--work">
+<div class="handoff-preset__time">09:00</div>
+<div class="handoff-preset__head"><strong>编程</strong><span>锁定</span></div>
+<div class="handoff-preset__rule"><label>启动条件</label><b>定时计划 · 周一至周五 · 09:00</b></div>
+<div class="handoff-preset__modules"><span>CLion</span><span>浏览器</span><span>Spotify</span><span>应用屏蔽</span><span>网站屏蔽</span></div>
+</article>
+<div aria-hidden="true" class="handoff-transition">
+<i></i>
+</div>
+<article class="handoff-preset handoff-preset--relax">
+<div class="handoff-preset__time">18:00</div>
+<div class="handoff-preset__head"><strong>休息</strong><span>普通</span></div>
+<div class="handoff-preset__rule"><label>启动条件</label><b>由上一个预设启动</b></div>
+<div class="handoff-preset__modules"><span>Steam</span><span>Discord</span><span>Spotify</span></div>
+</article>
+</div>
+</section>
+<section class="modules-teaser-v3">
+<div class="modules-teaser-v3__head reveal">
+<h2>按需扩展预设。</h2>
+</div>
+<div class="module-table reveal">
+<div><strong>应用启动器</strong><span>应用、IDE 项目、窗口布局及运行生命周期管理。</span></div>
+<div><strong>应用屏蔽</strong><span>屏蔽指定应用，或仅允许工作区应用。</span></div>
+<div><strong>网站屏蔽</strong><span>专注时段期间屏蔽网站或类别。</span></div>
+<div><strong>Home Assistant</strong><span>用于控制工作区附近设备的可选操作。</span></div>
+</div>
+</section>
+<section class="final-cta final-cta-v3">
+<div class="final-cta__inner reveal">
+<h2>预设只需创建一次，需要时启动即可。</h2>
+<div class="final-cta__actions">
+<a class="button button--light" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+<a class="button button--dark-outline" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/zh-Hans/">Axorith</a><span>源代码按 BSL 1.1 许可公开</span></div>
+<nav aria-label="页脚导航">
+<a href="/zh-Hans/download/">下载</a>
+<a href="/zh-Hans/blog/">博客</a><a href="/zh-Hans/privacy/">隐私</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+</body>
+</html>

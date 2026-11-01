@@ -1,0 +1,105 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Den Windows-Fokusplatz mit Home Assistant verbinden | Axorith</title><meta name="description" content="Verbinden Sie einen Windows-Arbeitsmodus mit Home Assistant und steuern Sie Licht oder Szenen beim Start und Ende der Sitzung."/><meta name="author" content="Axorith Labs"/><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"/><meta name="theme-color" content="#0b0c0e"/>
+<link rel="canonical" href="https://axorith.com/de/blog/home-assistant-focus-desk-windows/"/><meta property="og:title" content="Den Windows-Fokusplatz mit Home Assistant verbinden | Axorith"/><meta property="og:description" content="Verbinden Sie einen Windows-Arbeitsmodus mit Home Assistant und steuern Sie Licht oder Szenen beim Start und Ende der Sitzung."/><meta property="og:type" content="article"/><meta property="og:url" content="https://axorith.com/de/blog/home-assistant-focus-desk-windows/"/><meta property="og:image" content="https://axorith.com/assets/og_banner.jpg"/><meta property="og:site_name" content="Axorith"/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Den Windows-Fokusplatz mit Home Assistant verbinden | Axorith"/><meta name="twitter:description" content="Verbinden Sie einen Windows-Arbeitsmodus mit Home Assistant und steuern Sie Licht oder Szenen beim Start und Ende der Sitzung."/><meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg"/><link rel="icon" type="image/x-icon" href="/assets/icon.ico"/><link rel="stylesheet" href="/css/main.css"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Den Windows-Fokusplatz mit Home Assistant verbinden","description":"Verbinden Sie einen Windows-Arbeitsmodus mit Home Assistant und steuern Sie Licht oder Szenen beim Start und Ende der Sitzung.","url":"https://axorith.com/de/blog/home-assistant-focus-desk-windows/","mainEntityOfPage":"https://axorith.com/de/blog/home-assistant-focus-desk-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-31","dateModified":"2026-10-31","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/de/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/de/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/de/","inLanguage":"de"},"inLanguage":"de"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/de/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://axorith.com/de/blog/"},{"@type":"ListItem","position":3,"name":"Den Windows-Fokusplatz mit Home Assistant verbinden","item":"https://axorith.com/de/blog/home-assistant-focus-desk-windows/"}]}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="de_DE"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/home-assistant-focus-desk-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-page-type="blog-post" data-content-slug="home-assistant-focus-desk-windows">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith-Startseite" class="brand" href="/de/">Axorith</a>
+<nav aria-label="Hauptnavigation" class="desktop-nav">
+<a href="/de/#workflow">Ablauf</a>
+<a href="/de/#schedule">Zeitpläne</a>
+<a class="is-current" href="/de/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Herunterladen</a>
+<button aria-expanded="false" aria-label="Navigation öffnen" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Mobile Navigation" class="mobile-nav">
+<a href="/de/#workflow">Ablauf</a>
+<a href="/de/#schedule">Zeitpläne</a>
+<a href="/de/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Für Windows herunterladen</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Sprache: Deutsch">DE</summary>
+<nav aria-label="Sprache">
+<a href="/blog/home-assistant-focus-desk-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/home-assistant-focus-desk-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/home-assistant-focus-desk-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/home-assistant-focus-desk-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/home-assistant-focus-desk-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/home-assistant-focus-desk-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/home-assistant-focus-desk-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/home-assistant-focus-desk-windows/" hreflang="de" lang="de" aria-current="page">Deutsch</a>
+<a href="/ja/blog/home-assistant-focus-desk-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/home-assistant-focus-desk-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/home-assistant-focus-desk-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero"><div class="blog-post-hero__inner">
+<nav aria-label="Brotkrümelnavigation" class="breadcrumbs"><a href="/de/">Axorith</a><span>/</span><a href="/de/blog/">Blog</a></nav>
+<p class="blog-kicker">Home Assistant</p><h1>Den Windows-Fokusplatz mit Home Assistant verbinden</h1>
+<p class="blog-post-dek">Eine Arbeitsvoreinstellung kann neben dem Desktop auch die Umgebung am Schreibtisch verändern.</p>
+<div class="blog-post-hero__actions"><a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Für Windows herunterladen</a><a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a></div>
+</div></section>
+<article class="blog-post-layout"><div class="blog-post-content">
+<section class="blog-post-section blog-post-lead"><p>Ein Arbeitsbeginn verändert den Kontext: Werkzeuge öffnen sich, Ablenkungen werden reduziert, der Schreibtisch ist bereit. Das optionale Home-Assistant-Modul verbindet konfigurierte Geräteaktionen mit dem Beginn oder Ende einer Axorith-Sitzung, ohne den ganzen Desktop in die Cloud zu verlagern.</p></section>
+<section class="blog-post-section"><h2>Mit einer einfachen Aktion starten</h2><p>Wähle eine Lampe oder Szene in Home Assistant, die Arbeitszeit signalisiert, und konfiguriere sie in der Voreinstellung. Prüfe zunächst einen einfachen Ablauf und behalte die normale Bedienung des Geräts bei. Komplexe Automationsketten sind schwieriger zu testen.</p></section>
+<section class="blog-post-section"><h2>Digitale Schritte zusammenführen</h2><p>In derselben Voreinstellung öffnet Application Launcher Editor oder Browser; App Blocker und Site Blocker setzen die Regeln um. Die Raumaktion ist ein Teil des Kontextwechsels. Home Assistant muss nicht selbst Windows-Anwendungen verwalten.</p></section>
+<section class="blog-post-section"><h2>Den Zustand nach der Sitzung planen</h2><p>Lege fest, ob eine neutrale Beleuchtung oder eine andere Szene folgen soll. Nicht jede Sitzung endet normal: Stromausfälle oder Verbindungsprobleme können die Automation unterbrechen. Physische Schalter bleiben ein wichtiger Rückweg.</p></section>
+<section class="blog-post-section"><h2>Nur nützliche Aktionen behalten</h2><p>Eine Lichtanzeige kann die Routine unterstützen, ist aber optional. Wird die Einrichtung selbst zur Belastung, reicht der Windows-Preset. Der Nutzen liegt in weniger manuellen Übergängen, nicht in mehr Geräten.</p></section>
+<section class="blog-post-section"><p class="blog-kicker">Weiterführend</p><p><a href="/de/blog/automate-work-setup-windows/">Die vollständige Windows-Workspace-Automatisierung</a></p></section>
+<section class="blog-post-cta reveal"><div><p class="blog-kicker">AXORITH FÜR WINDOWS</p>
+<h2>Die vorbereitete Arbeitsumgebung starten, statt sie immer wieder neu einzurichten.</h2><p>Den Arbeitsbereich einmal einrichten und anschließend manuell oder nach Zeitplan starten.</p></div>
+<div class="blog-post-cta__actions"><a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Für Windows herunterladen</a><a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">Quellcode auf GitHub ansehen</a></div></section>
+</div><aside aria-label="Über Axorith" class="blog-post-rail"><div class="blog-post-rail__inner"><span class="blog-post-rail__label">Axorith</span><p>Lokale Windows-Arbeitsbereiche: Apps, Blocker, Zeitpläne und Sitzungsregeln in einem Profil.</p><a href="/de/#workflow">Ablauf ansehen</a><a href="/de/#schedule">Zeitplanung ansehen</a><a href="/de/blog/">Alle Beiträge</a></div></aside>
+</article></main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/de/">Axorith</a><span>Quellcode unter BSL 1.1 einsehbar</span></div>
+<nav aria-label="Fußzeilennavigation">
+<a href="/de/download/">Herunterladen</a>
+<a href="/de/blog/">Blog</a>
+<a href="/de/privacy/">Datenschutz</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

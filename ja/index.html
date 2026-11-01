@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith — Windowsの作業環境を自動化、アプリとサイトをブロック</title>
+<meta content="仕事用アプリやプロジェクトの起動、アプリやサイトのブロック、セッションの予約をWindows上でローカルに管理。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<link href="https://axorith.com/ja/" rel="canonical"/>
+<meta content="Axorith — Windowsの作業環境を自動化、アプリとサイトをブロック" property="og:title"/>
+<meta content="仕事用アプリやプロジェクトの起動、アプリやサイトのブロック、セッションの予約をWindows上でローカルに管理。" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/ja/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith — Windowsの作業環境を自動化、アプリとサイトをブロック" name="twitter:title"/>
+<meta content="仕事用アプリやプロジェクトの起動、アプリやサイトのブロック、セッションの予約をWindows上でローカルに管理。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script defer="" src="/js/posthog.js"></script>
+<script defer="" src="/js/main.js"></script>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/><meta content="#0b0c0e" name="theme-color"/><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/ja/","downloadUrl":"https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe","image":"https://axorith.com/assets/og_banner.jpg","operatingSystem":"Windows","applicationCategory":"ProductivityApplication","applicationSubCategory":"ワークスペースの自動化と集中を妨げる要素のブロック","description":"Windows上で作業用アプリやプロジェクトを起動し、気が散るアプリやウェブサイトをブロック。セッションを予定どおりに実行し、ワークスペースを順番に切り替えるローカルツールです。","license":"https://github.com/axorithlabs/axorith/blob/main/LICENSE.md","sameAs":["https://github.com/axorithlabs/axorith"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"BSL 1.1の下で個人・非商用利用は無料です。"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ja/"},"inLanguage":"ja"}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="ja_JP"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="home-page" data-content-slug="home" data-page-type="home">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorithのホーム" class="brand" href="/ja/">Axorith</a>
+<nav aria-label="メインナビゲーション" class="desktop-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a href="/ja/blog/">ブログ</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">ダウンロード</a>
+<button aria-expanded="false" aria-label="ナビゲーションを開く" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="モバイルのナビゲーション" class="mobile-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a href="/ja/blog/">ブログ</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="言語: 日本語">JA</summary>
+<nav aria-label="言語">
+<a href="/" hreflang="en" lang="en">English</a>
+<a href="/ru/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/" hreflang="es" lang="es">Español</a>
+<a href="/de/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/" hreflang="ja" lang="ja" aria-current="page">日本語</a>
+<a href="/nl/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="hero hero-v3">
+<div class="hero-v3__copy reveal">
+<h1>作業を始めるたびに、環境を作り直すのはもう終わり。</h1>
+<p>アプリ、ブロック、セッションのルールをプリセットに保存。手動でも予約でも開始できます。</p>
+<div class="hero__actions">
+<a class="button button--primary" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+<a class="button button--secondary" href="https://github.com/axorithlabs/axorith">GitHubで見る</a>
+</div>
+</div>
+<div aria-label="Axorithのプリセット画面のプレビュー" class="hero-app reveal">
+<div class="ax-window">
+<div class="ax-titlebar">
+<span class="ax-titlebar__name">Axorith</span>
+<span aria-hidden="true" class="ax-titlebar__controls"><i></i><i></i><i></i></span>
+</div>
+<div class="ax-shell">
+<aside aria-hidden="true" class="ax-sidebar">
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--home"></span>ホーム</div>
+<div class="ax-navitem is-active"><span class="ax-navicon ax-navicon--presets"></span>プリセット一覧</div>
+<div class="ax-nav-spacer"></div>
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--settings"></span>設定</div>
+</aside>
+<div class="ax-presets">
+<div class="ax-presets__head">
+<h2>プリセット一覧</h2>
+<button tabindex="-1" type="button">新しいプリセット</button>
+</div>
+<article class="ax-preset ax-preset--primary">
+<div class="ax-preset__content">
+<div class="ax-preset__name">プログラミング</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">ロック</span>
+<span>CLionとブラウザーを起動、気が散るサイトをブロック ほか2件</span>
+<span class="ax-dot">·</span>
+<span>18:00まで</span>
+</div>
+<div class="ax-preset__schedule">スケジュール：月・火・水・木・金 09:00</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">開始</button>
+<button aria-label="その他の操作" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">リラックス</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">通常</span>
+<span>Steam、Discord、Spotifyを起動</span>
+<span class="ax-dot">·</span>
+<span>停止するまで</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">開始</button>
+<button aria-label="その他の操作" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">学習</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">厳格</span>
+<span>ブラウザー、サイトブロック、アプリブロック</span>
+<span class="ax-dot">·</span>
+<span>セッション時間：120分</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">開始</button>
+<button aria-label="その他の操作" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="ritual" id="workflow">
+<div class="ritual__intro reveal">
+<h2>毎回の準備をひとつのプリセットに。</h2>
+<p>アプリ、ブロック、セッションのルールを一度まとめて保存。あとはプリセットを開始するだけで作業を始められます。</p>
+</div>
+<div aria-label="プログラミングのプリセットで繰り返しの準備を置き換え" class="ritual-compress reveal">
+<div aria-hidden="true" class="ritual-compress__source ritual-compress__source--v2">
+<div><span>起動</span><strong>CLion</strong></div>
+<div><span>起動</span><strong>ブラウザー</strong></div>
+<div><span>起動</span><strong>Spotify</strong></div>
+<div><span>ブロック</span><strong>気が散るアプリ</strong></div>
+<div><span>ブロック</span><strong>気が散るサイト</strong></div>
+<div><span>セッションモード</span><strong>ロック</strong></div>
+</div>
+<div aria-hidden="true" class="ritual-compress__bridge"><i></i></div>
+<article class="preset-light-card preset-light-card--v2">
+<div class="preset-light-card__head">
+<div><span>プリセット</span><strong>プログラミング</strong></div>
+<span class="preset-light-card__mode">ロック</span>
+</div>
+<div class="preset-light-card__chips">
+<span>CLion</span><span>ブラウザー</span><span>Spotify</span><span>アプリのブロック</span><span>サイトのブロック</span>
+</div>
+<div class="preset-light-card__footer"><button tabindex="-1" type="button">開始</button></div>
+</article>
+</div>
+</section>
+<section aria-label="Axorithのプリセットエディター" class="editor-screenshot-section reveal">
+<div class="editor-screenshot-section__copy">
+<h2>セッション全体をひとつのエディターで設定。</h2>
+<p>セッション保護、開始方法、モジュールの順序、終了条件、その後の動作を設定できます。</p>
+</div>
+<img alt="プリセット名、セッション保護、開始条件、アプリブロック、終了条件、その後の動作を設定するAxorithのエディター" src="/assets/preset-editor.png"/>
+</section>
+<section class="blockers-chapter">
+<div class="blockers-chapter__copy reveal">
+<h2>作業環境はそのまま。不要なものを取り除く。</h2>
+<p>選択したアプリやサイトをブロック。または、現在のワークスペースに設定したアプリだけを許可できます。</p>
+</div>
+<div aria-label="ブロック設定のプレビュー" class="blocker-visual reveal">
+<div class="blocker-column">
+<span class="blocker-column__label">アプリのブロック</span>
+<strong>ワークスペースのアプリのみ許可</strong>
+<div class="allowed-list">
+<span>CLion</span><span>ブラウザー</span><span>Spotify</span>
+</div>
+<div class="blocked-list"><span>Steam</span><span>Discord</span><span>その他のアプリ</span></div>
+</div>
+<div class="blocker-column">
+<span class="blocker-column__label">サイトのブロック</span>
+<strong>選択したカテゴリーをブロック</strong>
+<div class="category-list">
+<span>ソーシャルメディア</span><span>動画</span><span>ストリーミング</span><span>ゲーム</span><span>ニュース</span><span>ショッピング</span>
+</div>
+</div>
+</div>
+</section>
+<section class="schedule-story" id="schedule">
+<div class="schedule-story__copy reveal">
+<h2>09:00からプログラミング。18:00からリラックス。</h2>
+<p>Axorithは指定時刻にプリセットを開始し、決めた時刻に終了して次のプリセットへ自動的に切り替えられます。</p>
+</div>
+<div aria-label="18:00にプログラミングのプリセットからリラックスへ切り替え" class="preset-handoff reveal">
+<article class="handoff-preset handoff-preset--work">
+<div class="handoff-preset__time">09:00</div>
+<div class="handoff-preset__head"><strong>プログラミング</strong><span>ロック</span></div>
+<div class="handoff-preset__rule"><label>開始条件</label><b>時間指定 · 月〜金 · 09:00</b></div>
+<div class="handoff-preset__modules"><span>CLion</span><span>ブラウザー</span><span>Spotify</span><span>アプリのブロック</span><span>サイトのブロック</span></div>
+</article>
+<div aria-hidden="true" class="handoff-transition">
+<i></i>
+</div>
+<article class="handoff-preset handoff-preset--relax">
+<div class="handoff-preset__time">18:00</div>
+<div class="handoff-preset__head"><strong>リラックス</strong><span>通常</span></div>
+<div class="handoff-preset__rule"><label>開始条件</label><b>前のプリセットから開始</b></div>
+<div class="handoff-preset__modules"><span>Steam</span><span>Discord</span><span>Spotify</span></div>
+</article>
+</div>
+</section>
+<section class="modules-teaser-v3">
+<div class="modules-teaser-v3__head reveal">
+<h2>必要に応じてプリセットを拡張。</h2>
+</div>
+<div class="module-table reveal">
+<div><strong>アプリランチャー</strong><span>アプリ、IDEプロジェクト、ウィンドウ配置、起動から終了までの管理。</span></div>
+<div><strong>アプリのブロック</strong><span>選択したアプリをブロックするか、ワークスペース内のアプリだけを許可します。</span></div>
+<div><strong>サイトのブロック</strong><span>セッション中にサイトやカテゴリーをブロック。</span></div>
+<div><strong>Home Assistant</strong><span>作業場所の近くにある機器を操作するためのオプション機能。</span></div>
+</div>
+</section>
+<section class="final-cta final-cta-v3">
+<div class="final-cta__inner reveal">
+<h2>プリセットを一度作成。必要なときに作業環境を起動。</h2>
+<div class="final-cta__actions">
+<a class="button button--light" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+<a class="button button--dark-outline" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/ja/">Axorith</a><span>BSL 1.1でソースコードを公開</span></div>
+<nav aria-label="フッターのナビゲーション">
+<a href="/ja/download/">ダウンロード</a>
+<a href="/ja/blog/">ブログ</a><a href="/ja/privacy/">プライバシー</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+</body>
+</html>

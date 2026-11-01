@@ -1,0 +1,105 @@
+<!doctype html><html lang="zh-Hans"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>将 Windows 专注模式连接到 Home Assistant | Axorith</title><meta name="description" content="将 Windows 工作预设与 Home Assistant 联动，在专注时段开始和结束时切换灯光或场景。"/><meta name="author" content="Axorith Labs"/><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"/><meta name="theme-color" content="#0b0c0e"/>
+<link rel="canonical" href="https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/"/><meta property="og:title" content="将 Windows 专注模式连接到 Home Assistant | Axorith"/><meta property="og:description" content="将 Windows 工作预设与 Home Assistant 联动，在专注时段开始和结束时切换灯光或场景。"/><meta property="og:type" content="article"/><meta property="og:url" content="https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/"/><meta property="og:image" content="https://axorith.com/assets/og_banner.jpg"/><meta property="og:site_name" content="Axorith"/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="将 Windows 专注模式连接到 Home Assistant | Axorith"/><meta name="twitter:description" content="将 Windows 工作预设与 Home Assistant 联动，在专注时段开始和结束时切换灯光或场景。"/><meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg"/><link rel="icon" type="image/x-icon" href="/assets/icon.ico"/><link rel="stylesheet" href="/css/main.css"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"将 Windows 专注模式连接到 Home Assistant","description":"将 Windows 工作预设与 Home Assistant 联动，在专注时段开始和结束时切换灯光或场景。","url":"https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/","mainEntityOfPage":"https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-31","dateModified":"2026-10-31","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/zh-Hans/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/zh-Hans/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/zh-Hans/","inLanguage":"zh-Hans"},"inLanguage":"zh-Hans"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/zh-Hans/"},{"@type":"ListItem","position":2,"name":"博客","item":"https://axorith.com/zh-Hans/blog/"},{"@type":"ListItem","position":3,"name":"将 Windows 专注模式连接到 Home Assistant","item":"https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/"}]}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="zh_CN"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/home-assistant-focus-desk-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/home-assistant-focus-desk-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-page-type="blog-post" data-content-slug="home-assistant-focus-desk-windows">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith 首页" class="brand" href="/zh-Hans/">Axorith</a>
+<nav aria-label="主导航" class="desktop-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a class="is-current" href="/zh-Hans/blog/">博客</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载</a>
+<button aria-expanded="false" aria-label="打开导航" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="移动端导航" class="mobile-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a href="/zh-Hans/blog/">博客</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="语言: 简体中文">简中</summary>
+<nav aria-label="语言">
+<a href="/blog/home-assistant-focus-desk-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/home-assistant-focus-desk-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/home-assistant-focus-desk-windows/" hreflang="zh-Hans" lang="zh-Hans" aria-current="page">简体中文</a>
+<a href="/zh-Hant/blog/home-assistant-focus-desk-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/home-assistant-focus-desk-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/home-assistant-focus-desk-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/home-assistant-focus-desk-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/home-assistant-focus-desk-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/home-assistant-focus-desk-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/home-assistant-focus-desk-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/home-assistant-focus-desk-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero"><div class="blog-post-hero__inner">
+<nav aria-label="面包屑导航" class="breadcrumbs"><a href="/zh-Hans/">Axorith</a><span>/</span><a href="/zh-Hans/blog/">博客</a></nav>
+<p class="blog-kicker">Home Assistant</p><h1>将 Windows 专注模式连接到 Home Assistant</h1>
+<p class="blog-post-dek">让工作预设同时调整桌面应用与房间环境。</p>
+<div class="blog-post-hero__actions"><a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a><a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a></div>
+</div></section>
+<article class="blog-post-layout"><div class="blog-post-content">
+<section class="blog-post-section blog-post-lead"><p>工作开始意味着环境变化：工具打开、干扰减少、桌面准备就绪。借助可选的 Home Assistant 模块，Axorith 可以把设备动作与预设的开始或结束连接起来，无须把整个桌面工作流程转移到云端。</p></section>
+<section class="blog-post-section"><h2>从一个简单设备动作开始</h2><p>在 Home Assistant 中选择代表工作状态的灯光或场景，然后在 Axorith 预设中配置对应操作。先测试简单方案，并确保仍能正常手动控制设备。复杂的自动化链更难排查故障。</p></section>
+<section class="blog-post-section"><h2>将数字环境一并准备好</h2><p>同一个预设里，Application Launcher 可打开编辑器或浏览器，App Blocker 与 Site Blocker 则应用选定规则。房间动作只是环境切换的一部分；Home Assistant 不需要负责管理 Windows 应用。</p></section>
+<section class="blog-post-section"><h2>计划结束后的状态</h2><p>决定专注时段结束时恢复普通灯光，还是触发另一个场景。不要假设每次都正常结束：断电、网络或设备连接问题可能中断自动化。保留实体开关等后备控制方式。</p></section>
+<section class="blog-post-section"><h2>只保留真正有用的动作</h2><p>灯光提示可以强化工作与休息的边界，但并非必需。如果设置本身变成负担，保留 Windows 预设即可。价值在于减少手动切换，而不是增加设备数量。</p></section>
+<section class="blog-post-section"><p class="blog-kicker">相关阅读</p><p><a href="/zh-Hans/blog/automate-work-setup-windows/">阅读完整 Windows 工作环境指南</a></p></section>
+<section class="blog-post-cta reveal"><div><p class="blog-kicker">WINDOWS 版 AXORITH</p>
+<h2>直接启动环境，不必从头搭建。</h2><p>工作区只需创建一次，之后手动启动或交给计划执行。</p></div>
+<div class="blog-post-cta__actions"><a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a><a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">在 GitHub 查看源码</a></div></section>
+</div><aside aria-label="关于 Axorith" class="blog-post-rail"><div class="blog-post-rail__inner"><span class="blog-post-rail__label">Axorith</span><p>本地管理 Windows 工作区：应用、屏蔽、计划与专注时段规则集中在一个预设中。</p><a href="/zh-Hans/#workflow">查看使用流程</a><a href="/zh-Hans/#schedule">查看计划</a><a href="/zh-Hans/blog/">所有文章</a></div></aside>
+</article></main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/zh-Hans/">Axorith</a><span>源代码按 BSL 1.1 许可公开</span></div>
+<nav aria-label="页脚导航">
+<a href="/zh-Hans/download/">下载</a>
+<a href="/zh-Hans/blog/">博客</a>
+<a href="/zh-Hans/privacy/">隐私</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

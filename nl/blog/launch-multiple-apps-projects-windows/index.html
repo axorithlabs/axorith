@@ -1,0 +1,105 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Meerdere Windows-apps en IDE-projecten tegelijk starten | Axorith</title><meta name="description" content="Start IDE’s, projecten, browsers en andere werktools samen op Windows met één Axorith-preset."/><meta name="author" content="Axorith Labs"/><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"/><meta name="theme-color" content="#0b0c0e"/>
+<link rel="canonical" href="https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/"/><meta property="og:title" content="Meerdere Windows-apps en IDE-projecten tegelijk starten | Axorith"/><meta property="og:description" content="Start IDE’s, projecten, browsers en andere werktools samen op Windows met één Axorith-preset."/><meta property="og:type" content="article"/><meta property="og:url" content="https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/"/><meta property="og:image" content="https://axorith.com/assets/og_banner.jpg"/><meta property="og:site_name" content="Axorith"/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Meerdere Windows-apps en IDE-projecten tegelijk starten | Axorith"/><meta name="twitter:description" content="Start IDE’s, projecten, browsers en andere werktools samen op Windows met één Axorith-preset."/><meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg"/><link rel="icon" type="image/x-icon" href="/assets/icon.ico"/><link rel="stylesheet" href="/css/main.css"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Meerdere Windows-apps en IDE-projecten tegelijk starten","description":"Start IDE’s, projecten, browsers en andere werktools samen op Windows met één Axorith-preset.","url":"https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/","mainEntityOfPage":"https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-31","dateModified":"2026-10-31","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/nl/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/nl/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/nl/","inLanguage":"nl"},"inLanguage":"nl"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/nl/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://axorith.com/nl/blog/"},{"@type":"ListItem","position":3,"name":"Meerdere Windows-apps en IDE-projecten tegelijk starten","item":"https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/"}]}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="nl_NL"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/launch-multiple-apps-projects-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-page-type="blog-post" data-content-slug="launch-multiple-apps-projects-windows">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith-startpagina" class="brand" href="/nl/">Axorith</a>
+<nav aria-label="Hoofdnavigatie" class="desktop-nav">
+<a href="/nl/#workflow">Werkwijze</a>
+<a href="/nl/#schedule">Schema’s</a>
+<a class="is-current" href="/nl/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden</a>
+<button aria-expanded="false" aria-label="Navigatie openen" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Mobiele navigatie" class="mobile-nav">
+<a href="/nl/#workflow">Werkwijze</a>
+<a href="/nl/#schedule">Schema’s</a>
+<a href="/nl/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden voor Windows</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Taal: Nederlands">NL</summary>
+<nav aria-label="Taal">
+<a href="/blog/launch-multiple-apps-projects-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/launch-multiple-apps-projects-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/launch-multiple-apps-projects-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/launch-multiple-apps-projects-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/launch-multiple-apps-projects-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/launch-multiple-apps-projects-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/launch-multiple-apps-projects-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/launch-multiple-apps-projects-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/launch-multiple-apps-projects-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/launch-multiple-apps-projects-windows/" hreflang="nl" lang="nl" aria-current="page">Nederlands</a>
+<a href="/pl/blog/launch-multiple-apps-projects-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero"><div class="blog-post-hero__inner">
+<nav aria-label="Kruimelpad" class="breadcrumbs"><a href="/nl/">Axorith</a><span>/</span><a href="/nl/blog/">Blog</a></nav>
+<p class="blog-kicker">Applicatiestarter</p><h1>Meerdere Windows-apps en IDE-projecten tegelijk starten</h1>
+<p class="blog-post-dek">Eenmaal je tools openen is simpel; elke ochtend hetzelfde herhalen kost tijd.</p>
+<div class="blog-post-hero__actions"><a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden voor Windows</a><a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a></div>
+</div></section>
+<article class="blog-post-layout"><div class="blog-post-content">
+<section class="blog-post-section blog-post-lead"><p>Een werkdag begint vaak met dezelfde editor, repository, browser en hulpmiddelen. Een launcher bespaart die klikken. Axorith bewaart de start in een preset die ook blokkades en een sessieduur kan bevatten.</p></section>
+<section class="blog-post-section"><h2>Kies tools voor één taak</h2><p>Begin met IDE, project, browser en eventueel terminal of notities. Open niet tientallen programma's 'voor het geval dat'. Een bruikbare preset maakt duidelijk wat je gaat doen en vult het scherm niet met irrelevante vensters.</p></section>
+<section class="blog-post-section"><h2>Stel Application Launcher in de preset in</h2><p>De module start apps en IDE-projecten, met opties voor vensterplaatsing en levenscyclus. Controleer paden na een verplaatste repository of herinstallatie: een launcher werkt alleen met geldige doelen.</p></section>
+<section class="blog-post-section"><h2>Voeg blokkades alleen toe als ze helpen</h2><p>App Blocker en Site Blocker kunnen in dezelfde preset, maar dat is niet voor elke taak nodig. Onderzoek kan een open omgeving vragen; schrijven kan baat hebben bij gameblokkades. Maak niet van elke werkplek een vergrendelde sessie.</p></section>
+<section class="blog-post-section"><h2>Ga voor betrouwbaarheid, niet complexiteit</h2><p>Test de preset en start hem dan handmatig of gepland. Los specifieke fouten op voordat je meer automatisering toevoegt. Het doel is een betrouwbare start van de dag, geen zo ingewikkeld mogelijk systeem.</p></section>
+<section class="blog-post-section"><p class="blog-kicker">Verder lezen</p><p><a href="/nl/blog/automate-work-setup-windows/">De hele werkplek automatisch voorbereiden</a></p></section>
+<section class="blog-post-cta reveal"><div><p class="blog-kicker">AXORITH VOOR WINDOWS</p>
+<h2>Start de omgeving in plaats van haar opnieuw op te bouwen.</h2><p>Maak de werkruimte één keer en start handmatig of via het schema.</p></div>
+<div class="blog-post-cta__actions"><a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden voor Windows</a><a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">Broncode bekijken op GitHub</a></div></section>
+</div><aside aria-label="Over Axorith" class="blog-post-rail"><div class="blog-post-rail__inner"><span class="blog-post-rail__label">Axorith</span><p>Lokale Windows-werkruimtes: apps, blokkeringen, schema’s en sessieregels in één profiel.</p><a href="/nl/#workflow">Werkwijze bekijken</a><a href="/nl/#schedule">Planning bekijken</a><a href="/nl/blog/">Alle artikelen</a></div></aside>
+</article></main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/nl/">Axorith</a><span>Broncode beschikbaar onder BSL 1.1</span></div>
+<nav aria-label="Voettekstnavigatie">
+<a href="/nl/download/">Downloaden</a>
+<a href="/nl/blog/">Blog</a>
+<a href="/nl/privacy/">Privacy</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>スケジュールとブロックでWindowsの作業環境を自動化 | Axorith</title>
+<meta content="アプリやプロジェクトを起動し、気が散るものをブロックし、スケジュールで動作して次のワークスペースへ進むWindowsの作業環境を作成。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/ja/blog/automate-work-setup-windows/" rel="canonical"/>
+<meta content="スケジュールとブロックでWindowsの作業環境を自動化 | Axorith" property="og:title"/>
+<meta content="アプリやプロジェクトを起動し、気が散るものをブロックし、スケジュールで動作して次のワークスペースへ進むWindowsの作業環境を作成。" property="og:description"/>
+<meta content="article" property="og:type"/>
+<meta content="https://axorith.com/ja/blog/automate-work-setup-windows/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="スケジュールとブロックでWindowsの作業環境を自動化 | Axorith" name="twitter:title"/>
+<meta content="アプリやプロジェクトを起動し、気が散るものをブロックし、スケジュールで動作して次のワークスペースへ進むWindowsの作業環境を作成。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Windowsの作業環境を自動化","description":"アプリやプロジェクトを起動し、気が散るものをブロックし、スケジュールで動作して次のワークスペースへ進むWindowsの作業環境を作成。","url":"https://axorith.com/ja/blog/automate-work-setup-windows/","mainEntityOfPage":"https://axorith.com/ja/blog/automate-work-setup-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-04","dateModified":"2026-10-04","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ja/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ja/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/ja/","inLanguage":"ja"},"inLanguage":"ja"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/ja/"},{"@type":"ListItem","position":2,"name":"ブログ","item":"https://axorith.com/ja/blog/"},{"@type":"ListItem","position":3,"name":"Windowsの作業環境を自動化","item":"https://axorith.com/ja/blog/automate-work-setup-windows/"}]}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="ja_JP"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/automate-work-setup-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/automate-work-setup-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-content-slug="automate-work-setup-windows" data-page-type="blog-post">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorithのホーム" class="brand" href="/ja/">Axorith</a>
+<nav aria-label="メインナビゲーション" class="desktop-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a class="is-current" href="/ja/blog/">ブログ</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">ダウンロード</a>
+<button aria-expanded="false" aria-label="ナビゲーションを開く" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="モバイルのナビゲーション" class="mobile-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a href="/ja/blog/">ブログ</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="言語: 日本語">JA</summary>
+<nav aria-label="言語">
+<a href="/blog/automate-work-setup-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/automate-work-setup-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/automate-work-setup-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/automate-work-setup-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/automate-work-setup-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/automate-work-setup-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/automate-work-setup-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/automate-work-setup-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/automate-work-setup-windows/" hreflang="ja" lang="ja" aria-current="page">日本語</a>
+<a href="/nl/blog/automate-work-setup-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/automate-work-setup-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero">
+<div class="blog-post-hero__inner">
+<nav aria-label="パンくずリスト" class="breadcrumbs">
+<a href="/ja/">Axorith</a><span>/</span><a href="/ja/blog/">ブログ</a>
+</nav>
+<p class="blog-kicker">ワークスペースの自動化</p>
+<h1>Windowsの作業環境を自動化</h1>
+<p class="blog-post-dek">仕事、学習、コーディングのたびに繰り返す準備を、自動で動くプリセットに変えましょう。</p>
+<div class="blog-post-hero__actions">
+<a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+<a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+<article class="blog-post-layout">
+<div class="blog-post-content">
+<section class="blog-post-section blog-post-lead">
+<p>再現できるWindowsの作業環境には、アプリを開く以上の役割があります。気が散るものを閉じる・ブロックする、正しいプロジェクトを開く、セッションのルールを適用する、終了時刻を管理する。Axorithはこれらをプリセットに保存します。</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Axorith導入前</p>
+<h2>同じ準備を毎日繰り返していませんか。</h2>
+<p>IDEを開き、プロジェクトを探し、ブラウザーを起動。SteamとDiscordを閉じ、音楽とブロックを開始。Home Assistantを使うなら部屋のシーンも設定。ひとつずつは簡単でも、作業を切り替えるたびに同じ準備を繰り返すことになります。</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">プリセット</p>
+<h2>必要な状態を一度定義する。</h2>
+<p>プリセットにはアプリの起動、アプリとサイトのブロック、SpotifyやHome Assistantなどのオプションモジュールを含められます。途中終了を防ぐセッション保護や停止条件など、セッション自体のルールも保存します。</p>
+<div aria-label="Axorithの作業用プリセットの例" class="blog-post-inline-flow">
+<span>09:00</span><strong>プログラミング</strong><span>CLion</span><span>ブラウザー</span><span>アプリのブロック</span><span>サイトのブロック</span>
+</div>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">スケジューラー</p>
+<h2>アプリの起動から、本当の習慣へ。</h2>
+<p>予約により、プリセットは単なるボタンから習慣に変わります。たとえば平日09:00にプログラミングを開始し、18:00に終了してリラックスへ切り替えられます。次のプリセットは別のアプリやブロックルールを使えます。</p>
+<p>スケジュールはワークスペースの定義の一部です。ブロック設定と別のタスクスケジューラー用スクリプトを同期させる必要はありません。</p>
+</section>
+<figure class="blog-post-figure reveal">
+<img alt="Axorithのプリセットのスケジュール設定画面" decoding="async" loading="lazy" src="/assets/Axorith.Client_4.png"/>
+<figcaption>スケジュールは個別のWindowsタスクではなく、プリセットに紐づいています。</figcaption>
+</figure>
+<section class="blog-post-section">
+<p class="blog-kicker">セッション保護</p>
+<h2>セッションを途中で終了できる条件を設定します。</h2>
+<p>構造だけが必要なセッションもあれば、強い保護が必要なものもあります。Axorithは終了方法、休憩の有無、完了後の動作をプリセットにまとめます。</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">Home Assistant</p>
+<h2>作業環境に合わせて室内の機器も切り替えられます。</h2>
+<p>Home Assistantモジュールはセッションの開始・終了時に設定済みのエンティティを動かせます。デスクライトやシーンをデジタルな作業環境と連動させつつ、Axorithのほかの機能はローカルで動作します。</p>
+</section>
+<section class="blog-post-cta reveal">
+<div>
+<p class="blog-kicker">WINDOWS版AXORITH</p>
+<h2>環境を作り直さず、起動するだけに。</h2>
+<p>一度作ったワークスペースを手動で開始するか、スケジュールに任せましょう。</p>
+</div>
+<div class="blog-post-cta__actions">
+<a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+<a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">GitHubでソースを見る</a>
+</div>
+</section>
+</div>
+<aside aria-label="Axorithについて" class="blog-post-rail">
+<div class="blog-post-rail__inner">
+<span class="blog-post-rail__label">Axorith</span>
+<p>Windowsのワークスペースをローカルで管理。アプリ、ブロック、スケジュール、セッションルールをひとつのプリセットに。</p>
+<a href="/ja/#workflow">使い方を見る</a>
+<a href="/ja/#schedule">スケジュールを見る</a>
+<a href="/ja/blog/">すべての記事</a>
+</div>
+</aside>
+</article>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/ja/">Axorith</a><span>BSL 1.1でソースコードを公開</span></div>
+<nav aria-label="フッターのナビゲーション">
+<a href="/ja/download/">ダウンロード</a>
+<a href="/ja/blog/">ブログ</a>
+<a href="/ja/privacy/">プライバシー</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

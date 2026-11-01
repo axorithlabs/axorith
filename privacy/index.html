@@ -1,18 +1,61 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><title>Privacy — Axorith</title><meta content="How Axorith handles website and desktop telemetry." name="description"/><link href="https://axorith.com/privacy/" rel="canonical"/><link href="../assets/icon.ico" rel="icon" type="image/x-icon"/><link href="../css/main.css" rel="stylesheet"/><script defer="" src="../js/posthog.js"></script><script defer="" src="../js/main.js"></script><meta content="index,follow" name="robots"/></head><body data-content-slug="privacy" data-page-type="privacy"><header class="site-header"><div class="site-header__inner"><a class="brand" href="/">Axorith</a><nav class="desktop-nav"><a href="/index.html#workflow">How it works</a><a href="/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download</a><button aria-expanded="false" aria-label="Open navigation" class="nav-toggle" type="button"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/index.html#workflow">How it works</a><a href="/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav></header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><title>Privacy — Axorith</title><meta content="How Axorith handles website and desktop telemetry." name="description"/><link href="https://axorith.com/privacy/" rel="canonical"/><link href="/assets/icon.ico" rel="icon" type="image/x-icon"/><link href="/css/main.css" rel="stylesheet"/><script defer="" src="/js/posthog.js"></script><script defer="" src="/js/main.js"></script><meta content="index,follow" name="robots"/>
+<!-- locales:start -->
+<meta property="og:locale" content="en_US"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/privacy/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/privacy/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/privacy/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/privacy/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/privacy/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/privacy/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/privacy/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/privacy/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/privacy/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/privacy/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/privacy/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/privacy/"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head><body data-content-slug="privacy" data-page-type="privacy"><header class="site-header"><div class="site-header__inner"><a class="brand" href="/">Axorith</a><nav class="desktop-nav"><a href="/#workflow">How it works</a><a href="/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Download</a><button aria-expanded="false" aria-label="Open navigation" class="nav-toggle" type="button"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/#workflow">How it works</a><a href="/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav>
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Language: English">EN</summary>
+<nav aria-label="Language">
+<a href="/privacy/" hreflang="en" lang="en" aria-current="page">English</a>
+<a href="/ru/privacy/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/privacy/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/privacy/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/privacy/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/privacy/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/privacy/" hreflang="es" lang="es">Español</a>
+<a href="/de/privacy/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/privacy/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/privacy/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/privacy/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
 <span>Privacy</span>
 <h1>Telemetry and data</h1>
 <p>Axorith uses PostHog for website analytics and optional desktop product telemetry. The website and desktop app keep separate visitor identities.</p>
 <h2>Website analytics</h2>
-<p>When you visit axorith.com, the PostHog Web SDK records page views, page exits, visit sessions, Web Vitals, referrer source categories, and validated UTM source, medium, and campaign tags. Pages are reduced to fixed categories such as home, modules, and privacy. Full page and referrer URLs, domains, ad click IDs, UTM content, and UTM search terms are removed before events are sent. It also records clicks on download and GitHub links. Download click events include the CTA location and Windows platform; a release version is included only when the site actually knows it. PostHog may infer coarse location from network metadata.</p>
+<p>When you visit axorith.com, the PostHog Web SDK records page views, page exits, visit sessions, Web Vitals, referrer source categories, and validated UTM source, medium, and campaign tags. Pages are reduced to fixed categories such as home, modules, and privacy. Full page and referrer URLs, domains, ad click IDs, UTM content, and UTM search terms are removed before events are sent. It also records clicks on download and GitHub links. Download click events include the CTA location and Windows platform; a release version is included only when the site actually knows it. PostHog may infer coarse location from network metadata. The selected page language is also recorded.</p>
 <p>The website uses PostHog's browser identity. Axorith does not use IP addresses, user-agent matching, fingerprinting, or other heuristics to connect a website visitor with a later desktop installation.</p>
 <h2>Desktop telemetry</h2>
 <p>Usage telemetry is enabled by default and can be turned off in the app's Privacy settings. The setting is shared by Client and Host. Updates read the saved preference, and a fresh install keeps the existing default.</p>
-<p>When enabled, the desktop app sends Axorith and operating system versions, application lifecycle events, preset and module IDs and built-in module types, session IDs and lifecycle, commitment and break configuration, schedule changes, changed settings categories, onboarding counts, update and installation outcomes, and structured error details. A hashed device identifier is used as the existing desktop PostHog identity. Installer and first-launch events share a separate random <code>installAttemptId</code> for installation funnel analysis.</p>
+<p>When enabled, the desktop app sends Axorith and operating system versions, application lifecycle events, preset and module IDs and built-in module types, session IDs and lifecycle, commitment and break configuration, schedule changes, changed settings categories, update and installation outcomes, and structured error details. On Windows, the desktop app, installer, and uninstaller share a pseudonymous device identifier provided by Windows. Axorith does not store this identifier in files. It persists across app reinstalls and deletion of app folders; depending on the Windows identity source, it can also survive a clean Windows installation. When an older desktop identity is available during an upgrade, a migration event includes the previous and new identifiers so their telemetry can be linked.</p>
 <p>Error events contain an exception type, stable fingerprint, subsystem, operation, severity, handled/fatal status, and limited sanitized method names. Repeated errors are rate-limited and summarized.</p>
 <h2>Information we do not send from the desktop app</h2>
 <p>Desktop telemetry does not include preset names, custom module or action names, setting values, filesystem or executable paths, process names, command-line arguments, URLs, domains, Home Assistant entity IDs, access tokens, secrets, raw exception messages, or full stack traces. Axorith does not send IP addresses as event properties. PostHog may infer coarse location from network metadata.</p>
 <h2>PostHog and identity</h2>
-<p>Website and desktop events go to the same Axorith PostHog project, but use separate identities. The website does not use the desktop device identifier, and <code>installAttemptId</code> is a funnel correlation value rather than an identity.</p>
+<p>Website and desktop events go to the same Axorith PostHog project, but use separate identities. The website does not use the desktop device identifier.</p>
 <p>For questions, contact <a href="mailto:mail@axorith.com">mail@axorith.com</a>.</p>
 </article></section></main><footer class="footer"><div class="footer__inner"><div><a class="brand" href="/">Axorith</a><span>Source-available under BSL 1.1</span></div><nav><a href="/download/">Download</a><a href="https://github.com/axorithlabs/axorith">GitHub</a><a href="/blog/">Blog</a></nav></div></footer></body></html>

@@ -1,0 +1,105 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Autoriser uniquement les applications de travail sur Windows | Axorith</title><meta name="description" content="Créez une liste d’applications autorisées sur Windows avec Axorith : gardez vos outils de travail et bloquez les distractions pendant une session."/><meta name="author" content="Axorith Labs"/><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"/><meta name="theme-color" content="#0b0c0e"/>
+<link rel="canonical" href="https://axorith.com/fr/blog/windows-app-blocker-allowlist/"/><meta property="og:title" content="Autoriser uniquement les applications de travail sur Windows | Axorith"/><meta property="og:description" content="Créez une liste d’applications autorisées sur Windows avec Axorith : gardez vos outils de travail et bloquez les distractions pendant une session."/><meta property="og:type" content="article"/><meta property="og:url" content="https://axorith.com/fr/blog/windows-app-blocker-allowlist/"/><meta property="og:image" content="https://axorith.com/assets/og_banner.jpg"/><meta property="og:site_name" content="Axorith"/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Autoriser uniquement les applications de travail sur Windows | Axorith"/><meta name="twitter:description" content="Créez une liste d’applications autorisées sur Windows avec Axorith : gardez vos outils de travail et bloquez les distractions pendant une session."/><meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg"/><link rel="icon" type="image/x-icon" href="/assets/icon.ico"/><link rel="stylesheet" href="/css/main.css"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Autoriser uniquement les applications de travail sur Windows","description":"Créez une liste d’applications autorisées sur Windows avec Axorith : gardez vos outils de travail et bloquez les distractions pendant une session.","url":"https://axorith.com/fr/blog/windows-app-blocker-allowlist/","mainEntityOfPage":"https://axorith.com/fr/blog/windows-app-blocker-allowlist/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-31","dateModified":"2026-10-31","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/fr/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/fr/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/fr/","inLanguage":"fr"},"inLanguage":"fr"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/fr/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://axorith.com/fr/blog/"},{"@type":"ListItem","position":3,"name":"Autoriser uniquement les applications de travail sur Windows","item":"https://axorith.com/fr/blog/windows-app-blocker-allowlist/"}]}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="fr_FR"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/windows-app-blocker-allowlist/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/windows-app-blocker-allowlist/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-page-type="blog-post" data-content-slug="windows-app-blocker-allowlist">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Accueil Axorith" class="brand" href="/fr/">Axorith</a>
+<nav aria-label="Navigation principale" class="desktop-nav">
+<a href="/fr/#workflow">Fonctionnement</a>
+<a href="/fr/#schedule">Horaires</a>
+<a class="is-current" href="/fr/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Télécharger</a>
+<button aria-expanded="false" aria-label="Ouvrir la navigation" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Navigation mobile" class="mobile-nav">
+<a href="/fr/#workflow">Fonctionnement</a>
+<a href="/fr/#schedule">Horaires</a>
+<a href="/fr/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Télécharger pour Windows</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Langue: Français">FR</summary>
+<nav aria-label="Langue">
+<a href="/blog/windows-app-blocker-allowlist/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/windows-app-blocker-allowlist/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/windows-app-blocker-allowlist/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/windows-app-blocker-allowlist/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/windows-app-blocker-allowlist/" hreflang="fr" lang="fr" aria-current="page">Français</a>
+<a href="/pt/blog/windows-app-blocker-allowlist/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/windows-app-blocker-allowlist/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/windows-app-blocker-allowlist/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/windows-app-blocker-allowlist/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/windows-app-blocker-allowlist/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/windows-app-blocker-allowlist/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero"><div class="blog-post-hero__inner">
+<nav aria-label="Fil d’Ariane" class="breadcrumbs"><a href="/fr/">Axorith</a><span>/</span><a href="/fr/blog/">Blog</a></nav>
+<p class="blog-kicker">Blocage d’applications</p><h1>Autoriser uniquement les applications de travail sur Windows</h1>
+<p class="blog-post-dek">Une liste d’applications autorisées part des outils nécessaires, plutôt que d’énumérer toutes les distractions possibles.</p>
+<div class="blog-post-hero__actions"><a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Télécharger pour Windows</a><a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a></div>
+</div></section>
+<article class="blog-post-layout"><div class="blog-post-content">
+<section class="blog-post-section blog-post-lead"><p>Une liste de blocage oblige à prévoir chaque distraction. La liste d’autorisation inverse le raisonnement : définissez les applications nécessaires à la session, puis limitez les autres. Elle convient lorsque les outils de travail sont connus, mais que les tentations sont imprévisibles.</p></section>
+<section class="blog-post-section"><h2>Commencez par les outils vraiment nécessaires</h2><p>Créez un préréglage Programmation et ajoutez à Application Launcher l’éditeur, le projet et le navigateur de travail. Pensez au terminal, au gestionnaire de mots de passe et aux communications indispensables. Une liste trop stricte peut gêner le travail plus qu’elle n’aide à se concentrer.</p></section>
+<section class="blog-post-section"><h2>Appliquez la règle avec App Blocker</h2><p>App Blocker permet de n’autoriser que les applications configurées dans le Workspace actuel. Réunissez le lanceur et le bloqueur dans un préréglage : environnement et restrictions démarrent ensemble. Il s’agit d’une règle de session, non d’une modification définitive de Windows.</p></section>
+<section class="blog-post-section"><h2>Testez avant de renforcer les restrictions</h2><p>Commencez par une courte session facile à arrêter. Vérifiez les sélecteurs de fichiers, les outils de compilation, les messages importants et les logiciels d’accessibilité. Corrigez la liste avant d’utiliser un Focus Commitment strict. Ne bloquez jamais les moyens essentiels de secours.</p></section>
+<section class="blog-post-section"><h2>Quand une liste de blocage convient mieux</h2><p>Si votre activité exige souvent des programmes imprévus, la liste d’autorisation sera trop restrictive. Bloquez seulement les distractions connues, comme les jeux ou les messageries. Conservez le lanceur et l’horaire en modifiant uniquement App Blocker.</p></section>
+<section class="blog-post-section"><p class="blog-kicker">À lire aussi</p><p><a href="/fr/blog/block-apps-websites-and-launch-work-apps-windows/">Associer lanceurs et bloqueurs</a></p></section>
+<section class="blog-post-cta reveal"><div><p class="blog-kicker">AXORITH POUR WINDOWS</p>
+<h2>Lancez votre environnement au lieu de le recréer.</h2><p>Créez votre espace une fois, puis lancez-le manuellement ou selon un horaire.</p></div>
+<div class="blog-post-cta__actions"><a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Télécharger pour Windows</a><a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">Voir le code sur GitHub</a></div></section>
+</div><aside aria-label="À propos d’Axorith" class="blog-post-rail"><div class="blog-post-rail__inner"><span class="blog-post-rail__label">Axorith</span><p>Gestion locale de l’espace Windows : applications, blocages, horaires et règles de session dans un préréglage.</p><a href="/fr/#workflow">Voir le fonctionnement</a><a href="/fr/#schedule">Voir la planification</a><a href="/fr/blog/">Tous les articles</a></div></aside>
+</article></main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/fr/">Axorith</a><span>Code source accessible sous BSL 1.1</span></div>
+<nav aria-label="Navigation de pied de page">
+<a href="/fr/download/">Télécharger</a>
+<a href="/fr/blog/">Blog</a>
+<a href="/fr/privacy/">Confidentialité</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

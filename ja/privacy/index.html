@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><title>プライバシー — Axorith</title><meta content="Axorithのサイトとアプリのテレメトリーの取り扱い。" name="description"/><link href="https://axorith.com/ja/privacy/" rel="canonical"/><link href="/assets/icon.ico" rel="icon" type="image/x-icon"/><link href="/css/main.css" rel="stylesheet"/><script defer="" src="/js/posthog.js"></script><script defer="" src="/js/main.js"></script><meta content="index,follow" name="robots"/>
+<!-- locales:start -->
+<meta property="og:locale" content="ja_JP"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/privacy/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/privacy/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/privacy/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/privacy/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/privacy/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/privacy/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/privacy/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/privacy/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/privacy/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/privacy/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/privacy/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/privacy/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head><body data-content-slug="privacy" data-page-type="privacy"><header class="site-header"><div class="site-header__inner"><a class="brand" href="/ja/">Axorith</a><nav class="desktop-nav"><a href="/ja/#workflow">仕組み</a><a href="/ja/blog/">ブログ</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">ダウンロード</a><button aria-expanded="false" aria-label="ナビゲーションを開く" class="nav-toggle" type="button"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/ja/#workflow">仕組み</a><a href="/ja/blog/">ブログ</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav>
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="言語: 日本語">JA</summary>
+<nav aria-label="言語">
+<a href="/privacy/" hreflang="en" lang="en">English</a>
+<a href="/ru/privacy/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/privacy/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/privacy/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/privacy/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/privacy/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/privacy/" hreflang="es" lang="es">Español</a>
+<a href="/de/privacy/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/privacy/" hreflang="ja" lang="ja" aria-current="page">日本語</a>
+<a href="/nl/privacy/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/privacy/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
+<span>プライバシー</span>
+<h1>テレメトリーとデータ</h1>
+<p>Axorithはサイトの分析と任意のデスクトップテレメトリーにPostHogを使います。サイトとアプリは別々の識別情報を持ちます。</p>
+<h2>サイトの分析</h2>
+<p>axorith.comではPostHog Web SDKがページ表示・離脱、訪問セッション、Web Vitals、参照元のカテゴリー、検証済みのUTMソース・メディア・キャンペーンを記録します。ページはホーム、モジュール、プライバシーなど固定カテゴリーに整理します。送信前にページと参照元の完全なURL、ドメイン、広告クリックID、UTMコンテンツ・検索語を削除します。ダウンロードとGitHubのクリックも記録します。ダウンロードクリックにはボタンの位置とWindowsというプラットフォームを含め、リリース版はサイトが把握している場合だけ含めます。PostHogはネットワーク情報から大まかな位置を推定する場合があります。 選択されたページの言語も記録します。</p>
+<p>サイトはPostHogのブラウザー識別情報を使います。AxorithはIPアドレス、user-agent照合、フィンガープリンティングなどの推測でサイト訪問と後のインストールを結び付けません。</p>
+<h2>デスクトップのテレメトリー</h2>
+<p>利用状況のテレメトリーは既定で有効ですが、プライバシー設定から無効にできます。ClientとHostで設定を共有します。更新時は保存済みの選択を読み、新規インストールでは既存の既定値を維持します。</p>
+<p>有効な場合、アプリはAxorithとOSのバージョン、アプリのライフサイクル、プリセットとモジュールのID・組み込みの種類、セッションIDとライフサイクル、保護・休憩設定、スケジュール変更、変更された設定カテゴリー、更新・インストール結果、構造化エラー情報を送信します。Windowsではアプリ、インストーラー、アンインストーラーがWindows提供の仮名デバイス識別子を共有します。Axorithはこれをファイルに保存しません。アプリの再インストールやフォルダー削除後も残り、Windowsの識別情報の取得元によってはOSのクリーンインストール後も残る場合があります。更新時に古い識別子が利用できる場合は、新旧の識別子を移行イベントに含め、テレメトリーを関連付けます。</p>
+<p>エラーには例外の種類、安定した識別用指紋、サブシステム、操作、重大度、処理済み・致命的の区分、制限・整形済みのメソッド名が含まれます。繰り返すエラーは送信頻度を制限し、集約します。</p>
+<h2>デスクトップアプリが送信しない情報</h2>
+<p>アプリのテレメトリーにはプリセット名、独自のモジュール・操作名、設定値、ファイルや実行ファイルのパス、プロセス名、コマンドライン引数、URL、ドメイン、Home AssistantのエンティティID、アクセストークン、秘密情報、生の例外メッセージ、完全なスタックトレースは含まれません。AxorithはIPアドレスをイベントのプロパティとして送りません。PostHogはネットワーク情報から大まかな位置を推定する場合があります。</p>
+<h2>PostHogと識別情報</h2>
+<p>サイトとアプリのイベントは同じAxorithのPostHogプロジェクトへ届きますが、識別情報は別です。サイトはアプリのデバイス識別子を使いません。</p>
+<p>ご質問はこちらへ： <a href="mailto:mail@axorith.com">mail@axorith.com</a>.</p>
+</article></section></main><footer class="footer"><div class="footer__inner"><div><a class="brand" href="/ja/">Axorith</a><span>BSL 1.1でソースコードを公開</span></div><nav><a href="/ja/download/">ダウンロード</a><a href="https://github.com/axorithlabs/axorith">GitHub</a><a href="/ja/blog/">ブログ</a></nav></div></footer></body></html>

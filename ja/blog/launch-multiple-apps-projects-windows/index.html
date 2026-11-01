@@ -1,0 +1,105 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Windowsで複数のアプリとIDEプロジェクトをまとめて開く | Axorith</title><meta name="description" content="AxorithのプリセットでWindowsのIDE、プロジェクト、ブラウザ、補助ツールをまとめて起動する方法を紹介します。"/><meta name="author" content="Axorith Labs"/><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"/><meta name="theme-color" content="#0b0c0e"/>
+<link rel="canonical" href="https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/"/><meta property="og:title" content="Windowsで複数のアプリとIDEプロジェクトをまとめて開く | Axorith"/><meta property="og:description" content="AxorithのプリセットでWindowsのIDE、プロジェクト、ブラウザ、補助ツールをまとめて起動する方法を紹介します。"/><meta property="og:type" content="article"/><meta property="og:url" content="https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/"/><meta property="og:image" content="https://axorith.com/assets/og_banner.jpg"/><meta property="og:site_name" content="Axorith"/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Windowsで複数のアプリとIDEプロジェクトをまとめて開く | Axorith"/><meta name="twitter:description" content="AxorithのプリセットでWindowsのIDE、プロジェクト、ブラウザ、補助ツールをまとめて起動する方法を紹介します。"/><meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg"/><link rel="icon" type="image/x-icon" href="/assets/icon.ico"/><link rel="stylesheet" href="/css/main.css"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Windowsで複数のアプリとIDEプロジェクトをまとめて開く","description":"AxorithのプリセットでWindowsのIDE、プロジェクト、ブラウザ、補助ツールをまとめて起動する方法を紹介します。","url":"https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/","mainEntityOfPage":"https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-31","dateModified":"2026-10-31","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ja/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/ja/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/ja/","inLanguage":"ja"},"inLanguage":"ja"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/ja/"},{"@type":"ListItem","position":2,"name":"ブログ","item":"https://axorith.com/ja/blog/"},{"@type":"ListItem","position":3,"name":"Windowsで複数のアプリとIDEプロジェクトをまとめて開く","item":"https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/"}]}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="ja_JP"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/launch-multiple-apps-projects-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/launch-multiple-apps-projects-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-page-type="blog-post" data-content-slug="launch-multiple-apps-projects-windows">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorithのホーム" class="brand" href="/ja/">Axorith</a>
+<nav aria-label="メインナビゲーション" class="desktop-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a class="is-current" href="/ja/blog/">ブログ</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">ダウンロード</a>
+<button aria-expanded="false" aria-label="ナビゲーションを開く" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="モバイルのナビゲーション" class="mobile-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a href="/ja/blog/">ブログ</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="言語: 日本語">JA</summary>
+<nav aria-label="言語">
+<a href="/blog/launch-multiple-apps-projects-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/launch-multiple-apps-projects-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/launch-multiple-apps-projects-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/launch-multiple-apps-projects-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/launch-multiple-apps-projects-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/launch-multiple-apps-projects-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/launch-multiple-apps-projects-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/launch-multiple-apps-projects-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/launch-multiple-apps-projects-windows/" hreflang="ja" lang="ja" aria-current="page">日本語</a>
+<a href="/nl/blog/launch-multiple-apps-projects-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/launch-multiple-apps-projects-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero"><div class="blog-post-hero__inner">
+<nav aria-label="パンくずリスト" class="breadcrumbs"><a href="/ja/">Axorith</a><span>/</span><a href="/ja/blog/">ブログ</a></nav>
+<p class="blog-kicker">アプリランチャー</p><h1>Windowsで複数のアプリとIDEプロジェクトをまとめて開く</h1>
+<p class="blog-post-dek">一度アプリを開くのは簡単でも、同じ準備を毎朝繰り返すと時間がかかります。</p>
+<div class="blog-post-hero__actions"><a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a><a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a></div>
+</div></section>
+<article class="blog-post-layout"><div class="blog-post-content">
+<section class="blog-post-section blog-post-lead"><p>毎日の仕事で同じエディター、リポジトリ、ブラウザー、補助ツールを開くことがあります。ランチャーはクリック数を減らします。Axorithでは起動手順をプリセットに保存し、ブロックやセッションの長さもまとめて設定できます。</p></section>
+<section class="blog-post-section"><h2>一つのタスクに必要なツールを選ぶ</h2><p>IDE、プロジェクト、ブラウザーから始め、必要ならターミナルやメモを追加します。「念のため」に大量のアプリを開かないでください。良いプリセットは次に何をするかを明確にし、無関係なウィンドウを増やしません。</p></section>
+<section class="blog-post-section"><h2>Application Launcherをプリセットで設定する</h2><p>このモジュールはアプリやIDEプロジェクトを開き、ウィンドウ配置やライフサイクルの設定に対応しています。リポジトリを移動したりアプリを再インストールした後はパスを確認しましょう。起動先が間違っていると動きません。</p></section>
+<section class="blog-post-section"><h2>必要なときだけブロックを追加する</h2><p>App BlockerとSite Blockerを同じプリセットへ追加できますが、必須ではありません。調査には自由な環境、執筆にはゲームの制限が向くかもしれません。すべての作業環境を厳格なセッションにする必要はありません。</p></section>
+<section class="blog-post-section"><h2>複雑さより信頼性を重視する</h2><p>プリセットをテストしたら、手動またはスケジュールで開始します。問題が起きたら自動化を増やす前に原因を直しましょう。価値があるのは毎日使える安定した準備手順です。</p></section>
+<section class="blog-post-section"><p class="blog-kicker">関連記事</p><p><a href="/ja/blog/automate-work-setup-windows/">作業環境の準備について</a></p></section>
+<section class="blog-post-cta reveal"><div><p class="blog-kicker">WINDOWS版AXORITH</p>
+<h2>環境を作り直さず、起動するだけに。</h2><p>一度作ったワークスペースを手動で開始するか、スケジュールに任せましょう。</p></div>
+<div class="blog-post-cta__actions"><a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a><a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">GitHubでソースを見る</a></div></section>
+</div><aside aria-label="Axorithについて" class="blog-post-rail"><div class="blog-post-rail__inner"><span class="blog-post-rail__label">Axorith</span><p>Windowsのワークスペースをローカルで管理。アプリ、ブロック、スケジュール、セッションルールをひとつのプリセットに。</p><a href="/ja/#workflow">使い方を見る</a><a href="/ja/#schedule">スケジュールを見る</a><a href="/ja/blog/">すべての記事</a></div></aside>
+</article></main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/ja/">Axorith</a><span>BSL 1.1でソースコードを公開</span></div>
+<nav aria-label="フッターのナビゲーション">
+<a href="/ja/download/">ダウンロード</a>
+<a href="/ja/blog/">ブログ</a>
+<a href="/ja/privacy/">プライバシー</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

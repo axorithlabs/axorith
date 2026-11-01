@@ -1,3 +1,5 @@
+document.documentElement.classList.add('js');
+
 document.addEventListener('DOMContentLoaded', () => {
   const mobileToggle = document.querySelector('.nav-toggle');
   const mobileNav = document.querySelector('.mobile-nav');

@@ -1,0 +1,105 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Een praktische Windows-focusmodus voor programmeurs | Axorith</title><meta name="description" content="Maak een Windows-focussessie voor programmeurs: start de IDE en het project, beperk afleiding en stel een eindregel in."/><meta name="author" content="Axorith Labs"/><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"/><meta name="theme-color" content="#0b0c0e"/>
+<link rel="canonical" href="https://axorith.com/nl/blog/focus-mode-for-programmers-windows/"/><meta property="og:title" content="Een praktische Windows-focusmodus voor programmeurs | Axorith"/><meta property="og:description" content="Maak een Windows-focussessie voor programmeurs: start de IDE en het project, beperk afleiding en stel een eindregel in."/><meta property="og:type" content="article"/><meta property="og:url" content="https://axorith.com/nl/blog/focus-mode-for-programmers-windows/"/><meta property="og:image" content="https://axorith.com/assets/og_banner.jpg"/><meta property="og:site_name" content="Axorith"/>
+<meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Een praktische Windows-focusmodus voor programmeurs | Axorith"/><meta name="twitter:description" content="Maak een Windows-focussessie voor programmeurs: start de IDE en het project, beperk afleiding en stel een eindregel in."/><meta name="twitter:image" content="https://axorith.com/assets/og_banner.jpg"/><link rel="icon" type="image/x-icon" href="/assets/icon.ico"/><link rel="stylesheet" href="/css/main.css"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Een praktische Windows-focusmodus voor programmeurs","description":"Maak een Windows-focussessie voor programmeurs: start de IDE en het project, beperk afleiding en stel een eindregel in.","url":"https://axorith.com/nl/blog/focus-mode-for-programmers-windows/","mainEntityOfPage":"https://axorith.com/nl/blog/focus-mode-for-programmers-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-31","dateModified":"2026-10-31","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/nl/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/nl/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/nl/","inLanguage":"nl"},"inLanguage":"nl"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/nl/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://axorith.com/nl/blog/"},{"@type":"ListItem","position":3,"name":"Een praktische Windows-focusmodus voor programmeurs","item":"https://axorith.com/nl/blog/focus-mode-for-programmers-windows/"}]}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="nl_NL"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/focus-mode-for-programmers-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/focus-mode-for-programmers-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-page-type="blog-post" data-content-slug="focus-mode-for-programmers-windows">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith-startpagina" class="brand" href="/nl/">Axorith</a>
+<nav aria-label="Hoofdnavigatie" class="desktop-nav">
+<a href="/nl/#workflow">Werkwijze</a>
+<a href="/nl/#schedule">Schema’s</a>
+<a class="is-current" href="/nl/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden</a>
+<button aria-expanded="false" aria-label="Navigatie openen" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Mobiele navigatie" class="mobile-nav">
+<a href="/nl/#workflow">Werkwijze</a>
+<a href="/nl/#schedule">Schema’s</a>
+<a href="/nl/blog/">Blog</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden voor Windows</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Taal: Nederlands">NL</summary>
+<nav aria-label="Taal">
+<a href="/blog/focus-mode-for-programmers-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/focus-mode-for-programmers-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/focus-mode-for-programmers-windows/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/focus-mode-for-programmers-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/focus-mode-for-programmers-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/focus-mode-for-programmers-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/focus-mode-for-programmers-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/focus-mode-for-programmers-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/focus-mode-for-programmers-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/focus-mode-for-programmers-windows/" hreflang="nl" lang="nl" aria-current="page">Nederlands</a>
+<a href="/pl/blog/focus-mode-for-programmers-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero"><div class="blog-post-hero__inner">
+<nav aria-label="Kruimelpad" class="breadcrumbs"><a href="/nl/">Axorith</a><span>/</span><a href="/nl/blog/">Blog</a></nav>
+<p class="blog-kicker">Programmeerworkflow</p><h1>Een praktische Windows-focusmodus voor programmeurs</h1>
+<p class="blog-post-dek">Open meteen het juiste project en beperk de overstap naar irrelevante apps.</p>
+<div class="blog-post-hero__actions"><a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden voor Windows</a><a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a></div>
+</div></section>
+<article class="blog-post-layout"><div class="blog-post-content">
+<section class="blog-post-section blog-post-lead"><p>Programmeren vraagt meer dan een editorvenster. Vaak heb je eerst een repository, terminal, documentatie en lokale tools nodig. Een herbruikbare preset zet die context klaar, zonder elke dag dezelfde muisklikken te herhalen.</p></section>
+<section class="blog-post-section"><h2>Maak een preset voor elk belangrijk project</h2><p>Stel Application Launcher in voor de IDE of het project, plus de browser en hulpmiddelen. Een goede preset beantwoordt de vraag welke omgeving deze repository nodig heeft, in plaats van alle mogelijke programmeertaken samen te voegen.</p></section>
+<section class="blog-post-section"><h2>Beperk de makkelijke contextwissels</h2><p>Gebruik App Blocker tegen ongewenste games en chats en Site Blocker tegen afleidende websites. Houd documentatie en relevante technische fora toegankelijk: video's en zoekresultaten kunnen bij debuggen horen. Gerichte regels werken beter dan een algeheel verbod.</p></section>
+<section class="blog-post-section"><h2>Kies een realistisch einde</h2><p>Een vaste duur past bij een afgebakende taak; een eindtijd bij een werkdag. Axorith bewaart deze regels in de preset en kan daarna een andere starten. Een timer weet echter niet of een build, uitrol of datamigratie veilig klaar is.</p></section>
+<section class="blog-post-section"><h2>Herhaal een betrouwbare werkomgeving</h2><p>Het voordeel is voorspelbaarheid: project open, afleidingen beperkt, einde duidelijk. Probeer de preset enkele dagen en wijzig alleen wat echt hindert. Meer blokkades leveren niet vanzelf betere code op.</p></section>
+<section class="blog-post-section"><p class="blog-kicker">Verder lezen</p><p><a href="/nl/blog/automate-work-setup-windows/">Overzicht van Windows-werkplekautomatisering</a></p></section>
+<section class="blog-post-cta reveal"><div><p class="blog-kicker">AXORITH VOOR WINDOWS</p>
+<h2>Start de omgeving in plaats van haar opnieuw op te bouwen.</h2><p>Maak de werkruimte één keer en start handmatig of via het schema.</p></div>
+<div class="blog-post-cta__actions"><a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Downloaden voor Windows</a><a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">Broncode bekijken op GitHub</a></div></section>
+</div><aside aria-label="Over Axorith" class="blog-post-rail"><div class="blog-post-rail__inner"><span class="blog-post-rail__label">Axorith</span><p>Lokale Windows-werkruimtes: apps, blokkeringen, schema’s en sessieregels in één profiel.</p><a href="/nl/#workflow">Werkwijze bekijken</a><a href="/nl/#schedule">Planning bekijken</a><a href="/nl/blog/">Alle artikelen</a></div></aside>
+</article></main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/nl/">Axorith</a><span>Broncode beschikbaar onder BSL 1.1</span></div>
+<nav aria-label="Voettekstnavigatie">
+<a href="/nl/download/">Downloaden</a>
+<a href="/nl/blog/">Blog</a>
+<a href="/nl/privacy/">Privacy</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

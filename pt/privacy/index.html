@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><title>Privacidade — Axorith</title><meta content="Como o Axorith trata a telemetria do site e do aplicativo." name="description"/><link href="https://axorith.com/pt/privacy/" rel="canonical"/><link href="/assets/icon.ico" rel="icon" type="image/x-icon"/><link href="/css/main.css" rel="stylesheet"/><script defer="" src="/js/posthog.js"></script><script defer="" src="/js/main.js"></script><meta content="index,follow" name="robots"/>
+<!-- locales:start -->
+<meta property="og:locale" content="pt_BR"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/privacy/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/privacy/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/privacy/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/privacy/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/privacy/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/privacy/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/privacy/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/privacy/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/privacy/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/privacy/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/privacy/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/privacy/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head><body data-content-slug="privacy" data-page-type="privacy"><header class="site-header"><div class="site-header__inner"><a class="brand" href="/pt/">Axorith</a><nav class="desktop-nav"><a href="/pt/#workflow">Como funciona</a><a href="/pt/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar</a><button aria-expanded="false" aria-label="Abrir navegação" class="nav-toggle" type="button"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/pt/#workflow">Como funciona</a><a href="/pt/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav>
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Idioma: Português">PT</summary>
+<nav aria-label="Idioma">
+<a href="/privacy/" hreflang="en" lang="en">English</a>
+<a href="/ru/privacy/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/privacy/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/privacy/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/privacy/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/privacy/" hreflang="pt" lang="pt" aria-current="page">Português</a>
+<a href="/es/privacy/" hreflang="es" lang="es">Español</a>
+<a href="/de/privacy/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/privacy/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/privacy/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/privacy/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
+<span>Privacidade</span>
+<h1>Telemetria e dados</h1>
+<p>O Axorith usa PostHog para análise do site e telemetria opcional do app. Site e aplicativo mantêm identidades separadas.</p>
+<h2>Análise do site</h2>
+<p>Ao visitar axorith.com, o SDK Web do PostHog registra visualizações e saídas de páginas, sessões, Web Vitals, categorias de origem e tags UTM validadas de origem, mídia e campanha. Páginas são reduzidas a categorias fixas como início, módulos e privacidade. URLs completas de páginas e referências, domínios, IDs de cliques publicitários, conteúdo e termos de pesquisa UTM são removidos antes do envio. Cliques em download e GitHub também são registrados. O clique de download inclui a posição do botão e a plataforma Windows; a versão só aparece se o site a conhecer. O PostHog pode inferir localização aproximada por metadados de rede. O idioma selecionado da página também é registrado.</p>
+<p>O site usa a identidade de navegador do PostHog. O Axorith não usa IPs, correspondência de user-agent, impressão digital ou outras heurísticas para ligar visitantes a instalações posteriores.</p>
+<h2>Telemetria do aplicativo</h2>
+<p>A telemetria de uso vem ativada e pode ser desligada nas configurações de privacidade. Client e Host compartilham a opção. Atualizações leem a preferência salva e uma nova instalação mantém o padrão existente.</p>
+<p>Quando ativada, a telemetria envia versões do Axorith e do sistema, eventos de ciclo de vida, IDs de predefinições e módulos e tipos integrados, IDs e ciclo de sessões, proteção e pausas, mudanças de agenda, categorias de configurações alteradas, resultados de atualizações e instalações e erros estruturados. No Windows, app, instalador e desinstalador compartilham um identificador pseudônimo fornecido pelo Windows. O Axorith não o salva em arquivos. Ele persiste após reinstalações do app e exclusão das suas pastas; conforme a origem do identificador Windows, também pode sobreviver a uma instalação limpa do sistema. Se um identificador antigo estiver disponível na atualização, um evento de migração inclui os dois para vincular a telemetria.</p>
+<p>Erros contêm tipo de exceção, assinatura estável, subsistema, operação, gravidade, status tratado ou fatal e nomes de métodos limitados e sanitizados. Erros repetidos têm frequência limitada e são resumidos.</p>
+<h2>Dados que o aplicativo não envia</h2>
+<p>A telemetria do app não inclui nomes de predefinições, nomes personalizados de módulos ou ações, valores de configuração, caminhos de arquivos ou executáveis, nomes de processos, argumentos de comando, URLs, domínios, IDs de entidades Home Assistant, tokens de acesso, segredos, mensagens brutas de exceção nem pilhas completas. O Axorith não envia IPs como propriedades de eventos. O PostHog pode inferir localização aproximada por metadados de rede.</p>
+<h2>PostHog e identidade</h2>
+<p>Eventos do site e do app vão para o mesmo projeto PostHog do Axorith, mas usam identidades separadas. O site não usa o identificador de dispositivo do app.</p>
+<p>Para dúvidas, entre em contato com <a href="mailto:mail@axorith.com">mail@axorith.com</a>.</p>
+</article></section></main><footer class="footer"><div class="footer__inner"><div><a class="brand" href="/pt/">Axorith</a><span>Código-fonte disponível sob BSL 1.1</span></div><nav><a href="/pt/download/">Baixar</a><a href="https://github.com/axorithlabs/axorith">GitHub</a><a href="/pt/blog/">Blog</a></nav></div></footer></body></html>

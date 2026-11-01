@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorithブログ — Windowsの作業環境自動化とブロック</title>
+<meta content="Windowsの作業環境自動化、アプリとサイトのブロック、スケジュール、専用ブロッカーとの比較を扱うAxorithの記事。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/ja/blog/" rel="canonical"/>
+<meta content="Axorithブログ — Windowsの作業環境自動化とブロック" property="og:title"/>
+<meta content="Windowsの作業環境自動化、アプリとサイトのブロック、スケジュール、専用ブロッカーとの比較を扱うAxorithの記事。" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/ja/blog/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorithブログ — Windowsの作業環境自動化とブロック" name="twitter:title"/>
+<meta content="Windowsの作業環境自動化、アプリとサイトのブロック、スケジュール、専用ブロッカーとの比較を扱うAxorithの記事。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"Axorithブログ","url":"https://axorith.com/ja/blog/","description":"Windowsの作業環境自動化、ブロック、予約、関連ツールの実用的な情報。","isPartOf":{"@type":"WebSite","name":"Axorith","url":"https://axorith.com/ja/","inLanguage":"ja"},"inLanguage":"ja"}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="ja_JP"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-index" data-content-slug="blog" data-page-type="blog-index">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorithのホーム" class="brand" href="/ja/">Axorith</a>
+<nav aria-label="メインナビゲーション" class="desktop-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a class="is-current" href="/ja/blog/">ブログ</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">ダウンロード</a>
+<button aria-expanded="false" aria-label="ナビゲーションを開く" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="モバイルのナビゲーション" class="mobile-nav">
+<a href="/ja/#workflow">使い方</a>
+<a href="/ja/#schedule">スケジュール</a>
+<a href="/ja/blog/">ブログ</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Windows版をダウンロード</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="言語: 日本語">JA</summary>
+<nav aria-label="言語">
+<a href="/blog/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/" hreflang="ja" lang="ja" aria-current="page">日本語</a>
+<a href="/nl/blog/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-index-hero">
+<div class="blog-index-hero__inner">
+<p class="blog-kicker">ブログ</p>
+<h1>Axorithブログ</h1>
+<p>Windowsの作業環境自動化、ブロック、予約、ツール選びの利点と制約を解説。</p>
+</div>
+</section>
+<section aria-label="Axorithのブログ記事" class="blog-list">
+<a class="blog-list__item reveal" href="/ja/blog/windows-app-blocker-allowlist/"><span class="blog-list__type">アプリのブロック</span><h2>Windowsで仕事に必要なアプリだけを許可する方法</h2><p>気を散らすアプリをすべて予想するより、仕事に必要なツールを先に決めます。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/focus-mode-for-programmers-windows/"><span class="blog-list__type">開発者の作業環境</span><h2>プログラマー向けの実用的なWindows集中モード</h2><p>作業するプロジェクトをすぐ開き、無関係なアプリへの切り替えを減らします。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/study-focus-setup-windows/"><span class="blog-list__type">学習環境</span><h2>Windowsで勉強に集中しやすい環境を作る</h2><p>課題に必要なツールを使える状態にし、関係のない誘惑を減らします。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/switch-work-and-gaming-windows/"><span class="blog-list__type">作業環境の切り替え</span><h2>Windowsで仕事用とゲーム用の環境を切り替える</h2><p>仕事と休憩で同じウィンドウ、通知、制限を使う必要はありません。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/focus-commitment-modes-windows/"><span class="blog-list__type">集中セッション</span><h2>集中セッションの制限レベルを選ぶ方法</h2><p>厳しい制限が必ずしも良い結果につながるわけではありません。作業内容とリスクに合わせます。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/home-assistant-focus-desk-windows/"><span class="blog-list__type">Home Assistant</span><h2>Windowsの集中ルーティンをHome Assistantと連携する</h2><p>仕事用プリセットでデスクトップだけでなく部屋の環境も変えられます。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/local-first-focus-app-windows/"><span class="blog-list__type">ローカル中心のソフト</span><h2>ローカル中心のWindows集中ツールが向いている場合</h2><p>一台のWindows PCを整えたいのか、複数端末の制限を同期したいのか考えましょう。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/launch-multiple-apps-projects-windows/"><span class="blog-list__type">アプリランチャー</span><h2>Windowsで複数のアプリとIDEプロジェクトをまとめて開く</h2><p>一度アプリを開くのは簡単でも、同じ準備を毎朝繰り返すと時間がかかります。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/block-distractions-without-blocking-work/"><span class="blog-list__type">サイトのブロック</span><h2>仕事に必要なサイトは残して、誘惑となるサイトをブロックする</h2><p>使えるブロックとは、必要な学習資料や調査先にアクセスできるものです。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/windows-focus-setup-for-remote-work/"><span class="blog-list__type">在宅勤務</span><h2>Windowsの在宅勤務で集中環境を整える</h2><p>必要な連絡手段を残しながら、仕事に関係のない中断を減らします。</p><span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/ja/blog/block-apps-websites-and-launch-work-apps-windows/">
+<span class="blog-list__type">Windowsの集中環境</span>
+<h2>アプリとサイトをブロックし、Windowsの作業環境を起動</h2>
+<p>ひとつのプリセットで邪魔を取り除き、代わりの作業環境を用意できます。</p>
+<span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/ja/blog/automate-work-setup-windows/">
+<span class="blog-list__type">ワークスペースの自動化</span>
+<h2>Windowsの作業環境を自動化</h2>
+<p>仕事、学習、コーディングのたびに繰り返す準備を、自動で動くプリセットに変えましょう。</p>
+<span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/ja/blog/cold-turkey-alternative-windows/">
+<span class="blog-list__type">比較</span>
+<h2>Windows向けAxorithとCold Turkeyの比較</h2>
+<p>どちらも邪魔をブロックします。Axorithはセッション用の環境も作ります。</p>
+<span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/ja/blog/freedom-alternative-windows/">
+<span class="blog-list__type">比較</span>
+<h2>Windows向けAxorithとFreedomの比較</h2>
+<p>Freedomはデバイスをまたぐブロック、AxorithはWindowsの作業環境に重点を置きます。</p>
+<span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/ja/blog/schedule-apps-and-website-blocking-windows/">
+<span class="blog-list__type">Windowsのスケジュール</span>
+<h2>Windowsでアプリの起動と集中を妨げるもののブロックを予約</h2>
+<p>起動ツールとブロッカーを別々に予約せず、セッション全体をひとつのスケジュールに。</p>
+<span class="blog-list__link">記事を読む <span aria-hidden="true">→</span></span>
+</a>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/ja/">Axorith</a><span>BSL 1.1でソースコードを公開</span></div>
+<nav aria-label="フッターのナビゲーション">
+<a href="/ja/download/">ダウンロード</a>
+<a href="/ja/blog/">ブログ</a>
+<a href="/ja/privacy/">プライバシー</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

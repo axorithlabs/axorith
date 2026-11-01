@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith — automação do espaço de trabalho e bloqueio de apps e sites no Windows</title>
+<meta content="Inicie apps e projetos, bloqueie distrações e agende sessões, tudo localmente no Windows." name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<link href="https://axorith.com/pt/" rel="canonical"/>
+<meta content="Axorith — automação do espaço de trabalho e bloqueio de apps e sites no Windows" property="og:title"/>
+<meta content="Inicie apps e projetos, bloqueie distrações e agende sessões, tudo localmente no Windows." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/pt/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith — automação do espaço de trabalho e bloqueio de apps e sites no Windows" name="twitter:title"/>
+<meta content="Inicie apps e projetos, bloqueie distrações e agende sessões, tudo localmente no Windows." name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script defer="" src="/js/posthog.js"></script>
+<script defer="" src="/js/main.js"></script>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/><meta content="#0b0c0e" name="theme-color"/><script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/pt/","downloadUrl":"https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe","image":"https://axorith.com/assets/og_banner.jpg","operatingSystem":"Windows","applicationCategory":"ProductivityApplication","applicationSubCategory":"Automação do espaço de trabalho e bloqueio de distrações","description":"Uma ferramenta local para organizar espaços de trabalho no Windows: inicia aplicativos e projetos, bloqueia aplicativos e sites que distraem, agenda sessões e encadeia espaços de trabalho.","license":"https://github.com/axorithlabs/axorith/blob/main/LICENSE.md","sameAs":["https://github.com/axorithlabs/axorith"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"Gratuito para uso pessoal e não comercial sob a licença BSL 1.1."},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/pt/"},"inLanguage":"pt"}</script>
+<!-- locales:start -->
+<meta property="og:locale" content="pt_BR"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="home-page" data-content-slug="home" data-page-type="home">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Página inicial do Axorith" class="brand" href="/pt/">Axorith</a>
+<nav aria-label="Navegação principal" class="desktop-nav">
+<a href="/pt/#workflow">Como funciona</a>
+<a href="/pt/#schedule">Agendamentos</a>
+<a href="/pt/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar</a>
+<button aria-expanded="false" aria-label="Abrir navegação" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="Navegação móvel" class="mobile-nav">
+<a href="/pt/#workflow">Como funciona</a>
+<a href="/pt/#schedule">Agendamentos</a>
+<a href="/pt/blog/">Blog</a><a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar para Windows</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Idioma: Português">PT</summary>
+<nav aria-label="Idioma">
+<a href="/" hreflang="en" lang="en">English</a>
+<a href="/ru/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/" hreflang="pt" lang="pt" aria-current="page">Português</a>
+<a href="/es/" hreflang="es" lang="es">Español</a>
+<a href="/de/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="hero hero-v3">
+<div class="hero-v3__copy reveal">
+<h1>Pare de configurar seu espaço de trabalho do zero toda vez que começar.</h1>
+<p>Salve apps, bloqueadores e regras da sessão em uma predefinição. Inicie manualmente ou por agendamento.</p>
+<div class="hero__actions">
+<a class="button button--primary" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar para Windows</a>
+<a class="button button--secondary" href="https://github.com/axorithlabs/axorith">Ver no GitHub</a>
+</div>
+</div>
+<div aria-label="Prévia da interface de predefinições do Axorith" class="hero-app reveal">
+<div class="ax-window">
+<div class="ax-titlebar">
+<span class="ax-titlebar__name">Axorith</span>
+<span aria-hidden="true" class="ax-titlebar__controls"><i></i><i></i><i></i></span>
+</div>
+<div class="ax-shell">
+<aside aria-hidden="true" class="ax-sidebar">
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--home"></span>Início</div>
+<div class="ax-navitem is-active"><span class="ax-navicon ax-navicon--presets"></span>Predefinições</div>
+<div class="ax-nav-spacer"></div>
+<div class="ax-navitem"><span class="ax-navicon ax-navicon--settings"></span>Configurações</div>
+</aside>
+<div class="ax-presets">
+<div class="ax-presets__head">
+<h2>Predefinições</h2>
+<button tabindex="-1" type="button">Nova predefinição</button>
+</div>
+<article class="ax-preset ax-preset--primary">
+<div class="ax-preset__content">
+<div class="ax-preset__name">Programação</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">Bloqueado</span>
+<span>Iniciar CLion e navegador, bloquear sites que distraem +2</span>
+<span class="ax-dot">·</span>
+<span>Até 18:00</span>
+</div>
+<div class="ax-preset__schedule">Agenda: seg., ter., qua., qui., sex. às 09:00</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">Iniciar</button>
+<button aria-label="Mais ações" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">Descanso</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">Normal</span>
+<span>Iniciar Steam, Discord, Spotify</span>
+<span class="ax-dot">·</span>
+<span>Até encerrar manualmente</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">Iniciar</button>
+<button aria-label="Mais ações" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+<article class="ax-preset">
+<div class="ax-preset__content">
+<div class="ax-preset__name">Estudo</div>
+<div class="ax-preset__summary">
+<span class="ax-chip">Rigoroso</span>
+<span>Navegador, bloqueador de sites e de aplicativos</span>
+<span class="ax-dot">·</span>
+<span>Duração da sessão: 120 min</span>
+</div>
+</div>
+<div class="ax-preset__actions">
+<button class="ax-start" tabindex="-1" type="button">Iniciar</button>
+<button aria-label="Mais ações" class="ax-more" tabindex="-1" type="button"><b></b><b></b><b></b></button>
+</div>
+</article>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="ritual" id="workflow">
+<div class="ritual__intro reveal">
+<h2>Uma predefinição substitui o ritual de preparação.</h2>
+<p>Salve apps, bloqueadores e regras da sessão juntos uma vez. Depois, começar a trabalhar é só iniciar a predefinição.</p>
+</div>
+<div aria-label="A predefinição Programação substitui a preparação repetitiva" class="ritual-compress reveal">
+<div aria-hidden="true" class="ritual-compress__source ritual-compress__source--v2">
+<div><span>Iniciar</span><strong>CLion</strong></div>
+<div><span>Iniciar</span><strong>Navegador</strong></div>
+<div><span>Iniciar</span><strong>Spotify</strong></div>
+<div><span>Bloquear</span><strong>Aplicativos que distraem</strong></div>
+<div><span>Bloquear</span><strong>Sites que distraem</strong></div>
+<div><span>Modo da sessão</span><strong>Bloqueado</strong></div>
+</div>
+<div aria-hidden="true" class="ritual-compress__bridge"><i></i></div>
+<article class="preset-light-card preset-light-card--v2">
+<div class="preset-light-card__head">
+<div><span>Predefinição</span><strong>Programação</strong></div>
+<span class="preset-light-card__mode">Bloqueado</span>
+</div>
+<div class="preset-light-card__chips">
+<span>CLion</span><span>Navegador</span><span>Spotify</span><span>Bloqueio de aplicativos</span><span>Bloqueador de sites</span>
+</div>
+<div class="preset-light-card__footer"><button tabindex="-1" type="button">Iniciar</button></div>
+</article>
+</div>
+</section>
+<section aria-label="Editor de predefinições do Axorith" class="editor-screenshot-section reveal">
+<div class="editor-screenshot-section__copy">
+<h2>Configure toda a sessão em um só editor.</h2>
+<p>Defina a proteção da sessão, como ela começa, a ordem dos módulos, quando termina e o que acontece depois.</p>
+</div>
+<img alt="Editor do Axorith com nome, proteção da sessão, início, bloqueio de aplicativos, encerramento e próxima ação" src="/assets/preset-editor.png"/>
+</section>
+<section class="blockers-chapter">
+<div class="blockers-chapter__copy reveal">
+<h2>Mantenha o espaço de trabalho. Deixe as distrações de fora.</h2>
+<p>Bloqueie apps e sites selecionados ou permita apenas os aplicativos configurados no espaço de trabalho atual.</p>
+</div>
+<div aria-label="Prévia da configuração de bloqueio" class="blocker-visual reveal">
+<div class="blocker-column">
+<span class="blocker-column__label">Bloqueio de aplicativos</span>
+<strong>Permitir apenas apps do espaço de trabalho</strong>
+<div class="allowed-list">
+<span>CLion</span><span>Navegador</span><span>Spotify</span>
+</div>
+<div class="blocked-list"><span>Steam</span><span>Discord</span><span>Outros aplicativos</span></div>
+</div>
+<div class="blocker-column">
+<span class="blocker-column__label">Bloqueador de sites</span>
+<strong>Bloquear categorias selecionadas</strong>
+<div class="category-list">
+<span>Redes sociais</span><span>Vídeo</span><span>Transmissões</span><span>Jogos</span><span>Notícias</span><span>Compras</span>
+</div>
+</div>
+</div>
+</section>
+<section class="schedule-story" id="schedule">
+<div class="schedule-story__copy reveal">
+<h2>Programação às 09:00. Descanso às 18:00.</h2>
+<p>O Axorith inicia uma predefinição no horário agendado, encerra em um horário fixo e passa automaticamente para a próxima.</p>
+</div>
+<div aria-label="A predefinição Programação muda para Descanso às 18:00" class="preset-handoff reveal">
+<article class="handoff-preset handoff-preset--work">
+<div class="handoff-preset__time">09:00</div>
+<div class="handoff-preset__head"><strong>Programação</strong><span>Bloqueado</span></div>
+<div class="handoff-preset__rule"><label>Início</label><b>Agendamento · seg.–sex. · 09:00</b></div>
+<div class="handoff-preset__modules"><span>CLion</span><span>Navegador</span><span>Spotify</span><span>Bloqueio de aplicativos</span><span>Bloqueador de sites</span></div>
+</article>
+<div aria-hidden="true" class="handoff-transition">
+<i></i>
+</div>
+<article class="handoff-preset handoff-preset--relax">
+<div class="handoff-preset__time">18:00</div>
+<div class="handoff-preset__head"><strong>Descanso</strong><span>Normal</span></div>
+<div class="handoff-preset__rule"><label>Início</label><b>Iniciada pela predefinição anterior</b></div>
+<div class="handoff-preset__modules"><span>Steam</span><span>Discord</span><span>Spotify</span></div>
+</article>
+</div>
+</section>
+<section class="modules-teaser-v3">
+<div class="modules-teaser-v3__head reveal">
+<h2>Amplie a predefinição conforme precisar.</h2>
+</div>
+<div class="module-table reveal">
+<div><strong>Lançador de aplicativos</strong><span>Aplicativos, projetos de IDE, posição de janelas e ciclo de vida.</span></div>
+<div><strong>Bloqueio de aplicativos</strong><span>Bloqueie apps selecionados ou permita apenas os do espaço de trabalho.</span></div>
+<div><strong>Bloqueador de sites</strong><span>Bloqueie sites ou categorias enquanto a sessão estiver ativa.</span></div>
+<div><strong>Home Assistant</strong><span>Ações opcionais para dispositivos próximos ao local de trabalho.</span></div>
+</div>
+</section>
+<section class="final-cta final-cta-v3">
+<div class="final-cta__inner reveal">
+<h2>Configure a predefinição uma vez. Inicie o ambiente quando precisar.</h2>
+<div class="final-cta__actions">
+<a class="button button--light" data-analytics-placement="home" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Baixar para Windows</a>
+<a class="button button--dark-outline" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/pt/">Axorith</a><span>Código-fonte disponível sob BSL 1.1</span></div>
+<nav aria-label="Navegação do rodapé">
+<a href="/pt/download/">Baixar</a>
+<a href="/pt/blog/">Blog</a><a href="/pt/privacy/">Privacidade</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith 博客 — Windows 工作区自动化与屏蔽</title>
+<meta content="Axorith 实用文章，涵盖 Windows 工作区自动化、应用与网站屏蔽、计划及与专用屏蔽工具的对比。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/zh-Hans/blog/" rel="canonical"/>
+<meta content="Axorith 博客 — Windows 工作区自动化与屏蔽" property="og:title"/>
+<meta content="Axorith 实用文章，涵盖 Windows 工作区自动化、应用与网站屏蔽、计划及与专用屏蔽工具的对比。" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/zh-Hans/blog/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith 博客 — Windows 工作区自动化与屏蔽" name="twitter:title"/>
+<meta content="Axorith 实用文章，涵盖 Windows 工作区自动化、应用与网站屏蔽、计划及与专用屏蔽工具的对比。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"Axorith 博客","url":"https://axorith.com/zh-Hans/blog/","description":"关于 Windows 工作区自动化、应用与网站屏蔽、计划及相关工具的实用内容。","isPartOf":{"@type":"WebSite","name":"Axorith","url":"https://axorith.com/zh-Hans/","inLanguage":"zh-Hans"},"inLanguage":"zh-Hans"}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="zh_CN"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-index" data-content-slug="blog" data-page-type="blog-index">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith 首页" class="brand" href="/zh-Hans/">Axorith</a>
+<nav aria-label="主导航" class="desktop-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a class="is-current" href="/zh-Hans/blog/">博客</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载</a>
+<button aria-expanded="false" aria-label="打开导航" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="移动端导航" class="mobile-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a href="/zh-Hans/blog/">博客</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="语言: 简体中文">简中</summary>
+<nav aria-label="语言">
+<a href="/blog/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/" hreflang="zh-Hans" lang="zh-Hans" aria-current="page">简体中文</a>
+<a href="/zh-Hant/blog/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-index-hero">
+<div class="blog-index-hero__inner">
+<p class="blog-kicker">博客</p>
+<h1>Axorith 博客</h1>
+<p>关于 Windows 工作区自动化、应用与网站屏蔽、计划，以及工具选择取舍的实用内容。</p>
+</div>
+</section>
+<section aria-label="Axorith 博客文章" class="blog-list">
+<a class="blog-list__item reveal" href="/zh-Hans/blog/windows-app-blocker-allowlist/"><span class="blog-list__type">应用屏蔽</span><h2>如何在 Windows 上只允许运行工作应用</h2><p>先确定工作真正需要哪些应用，而不是试图列出每一种可能分散注意力的程序。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/focus-mode-for-programmers-windows/"><span class="blog-list__type">开发者工作流程</span><h2>程序员的实用 Windows 专注模式</h2><p>直接打开准备处理的项目，同时减少切换到无关应用的机会。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/study-focus-setup-windows/"><span class="blog-list__type">学习流程</span><h2>如何在 Windows 上安排少干扰的学习专注时段</h2><p>保留完成作业需要的工具，减少无关内容的干扰。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/switch-work-and-gaming-windows/"><span class="blog-list__type">工作环境切换</span><h2>如何在 Windows 上切换工作和游戏环境</h2><p>工作与休闲不必共用同一组窗口、通知和限制。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/focus-commitment-modes-windows/"><span class="blog-list__type">专注时段</span><h2>如何选择专注专注时段的限制强度</h2><p>并非越严格越高效；应根据任务和风险选择规则。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/home-assistant-focus-desk-windows/"><span class="blog-list__type">Home Assistant</span><h2>将 Windows 专注模式连接到 Home Assistant</h2><p>让工作预设同时调整桌面应用与房间环境。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/local-first-focus-app-windows/"><span class="blog-list__type">本地优先软件</span><h2>为什么选择本地优先的 Windows 专注工具</h2><p>先弄清你需要管理一台 Windows 电脑，还是同步限制多个设备。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/launch-multiple-apps-projects-windows/"><span class="blog-list__type">应用启动器</span><h2>如何在 Windows 上同时启动工作应用和项目</h2><p>偶尔打开一组工具很简单；每天重复同样的步骤才浪费时间。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/block-distractions-without-blocking-work/"><span class="blog-list__type">网站屏蔽</span><h2>如何屏蔽分心网站而不影响工作</h2><p>有效的屏蔽应足够精准，让必要的学习和研究资源继续可用。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/windows-focus-setup-for-remote-work/"><span class="blog-list__type">远程办公</span><h2>为 Windows 远程工作建立稳定的专注环境</h2><p>保留工作所需的沟通工具，同时减少无关打扰。</p><span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/block-apps-websites-and-launch-work-apps-windows/">
+<span class="blog-list__type">Windows 专注环境</span>
+<h2>屏蔽应用和网站，再启动 Windows 工作环境</h2>
+<p>一个预设既去除干扰，也搭建替代它们的工作区。</p>
+<span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/automate-work-setup-windows/">
+<span class="blog-list__type">工作区自动化</span>
+<h2>自动化你的 Windows 工作环境</h2>
+<p>将工作、学习或编程前的重复准备，变成能自行运行的预设。</p>
+<span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/cold-turkey-alternative-windows/">
+<span class="blog-list__type">对比</span>
+<h2>Windows 上的 Axorith 与 Cold Turkey 对比</h2>
+<p>两者都能屏蔽干扰。Axorith 还会为专注时段搭建工作环境。</p>
+<span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/freedom-alternative-windows/">
+<span class="blog-list__type">对比</span>
+<h2>Windows 上的 Axorith 与 Freedom 对比</h2>
+<p>Freedom 关注跨设备屏蔽，Axorith 关注 Windows 工作区本身。</p>
+<span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hans/blog/schedule-apps-and-website-blocking-windows/">
+<span class="blog-list__type">Windows 计划</span>
+<h2>在 Windows 定时启动应用并屏蔽干扰</h2>
+<p>用一个计划管理整个工作专注时段，不必分别安排启动器和屏蔽工具。</p>
+<span class="blog-list__link">阅读文章 <span aria-hidden="true">→</span></span>
+</a>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/zh-Hans/">Axorith</a><span>源代码按 BSL 1.1 许可公开</span></div>
+<nav aria-label="页脚导航">
+<a href="/zh-Hans/download/">下载</a>
+<a href="/zh-Hans/blog/">博客</a>
+<a href="/zh-Hans/privacy/">隐私</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><title>Конфиденциальность — Axorith</title><meta content="Как Axorith обрабатывает телеметрию сайта и настольного приложения." name="description"/><link href="https://axorith.com/ru/privacy/" rel="canonical"/><link href="/assets/icon.ico" rel="icon" type="image/x-icon"/><link href="/css/main.css" rel="stylesheet"/><script defer="" src="/js/posthog.js"></script><script defer="" src="/js/main.js"></script><meta content="index,follow" name="robots"/>
+<!-- locales:start -->
+<meta property="og:locale" content="ru_RU"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/privacy/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/privacy/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/privacy/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/privacy/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/privacy/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/privacy/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/privacy/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/privacy/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/privacy/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/privacy/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/privacy/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/privacy/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head><body data-content-slug="privacy" data-page-type="privacy"><header class="site-header"><div class="site-header__inner"><a class="brand" href="/ru/">Axorith</a><nav class="desktop-nav"><a href="/ru/#workflow">Как это работает</a><a href="/ru/blog/">Блог</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">Скачать</a><button aria-expanded="false" aria-label="Открыть навигацию" class="nav-toggle" type="button"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/ru/#workflow">Как это работает</a><a href="/ru/blog/">Блог</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav>
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="Язык: Русский">RU</summary>
+<nav aria-label="Язык">
+<a href="/privacy/" hreflang="en" lang="en">English</a>
+<a href="/ru/privacy/" hreflang="ru" lang="ru" aria-current="page">Русский</a>
+<a href="/zh-Hans/privacy/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/privacy/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/privacy/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/privacy/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/privacy/" hreflang="es" lang="es">Español</a>
+<a href="/de/privacy/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/privacy/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/privacy/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/privacy/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
+<span>Конфиденциальность</span>
+<h1>Телеметрия и данные</h1>
+<p>Axorith использует PostHog для аналитики сайта и отключаемой телеметрии настольного приложения. У сайта и приложения разные идентификаторы посетителей.</p>
+<h2>Аналитика сайта</h2>
+<p>При посещении axorith.com PostHog Web SDK фиксирует просмотры страниц и уход с них, сеансы посещений, Web Vitals, категории источников переходов и проверенные UTM-метки источника, канала и кампании. Страницы относятся к фиксированным категориям, например «Главная», «Модули» и «Конфиденциальность». До отправки событий удаляются полные URL страниц и источников переходов, домены, идентификаторы рекламных кликов, параметры utm_content и utm_term. Также фиксируются нажатия на ссылки скачивания и GitHub. События нажатия на кнопку скачивания содержат её расположение на странице и платформу Windows; версия выпуска добавляется только тогда, когда она действительно известна сайту. PostHog может приблизительно определять местоположение по сетевым метаданным. Также записывается выбранный язык страницы.</p>
+<p>Сайт использует браузерный идентификатор PostHog. Axorith не связывает посетителя сайта с последующей установкой по IP-адресу, user-agent, цифровому отпечатку или другим эвристикам.</p>
+<h2>Телеметрия приложения</h2>
+<p>Телеметрия использования включена по умолчанию. Её можно отключить в настройках конфиденциальности приложения. Настройка общая для Client и Host. Обновления читают сохранённый выбор, а новая установка сохраняет существующее значение по умолчанию.</p>
+<p>При включённой телеметрии приложение отправляет версии Axorith и операционной системы, события жизненного цикла приложения, идентификаторы пресетов и модулей и типы встроенных модулей, идентификаторы сеансов и события их жизненного цикла, настройки защиты сеанса и перерывов, изменения расписаний, категории изменённых настроек, результаты обновлений и установок, а также структурированные сведения об ошибках. В Windows приложение, установщик и программа удаления используют общий псевдонимный идентификатор устройства, предоставляемый Windows. Axorith не хранит этот идентификатор в файлах. Он сохраняется при переустановке приложения и удалении его папок; в зависимости от источника идентификатора Windows он может сохраниться и после чистой установки ОС. Если при обновлении доступен прежний идентификатор устройства, событие миграции содержит прежний и новый идентификаторы, чтобы связать телеметрию.</p>
+<p>События ошибок содержат тип исключения, стабильный отпечаток, подсистему, операцию, серьёзность, признак обработанной или критической ошибки и ограниченный набор очищенных имён методов. Повторяющиеся ошибки ограничиваются по частоте и объединяются в сводки.</p>
+<h2>Какие данные приложение не отправляет</h2>
+<p>Телеметрия приложения не содержит названий пресетов, пользовательских названий модулей и действий, значений настроек, путей к файлам и исполняемым программам, имён процессов, аргументов командной строки, URL, доменов, идентификаторов сущностей Home Assistant, токенов доступа, секретов, исходных текстов исключений и полных трассировок стека. Axorith не передаёт IP-адреса в свойствах событий. PostHog может приблизительно определять местоположение по сетевым метаданным.</p>
+<h2>PostHog и идентификация</h2>
+<p>События сайта и приложения поступают в один проект PostHog Axorith, но используют разные идентификаторы. Сайт не использует идентификатор устройства настольного приложения.</p>
+<p>По вопросам пишите на <a href="mailto:mail@axorith.com">mail@axorith.com</a>.</p>
+</article></section></main><footer class="footer"><div class="footer__inner"><div><a class="brand" href="/ru/">Axorith</a><span>Исходный код доступен по лицензии BSL 1.1</span></div><nav><a href="/ru/download/">Скачать</a><a href="https://github.com/axorithlabs/axorith">GitHub</a><a href="/ru/blog/">Блог</a></nav></div></footer></body></html>

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith 与 Cold Turkey：Windows 屏蔽与工作区自动化</title>
+<meta content="对比 Windows 上的 Axorith 与 Cold Turkey：应用和网站屏蔽、计划、锁定专注时段、应用启动、工作区衔接、平台及收费模式。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/zh-Hans/blog/cold-turkey-alternative-windows/" rel="canonical"/>
+<meta content="Axorith 与 Cold Turkey：Windows 屏蔽与工作区自动化" property="og:title"/>
+<meta content="对比 Windows 上的 Axorith 与 Cold Turkey：应用和网站屏蔽、计划、锁定专注时段、应用启动、工作区衔接、平台及收费模式。" property="og:description"/>
+<meta content="article" property="og:type"/>
+<meta content="https://axorith.com/zh-Hans/blog/cold-turkey-alternative-windows/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith 与 Cold Turkey：Windows 屏蔽与工作区自动化" name="twitter:title"/>
+<meta content="对比 Windows 上的 Axorith 与 Cold Turkey：应用和网站屏蔽、计划、锁定专注时段、应用启动、工作区衔接、平台及收费模式。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Windows 上的 Axorith 与 Cold Turkey 对比","description":"对比 Windows 上的 Axorith 与 Cold Turkey：应用和网站屏蔽、计划、锁定专注时段、应用启动、工作区衔接、平台及收费模式。","url":"https://axorith.com/zh-Hans/blog/cold-turkey-alternative-windows/","mainEntityOfPage":"https://axorith.com/zh-Hans/blog/cold-turkey-alternative-windows/","image":"https://axorith.com/assets/og_banner.jpg","datePublished":"2026-10-04","dateModified":"2026-10-04","author":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/zh-Hans/"},"publisher":{"@type":"Organization","name":"Axorith Labs","url":"https://axorith.com/zh-Hans/"},"about":{"@type":"SoftwareApplication","name":"Axorith","url":"https://axorith.com/zh-Hans/","inLanguage":"zh-Hans"},"inLanguage":"zh-Hans"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Axorith","item":"https://axorith.com/zh-Hans/"},{"@type":"ListItem","position":2,"name":"博客","item":"https://axorith.com/zh-Hans/blog/"},{"@type":"ListItem","position":3,"name":"Windows 上的 Axorith 与 Cold Turkey 对比","item":"https://axorith.com/zh-Hans/blog/cold-turkey-alternative-windows/"}]}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="zh_CN"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/cold-turkey-alternative-windows/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/cold-turkey-alternative-windows/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-post" data-content-slug="cold-turkey-alternative-windows" data-page-type="blog-post">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith 首页" class="brand" href="/zh-Hans/">Axorith</a>
+<nav aria-label="主导航" class="desktop-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a class="is-current" href="/zh-Hans/blog/">博客</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载</a>
+<button aria-expanded="false" aria-label="打开导航" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="移动端导航" class="mobile-nav">
+<a href="/zh-Hans/#workflow">使用流程</a>
+<a href="/zh-Hans/#schedule">计划</a>
+<a href="/zh-Hans/blog/">博客</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="语言: 简体中文">简中</summary>
+<nav aria-label="语言">
+<a href="/blog/cold-turkey-alternative-windows/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/cold-turkey-alternative-windows/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/cold-turkey-alternative-windows/" hreflang="zh-Hans" lang="zh-Hans" aria-current="page">简体中文</a>
+<a href="/zh-Hant/blog/cold-turkey-alternative-windows/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/blog/cold-turkey-alternative-windows/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/cold-turkey-alternative-windows/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/cold-turkey-alternative-windows/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/cold-turkey-alternative-windows/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/cold-turkey-alternative-windows/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/cold-turkey-alternative-windows/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/cold-turkey-alternative-windows/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-post-hero">
+<div class="blog-post-hero__inner">
+<nav aria-label="面包屑导航" class="breadcrumbs">
+<a href="/zh-Hans/">Axorith</a><span>/</span><a href="/zh-Hans/blog/">博客</a>
+</nav>
+<p class="blog-kicker">对比</p>
+<h1>Windows 上的 Axorith 与 Cold Turkey 对比</h1>
+<p class="blog-post-dek">两者都能屏蔽干扰。Axorith 还会为专注时段搭建工作环境。</p>
+<div class="blog-post-hero__actions">
+<a class="button button--primary" data-analytics-placement="article-hero" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+<a class="text-link" href="https://github.com/axorithlabs/axorith">GitHub</a>
+</div>
+</div>
+</section>
+<article class="blog-post-layout">
+<div class="blog-post-content">
+<section class="blog-post-section blog-post-lead">
+<p>Cold Turkey Blocker 和 Axorith 都能屏蔽 Windows 上的干扰网站与桌面应用，之后的方向有所不同。Cold Turkey 主要是成熟的屏蔽工具；Axorith 围绕更完整的工作区预设构建，还能启动需要的应用和项目。</p>
+<p>本次对比于 2026 年 10 月 4 日参照 Cold Turkey 公开功能及价格页面核对。</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">快速对比</p>
+<h2>区别在于屏蔽干扰之后会发生什么。</h2>
+<div class="blog-post-table-wrap">
+<table class="blog-post-table">
+<thead><tr><th>功能</th><th>Axorith</th><th>Cold Turkey Blocker</th></tr></thead>
+<tbody>
+<tr><td>网站屏蔽</td><td>支持</td><td>支持</td></tr>
+<tr><td>桌面应用屏蔽</td><td>支持</td><td>支持，列为 Pro 功能</td></tr>
+<tr><td>重复计划</td><td>支持</td><td>支持，列为 Pro 功能</td></tr>
+<tr><td>锁定或严格专注时段</td><td>专注时段保护模式</td><td>锁定功能</td></tr>
+<tr><td>启动工作应用和项目</td><td>支持</td><td>不在 Blocker 已公布的功能中</td></tr>
+<tr><td>衔接不同工作区</td><td>支持</td><td>不在 Blocker 已公布的功能中</td></tr>
+<tr><td>Home Assistant 集成</td><td>支持</td><td>不在 Blocker 已公布的功能中</td></tr>
+<tr><td>桌面平台</td><td>Windows</td><td>Windows 和 macOS</td></tr>
+<tr><td>源代码可用性</td><td>源码可查看，BSL 1.1</td><td>专有软件</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">何时选择 Cold Turkey</p>
+<h2>你主要需要屏蔽工具。</h2>
+<p>如果主要需求是严格屏蔽，尤其同时需要 macOS 和 Windows，Cold Turkey 是更成熟的选择。其产品页面重点介绍网站与应用屏蔽、锁定、计划、允许使用时长和统计。</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">何时选择 Axorith</p>
+<h2>你希望同时准备好工作环境。</h2>
+<p>当屏蔽只是任务切换的一部分时，Axorith 更适合。“编程”预设可关闭或屏蔽干扰，启动 IDE 和项目、浏览器、Spotify，应用 Home Assistant 场景，之后再衔接其他预设。</p>
+</section>
+<section class="blog-post-section">
+<p class="blog-kicker">资料来源</p>
+<h2>本次对比使用的 Cold Turkey 资料。</h2>
+<p><a href="https://getcoldturkey.com/pricing/">Cold Turkey 价格</a> 将应用屏蔽、计划及锁定列在 Blocker Pro 中；免费版列出网站屏蔽、网站例外、定时屏蔽和统计。</p>
+<p><a href="https://getcoldturkey.com/compare/">Cold Turkey 产品对比</a> 说明了网站屏蔽、应用屏蔽、计划、定时屏蔽及支持的平台。</p>
+</section>
+<section class="blog-post-cta reveal">
+<div>
+<p class="blog-kicker">WINDOWS 版 AXORITH</p>
+<h2>直接启动环境，不必从头搭建。</h2>
+<p>工作区只需创建一次，之后手动启动或交给计划执行。</p>
+</div>
+<div class="blog-post-cta__actions">
+<a class="button button--primary" data-analytics-placement="article-end" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载 Windows 版</a>
+<a class="button button--secondary button--on-light" href="https://github.com/axorithlabs/axorith">在 GitHub 查看源码</a>
+</div>
+</section>
+</div>
+<aside aria-label="关于 Axorith" class="blog-post-rail">
+<div class="blog-post-rail__inner">
+<span class="blog-post-rail__label">Axorith</span>
+<p>本地管理 Windows 工作区：应用、屏蔽、计划与专注时段规则集中在一个预设中。</p>
+<a href="/zh-Hans/#workflow">查看使用流程</a>
+<a href="/zh-Hans/#schedule">查看计划</a>
+<a href="/zh-Hans/blog/">所有文章</a>
+</div>
+</aside>
+</article>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/zh-Hans/">Axorith</a><span>源代码按 BSL 1.1 许可公开</span></div>
+<nav aria-label="页脚导航">
+<a href="/zh-Hans/download/">下载</a>
+<a href="/zh-Hans/blog/">博客</a>
+<a href="/zh-Hans/privacy/">隐私</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

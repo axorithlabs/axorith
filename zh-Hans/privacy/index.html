@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hans"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><title>隐私 — Axorith</title><meta content="Axorith 如何处理网站与桌面遥测。" name="description"/><link href="https://axorith.com/zh-Hans/privacy/" rel="canonical"/><link href="/assets/icon.ico" rel="icon" type="image/x-icon"/><link href="/css/main.css" rel="stylesheet"/><script defer="" src="/js/posthog.js"></script><script defer="" src="/js/main.js"></script><meta content="index,follow" name="robots"/>
+<!-- locales:start -->
+<meta property="og:locale" content="zh_CN"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/privacy/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/privacy/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/privacy/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/privacy/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/privacy/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/privacy/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/privacy/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/privacy/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/privacy/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/privacy/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/privacy/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/privacy/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_TW"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head><body data-content-slug="privacy" data-page-type="privacy"><header class="site-header"><div class="site-header__inner"><a class="brand" href="/zh-Hans/">Axorith</a><nav class="desktop-nav"><a href="/zh-Hans/#workflow">工作原理</a><a href="/zh-Hans/blog/">博客</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav><a class="header-download" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下载</a><button aria-expanded="false" aria-label="打开导航" class="nav-toggle" type="button"><span></span><span></span></button></div><nav class="mobile-nav"><a href="/zh-Hans/#workflow">工作原理</a><a href="/zh-Hans/blog/">博客</a><a href="https://github.com/axorithlabs/axorith">GitHub</a></nav>
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="语言: 简体中文">简中</summary>
+<nav aria-label="语言">
+<a href="/privacy/" hreflang="en" lang="en">English</a>
+<a href="/ru/privacy/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/privacy/" hreflang="zh-Hans" lang="zh-Hans" aria-current="page">简体中文</a>
+<a href="/zh-Hant/privacy/" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a>
+<a href="/fr/privacy/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/privacy/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/privacy/" hreflang="es" lang="es">Español</a>
+<a href="/de/privacy/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/privacy/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/privacy/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/privacy/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header><main class="page-main"><section class="page-content page-content--narrow"><article class="privacy-copy">
+<span>隐私</span>
+<h1>遥测与数据</h1>
+<p>Axorith 使用 PostHog 分析网站，并提供可选的桌面产品遥测。网站与桌面应用采用独立访客身份。</p>
+<h2>网站分析</h2>
+<p>访问 axorith.com 时，PostHog Web SDK 记录页面浏览与离开、访问会话、Web Vitals、来源类别，以及验证过的 UTM 来源、媒介和活动标签。页面归为首页、模块、隐私等固定类别。发送前移除完整页面和来源 URL、域名、广告点击 ID、UTM 内容与搜索词。还会记录下载和 GitHub 链接点击。下载点击包含按钮位置和 Windows 平台，只有网站确知版本时才包含发行版本。PostHog 可能根据网络元数据推断大致位置。 还会记录所选页面语言。</p>
+<p>网站使用 PostHog 的浏览器身份。Axorith 不通过 IP 地址、user-agent 匹配、指纹识别或其他启发式方式将网站访客与之后的安装关联。</p>
+<h2>桌面遥测</h2>
+<p>使用遥测默认开启，可在应用的隐私设置中关闭。Client 与 Host 共享该设置。更新读取已保存的选择，新安装保持现有默认值。</p>
+<p>启用后，桌面应用发送 Axorith 与系统版本、应用生命周期事件、预设和模块 ID 及内置模块类型、会话 ID 与生命周期、保护和休息设置、计划变更、修改的设置类别、更新和安装结果及结构化错误详情。在 Windows 上，应用、安装程序与卸载程序共享 Windows 提供的假名设备标识。Axorith 不将其存入文件。它在应用重装或删除应用文件夹后仍然保留；根据 Windows 身份来源，也可能在全新安装 Windows 后保留。更新时若旧身份可用，迁移事件会包含新旧标识以关联遥测。</p>
+<p>错误事件包含异常类型、稳定指纹、子系统、操作、严重程度、已处理或致命状态，以及数量受限且经过清理的方法名。重复错误会被限频并汇总。</p>
+<h2>桌面应用不发送的信息</h2>
+<p>桌面遥测不包含预设名称、自定义模块或操作名称、设置值、文件或可执行文件路径、进程名称、命令行参数、URL、域名、Home Assistant 实体 ID、访问令牌、机密信息、原始异常消息或完整堆栈跟踪。Axorith 不会将 IP 地址作为事件属性发送。PostHog 可能根据网络元数据推断大致位置。</p>
+<h2>PostHog 与身份</h2>
+<p>网站和桌面事件发送到同一个 Axorith PostHog 项目，但采用独立身份。网站不使用桌面应用的设备标识。</p>
+<p>如有问题，请联系 <a href="mailto:mail@axorith.com">mail@axorith.com</a>.</p>
+</article></section></main><footer class="footer"><div class="footer__inner"><div><a class="brand" href="/zh-Hans/">Axorith</a><span>源代码按 BSL 1.1 许可公开</span></div><nav><a href="/zh-Hans/download/">下载</a><a href="https://github.com/axorithlabs/axorith">GitHub</a><a href="/zh-Hans/blog/">博客</a></nav></div></footer></body></html>

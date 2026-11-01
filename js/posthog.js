@@ -1,12 +1,25 @@
 const posthogProjectToken = "phc_5JRZwyXJmWlMk1dln5MK3PipGNnAZNmRObSWLqjpMOT";
 const posthogApiHost = "https://us.posthog.com";
 const windowsInstallerPath = "/axorithlabs/axorith/releases/latest/download/axorith-setup.exe";
+const websiteLanguages = ["en", "ru", "zh-Hans", "zh-Hant", "fr", "pt", "es", "de", "ja", "nl", "pl"];
+
+function websiteLanguage(value) {
+    try {
+        const prefix = new URL(value, "https://axorith.com").pathname.split("/")[1];
+        return websiteLanguages.includes(prefix) ? prefix : "en";
+    } catch {
+        return "en";
+    }
+}
 
 function normalizeWebsitePath(value) {
     if (typeof value !== "string") return "/other";
 
     try {
-        const pathname = new URL(value, "https://axorith.com").pathname.replace(/\/+$/, "") || "/";
+        let pathname = new URL(value, "https://axorith.com").pathname;
+        const language = websiteLanguage(value);
+        if (language !== "en") pathname = pathname.slice(language.length + 1);
+        pathname = pathname.replace(/\/+$/, "") || "/";
         const fixed = {
             "/": "/",
             "/index.html": "/",
@@ -23,8 +36,8 @@ function normalizeWebsitePath(value) {
 
         if (fixed[pathname]) return fixed[pathname];
 
-        const blogMatch = pathname.match(/^\/blog\/([a-z0-9-]+)(?:\/index\.html)?$/);
-        if (guideMatch) return `/blog/${guideMatch[1]}`;
+        const articleMatch = pathname.match(/^\/blog\/([a-z0-9-]+)(?:\/index\.html)?$/);
+        if (articleMatch) return `/blog/${articleMatch[1]}`;
 
         return "/other";
     } catch {
@@ -86,6 +99,7 @@ function sanitizeWebsiteEvent(event) {
     }
 
     properties.$pathname = pagePath;
+    properties.pageLanguage = websiteLanguage(sourceUrl);
     if (typeof properties.$initial_pathname === "string") {
         properties.$initial_pathname = normalizeWebsitePath(properties.$initial_pathname);
     }
@@ -105,7 +119,7 @@ function sanitizeWebsiteEvent(event) {
     return event;
 }
 
-if (typeof window !== "undefined" && posthogProjectToken && !posthogProjectToken.startsWith("##")) {
+if (typeof window !== "undefined" && window.location.hostname === "axorith.com" && posthogProjectToken && !posthogProjectToken.startsWith("##")) {
     !function (document, posthog) {
         var methodNames = "capture register identify alias group set_group_properties resetGroups setPersonProperties setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded getSurveys getActiveMatchingSurveys renderSurvey canLaunchSurvey getNextSurveyStep enable timeEvent get_property getSessionProperty".split(" ");
         var firstScript;
@@ -150,13 +164,13 @@ if (typeof window !== "undefined" && posthogProjectToken && !posthogProjectToken
         capture_performance: true,
         before_send: sanitizeWebsiteEvent,
         loaded: function (posthog) {
-            posthog.register({ application: "Axorith.Website" });
+            posthog.register({ application: { name: "Axorith.Website" } });
         }
     });
 
-    window.posthog.register({ application: "Axorith.Website" });
+    window.posthog.register({ application: { name: "Axorith.Website" } });
 }
 
 if (typeof module !== "undefined") {
-    module.exports = { sanitizeWebsiteEvent, normalizeWebsitePath, isWindowsInstallerDownloadUrl };
+    module.exports = { sanitizeWebsiteEvent, normalizeWebsitePath, isWindowsInstallerDownloadUrl, websiteLanguage };
 }

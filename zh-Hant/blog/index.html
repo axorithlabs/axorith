@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Axorith 部落格 — Windows 工作區自動化與封鎖</title>
+<meta content="Axorith 實用文章，涵蓋 Windows 工作區自動化、程式與網站封鎖、排程及與專用封鎖工具的比較。" name="description"/>
+<meta content="Axorith Labs" name="author"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<meta content="#0b0c0e" name="theme-color"/>
+<link href="https://axorith.com/zh-Hant/blog/" rel="canonical"/>
+<meta content="Axorith 部落格 — Windows 工作區自動化與封鎖" property="og:title"/>
+<meta content="Axorith 實用文章，涵蓋 Windows 工作區自動化、程式與網站封鎖、排程及與專用封鎖工具的比較。" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://axorith.com/zh-Hant/blog/" property="og:url"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" property="og:image"/>
+<meta content="Axorith" property="og:site_name"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Axorith 部落格 — Windows 工作區自動化與封鎖" name="twitter:title"/>
+<meta content="Axorith 實用文章，涵蓋 Windows 工作區自動化、程式與網站封鎖、排程及與專用封鎖工具的比較。" name="twitter:description"/>
+<meta content="https://axorith.com/assets/og_banner.jpg" name="twitter:image"/>
+<link href="/assets/icon.ico" rel="icon" type="image/x-icon"/>
+<link href="/css/main.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"Axorith 部落格","url":"https://axorith.com/zh-Hant/blog/","description":"關於 Windows 工作區自動化、程式與網站封鎖、排程及相關工具的實用內容。","isPartOf":{"@type":"WebSite","name":"Axorith","url":"https://axorith.com/zh-Hant/","inLanguage":"zh-Hant"},"inLanguage":"zh-Hant"}</script>
+
+<!-- locales:start -->
+<meta property="og:locale" content="zh_TW"/>
+<link rel="alternate" hreflang="en" href="https://axorith.com/blog/"/>
+<link rel="alternate" hreflang="ru" href="https://axorith.com/ru/blog/"/>
+<link rel="alternate" hreflang="zh-Hans" href="https://axorith.com/zh-Hans/blog/"/>
+<link rel="alternate" hreflang="zh-Hant" href="https://axorith.com/zh-Hant/blog/"/>
+<link rel="alternate" hreflang="fr" href="https://axorith.com/fr/blog/"/>
+<link rel="alternate" hreflang="pt" href="https://axorith.com/pt/blog/"/>
+<link rel="alternate" hreflang="es" href="https://axorith.com/es/blog/"/>
+<link rel="alternate" hreflang="de" href="https://axorith.com/de/blog/"/>
+<link rel="alternate" hreflang="ja" href="https://axorith.com/ja/blog/"/>
+<link rel="alternate" hreflang="nl" href="https://axorith.com/nl/blog/"/>
+<link rel="alternate" hreflang="pl" href="https://axorith.com/pl/blog/"/>
+<link rel="alternate" hreflang="x-default" href="https://axorith.com/blog/"/>
+<meta property="og:locale:alternate" content="en_US"/>
+<meta property="og:locale:alternate" content="ru_RU"/>
+<meta property="og:locale:alternate" content="zh_CN"/>
+<meta property="og:locale:alternate" content="fr_FR"/>
+<meta property="og:locale:alternate" content="pt_BR"/>
+<meta property="og:locale:alternate" content="es_ES"/>
+<meta property="og:locale:alternate" content="de_DE"/>
+<meta property="og:locale:alternate" content="ja_JP"/>
+<meta property="og:locale:alternate" content="nl_NL"/>
+<meta property="og:locale:alternate" content="pl_PL"/>
+<!-- locales:end -->
+</head>
+<body class="content-page blog-index" data-content-slug="blog" data-page-type="blog-index">
+<header class="site-header">
+<div class="site-header__inner">
+<a aria-label="Axorith 首頁" class="brand" href="/zh-Hant/">Axorith</a>
+<nav aria-label="主要導覽" class="desktop-nav">
+<a href="/zh-Hant/#workflow">使用流程</a>
+<a href="/zh-Hant/#schedule">排程</a>
+<a class="is-current" href="/zh-Hant/blog/">部落格</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+<a class="header-download" data-analytics-placement="header" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下載</a>
+<button aria-expanded="false" aria-label="開啟導覽" class="nav-toggle" type="button">
+<span></span><span></span>
+</button>
+</div>
+<nav aria-label="行動版導覽" class="mobile-nav">
+<a href="/zh-Hant/#workflow">使用流程</a>
+<a href="/zh-Hant/#schedule">排程</a>
+<a href="/zh-Hant/blog/">部落格</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+<a data-analytics-placement="mobile-nav" href="https://github.com/axorithlabs/axorith/releases/latest/download/axorith-setup.exe">下載 Windows 版</a>
+</nav>
+
+<!-- locales:start -->
+<details class="language-menu"><summary aria-label="語言: 繁體中文">繁中</summary>
+<nav aria-label="語言">
+<a href="/blog/" hreflang="en" lang="en">English</a>
+<a href="/ru/blog/" hreflang="ru" lang="ru">Русский</a>
+<a href="/zh-Hans/blog/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+<a href="/zh-Hant/blog/" hreflang="zh-Hant" lang="zh-Hant" aria-current="page">繁體中文</a>
+<a href="/fr/blog/" hreflang="fr" lang="fr">Français</a>
+<a href="/pt/blog/" hreflang="pt" lang="pt">Português</a>
+<a href="/es/blog/" hreflang="es" lang="es">Español</a>
+<a href="/de/blog/" hreflang="de" lang="de">Deutsch</a>
+<a href="/ja/blog/" hreflang="ja" lang="ja">日本語</a>
+<a href="/nl/blog/" hreflang="nl" lang="nl">Nederlands</a>
+<a href="/pl/blog/" hreflang="pl" lang="pl">Polski</a>
+</nav></details>
+<!-- locales:end -->
+</header>
+<main>
+<section class="blog-index-hero">
+<div class="blog-index-hero__inner">
+<p class="blog-kicker">部落格</p>
+<h1>Axorith 部落格</h1>
+<p>關於 Windows 工作區自動化、程式與網站封鎖、排程，以及工具選擇取捨的實用內容。</p>
+</div>
+</section>
+<section aria-label="Axorith 部落格文章" class="blog-list">
+<a class="blog-list__item reveal" href="/zh-Hant/blog/windows-app-blocker-allowlist/"><span class="blog-list__type">應用程式封鎖</span><h2>如何在 Windows 上只允許運行工作應用</h2><p>先確定工作真正需要哪些應用，而不是試圖列出每一種可能分散注意力的程式。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/focus-mode-for-programmers-windows/"><span class="blog-list__type">開發者工作流程</span><h2>程式員的實用 Windows 專注模式</h2><p>直接打開準備處理的專案，同時減少切換到無關應用的機會。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/study-focus-setup-windows/"><span class="blog-list__type">學習流程</span><h2>如何在 Windows 上安排少干擾的學習專注時段</h2><p>保留完成作業需要的工具，減少無關內容的干擾。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/switch-work-and-gaming-windows/"><span class="blog-list__type">工作環境切換</span><h2>如何在 Windows 上切換工作和游戲環境</h2><p>工作與休閒不必共用同一組窗口、通知和限制。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/focus-commitment-modes-windows/"><span class="blog-list__type">專注時段</span><h2>如何選擇專注專注時段的限制強度</h2><p>並非越嚴格越高效；應根據任務和風險選擇規則。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/home-assistant-focus-desk-windows/"><span class="blog-list__type">Home Assistant</span><h2>將 Windows 專注模式連接到 Home Assistant</h2><p>讓工作預設同時調整桌面應用與房間環境。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/local-first-focus-app-windows/"><span class="blog-list__type">本機優先軟體</span><h2>為甚麼選擇本地優先的 Windows 專注工具</h2><p>先弄清你需要管理一台 Windows 電腦，還是同步限制多個設備。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/launch-multiple-apps-projects-windows/"><span class="blog-list__type">應用程式啟動器</span><h2>如何在 Windows 上同時啓動工作應用和專案</h2><p>偶爾打開一組工具很簡單；每天重復同樣的步驟才浪費時間。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/block-distractions-without-blocking-work/"><span class="blog-list__type">網站封鎖</span><h2>如何封鎖分心網站而不影響工作</h2><p>有效的封鎖應足夠精准，讓必要的學習和研究資源繼續可用。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/windows-focus-setup-for-remote-work/"><span class="blog-list__type">遠端工作</span><h2>為 Windows 遠程工作建立穩定的專注環境</h2><p>保留工作所需的溝通工具，同時減少無關打擾。</p><span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span></a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/block-apps-websites-and-launch-work-apps-windows/">
+<span class="blog-list__type">Windows 專注環境</span>
+<h2>封鎖程式與網站，再啟動 Windows 工作環境</h2>
+<p>一個組合既移除干擾，也建立取代它們的工作區。</p>
+<span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/automate-work-setup-windows/">
+<span class="blog-list__type">工作區自動化</span>
+<h2>自動化你的 Windows 工作環境</h2>
+<p>將工作、學習或寫程式前的重複準備，變成能自行執行的組合。</p>
+<span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/cold-turkey-alternative-windows/">
+<span class="blog-list__type">比較</span>
+<h2>Windows 上的 Axorith 與 Cold Turkey 比較</h2>
+<p>兩者都能封鎖干擾。Axorith 還會為專注時段建立環境。</p>
+<span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/freedom-alternative-windows/">
+<span class="blog-list__type">比較</span>
+<h2>Windows 上的 Axorith 與 Freedom 比較</h2>
+<p>Freedom 關注跨裝置封鎖，Axorith 關注 Windows 工作區本身。</p>
+<span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span>
+</a>
+<a class="blog-list__item reveal" href="/zh-Hant/blog/schedule-apps-and-website-blocking-windows/">
+<span class="blog-list__type">Windows 排程</span>
+<h2>在 Windows 定時啟動程式並封鎖干擾</h2>
+<p>用一個排程管理整個專注時段，不必分別安排啟動器與封鎖工具。</p>
+<span class="blog-list__link">閱讀文章 <span aria-hidden="true">→</span></span>
+</a>
+</section>
+</main>
+<footer class="footer">
+<div class="footer__inner">
+<div><a class="brand" href="/zh-Hant/">Axorith</a><span>原始碼依 BSL 1.1 授權公開</span></div>
+<nav aria-label="頁尾導覽">
+<a href="/zh-Hant/download/">下載</a>
+<a href="/zh-Hant/blog/">部落格</a>
+<a href="/zh-Hant/privacy/">隱私權</a>
+<a href="https://github.com/axorithlabs/axorith">GitHub</a>
+</nav>
+</div>
+</footer>
+<script src="/js/posthog.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>
