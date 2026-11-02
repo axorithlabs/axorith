@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
     <PropertyGroup>
-        <AssemblyName>Axorith.Host</AssemblyName>
-        <RootNamespace>Axorith.Host</RootNamespace>
         <Description>Headless gRPC server for Axorith Core services</Description>
         <OutputType>WinExe</OutputType>
         <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -11,7 +9,7 @@
         
         <PublishSingleFile Condition="'$(Configuration)' == 'Release'">false</PublishSingleFile>
         <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
-        <PublishReadyToRunShowWarnings Condition="'$(Configuration)' == 'Release'">false</PublishReadyToRunShowWarnings>
+        <PublishReadyToRunShowWarnings Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRunShowWarnings>
         
         <TieredCompilation>true</TieredCompilation>
         <TieredCompilationQuickJit>true</TieredCompilationQuickJit>

@@ -26,9 +26,7 @@ internal sealed class CoreConnectionHolder
     {
         var connection = Interlocked.Exchange(ref _connection, null);
         if (connection is not null)
-        {
             await CloseAsync(connection).ConfigureAwait(false);
-        }
     }
 
     private static async Task CloseAsync(ICoreConnection connection)

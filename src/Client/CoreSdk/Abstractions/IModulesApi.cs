@@ -6,11 +6,6 @@ public interface IModulesApi
 {
     Task<IReadOnlyList<ModuleDefinition>> ListModulesAsync(CancellationToken ct = default);
 
-    Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default);
-
-    Task<OperationResult> InvokeActionAsync(Guid moduleInstanceId, string actionKey,
-        CancellationToken ct = default);
-
     Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId, string actionKey,
         CancellationToken ct = default);
 
@@ -22,8 +17,6 @@ public interface IModulesApi
 
     Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default);
 
-    Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default);
-
     Task<ValidationResult> ValidateSettingsAsync(Guid moduleId, Guid moduleInstanceId,
         IReadOnlyDictionary<string, object?> values, CancellationToken ct = default);
 
@@ -31,7 +24,6 @@ public interface IModulesApi
 
     Task<IDisposable> SubscribeToSettingUpdatesAsync(Guid moduleInstanceId);
 
-    ModuleSettingsInfo? GetCachedSettings(Guid moduleId);
 }
 
 public record SettingUpdate(

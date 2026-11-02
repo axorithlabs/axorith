@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.Collections;
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -167,7 +167,7 @@ public sealed partial class TelemetryService : ITelemetryService
                     var personProperties = safeProperties.TryGetValue(TelemetryConstants.Properties.Set, out var value) &&
                                            value is IReadOnlyDictionary<string, object?> set
                         ? new Dictionary<string, object?>(set)
-                        : new Dictionary<string, object?>();
+                        : [];
                     foreach (var (key, baseValue) in _baseProperties) personProperties[key] = baseValue;
                     eventProperties[TelemetryConstants.Properties.Set] = ToPostHogValue(personProperties)!;
                     // The consent generation lets an unchanged profile be sent again after opting back in.
@@ -205,9 +205,7 @@ public sealed partial class TelemetryService : ITelemetryService
             ["fatal"] = fatal
         };
         if (properties is not null)
-        {
             foreach (var (key, value) in properties) details[key] = value;
-        }
 
         var safeDetails = TelemetryEventSanitizer.SanitizeProperties(details)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -269,10 +267,7 @@ public sealed partial class TelemetryService : ITelemetryService
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await FlushAsync().ConfigureAwait(false);
-    }
+    public async ValueTask DisposeAsync() => await FlushAsync().ConfigureAwait(false);
 
     private async Task DrainClientAsync()
     {
@@ -350,9 +345,7 @@ public sealed partial class TelemetryService : ITelemetryService
         IEnumerable<KeyValuePair<string, object?>> properties)
     {
         foreach (var (key, value) in properties)
-        {
             if (value is not null) destination[key] = ToPostHogValue(value)!;
-        }
     }
 
     private static object? ToPostHogValue(object? value) => value switch

@@ -34,21 +34,18 @@ public class ValidationResult
     /// <summary>
     ///     Creates a new failed validation result with a specific global error message.
     /// </summary>
-    public static ValidationResult Fail(string errorMessage) => new ValidationResult(ValidationStatus.Error, errorMessage);
+    public static ValidationResult Fail(string errorMessage) => new(ValidationStatus.Error, errorMessage);
 
     /// <summary>
     ///     Creates a new failed validation result with specific field errors.
     /// </summary>
     public static ValidationResult Fail(IDictionary<string, string> fieldErrors,
-        string globalMessage = "Validation failed")
-    {
-        return new ValidationResult(ValidationStatus.Error, globalMessage, fieldErrors);
-    }
+        string globalMessage = "Validation failed") => new(ValidationStatus.Error, globalMessage, fieldErrors);
 
     /// <summary>
     ///     Creates a new warning validation result.
     /// </summary>
-    public static ValidationResult Warn(string warningMessage) => new ValidationResult(ValidationStatus.Warning, warningMessage);
+    public static ValidationResult Warn(string warningMessage) => new(ValidationStatus.Warning, warningMessage);
 
     /// <summary>
     ///     Creates a warning with a stable diagnostic code.
@@ -62,6 +59,6 @@ public class ValidationResult
         Status = status;
         Message = message;
         ReasonCode = reasonCode;
-        FieldErrors = fieldErrors?.ToDictionary(k => k.Key, v => v.Value) ?? new();
+        FieldErrors = fieldErrors?.ToDictionary(k => k.Key, v => v.Value) ?? [];
     }
 }

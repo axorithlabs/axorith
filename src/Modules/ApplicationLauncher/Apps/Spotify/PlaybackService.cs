@@ -94,9 +94,7 @@ internal sealed class PlaybackService : IDisposable
             while (await timer.WaitForNextTickAsync(cts.Token))
             {
                 if (_authService.HasRefreshToken())
-                {
                     _ = LoadDynamicChoicesAsync();
-                }
             }
         }
         catch (OperationCanceledException)
@@ -253,9 +251,7 @@ internal sealed class PlaybackService : IDisposable
                     _logger.LogInfo("Process '{ProcessName}' found (PID: {Pid}). Proceeding.", processName,
                         processes[0].Id);
                     foreach (var p in processes)
-                    {
                         p.Dispose();
-                    }
 
                     return true;
                 }
@@ -319,27 +315,19 @@ internal sealed class PlaybackService : IDisposable
         };
 
         if (!string.IsNullOrWhiteSpace(_cachedLikedSongsUri))
-        {
             finalChoicesDict[_cachedLikedSongsUri] = "Liked Songs";
-        }
 
         foreach (var playlist in _cachedPlaylists.Where(playlist => !string.IsNullOrWhiteSpace(playlist.Key)))
-        {
             finalChoicesDict[playlist.Key] = playlist.Value;
-        }
 
         foreach (var album in _cachedAlbums)
         {
             if (!string.IsNullOrWhiteSpace(album.Key))
-            {
                 finalChoicesDict[album.Key] = album.Value;
-            }
         }
 
         if (!string.IsNullOrWhiteSpace(currentContext) && !finalChoicesDict.ContainsKey(currentContext))
-        {
             finalChoicesDict[currentContext] = $"{currentContext} (Saved)";
-        }
 
         var finalChoicesList = finalChoicesDict
             .Select(kvp => new KeyValuePair<string, string>(kvp.Key, kvp.Value))
@@ -348,9 +336,7 @@ internal sealed class PlaybackService : IDisposable
         _settings.PlaybackContext.SetChoices(finalChoicesList);
 
         if (!string.IsNullOrWhiteSpace(currentContext))
-        {
             _settings.PlaybackContext.SetValue(currentContext);
-        }
     }
 
     private void ClearChoices()
@@ -395,9 +381,7 @@ internal sealed class PlaybackService : IDisposable
         if (url.Contains("spotify:", StringComparison.Ordinal)) return url;
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
             throw new ArgumentException("Invalid URL format");
-        }
 
         var segments = uri.AbsolutePath.Trim('/').Split('/');
         return segments.Length < 2
@@ -408,9 +392,7 @@ internal sealed class PlaybackService : IDisposable
     private void OnAuthenticationStateChanged(bool isAuthenticated)
     {
         if (isAuthenticated)
-        {
             _ = LoadDynamicChoicesAsync(force: true);
-        }
         else ClearChoices();
     }
 

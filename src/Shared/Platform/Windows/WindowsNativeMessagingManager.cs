@@ -11,6 +11,8 @@ namespace Axorith.Shared.Platform.Windows;
 [SupportedOSPlatform("windows")]
 internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManager> logger) : INativeMessagingManager
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
     public void RegisterFirefoxHost(string hostName, string executablePath, string[] allowedExtensions)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostName);
@@ -35,8 +37,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
                 allowed_extensions = allowedExtensions
             };
 
-            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-            var jsonContent = JsonSerializer.Serialize(manifest, jsonOptions);
+            var jsonContent = JsonSerializer.Serialize(manifest, JsonOptions);
 
             var manifestFileName = $"{hostName}.json";
             var manifestPath = Path.Combine(manifestDir, manifestFileName);
@@ -96,9 +97,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
 
                 changed = true;
                 if (settings.Count > 0)
-                {
                     updatedValues.Add(settings.ToJsonString());
-                }
             }
             catch (JsonException)
             {
@@ -109,13 +108,9 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         if (!changed) return;
 
         if (updatedValues.Count == 0)
-        {
             key.DeleteValue(valueName, throwOnMissingValue: false);
-        }
         else if (existingValue is string[])
-        {
             key.SetValue(valueName, updatedValues.ToArray(), RegistryValueKind.MultiString);
-        }
         else key.SetValue(valueName, updatedValues[0], RegistryValueKind.String);
 
         logger.LogInformation("Removed legacy Firefox install policy for add-on {ExtensionId}", extensionId);
@@ -172,7 +167,7 @@ internal class WindowsNativeMessagingManager(ILogger<WindowsNativeMessagingManag
         };
 
         var manifestPath = Path.Combine(manifestDir, $"{hostName}.{browser}.json");
-        File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, JsonOptions));
         logger.LogDebug("Generated {Browser} Native Messaging Host manifest at: {Path}", browser,
             TelemetryGuard.SafePath(manifestPath));
         return manifestPath;

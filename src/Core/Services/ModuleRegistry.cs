@@ -93,9 +93,7 @@ public class ModuleRegistry(
         _definitions = ImmutableDictionary<Guid, ModuleDefinition>.Empty;
 
         if (contextsToTrack.Count > 0)
-        {
             _ = Task.Run(() => MonitorUnloadingAsync(contextsToTrack));
-        }
 
         GC.SuppressFinalize(this);
     }

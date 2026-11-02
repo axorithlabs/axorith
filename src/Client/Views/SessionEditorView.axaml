@@ -629,6 +629,7 @@
                                         <Rectangle Width="1" Fill="{DynamicResource BorderPrimaryBrush}" VerticalAlignment="Stretch" HorizontalAlignment="Center"/>
 
                                         <Border Background="{DynamicResource BackgroundTertiaryBrush}" BorderBrush="{DynamicResource BorderPrimaryBrush}" BorderThickness="1" CornerRadius="12" Padding="8,2"
+                                                ToolTip.Tip="Enter a delay greater than 0 seconds, or remove it."
                                                 VerticalAlignment="Center" HorizontalAlignment="Center"
                                                 IsVisible="{Binding NextModule.HasDelay}">
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -636,6 +637,9 @@
                                                 <TextBlock Text="Wait" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
 
                                                 <TextBox Classes="delay-input" Text="{Binding NextModule.StartDelaySecondsString, Mode=TwoWay}"
+                                                         Classes.error="{Binding NextModule.HasDelayError}"
+                                                         AutomationProperties.Name="Delay in seconds"
+                                                         AutomationProperties.HelpText="Enter a delay greater than 0 seconds, or remove it."
                                                          Width="36" Height="22" Padding="0" FontSize="13"
                                                          TextAlignment="Center"
                                                          VerticalContentAlignment="Center"

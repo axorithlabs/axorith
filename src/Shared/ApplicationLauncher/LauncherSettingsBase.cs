@@ -31,92 +31,47 @@ public abstract class LauncherSettingsBase : IDisposable
 
     protected LauncherSettingsBase()
     {
-        ProcessMode = Setting.AsChoice(
-            key: "ProcessMode",
-            label: "Process Mode",
-            defaultValue: "LaunchNew",
-            initialChoices:
+        ProcessMode = Setting.AsChoice("ProcessMode", "Process Mode", "LaunchNew",
             [
                 new KeyValuePair<string, string>("LaunchNew", "Launch New Process"),
                 new KeyValuePair<string, string>("AttachExisting", "Attach to Existing"),
                 new KeyValuePair<string, string>("LaunchOrAttach", "Launch or Attach")
-            ],
-            description: "How to handle the application process."
-        );
+            ], description: "How to handle the application process.");
 
-        WindowState = Setting.AsChoice(
-            key: "WindowState",
-            label: "Window State",
-            defaultValue: "Normal",
-            initialChoices:
+        WindowState = Setting.AsChoice("WindowState", "Window State", "Normal",
             [
                 new KeyValuePair<string, string>("Normal", "Normal"),
                 new KeyValuePair<string, string>("Maximized", "Maximized"),
                 new KeyValuePair<string, string>("Minimized", "Minimized")
-            ],
-            description: "Desired window state after application starts."
-        );
+            ], description: "Desired window state after application starts.");
 
-        UseCustomSize = Setting.AsCheckbox(
-            key: "UseCustomSize",
-            label: "Use Custom Window Size",
-            defaultValue: false,
-            description: "Enable custom window dimensions. Requires Normal window state."
-        );
+        UseCustomSize = Setting.AsCheckbox("UseCustomSize", "Use Custom Window Size", false,
+            description: "Enable custom window dimensions. Requires Normal window state.");
 
-        WindowWidth = Setting.AsInt(
-            key: "WindowWidth",
-            label: "Window Width",
-            description: "Custom window width in pixels.",
-            defaultValue: 1280,
-            isVisible: false
-        );
+        WindowWidth = Setting.AsInt("WindowWidth", "Window Width", description: "Custom window width in pixels.",
+            defaultValue: 1280, isVisible: false);
 
-        WindowHeight = Setting.AsInt(
-            key: "WindowHeight",
-            label: "Window Height",
-            description: "Custom window height in pixels.",
-            defaultValue: 720,
-            isVisible: false
-        );
+        WindowHeight = Setting.AsInt("WindowHeight", "Window Height", description: "Custom window height in pixels.",
+            defaultValue: 720, isVisible: false);
 
         var monitorChoices = BuildMonitorChoices();
 
-        MoveToMonitor = Setting.AsCheckbox(
-            key: "MoveToMonitor",
-            label: "Move Window To Monitor",
-            defaultValue: false,
-            description: "If enabled, window will be moved to the selected monitor."
-        );
+        MoveToMonitor = Setting.AsCheckbox("MoveToMonitor", "Move Window To Monitor", false,
+            description: "If enabled, window will be moved to the selected monitor.");
 
-        TargetMonitor = Setting.AsChoice(
-            key: "TargetMonitor",
-            label: "Target Monitor",
-            defaultValue: monitorChoices[0].Key,
-            initialChoices: monitorChoices,
-            description: "Monitor to move the window to after it appears.",
-            isVisible: false
-        );
+        TargetMonitor = Setting.AsChoice("TargetMonitor", "Target Monitor", monitorChoices[0].Key, monitorChoices,
+            description: "Monitor to move the window to after it appears.", isVisible: false);
 
-        LifecycleMode = Setting.AsChoice(
-            key: "LifecycleMode",
-            label: "Process Lifecycle",
-            defaultValue: "TerminateGraceful",
-            initialChoices:
+        LifecycleMode = Setting.AsChoice("LifecycleMode", "Process Lifecycle", "TerminateGraceful",
             [
                 new KeyValuePair<string, string>("KeepRunning", "Keep Running"),
                 new KeyValuePair<string, string>("TerminateGraceful", "Try Close (may remain open)"),
                 new KeyValuePair<string, string>("TerminateForce", "Kill Immediately")
             ],
-            description: "What happens to applications launched by Axorith when the session ends. Already running applications stay open."
-        );
+            description: "What happens to applications launched by Axorith when the session ends. Already running applications stay open.");
 
-        BringToForeground = Setting.AsCheckbox(
-            key: "BringToForeground",
-            label: "Bring to Foreground",
-            defaultValue: true,
-            description: "Automatically bring the window to foreground after setup."
-        );
+        BringToForeground = Setting.AsCheckbox("BringToForeground", "Bring to Foreground", true,
+            description: "Automatically bring the window to foreground after setup.");
 
         _baseSettings =
         [
@@ -138,7 +93,7 @@ public abstract class LauncherSettingsBase : IDisposable
     public IReadOnlyList<ISetting> GetAllSettings() =>
         [ApplicationPath, .. GetAdditionalSettingsBeforeBase(), .. _baseSettings, .. GetAdditionalSettings()];
 
-    public IReadOnlyList<IAction> GetAllActions() => GetAdditionalActions().ToArray();
+    public IReadOnlyList<IAction> GetAllActions() => [.. GetAdditionalActions()];
 
     public Task InitializeAsync() => InitializeAdditionalAsync();
 
@@ -155,31 +110,23 @@ public abstract class LauncherSettingsBase : IDisposable
         {
             var mode = ProcessMode.GetCurrentValue();
             if (mode != "AttachExisting" && Path.IsPathRooted(appPath) && !File.Exists(appPath))
-            {
                 errors[ApplicationPath.Key] = $"File not found at '{appPath}'.";
-            }
         }
 
         if (UseCustomSize.GetCurrentValue())
         {
             if (WindowWidth.GetCurrentValue() < 100)
-            {
                 errors[WindowWidth.Key] = "Width must be at least 100px.";
-            }
 
             if (WindowHeight.GetCurrentValue() < 100)
-            {
                 errors[WindowHeight.Key] = "Height must be at least 100px.";
-            }
         }
 
         var additionalResult = await ValidateAdditionalAsync().ConfigureAwait(false);
         if (additionalResult.Status != ValidationStatus.Ok)
         {
             foreach (var fieldError in additionalResult.FieldErrors)
-            {
                 errors[fieldError.Key] = fieldError.Value;
-            }
 
             if (errors.Count == 0 && !string.IsNullOrEmpty(additionalResult.Message))
                 return additionalResult;
@@ -245,9 +192,7 @@ public abstract class LauncherSettingsBase : IDisposable
     private static IReadOnlyList<KeyValuePair<string, string>> BuildMonitorChoices()
     {
         var windowService = PlatformServices.CreateWindowService();
-        return Enumerable.Range(0, Math.Max(1, windowService.GetMonitorCount()))
-            .Select(i => new KeyValuePair<string, string>(i.ToString(), $"{i}: {windowService.GetMonitorName(i)}"))
-            .ToArray();
+        return [.. Enumerable.Range(0, Math.Max(1, windowService.GetMonitorCount())).Select(i => new KeyValuePair<string, string>(i.ToString(), $"{i}: {windowService.GetMonitorName(i)}"))];
     }
 
     public virtual void Dispose()

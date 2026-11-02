@@ -191,7 +191,6 @@
                                         <TextBlock Text="GitHub" />
                                     </StackPanel>
                                 </Button>
-                                <Button Content="Run setup wizard" Command="{Binding RunSetupWizardCommand}" />
                             </StackPanel>
                         </StackPanel>
                     </Grid>

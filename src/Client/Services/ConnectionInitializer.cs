@@ -26,9 +26,7 @@ public sealed class ConnectionInitializer
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (shellViewModel.Content != loadingViewModel)
-                {
                     shellViewModel.Content = loadingViewModel;
-                }
 
                 loadingViewModel.Message = message;
                 loadingViewModel.SubMessage = subMessage;
@@ -40,9 +38,7 @@ public sealed class ConnectionInitializer
             await UpdateStatus("Starting Axorith Client...", "Initializing environment...");
 
             if (config.Host is { UseRemoteHost: false, AutoStartHost: true })
-            {
                 await EnsureHostRunningAsync(app.Services, logger, UpdateStatus);
-            }
 
             var serverAddress = config.Host.GetEndpointUrl();
             if (!config.Host.UseRemoteHost && HostInfoReader.TryReadPort(HostInfoPath, out var discoveredPort))
@@ -121,9 +117,7 @@ public sealed class ConnectionInitializer
         try
         {
             await foreach (var notification in api.StreamNotificationsAsync())
-            {
                 toastService.Show(notification.Message, notification.Type, notification.Source);
-            }
         }
         catch (Exception ex)
         {
@@ -283,8 +277,7 @@ public sealed class ConnectionInitializer
         Configuration config,
         ILoggerFactory loggerFactory,
         ILogger<App> logger,
-        string errorMessage)
-    {
+        string errorMessage) =>
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var shellViewModel = app.Services.GetRequiredService<ShellViewModel>();
@@ -305,7 +298,6 @@ public sealed class ConnectionInitializer
 
             shellViewModel.Content = errorViewModel;
         });
-    }
 
 
 }

@@ -16,6 +16,11 @@ env:
   SOLUTION_PATH: './Axorith.sln'
   Configuration: Release
   AVALONIA_TELEMETRY_OPTOUT: '1'
+  AXORITH_DEV: '1'
+  AXORITH_TEST_MODE: '1'
+  AXORITH_TELEMETRY_DISABLED: '1'
+  AXORITH_TELEMETRY_API_KEY: '##E2E_DISABLED##'
+  AXORITH_TELEMETRY_HOST: 'http://127.0.0.1:9'
 
 jobs:
   tests:
@@ -34,31 +39,33 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        run: dotnet restore ${{ env.SOLUTION_PATH }} -p:Configuration=${{ env.Configuration }}
 
       - name: Build (No Restore)
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration ${{ env.Configuration }} --no-restore
 
       - name: Run Unit Tests
-        run: |
-          dotnet test ${{ env.SOLUTION_PATH }} `
-            --configuration ${{ env.Configuration }} `
-            --no-build `
-            --filter "Category!=Integration" `
-            --logger "trx;LogFileName=unit-tests.trx"
+        run: ./scripts/run-tests.ps1 -Suite Unit -NoBuild -Coverage
       
       - name: Run Integration Tests
-        run: |
-          dotnet test ${{ env.SOLUTION_PATH }} `
-            --configuration ${{ env.Configuration }} `
-            --no-build `
-            --filter "Category=Integration" `
-            --logger "trx;LogFileName=integration-tests.trx"
+        run: ./scripts/run-tests.ps1 -Suite Integration -NoBuild -Coverage
+
+      - name: Test production browser-extension script
+        run: node --test tests/browser/site-blocker.test.cjs
+
+      - name: Upload test and coverage results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/Release/*.trx
+            build/Release/**/coverage.cobertura.xml
+          if-no-files-found: error
 
   build-installer:
     name: 📦 Build Windows Installer
     needs: tests
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     env:
       POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
@@ -67,6 +74,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -78,7 +87,8 @@ jobs:
         id: get_version
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = if ("${{ github.ref }}".StartsWith('refs/tags/v')) { "${{ github.ref_name }}" } else { git describe --tags --abbrev=0 }
+          if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the product version.' }
           $version = $tag.TrimStart('v')
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Building version: $version"
@@ -126,7 +136,7 @@ jobs:
           }
 
       - name: Ensure PostHog key is present
-        if: ${{ env.POSTHOG_API_KEY == '' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && env.POSTHOG_API_KEY == '' }}
         shell: pwsh
         run: |
           Write-Error "POSTHOG_API_KEY secret is required for telemetry patching (CI injects into TelemetryDefaults)."
@@ -150,6 +160,32 @@ jobs:
         shell: pwsh
         run: |
           ./installer/windows/build.ps1 -Version ${{ steps.get_version.outputs.VERSION }}
+
+      - name: Build installed-product test client
+        shell: pwsh
+        run: dotnet build ./tests/Axorith.Integrations.Tests/Axorith.Integrations.Tests.csproj -c Release
+
+      - name: Exercise actual installer, repair, upgrade, and uninstaller
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          Start-Transcript -Path ./build/Release/installer-e2e.log
+          try { ./scripts/test-installer.ps1 }
+          finally { Stop-Transcript }
+
+      - name: Upload installer E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-test-results
+          path: |
+            ./build/Release/installed-product-*.trx
+            ./build/Release/installer-e2e.log
+            ./build/Release/browser-e2e.log
+            ./build/Release/firefox-e2e.log
+            ./build/Release/host-process-e2e.log
+          if-no-files-found: error
       
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4

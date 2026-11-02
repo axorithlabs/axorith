@@ -4,9 +4,9 @@ using System.Text.Json;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Axorith.Core.Logging;
+using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
-using Axorith.Core.Models;
 using Axorith.Core.Telemetry;
 using Axorith.Host;
 using Axorith.Host.Grpc;
@@ -20,8 +20,8 @@ using Axorith.Telemetry;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase))
@@ -38,9 +38,7 @@ if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase)
         var commitmentStateDirectory = CommitmentStatePaths.Resolve(configPath, secureState, migrateLegacy: false);
         var committedSessionPath = Path.Combine(commitmentStateDirectory, "committed-session.json");
         if (!File.Exists(committedSessionPath) && secureState)
-        {
             committedSessionPath = Path.Combine(configPath, "committed-session.json");
-        }
 
         if (File.Exists(committedSessionPath))
         {
@@ -53,22 +51,16 @@ if (args.Contains("--check-committed-session", StringComparer.OrdinalIgnoreCase)
                     deadline > DateTimeOffset.UtcNow)
                 {
                     if (deadline != default)
-                    {
                         Console.WriteLine($"A committed session is active until {deadline.ToLocalTime():yyyy-MM-dd HH:mm}.");
-                    }
                     else
-                    {
                         Console.WriteLine("A committed session is active, but its end time could not be verified.");
-                    }
 
                     return 2;
                 }
             }
 
             if (mode is not (0 or 1 or 2))
-            {
                 return 2;
-            }
 
             if (mode == 2)
             {
@@ -229,17 +221,11 @@ try
     var actualPort = IsPortAvailable(bindAddress, configuredPort) ? configuredPort : 0;
 
     if (actualPort == 0)
-    {
         Log.Warning("Configured port {Port} is busy, will use dynamic port assignment", configuredPort);
-    }
 
     builder.WebHost.ConfigureKestrel((_, options) =>
     {
-        options.Listen(bindAddress, actualPort, listenOptions =>
-        {
-            listenOptions.Protocols = HttpProtocols.Http2;
-            // NO TLS for local MVP - listening on loopback only
-        });
+        options.Listen(bindAddress, actualPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
 
         options.Limits.Http2.MaxStreamsPerConnection = config.Grpc.MaxConcurrentStreams;
         options.Limits.Http2.KeepAlivePingDelay = TimeSpan.FromSeconds(config.Grpc.KeepAliveInterval);
@@ -269,9 +255,7 @@ try
 
 
     if (builder.Environment.IsDevelopment())
-    {
         builder.Services.AddGrpcReflection();
-    }
 
     builder.Host.ConfigureContainer<ContainerBuilder>((_, containerBuilder) =>
     {
@@ -388,9 +372,7 @@ try
         }
     };
     if (telemetry is { IsEnabled: true } && refreshTelemetryProductState is { } refresh)
-    {
         await refresh().ConfigureAwait(false);
-    }
 
     app.MapGrpcService<PresetsServiceImpl>();
     app.MapGrpcService<SessionsServiceImpl>();
@@ -402,9 +384,7 @@ try
     app.MapGrpcService<GrpcUpdatesService>();
 
     if (app.Environment.IsDevelopment())
-    {
         app.MapGrpcReflectionService();
-    }
 
     app.MapGet("/", () => "Axorith.Host gRPC server is running. Use gRPC client to connect.");
 
@@ -430,9 +410,7 @@ try
         {
             var hostInfoDir = Path.GetDirectoryName(hostInfoPath);
             if (!string.IsNullOrEmpty(hostInfoDir) && !Directory.Exists(hostInfoDir))
-            {
                 Directory.CreateDirectory(hostInfoDir);
-            }
 
             var hostInfo = new
                 { port = boundPort, address = config.Grpc.BindAddress, timestamp = DateTimeOffset.UtcNow };

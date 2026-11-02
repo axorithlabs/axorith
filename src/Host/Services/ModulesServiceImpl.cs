@@ -19,9 +19,7 @@ public class ModulesServiceImpl(
     public override Task<OperationResult> SyncEdit(SyncEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-        {
             return Task.FromResult(CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId));
-        }
 
         try
         {
@@ -51,10 +49,9 @@ public class ModulesServiceImpl(
         if (!string.IsNullOrWhiteSpace(request.Category))
         {
             var category = request.Category.Trim();
-            modules = modules
+            modules = [.. modules
                 .Where(m => !string.IsNullOrEmpty(m.Category) &&
-                            string.Equals(m.Category, category, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                            string.Equals(m.Category, category, StringComparison.OrdinalIgnoreCase))];
         }
 
         var response = new ListModulesResponse();
@@ -81,9 +78,7 @@ public class ModulesServiceImpl(
 
         var definition = moduleRegistry.GetDefinitionById(moduleId);
         if (definition?.ModuleType == null)
-        {
             throw new RpcException(new Status(StatusCode.NotFound, $"Module not found: {moduleId}"));
-        }
 
         var (module, scope) = moduleRegistry.CreateInstance(moduleId);
         if (module == null)
@@ -129,9 +124,7 @@ public class ModulesServiceImpl(
     {
 
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-        {
             return CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId);
-        }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(request.ActionKey);
 
@@ -173,17 +166,13 @@ public class ModulesServiceImpl(
     {
 
         if (!Guid.TryParse(request.ModuleId, out var moduleId))
-        {
             return CreateInvalidGuidResult("module ID", request.ModuleId);
-        }
 
         Guid? moduleInstanceId = null;
         if (!string.IsNullOrWhiteSpace(request.ModuleInstanceId))
         {
             if (!Guid.TryParse(request.ModuleInstanceId, out var parsedInstanceId))
-            {
                 return CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId);
-            }
 
             moduleInstanceId = parsedInstanceId;
         }
@@ -268,9 +257,7 @@ public class ModulesServiceImpl(
     {
 
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-        {
             return Task.FromResult(CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId));
-        }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(request.SettingKey);
 
@@ -390,9 +377,7 @@ public class ModulesServiceImpl(
     public override Task<OperationResult> EndEdit(EndEditRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ModuleInstanceId, out var instanceId))
-        {
             return Task.FromResult(CreateInvalidGuidResult("module instance ID", request.ModuleInstanceId));
-        }
 
         sandboxManager.DisposeSandbox(instanceId);
         return Task.FromResult(SessionMapper.CreateResult(true, "Design-time edit ended"));
@@ -432,9 +417,7 @@ public class ModulesServiceImpl(
                 return new ValidationResponse { IsValid = false, Message = "Failed to load module instance" };
 
             foreach (var kv in settingsDict)
-            {
                 sandboxManager.ApplySetting(instanceId, kv.Key, kv.Value);
-            }
 
             var result = await module.ValidateSettingsAsync(context.CancellationToken).ConfigureAwait(false);
 

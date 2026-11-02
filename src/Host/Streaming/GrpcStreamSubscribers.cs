@@ -4,7 +4,8 @@ using Grpc.Core;
 
 namespace Axorith.Host.Streaming;
 
-internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, string streamName) : IDisposable
+internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, string streamName,
+    CancellationToken applicationStopping = default) : IDisposable
 {
     private sealed class Subscriber(Channel<T> queue, CancellationTokenSource cts)
     {
@@ -27,7 +28,7 @@ internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, str
             SingleReader = true,
             SingleWriter = false
         });
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, applicationStopping);
         var subscriber = new Subscriber(queue, cts);
 
         _items.AddOrUpdate(key, subscriber, (_, old) =>
@@ -56,9 +57,7 @@ internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, str
     public void Publish(T value, Func<string, bool>? filter = null)
     {
         foreach (var (key, subscriber) in _items)
-        {
             if (filter == null || filter(key)) subscriber.Queue.Writer.TryWrite(value);
-        }
     }
 
     private async Task PumpAsync(string key, IServerStreamWriter<T> stream, Subscriber subscriber)
@@ -66,9 +65,7 @@ internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, str
         try
         {
             await foreach (var value in subscriber.Queue.Reader.ReadAllAsync(subscriber.Cts.Token).ConfigureAwait(false))
-            {
                 await stream.WriteAsync(value, subscriber.Cts.Token).ConfigureAwait(false);
-            }
         }
         catch (OperationCanceledException)
         {
@@ -111,9 +108,7 @@ internal sealed class GrpcStreamSubscribers<T>(ILogger logger, int capacity, str
     public void Dispose()
     {
         foreach (var subscriber in _items.Values)
-        {
             Stop(subscriber);
-        }
 
         _items.Clear();
     }

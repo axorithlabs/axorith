@@ -1,3 +1,4 @@
+!pragma warning error all
 !define PRODUCT_NAME "Axorith"
 !ifndef PRODUCT_VERSION
   !define PRODUCT_VERSION "0.0.0-dev"
@@ -77,6 +78,7 @@ ${StrCase}
 ${StrStr}
 ${StrTok}
 ${UnStrCase}
+${UnStrStr}
 ${UnStrTok}
 
 !include "WindowsDeviceIdentity.nsh"
@@ -122,19 +124,19 @@ Function ${Prefix}PrepareProtectedRoot
     IntOp $1 $0 & 0x400
     ${If} $0 != -1
     ${AndIf} $1 != 0
-        MessageBox MB_OK|MB_ICONSTOP "The Axorith installation directory cannot be a reparse point."
+        MessageBox MB_OK|MB_ICONSTOP "The Axorith installation directory cannot be a reparse point." /SD IDOK
         Abort
     ${EndIf}
     CreateDirectory "$INSTDIR"
     System::Call 'advapi32::ConvertStringSecurityDescriptorToSecurityDescriptorW(w "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;BU)", i 1, *p.r0, p 0) i.r1'
     ${If} $1 == 0
-        MessageBox MB_OK|MB_ICONSTOP "Could not protect the Axorith installation directory."
+        MessageBox MB_OK|MB_ICONSTOP "Could not protect the Axorith installation directory." /SD IDOK
         Abort
     ${EndIf}
     System::Call 'advapi32::SetFileSecurityW(w "$INSTDIR", i 0x80000005, p r0) i.r1'
     System::Call 'kernel32::LocalFree(p r0)'
     ${If} $1 == 0
-        MessageBox MB_OK|MB_ICONSTOP "Could not protect the Axorith installation directory."
+        MessageBox MB_OK|MB_ICONSTOP "Could not protect the Axorith installation directory." /SD IDOK
         Abort
     ${EndIf}
 FunctionEnd
@@ -143,14 +145,19 @@ FunctionEnd
 !insertmacro DefineProtectedRootFunction ""
 !insertmacro DefineProtectedRootFunction "un."
 
-!macro CheckCommittedSession Action AllowedLabel TelemetrySender
+!macro CheckCommittedSession Action AllowedLabel TelemetrySender RuntimePrefix
     IfFileExists "$INSTDIR\Axorith.Host\Axorith.Host.exe" ${AllowedLabel}_check
     IfFileExists "$LOCALAPPDATA\Programs\${PRODUCT_NAME}\Axorith.Host\Axorith.Host.exe" ${AllowedLabel}_check
     IfFileExists "$APPDATA\Axorith\config\committed-session.json" ${AllowedLabel}_check
     IfFileExists "$APPDATA\Axorith\config\strict-protection.json" ${AllowedLabel}_check
     IfFileExists "$CommonAppData\Axorith\CommittedSessions\*.*" ${AllowedLabel}_check ${AllowedLabel}
 ${AllowedLabel}_check:
-    nsExec::ExecToStack '"$MaintenanceHost" --check-committed-session --environment Production --contentRoot "$MaintenanceDirectory" --Persistence:ConfigPath "$APPDATA\Axorith\config"'
+    ; The maintenance Host cannot check safety until its framework is runnable.
+    Call ${RuntimePrefix}CheckDotNetAspNetRuntime
+    ${If} $AspNetRuntimeInstalled != "1"
+        Call ${RuntimePrefix}InstallDotNetAspNetRuntime
+    ${EndIf}
+    nsExec::ExecToStack /TIMEOUT=15000 '"$MaintenanceHost" --check-committed-session --environment Production --contentRoot "$MaintenanceDirectory" --Persistence:ConfigPath "$APPDATA\Axorith\config"'
     Pop $0
     Pop $1
     StrCmp $0 "0" ${AllowedLabel}
@@ -171,7 +178,7 @@ ${AllowedLabel}_check:
     StrCpy $TelemetryEventProperties "$\"stage$\":$\"$TelemetryFailureStage$\""
     Call ${TelemetrySender}
     StrCpy $TelemetryFailureReported "1"
-    MessageBox MB_OK|MB_ICONSTOP "$1 ${Action} is blocked."
+    MessageBox MB_OK|MB_ICONSTOP "$1 ${Action} is blocked." /SD IDOK
     Abort
 ${AllowedLabel}:
 !macroend
@@ -218,6 +225,10 @@ Function ${Prefix}InitializeTelemetry
         telemetry_mode_done:
     !endif
 
+    ReadEnvStr $0 "AXORITH_TELEMETRY_DISABLED"
+    StrCmp $0 "1" telemetry_init_done
+    ReadEnvStr $0 "AXORITH_TEST_MODE"
+    StrCmp $0 "1" telemetry_init_done
     Call ${Prefix}GetWindowsDeviceIdentity
     Pop $InstallerDistinctId
     !if "${POSTHOG_API_KEY}" != ""
@@ -232,6 +243,7 @@ Function ${Prefix}InitializeTelemetry
         StrCpy $TelemetryEnabled "0"
         telemetry_preference_done:
     !endif
+    telemetry_init_done:
 FunctionEnd
 !macroend
 
@@ -321,13 +333,29 @@ Function .onInit
     StrCpy $MaintenanceHost "$MaintenanceDirectory\Axorith.Host.exe"
     StrCpy $TelemetryEventName "InstallerStarted"
     Call SendTelemetryEvent
-    !insertmacro CheckCommittedSession "Installation or update" on_init_allowed SendTelemetryEvent
+    !insertmacro CheckCommittedSession "Installation or update" on_init_allowed SendTelemetryEvent ""
 FunctionEnd
 
 Function un.onInit
     Call un.PrepareProtectedRoot
     StrCpy $MaintenanceDirectory "$INSTDIR\Axorith.Host"
     StrCpy $MaintenanceHost "$MaintenanceDirectory\Axorith.Host.exe"
+    IfFileExists "$MaintenanceHost" un_maintenance_ready
+    ; A partial uninstall may remove Host; keep the same safety check runnable on retry.
+    System::Call 'ole32::CoCreateGuid(g .s)'
+    Pop $0
+    StrCpy $0 $0 36 1
+    StrCpy $MaintenanceDirectory "$INSTDIR\.setup-$0"
+    SetOutPath "$MaintenanceDirectory"
+    ClearErrors
+    File /r "${BUILD_ROOT}\Axorith.Host\*"
+    ${If} ${Errors}
+        MessageBox MB_OK|MB_ICONSTOP "Could not prepare the Axorith maintenance safety check." /SD IDOK
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
+    StrCpy $MaintenanceHost "$MaintenanceDirectory\Axorith.Host.exe"
+    un_maintenance_ready:
     Call un.InitializeTelemetry
     ${GetParameters} $0
     ClearErrors
@@ -339,7 +367,7 @@ Function un.onInit
     StrCpy $TelemetryEventName "UninstallStarted"
     Call un.SendTelemetryEvent
     un_start_event_done:
-    !insertmacro CheckCommittedSession "Uninstall" un_on_init_allowed un.SendTelemetryEvent
+    !insertmacro CheckCommittedSession "Uninstall" un_on_init_allowed un.SendTelemetryEvent "un."
 FunctionEnd
 
 Function InstallerUserAbort
@@ -349,6 +377,17 @@ Function InstallerUserAbort
 FunctionEnd
 
 Function .onGUIEnd
+    SetOutPath "$TEMP"
+    ${GetParent} "$MaintenanceDirectory" $0
+    ${GetFileName} "$MaintenanceDirectory" $1
+    StrCpy $1 $1 7
+    ${If} $0 == $INSTDIR
+    ${AndIf} $1 == ".setup-"
+        RMDir /r "$MaintenanceDirectory"
+    ${EndIf}
+FunctionEnd
+
+Function un.onGUIEnd
     SetOutPath "$TEMP"
     ${GetParent} "$MaintenanceDirectory" $0
     ${GetFileName} "$MaintenanceDirectory" $1
@@ -403,8 +442,8 @@ Function .onInstSuccess
     Call SendTelemetryEvent
 FunctionEnd
 
-!macro DefineRuntimeCheck Name Framework RuntimeFile InstalledFlag
-Function ${Name}
+!macro DefineRuntimeCheck Prefix Name Framework RuntimeFile InstalledFlag
+Function ${Prefix}${Name}
     ; Inspect installed files: nsExec truncates --list-runtimes on machines with many runtimes.
     StrCpy ${InstalledFlag} "0"
     IfFileExists "$PROGRAMFILES64\dotnet\dotnet.exe" runtime_check_start
@@ -413,7 +452,11 @@ Function ${Name}
     FindFirst $0 $1 "$PROGRAMFILES64\dotnet\shared\${Framework}\10.*"
     runtime_check_next:
     StrCmp $1 "" runtime_check_done
-    ${StrStr} $2 $1 "-"
+    !if "${Prefix}" == "un."
+        ${UnStrStr} $2 $1 "-"
+    !else
+        ${StrStr} $2 $1 "-"
+    !endif
     ${If} $2 == ""
         IfFileExists "$PROGRAMFILES64\dotnet\shared\${Framework}\$1\${RuntimeFile}" 0 runtime_check_continue
         StrCpy ${InstalledFlag} "1"
@@ -427,8 +470,9 @@ Function ${Name}
 FunctionEnd
 !macroend
 
-!insertmacro DefineRuntimeCheck CheckDotNetDesktopRuntime Microsoft.WindowsDesktop.App PresentationFramework.dll $DesktopRuntimeInstalled
-!insertmacro DefineRuntimeCheck CheckDotNetAspNetRuntime Microsoft.AspNetCore.App Microsoft.AspNetCore.dll $AspNetRuntimeInstalled
+!insertmacro DefineRuntimeCheck "" CheckDotNetDesktopRuntime Microsoft.WindowsDesktop.App PresentationFramework.dll $DesktopRuntimeInstalled
+!insertmacro DefineRuntimeCheck "" CheckDotNetAspNetRuntime Microsoft.AspNetCore.App Microsoft.AspNetCore.dll $AspNetRuntimeInstalled
+!insertmacro DefineRuntimeCheck "un." CheckDotNetAspNetRuntime Microsoft.AspNetCore.App Microsoft.AspNetCore.dll $AspNetRuntimeInstalled
 
 !macro InstallDotNetRuntime RuntimeName RuntimeVersion RuntimeUrl InstallerFile CheckFunction InstalledFlag
     DetailPrint "Downloading ${RuntimeName} ${RuntimeVersion}..."
@@ -460,15 +504,37 @@ FunctionEnd
     ${Else}
         StrCpy $TelemetryErrorCode $0
     ${EndIf}
-    Delete "$MaintenanceDirectory\${InstallerFile}"
     ${If} $0 == 3010
         SetRebootFlag true
     ${ElseIf} $0 != 0
+        Delete "$MaintenanceDirectory\${InstallerFile}"
         MessageBox MB_OK|MB_ICONSTOP "Failed to install ${RuntimeName} ($0). Axorith installation cannot continue." /SD IDOK
         SetErrorLevel 2
         Abort
     ${EndIf}
     Call ${CheckFunction}
+    ${If} ${InstalledFlag} != "1"
+        ; A registered MSI can report install success while its runtime files are missing.
+        ClearErrors
+        ExecWait '"$MaintenanceDirectory\${InstallerFile}" /repair /quiet /norestart' $0
+        ${If} ${Errors}
+            StrCpy $0 "launch failed"
+            StrCpy $TelemetryErrorCode ""
+        ${Else}
+            StrCpy $TelemetryErrorCode $0
+        ${EndIf}
+        ${If} $0 == 3010
+            SetRebootFlag true
+        ${ElseIf} $0 != 0
+            Delete "$MaintenanceDirectory\${InstallerFile}"
+            StrCpy $TelemetryErrorMessage "Failed to repair ${RuntimeName}."
+            MessageBox MB_OK|MB_ICONSTOP "Failed to repair ${RuntimeName} ($0). Axorith maintenance cannot continue." /SD IDOK
+            SetErrorLevel 2
+            Abort
+        ${EndIf}
+        Call ${CheckFunction}
+    ${EndIf}
+    Delete "$MaintenanceDirectory\${InstallerFile}"
     ${If} ${InstalledFlag} != "1"
         StrCpy $TelemetryErrorMessage "${RuntimeName} was not detected after installation."
         StrCpy $TelemetryErrorCode ""
@@ -484,6 +550,10 @@ FunctionEnd
 
 Function InstallDotNetAspNetRuntime
     !insertmacro InstallDotNetRuntime "ASP.NET Core Runtime" "${DOTNET_ASPNET_RUNTIME_VERSION}" "${DOTNET_ASPNET_RUNTIME_URL}" "aspnetcore-runtime.exe" CheckDotNetAspNetRuntime $AspNetRuntimeInstalled
+FunctionEnd
+
+Function un.InstallDotNetAspNetRuntime
+    !insertmacro InstallDotNetRuntime "ASP.NET Core Runtime" "${DOTNET_ASPNET_RUNTIME_VERSION}" "${DOTNET_ASPNET_RUNTIME_URL}" "aspnetcore-runtime.exe" un.CheckDotNetAspNetRuntime $AspNetRuntimeInstalled
 FunctionEnd
 
 Section "Prerequisites" SEC_PREREQ
@@ -511,7 +581,7 @@ SectionEnd
 
 Section "MainSection" SEC_INSTALL
     SetShellVarContext current
-    !insertmacro CheckCommittedSession "Installation or update" install_section_allowed SendTelemetryEvent
+    !insertmacro CheckCommittedSession "Installation or update" install_section_allowed SendTelemetryEvent ""
 
     StrCpy $TelemetryFailureStage "existing_version_removal"
     StrCpy $TelemetryErrorMessage "Could not preserve existing Axorith settings."
@@ -532,6 +602,10 @@ Section "MainSection" SEC_INSTALL
     Pop $0
     Pop $1
     nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Host.exe'
+    Pop $0
+    Pop $1
+
+    nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Shim.exe'
     Pop $0
     Pop $1
 
@@ -594,7 +668,7 @@ Section "MainSection" SEC_INSTALL
 SectionEnd
 
 Section "Uninstall"
-    !insertmacro CheckCommittedSession "Uninstall" uninstall_section_allowed un.SendTelemetryEvent
+    !insertmacro CheckCommittedSession "Uninstall" uninstall_section_allowed un.SendTelemetryEvent "un."
     StrCpy $TelemetryFailureStage "uninstall_cleanup"
     StrCpy $TelemetryErrorMessage "Could not remove the Axorith files."
     nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Client.exe'
@@ -614,14 +688,14 @@ Section "Uninstall"
     nsExec::ExecToStack '"$SYSDIR\taskkill.exe" /F /IM Axorith.Shim.exe'
     Pop $0
     Pop $1
-    DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith"
-    DeleteRegKey /ifempty HKCU "Software\Mozilla\NativeMessagingHosts\axorith.dev"
-    DeleteRegKey /ifempty HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith"
-    DeleteRegKey /ifempty HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith.dev"
-    DeleteRegKey /ifempty HKCU "Software\Chromium\NativeMessagingHosts\axorith"
-    DeleteRegKey /ifempty HKCU "Software\Chromium\NativeMessagingHosts\axorith.dev"
-    DeleteRegKey /ifempty HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith"
-    DeleteRegKey /ifempty HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith.dev"
+    DeleteRegKey HKCU "Software\Mozilla\NativeMessagingHosts\axorith"
+    DeleteRegKey HKCU "Software\Mozilla\NativeMessagingHosts\axorith.dev"
+    DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith"
+    DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\axorith.dev"
+    DeleteRegKey HKCU "Software\Chromium\NativeMessagingHosts\axorith"
+    DeleteRegKey HKCU "Software\Chromium\NativeMessagingHosts\axorith.dev"
+    DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith"
+    DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\axorith.dev"
     DeleteRegValue HKCU "Environment" "AXORITH_HOST_PATH"
     SetOutPath "$TEMP"
     ClearErrors
@@ -637,6 +711,8 @@ Section "Uninstall"
     Goto uninstall_telemetry_done
     uninstall_cleanup_failed:
     SetErrorLevel 2
+    CreateDirectory "$INSTDIR"
+    CopyFiles /SILENT "$EXEPATH" "$INSTDIR\uninstall.exe"
     StrCpy $TelemetryEventName "UninstallFailed"
     StrCpy $TelemetryEventProperties "$\"stage$\":$\"$TelemetryFailureStage$\""
     Call un.SendTelemetryEvent

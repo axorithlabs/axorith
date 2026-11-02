@@ -1,172 +1,67 @@
-#!/bin/bash
-# Axorith Test Runner for Linux/macOS
-
-set -e
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-
-# Default values
-FILTER=""
-COVERAGE=false
-OPEN_REPORT=false
-VERBOSE=false
-PROJECT="All"
-CLEAN=false
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --filter)
-            FILTER="$2"
-            shift 2
-            ;;
-        --coverage)
-            COVERAGE=true
-            shift
-            ;;
-        --open)
-            OPEN_REPORT=true
-            shift
-            ;;
-        --verbose)
-            VERBOSE=true
-            shift
-            ;;
-        --project)
-            PROJECT="$2"
-            shift 2
-            ;;
-        --clean)
-            CLEAN=true
-            shift
-            ;;
-        --help)
-            echo "Usage: ./run-tests.sh [options]"
-            echo ""
-            echo "Options:"
-            echo "  --filter <pattern>    Filter tests by name"
-            echo "  --coverage            Generate coverage report"
-            echo "  --open                Open coverage report in browser"
-            echo "  --verbose             Verbose output"
-            echo "  --project <name>      Test specific project (Sdk, Core, Shared, All)"
-            echo "  --clean               Clean before running"
-            echo "  --help                Show this help"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Use --help for usage information"
-            exit 1
-            ;;
+#!/usr/bin/env bash
+set -euo pipefail
+export AVALONIA_TELEMETRY_OPTOUT=1
+export AXORITH_TEST_MODE=1
+export AXORITH_DEV=1
+export AXORITH_TELEMETRY_DISABLED=1
+export AXORITH_TELEMETRY_API_KEY='##E2E_DISABLED##'
+export AXORITH_TELEMETRY_HOST=http://127.0.0.1:9
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+project=All
+suite=All
+configuration=Release
+filter=""
+coverage=false
+no_build=false
+clean=false
+verbose=minimal
+while (( $# )); do
+    case "$1" in
+        --filter) filter="$2"; shift 2 ;;
+        --project) project="$2"; shift 2 ;;
+        --suite) suite="$2"; shift 2 ;;
+        --configuration) configuration="$2"; shift 2 ;;
+        --coverage) coverage=true; shift ;;
+        --no-build) no_build=true; shift ;;
+        --clean) clean=true; shift ;;
+        --verbose) verbose=normal; shift ;;
+        --open) echo 'Use the generated coverage XML or the PowerShell runner -OpenReport.' >&2; exit 1 ;;
+        --help) echo 'run-tests.sh [--project Sdk|Core|Shared|Contracts|Host|Integrations|All] [--suite All|Unit|Integration] [--configuration Debug|Release] [--filter pattern] [--coverage] [--no-build] [--clean]'; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
-
-echo -e "${CYAN}🧪 Axorith Test Runner${NC}"
-echo -e "${CYAN}=====================${NC}\n"
-
-# Get script directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-SOLUTION_PATH="$ROOT_DIR/Axorith.sln"
-
-# Clean if requested
-if [ "$CLEAN" = true ]; then
-    echo -e "${YELLOW}🧹 Cleaning solution...${NC}"
-    dotnet clean "$SOLUTION_PATH" --verbosity quiet
-    echo -e "${GREEN}✅ Cleaned${NC}\n"
-fi
-
-# Build test arguments
-TEST_ARGS="--verbosity normal"
-
-if [ "$VERBOSE" = true ]; then
-    TEST_ARGS="--verbosity detailed"
-fi
-
-if [ -n "$FILTER" ]; then
-    TEST_ARGS="$TEST_ARGS --filter $FILTER"
-    echo -e "${CYAN}🔍 Filter: $FILTER${NC}"
-fi
-
-# Determine test target
-case $PROJECT in
-    Sdk)
-        TEST_TARGET="$ROOT_DIR/tests/Axorith.Sdk.Tests/Axorith.Sdk.Tests.csproj"
-        echo -e "${CYAN}📦 Testing: Axorith.Sdk.Tests${NC}"
-        ;;
-    Core)
-        TEST_TARGET="$ROOT_DIR/tests/Axorith.Core.Tests/Axorith.Core.Tests.csproj"
-        echo -e "${CYAN}📦 Testing: Axorith.Core.Tests${NC}"
-        ;;
-    Shared)
-        TEST_TARGET="$ROOT_DIR/tests/Axorith.Shared.Tests/Axorith.Shared.Tests.csproj"
-        echo -e "${CYAN}📦 Testing: Axorith.Shared.Tests${NC}"
-        ;;
-    All|*)
-        TEST_TARGET="$SOLUTION_PATH"
-        echo -e "${CYAN}📦 Testing: All projects${NC}"
-        ;;
-esac
-
-# Coverage setup
-COVERAGE_DIR="$ROOT_DIR/coverage"
-REPORT_DIR="$ROOT_DIR/coverage-report"
-
-if [ "$COVERAGE" = true ]; then
-    echo -e "${CYAN}📊 Coverage: Enabled${NC}"
-    TEST_ARGS="$TEST_ARGS --collect:XPlat Code Coverage --results-directory $COVERAGE_DIR"
-    
-    # Clean old coverage
-    if [ -d "$COVERAGE_DIR" ]; then
-        rm -rf "$COVERAGE_DIR"
+case "$project" in Sdk|Core|Shared|Contracts|Host|Integrations|All) ;; *) echo 'Invalid project' >&2; exit 1 ;; esac
+case "$suite" in All|Unit|Integration) ;; *) echo 'Invalid suite' >&2; exit 1 ;; esac
+case "$configuration" in Debug|Release) ;; *) echo 'Invalid configuration' >&2; exit 1 ;; esac
+results="$root/build/$configuration"
+mkdir -p "$results"
+if $clean; then dotnet clean "$root/Axorith.sln" -c "$configuration" --verbosity quiet; fi
+selected=0
+for name in Sdk Core Shared Contracts Host Integrations; do
+    [[ "$project" == All || "$project" == "$name" ]] || continue
+    [[ "$suite" != Unit || "$name" != Integrations ]] || continue
+    [[ "$suite" != Integration || "$name" == Integrations ]] || continue
+    selected=$((selected + 1))
+    effective_filter="$filter"
+    if $coverage && [[ "$name" == Integrations ]]; then
+        plain_args=(--project Integrations --configuration "$configuration")
+        if $no_build; then plain_args+=(--no-build); fi
+        bash "$root/scripts/run-tests.sh" "${plain_args[@]}"
+        cp "$results/Axorith.Integrations.Tests.trx" "$results/Axorith.Integrations.Tests.uninstrumented.trx"
+        excluded='FullyQualifiedName!~RealModulesWithPrivateDependenciesUnloadAfterHostShutdown'
+        effective_filter="${filter:+($filter)&}$excluded"
     fi
-fi
-
-echo -e "\n${YELLOW}⚡ Running tests...${NC}\n"
-
-# Run tests
-if dotnet test "$TEST_TARGET" $TEST_ARGS; then
-    echo -e "\n${GREEN}✅ All tests passed!${NC}"
-    
-    # Generate coverage report
-    if [ "$COVERAGE" = true ]; then
-        echo -e "\n${YELLOW}📈 Generating coverage report...${NC}"
-        
-        # Check if reportgenerator is installed
-        if ! command -v reportgenerator &> /dev/null; then
-            echo -e "${YELLOW}Installing ReportGenerator...${NC}"
-            dotnet tool install -g dotnet-reportgenerator-globaltool
-        fi
-        
-        # Generate report
-        reportgenerator \
-            -reports:"$COVERAGE_DIR/**/coverage.cobertura.xml" \
-            -targetdir:"$REPORT_DIR" \
-            -reporttypes:"Html;Badges;Cobertura" \
-            -verbosity:Warning
-        
-        echo -e "${GREEN}✅ Coverage report generated: $REPORT_DIR/index.html${NC}"
-        
-        # Open report
-        if [ "$OPEN_REPORT" = true ]; then
-            echo -e "${CYAN}🌐 Opening report in browser...${NC}"
-            if command -v xdg-open &> /dev/null; then
-                xdg-open "$REPORT_DIR/index.html"
-            elif command -v open &> /dev/null; then
-                open "$REPORT_DIR/index.html"
-            else
-                echo -e "${YELLOW}⚠️ Cannot open browser automatically${NC}"
-            fi
-        fi
+    args=(test "$root/tests/Axorith.$name.Tests/Axorith.$name.Tests.csproj" -c "$configuration"
+        --results-directory "$results" --logger "trx;LogFileName=Axorith.$name.Tests.trx" --verbosity "$verbose")
+    if $no_build; then args+=(--no-build); fi
+    if $coverage; then args+=("--collect:XPlat Code Coverage"); fi
+    if [[ -n "$effective_filter" ]]; then args+=(--filter "$effective_filter"); fi
+    trx="$results/Axorith.$name.Tests.trx"
+    rm -f -- "$trx"
+    dotnet "${args[@]}" -- RunConfiguration.TreatNoTestsAsError=true
+    if [[ ! -s "$trx" ]] || grep -Eq '<Counters[^>]*executed="0"' "$trx"; then
+        echo "$name produced no results or executed zero tests" >&2
+        exit 1
     fi
-    
-    echo -e "\n${GREEN}🎉 Done!${NC}"
-else
-    echo -e "\n${RED}❌ Tests failed!${NC}"
-    exit 1
-fi
+done
+if (( selected == 0 )); then echo 'Selected suite contains no test projects' >&2; exit 1; fi

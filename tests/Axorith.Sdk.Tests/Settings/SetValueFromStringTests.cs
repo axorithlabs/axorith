@@ -224,8 +224,20 @@ public class SetValueFromStringTests
         ((decimal)number.GetCurrentValueAsObject()!).Should().BeApproximately(999999999999999.99m, 0.01m);
     }
 
-    private static void SetAndAssert(ISetting setting, string? input, object? expected, bool assertRoundTrip = false)
+    internal static void SetAndAssert(ISetting setting, string? input, object? expected, bool assertRoundTrip = false)
     {
+        using var lifetime = setting as IDisposable;
+        setting.SetValueFromObject(expected switch
+        {
+            string => "before-deserialization",
+            bool value => !value,
+            int value => value == 0 ? 1 : 0,
+            decimal value => value == 0 ? 1m : 0m,
+            double value => value == 0 ? 1d : 0d,
+            TimeSpan value => value == TimeSpan.Zero ? TimeSpan.FromSeconds(1) : TimeSpan.Zero,
+            _ => throw new InvalidOperationException("Add a distinct initial value for this setting type.")
+        });
+        setting.GetCurrentValueAsObject().Should().NotBe(expected);
         setting.SetValueFromString(input);
         setting.GetCurrentValueAsObject().Should().Be(expected);
         if (assertRoundTrip) setting.GetValueAsString().Should().Be(expected?.ToString());

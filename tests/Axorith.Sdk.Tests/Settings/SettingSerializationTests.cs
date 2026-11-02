@@ -13,17 +13,9 @@ public class SettingSerializationTests
     [InlineData("hello", "hello")]
     [InlineData("", "")]
     [InlineData("special chars: \n\t\r", "special chars: \n\t\r")]
-    public void TextSetting_Serialization_ShouldPreserveValue(string value, string expected)
-    {
-        var setting = Setting.AsText("key", "Label", "default");
-        var iSetting = (ISetting)setting;
-        setting.SetValue(value);
-
-        var serialized = iSetting.GetValueAsString();
-        iSetting.SetValueFromString(serialized);
-
-        setting.GetCurrentValue().Should().Be(expected);
-    }
+    public void TextSetting_Serialization_ShouldPreserveValue(string value, string expected) =>
+        RoundTrip(Setting.AsText("key", "Label", "default"),
+            Setting.AsText("key", "Label", "different initial value"), value).Should().Be(expected);
 
     [Theory]
     [InlineData(0)]
@@ -31,63 +23,31 @@ public class SettingSerializationTests
     [InlineData(-100)]
     [InlineData(int.MaxValue)]
     [InlineData(int.MinValue)]
-    public void IntSetting_Serialization_ShouldPreserveValue(int value)
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var iSetting = (ISetting)setting;
-        setting.SetValue(value);
-
-        var serialized = iSetting.GetValueAsString();
-        iSetting.SetValueFromString(serialized);
-
-        setting.GetCurrentValue().Should().Be(value);
-    }
+    public void IntSetting_Serialization_ShouldPreserveValue(int value) =>
+        RoundTrip(Setting.AsInt("key", "Label", 0),
+            Setting.AsInt("key", "Label", value == 0 ? 1 : 0), value).Should().Be(value);
 
     [Theory]
     [InlineData(0.0)]
     [InlineData(3.14159)]
     [InlineData(-2.71828)]
     [InlineData(1.234567890123456)]
-    public void DoubleSetting_Serialization_ShouldPreserveValue(double value)
-    {
-        var setting = Setting.AsDouble("key", "Label", 0.0);
-        var iSetting = (ISetting)setting;
-        setting.SetValue(value);
-
-        var serialized = iSetting.GetValueAsString();
-        iSetting.SetValueFromString(serialized);
-
-        setting.GetCurrentValue().Should().BeApproximately(value, 1e-10);
-    }
+    public void DoubleSetting_Serialization_ShouldPreserveValue(double value) =>
+        RoundTrip(Setting.AsDouble("key", "Label", 0),
+            Setting.AsDouble("key", "Label", value == 0 ? 1 : 0), value).Should().BeApproximately(value, 1e-10);
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void BoolSetting_Serialization_ShouldPreserveValue(bool value)
-    {
-        var setting = Setting.AsCheckbox("key", "Label", false);
-        var iSetting = (ISetting)setting;
-        setting.SetValue(value);
-
-        var serialized = iSetting.GetValueAsString();
-        iSetting.SetValueFromString(serialized);
-
-        setting.GetCurrentValue().Should().Be(value);
-    }
+    public void BoolSetting_Serialization_ShouldPreserveValue(bool value) =>
+        RoundTrip(Setting.AsCheckbox("key", "Label", false),
+            Setting.AsCheckbox("key", "Label", !value), value).Should().Be(value);
 
     [Fact]
-    public void TimeSpanSetting_Serialization_ShouldPreserveDuration()
-    {
-        var duration = TimeSpan.FromMinutes(123.456);
-        var setting = Setting.AsTimeSpan("key", "Label", TimeSpan.Zero);
-        var iSetting = (ISetting)setting;
-        setting.SetValue(duration);
-
-        var serialized = iSetting.GetValueAsString();
-        iSetting.SetValueFromString(serialized);
-
-        setting.GetCurrentValue().Should().BeCloseTo(duration, TimeSpan.FromMilliseconds(1));
-    }
+    public void TimeSpanSetting_Serialization_ShouldPreserveDuration() =>
+        RoundTrip(Setting.AsTimeSpan("key", "Label", TimeSpan.Zero),
+            Setting.AsTimeSpan("key", "Label", TimeSpan.Zero), TimeSpan.FromMinutes(123.456))
+            .Should().BeCloseTo(TimeSpan.FromMinutes(123.456), TimeSpan.FromMilliseconds(1));
 
     [Fact]
     public void DecimalSetting_Serialization_WithInvariantCulture_ShouldWork()
@@ -103,9 +63,10 @@ public class SettingSerializationTests
             setting.SetValue(123.45m);
 
             var serialized = iSetting.GetValueAsString();
-            iSetting.SetValueFromString(serialized);
+            using var restored = Setting.AsNumber("key", "Label", 0m);
+            ((ISetting)restored).SetValueFromString(serialized);
 
-            setting.GetCurrentValue().Should().Be(123.45m);
+            restored.GetCurrentValue().Should().Be(123.45m);
             serialized.Should().Contain("."); // Should use invariant culture (dot)
         }
         finally
@@ -124,23 +85,42 @@ public class SettingSerializationTests
             new("key3", "Value 3")
         };
         var setting = Setting.AsChoice("choice", "Choice", "key1", choices);
-        var iSetting = (ISetting)setting;
         setting.SetValue("key2");
 
-        var serialized = iSetting.GetValueAsString();
-        iSetting.SetValueFromString(serialized);
+        var serialized = ((ISetting)setting).GetValueAsString();
+        using var restored = Setting.AsChoice("choice", "Choice", "key1", choices);
+        ((ISetting)restored).SetValueFromString(serialized);
 
-        setting.GetCurrentValue().Should().Be("key2");
+        restored.GetCurrentValue().Should().Be("key2");
         serialized.Should().Be("key2"); // Should serialize the key, not the display value
+    }
+
+    [Fact]
+    public void MultiChoiceRoundTripPreservesSelectedKeysAndTheirOrderInANewSetting()
+    {
+        var choices = new[] { KeyValuePair.Create("a", "First"), KeyValuePair.Create("b", "Second"),
+            KeyValuePair.Create("c", "Third") };
+        using var source = Setting.AsMultiChoice("categories", "Categories", ["a"], choices);
+        using var restored = Setting.AsMultiChoice("categories", "Categories", ["a"], choices);
+        source.SetValue(["c", "b"]);
+
+        ((ISetting)restored).SetValueFromString(((ISetting)source).GetValueAsString());
+
+        restored.GetCurrentValue().Should().Equal("c", "b");
+        restored.ControlType.Should().Be(SettingControlType.MultiChoice);
+        ((ISetting)restored).GetCurrentChoices().Should().Equal(choices);
+        source.SetValue([]);
+        ((ISetting)restored).SetValueFromString(((ISetting)source).GetValueAsString());
+        restored.GetCurrentValue().Should().BeEmpty();
     }
 
     [Fact]
     public void TextSetting_DeserializeNull_ShouldUseDefault()
     {
         var setting = Setting.AsText("key", "Label", "default");
-        var iSetting = (ISetting)setting;
+        setting.SetValue("changed");
 
-        iSetting.SetValueFromString(null);
+        ((ISetting)setting).SetValueFromString(null);
 
         setting.GetCurrentValue().Should().Be("default");
     }
@@ -149,9 +129,8 @@ public class SettingSerializationTests
     public void TextSetting_DeserializeEmptyString_ShouldPreserveEmptyString()
     {
         var setting = Setting.AsText("key", "Label", "default");
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromString("");
+        ((ISetting)setting).SetValueFromString("");
 
         setting.GetCurrentValue().Should().Be("", "empty string is a valid value distinct from null");
     }
@@ -163,9 +142,9 @@ public class SettingSerializationTests
     public void IntSetting_DeserializeInvalid_ShouldUseDefault(string? input)
     {
         var setting = Setting.AsInt("key", "Label", 999);
-        var iSetting = (ISetting)setting;
+        setting.SetValue(123);
 
-        iSetting.SetValueFromString(input);
+        ((ISetting)setting).SetValueFromString(input);
 
         setting.GetCurrentValue().Should().Be(999);
     }
@@ -178,9 +157,8 @@ public class SettingSerializationTests
     public void BoolSetting_DeserializeInvalid_ShouldBeFalse(string input)
     {
         var setting = Setting.AsCheckbox("key", "Label", true);
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromString(input);
+        ((ISetting)setting).SetValueFromString(input);
 
         // Invalid bool strings parse to false
         setting.GetCurrentValue().Should().BeFalse();
@@ -218,4 +196,16 @@ public class SettingSerializationTests
         number2.GetCurrentValue().Should().Be(42);
         checkbox2.GetCurrentValue().Should().BeTrue();
     }
+    private static T RoundTrip<T>(Setting<T> source, Setting<T> target, T value)
+    {
+        using (source)
+        using (target)
+        {
+            target.GetCurrentValue().Should().NotBe(value);
+            source.SetValue(value);
+            ((ISetting)target).SetValueFromString(((ISetting)source).GetValueAsString());
+            return target.GetCurrentValue();
+        }
+    }
+
 }

@@ -18,11 +18,9 @@ internal class WindowsSecureStorage : SecureStorageBase
         Logger.LogDebug("Windows SecureStorage initialized at: {Path}", TelemetryGuard.SafePath(_storagePath));
     }
 
-    protected override void StoreSecretCore(string key, string secret)
-    {
+    protected override void StoreSecretCore(string key, string secret) =>
         WriteSecretFile(GetFilePathForKey(key), ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), null,
             DataProtectionScope.CurrentUser));
-    }
 
     protected override string? RetrieveSecretCore(string key)
     {

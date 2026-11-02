@@ -1,7 +1,7 @@
 ﻿using Axorith.Contracts;
 using Axorith.Core.Models;
-using Axorith.Core.Telemetry;
 using Axorith.Core.Services.Abstractions;
+using Axorith.Core.Telemetry;
 using Axorith.Host.Mappers;
 using Axorith.Host.Streaming;
 using Axorith.Shared.Exceptions;
@@ -9,8 +9,8 @@ using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Action = Axorith.Contracts.Action;
-using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
+using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 
 namespace Axorith.Host.Services;
 
@@ -81,19 +81,13 @@ public class SessionsServiceImpl(
             state.EmergencyUnlockAvailable = commitment?.IsCommitted == true;
 
             if (sessionManager.BreakEndsAt is { } breakEndsAt)
-            {
                 state.BreakEndsAt = Timestamp.FromDateTimeOffset(breakEndsAt);
-            }
 
             if (endsAt is { } sessionEndsAt)
-            {
                 state.EndsAt = Timestamp.FromDateTimeOffset(sessionEndsAt);
-            }
 
             if (sessionManager.SessionStartedAt is { } startedAt)
-            {
                 state.StartedAt = Timestamp.FromDateTimeOffset(startedAt);
-            }
 
             foreach (var module in snapshot.Modules)
             {
@@ -155,9 +149,8 @@ public class SessionsServiceImpl(
         if (!Guid.TryParse(request.PresetId, out var presetId))
         {
             TrackSessionStartFailure(sessionInstanceId ?? Guid.NewGuid(), null, "validation_failed", "Invalid preset ID");
-            var result = SessionMapper.CreateResult(false, "Invalid preset ID",
+            return SessionMapper.CreateResult(false, "Invalid preset ID",
                 [$"Could not parse preset ID: {request.PresetId}"]);
-            return result;
         }
 
         logger.LogInformation("Starting session for preset {PresetId}", presetId);
@@ -196,19 +189,17 @@ public class SessionsServiceImpl(
         _ => throw new ArgumentOutOfRangeException(nameof(exception))
     };
 
-    private void TrackSessionStartFailure(Guid sessionInstanceId, Guid? presetId, string failureReason, string errorMessage)
-    {
+    private void TrackSessionStartFailure(Guid sessionInstanceId, Guid? presetId, string failureReason, string errorMessage) =>
         _telemetry.TrackEvent("SessionStartFailed", new Dictionary<string, object?>
-        {
-            ["sessionInstanceId"] = sessionInstanceId,
-            ["preset"] = ProductAnalyticsProperties.PresetReference(presetId),
-            ["startSource"] = "manual",
-            ["stage"] = "rpc_request",
-            ["failureReason"] = failureReason,
-            ["result"] = "failed",
-            ["errorMessage"] = errorMessage
-        });
-    }
+    {
+        ["sessionInstanceId"] = sessionInstanceId,
+        ["preset"] = ProductAnalyticsProperties.PresetReference(presetId),
+        ["startSource"] = "manual",
+        ["stage"] = "rpc_request",
+        ["failureReason"] = failureReason,
+        ["result"] = "failed",
+        ["errorMessage"] = errorMessage
+    });
 
     public override async Task<OperationResult> PreflightSession(PreflightSessionRequest request, ServerCallContext context)
     {

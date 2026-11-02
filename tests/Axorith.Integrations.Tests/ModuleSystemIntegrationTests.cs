@@ -48,7 +48,7 @@ public partial class HostGrpcEndToEndTests
 
                 Assert.All(replies, reply => Assert.True(reply.Result.Success, reply.Result.Message));
                 var scope = Assert.Single(scopes);
-                var setting = scope.Resolve<IModule>().GetSettings().First();
+                var setting = scope.Resolve<IModule>().GetSettings()[0];
                 Assert.True((await modules.EndEditAsync(new EndEditRequest
                 {
                     ModuleInstanceId = instanceId.ToString()
@@ -100,7 +100,7 @@ public sealed class ModuleSystemIntegrationTests
         var manager = host.Services.GetRequiredService<DesignTimeSandboxManager>();
         await manager.EnsureAsync(Guid.Empty, host.SiteBlockerModuleId, new Dictionary<string, string?>(), CancellationToken.None);
         var first = manager.GetModule(Guid.Empty)!;
-        var setting = first.GetSettings().First();
+        var setting = first.GetSettings()[0];
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.EnsureAsync(
             Guid.Empty, host.AppBlockerModuleId, new Dictionary<string, string?>(), CancellationToken.None));
         Assert.Same(first, manager.GetModule(Guid.Empty));
@@ -189,7 +189,7 @@ public sealed class ModuleSystemIntegrationTests
             using (scope)
             {
                 module.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
-                settings = module.GetSettings().ToArray();
+                settings = [.. module.GetSettings()];
                 Assert.NotEmpty(settings);
                 Assert.Same(typeof(IModule).Assembly,
                     definition.LoadContext!.LoadFromAssemblyName(typeof(IModule).Assembly.GetName()));
@@ -209,7 +209,7 @@ public sealed class ModuleSystemIntegrationTests
         return (references, host.TestDataPath);
     }
 
-    private static string InstallModule(string dataPath, string name, Guid id, int sdkApiVersion = 1)
+    internal static string InstallModule(string dataPath, string name, Guid id, int sdkApiVersion = 1)
     {
         var buildDirectory = Directory.GetParent(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar))!.FullName;
         var source = Path.Combine(buildDirectory, "Modules", name);

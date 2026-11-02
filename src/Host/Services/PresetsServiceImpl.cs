@@ -34,10 +34,9 @@ public class PresetsServiceImpl(
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim();
-            filteredPresets = presets
+            filteredPresets = [.. presets
                 .Where(p => !string.IsNullOrEmpty(p.Name) &&
-                            p.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+                            p.Name.Contains(term, StringComparison.OrdinalIgnoreCase))];
         }
 
         var response = new ListPresetsResponse();
@@ -82,14 +81,10 @@ public class PresetsServiceImpl(
             .ConfigureAwait(false);
 
         if (preset.Id == Guid.Empty)
-        {
             preset.Id = Guid.NewGuid();
-        }
 
         foreach (var module in preset.Modules.Where(module => module.InstanceId == Guid.Empty))
-        {
             module.InstanceId = Guid.NewGuid();
-        }
 
         await presetManager.SavePresetAsync(preset, context.CancellationToken)
             .ConfigureAwait(false);
@@ -165,9 +160,7 @@ public class PresetsServiceImpl(
                          await presetManager.GetPresetByIdAsync(presetId, context.CancellationToken)
                              .ConfigureAwait(false) is null;
         if (wasDeleted)
-        {
             await TrackPresetDeletedAsync(deletedPreset!, context.CancellationToken).ConfigureAwait(false);
-        }
         return new Empty();
     }
 

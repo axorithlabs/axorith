@@ -16,7 +16,6 @@ public static class TelemetryConstants
         public const string EventName = "EventName";
 
         internal const string PreferenceGeneration = "__telemetry_preference_generation";
-        internal const string GeoIpDisable = "$geoip_disable";
 
         public const string Application = "application";
 

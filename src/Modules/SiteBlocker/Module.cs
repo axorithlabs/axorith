@@ -8,6 +8,7 @@ using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Sdk.Settings;
 using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Action = Axorith.Sdk.Actions.Action;
 
 namespace Axorith.Module.SiteBlocker;
@@ -15,35 +16,21 @@ namespace Axorith.Module.SiteBlocker;
 public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessionBreakParticipant,
     ICommittedSessionValidator, IBrowserBlockingState, IAsyncDisposable
 {
-    private static Dictionary<string, string[]>? _categorySites;
-    private static readonly Lock _loadLock = new();
+    private static readonly Lazy<Dictionary<string, string[]>> CategorySites = new(LoadCategories);
 
-    private readonly Setting<string> _mode = Setting.AsChoice(
-        key: "Mode",
-        label: "Blocking Mode",
-        defaultValue: "BlockList",
-        initialChoices:
+    private readonly Setting<string> _mode = Setting.AsChoice("Mode", "Blocking Mode", "BlockList",
         [
             new KeyValuePair<string, string>("BlockList", "Block List (Blacklist)"),
             new KeyValuePair<string, string>("AllowList", "Allow List (Whitelist)")
-        ],
-        description: "BlockList: Blocks listed sites. AllowList: Blocks EVERYTHING except listed sites."
-    );
+        ], description: "BlockList: Blocks listed sites. AllowList: Blocks EVERYTHING except listed sites.");
 
-    private readonly Setting<List<string>> _categories = Setting.AsMultiChoice(
-        key: "Categories",
-        label: "Block Categories",
-        defaultValues: [],
-        initialChoices: GetCategoryChoices(),
-        description: "Select categories to block. Sites from selected categories will be automatically added."
-    );
+    private readonly Setting<List<string>> _categories = Setting.AsMultiChoice("Categories", "Block Categories", [],
+        GetCategoryChoices(),
+        description: "Select categories to block. Sites from selected categories will be automatically added.");
 
-    private readonly Setting<string> _customSites = Setting.AsTextArea(
-        key: "CustomSites",
-        label: "Custom Sites",
+    private readonly Setting<string> _customSites = Setting.AsTextArea("CustomSites", "Custom Sites",
         description: "Additional domains to block/allow (comma or newline separated). Example: example.com, test.org",
-        defaultValue: ""
-    );
+        defaultValue: "");
 
     private sealed record BrowserEndpoint(string Name, string PipeName, string[] Processes, string ResponseBrowser);
     private sealed record ExtensionResult(BrowserEndpoint Endpoint, string Status, string? Version,
@@ -69,9 +56,9 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
     private bool _disposed;
     private volatile bool _legacyFirefoxProtocol;
     private readonly Action _firefoxExtensionAction =
-        new Action("InstallExtension.Firefox", "Install Firefox Extension");
+        new("InstallExtension.Firefox", "Install Firefox Extension");
     private readonly Action _chromeExtensionAction =
-        new Action("InstallExtension.Chrome", "Install Chrome Extension");
+        new("InstallExtension.Chrome", "Install Chrome Extension");
 
     private bool HasActiveRules => _activeSiteList.Count > 0 || _isAllowList;
 
@@ -175,7 +162,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
         }
 
         logger.LogInfo("Sending site-block command to supported browsers ({Count} sites).", _activeSiteList.Count);
-        BrowserRules = new BrowserBlockingRules(_isAllowList ? "AllowList" : "BlockList", _activeSiteList.ToArray());
+        BrowserRules = new BrowserBlockingRules(_isAllowList ? "AllowList" : "BlockList", [.. _activeSiteList]);
         var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         UpdateBrowserStatuses(results);
     }
@@ -184,9 +171,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
     {
         BrowserRules = null;
         if (HasActiveRules)
-        {
             await SendToAllExtensionsAsync(new { command = "unblock" }, cancellationToken).ConfigureAwait(false);
-        }
 
         _activeSiteList.Clear();
         _isAllowList = false;
@@ -209,7 +194,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
     {
         if (!HasActiveRules) return;
 
-        BrowserRules = new BrowserBlockingRules(_isAllowList ? "AllowList" : "BlockList", _activeSiteList.ToArray());
+        BrowserRules = new BrowserBlockingRules(_isAllowList ? "AllowList" : "BlockList", [.. _activeSiteList]);
 
         var results = await SendToAllExtensionsAsync(CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
         _pausedForBreak = false;
@@ -233,9 +218,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
         for (var i = 0; i < results.Count; i++)
         {
             if (results[i].Status == "Connected" && !results[i].Blocking)
-            {
                 results[i] = await SendToExtensionAsync(results[i].Endpoint, CreateBlockingRequest("block"), cancellationToken).ConfigureAwait(false);
-            }
         }
 
         UpdateBrowserStatuses(results);
@@ -270,7 +253,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
 
         try
         {
-            await using var pipeClient = new NamedPipeClientStream(".", endpoint.PipeName, PipeDirection.InOut,
+            await using var pipeClient = new NamedPipeClientStream(".", SiteBlockerExtensionIds.ScopePipeName(endpoint.PipeName), PipeDirection.InOut,
                 PipeOptions.Asynchronous);
             await pipeClient.ConnectAsync(250, cancellationToken).ConfigureAwait(false);
             connectedToPipe = true;
@@ -368,7 +351,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
 
         try
         {
-            await using var pipeClient = new NamedPipeClientStream(".", endpoint.PipeName, PipeDirection.InOut,
+            await using var pipeClient = new NamedPipeClientStream(".", SiteBlockerExtensionIds.ScopePipeName(endpoint.PipeName), PipeDirection.InOut,
                 PipeOptions.Asynchronous);
             await pipeClient.ConnectAsync(250, cancellationToken).ConfigureAwait(false);
             using var writer = new StreamWriter(pipeClient, new UTF8Encoding(false), 1024, leaveOpen: true)
@@ -405,9 +388,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
             if (processes.Length == 0) continue;
 
             foreach (var process in processes)
-            {
                 process.Dispose();
-            }
 
             return true;
         }
@@ -429,9 +410,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var category in _categories.GetCurrentValue())
-        {
-            if (_categorySites!.TryGetValue(category, out var sites)) result.UnionWith(sites);
-        }
+            if (CategorySites.Value.TryGetValue(category, out var sites)) result.UnionWith(sites);
 
         result.UnionWith(_customSites.GetCurrentValue()
             .Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -439,45 +418,24 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
         return [.. result];
     }
 
-    private static void EnsureCategoriesLoaded()
+    private static Dictionary<string, string[]> LoadCategories()
     {
-        if (_categorySites != null) return;
-
-        lock (_loadLock)
+        var moduleDirectory = Path.GetDirectoryName(typeof(Module).Assembly.Location);
+        if (string.IsNullOrEmpty(moduleDirectory)) return [];
+        var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_sites.json");
+        if (!File.Exists(jsonPath)) return [];
+        try
         {
-            if (_categorySites != null) return;
-
-            var moduleDirectory = Path.GetDirectoryName(typeof(Module).Assembly.Location);
-            if (string.IsNullOrEmpty(moduleDirectory))
-            {
-                _categorySites = new();
-                return;
-            }
-
-            var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_sites.json");
-
-            if (!File.Exists(jsonPath))
-            {
-                _categorySites = new();
-                return;
-            }
-
-            try
-            {
-                var json = File.ReadAllText(jsonPath);
-                _categorySites = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) ?? new();
-            }
-            catch
-            {
-                _categorySites = new();
-            }
+            return JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(jsonPath)) ?? [];
+        }
+        catch
+        {
+            return [];
         }
     }
 
     private static List<KeyValuePair<string, string>> GetCategoryChoices()
     {
-        EnsureCategoriesLoaded();
-
         var descriptions = new Dictionary<string, string>
         {
             ["Social"] = "Social Media (Facebook, Twitter, Instagram, TikTok, Reddit...)",
@@ -494,9 +452,7 @@ public class Module(IModuleLogger logger, INotifier notifier) : IModule, ISessio
             ["Forums"] = "Forums & Communities (Reddit, Quora...)"
         };
 
-        return _categorySites?.Keys
-            .Select(category => KeyValuePair.Create(category, descriptions.GetValueOrDefault(category, category)))
-            .ToList() ?? [];
+        return [.. CategorySites.Value.Keys.Select(category => KeyValuePair.Create(category, descriptions.GetValueOrDefault(category, category)))];
     }
 
     private static FirefoxExtensionState? FindInstalledFirefoxExtension()

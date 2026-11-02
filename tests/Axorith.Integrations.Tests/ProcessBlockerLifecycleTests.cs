@@ -7,10 +7,9 @@ namespace Axorith.Integrations.Tests;
 
 public sealed class ProcessBlockerLifecycleTests
 {
-    [Fact]
+    [WindowsFact]
     public async Task PollingBlocksTheTargetAndUnblockAllStopsBlockingNewProcesses()
     {
-        if (!OperatingSystem.IsWindows()) return;
         var directory = Directory.CreateTempSubdirectory("axorith-blocker-");
         var processName = $"axorith-probe-{Guid.NewGuid():N}";
         var executable = Path.Combine(directory.FullName, processName + ".exe");

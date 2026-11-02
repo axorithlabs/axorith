@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Module.AppBlocker</AssemblyName>
-        <RootNamespace>Axorith.Module.AppBlocker</RootNamespace>
 
         <Description>Application Blocker module for Axorith.</Description>
     </PropertyGroup>

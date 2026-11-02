@@ -50,7 +50,6 @@ internal static class BenchmarkEnvironment
                 Path.Combine(_root, "roaming", "Axorith"));
             Environment.SetEnvironmentVariable("AXORITH_LOCAL_ROOT",
                 Path.Combine(_root, "local", "Axorith"));
-            Environment.SetEnvironmentVariable("AXORITH_TEST_MODE", "1");
             Environment.SetEnvironmentVariable("AXORITH_TEST_HOST_MUTEX",
                 $"Global\\AxorithBenchmarkHost-{Environment.ProcessId}");
 

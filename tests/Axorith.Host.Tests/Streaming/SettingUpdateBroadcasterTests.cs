@@ -96,6 +96,8 @@ public class SettingUpdateBroadcasterTests : IDisposable
 
         updates.Should().ContainSingle();
         updates[0].SettingKey.Should().Be("settingKey");
+        updates[0].Property.Should().Be(SettingProperty.Value);
+        updates[0].StringValue.Should().Be("newValue");
     }
 
     [Fact]
@@ -118,7 +120,7 @@ public class SettingUpdateBroadcasterTests : IDisposable
             await _broadcaster.BroadcastUpdateAsync(Guid.NewGuid(), "key", SettingProperty.Value, "other");
         }, filterToInstance: true);
 
-        updates.Should().ContainSingle(update => update.StringValue == "target");
+        updates.Should().ContainSingle().Which.StringValue.Should().Be("target");
     }
 
     [Fact]
@@ -132,7 +134,8 @@ public class SettingUpdateBroadcasterTests : IDisposable
             setting.SetValue("updated");
         }, settleMs: 200);
 
-        updates.Should().Contain(update => update.SettingKey == "testKey" && update.Property == SettingProperty.Value);
+        updates.Should().Contain(update => update.SettingKey == "testKey" &&
+                                           update.Property == SettingProperty.Value && update.StringValue == "updated");
     }
 
     [Fact]
@@ -163,7 +166,8 @@ public class SettingUpdateBroadcasterTests : IDisposable
         }, settleMs: 200);
 
         updates.Should().Contain(update => update.SettingKey == "testKey" &&
-                                           update.Property == SettingProperty.Visibility);
+                                           update.Property == SettingProperty.Visibility &&
+                                           update.ValueCase == SettingUpdate.ValueOneofCase.BoolValue && !update.BoolValue);
     }
 
     [Fact]
@@ -178,7 +182,8 @@ public class SettingUpdateBroadcasterTests : IDisposable
         }, settleMs: 200);
 
         updates.Should().Contain(update => update.SettingKey == "actionKey" &&
-                                           update.Property == SettingProperty.ActionLabel);
+                                           update.Property == SettingProperty.ActionLabel &&
+                                           update.StringValue == "Updated Label");
     }
 
     [Fact]
@@ -193,7 +198,8 @@ public class SettingUpdateBroadcasterTests : IDisposable
         }, settleMs: 200);
 
         updates.Should().Contain(update => update.SettingKey == "actionKey" &&
-                                           update.Property == SettingProperty.ActionEnabled);
+                                           update.Property == SettingProperty.ActionEnabled &&
+                                           update.ValueCase == SettingUpdate.ValueOneofCase.BoolValue && !update.BoolValue);
     }
 
     [Fact]
@@ -257,6 +263,7 @@ public class SettingUpdateBroadcasterTests : IDisposable
         await Task.Delay(settleMs);
         await cts.CancelAsync();
         await subscription;
+        updates.Should().OnlyContain(update => update.ModuleInstanceId == instanceId.ToString());
         return updates;
     }
 

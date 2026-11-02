@@ -44,9 +44,7 @@ public static class CommittedSessionStateFile
     {
         var directory = Path.GetDirectoryName(path);
         if (string.IsNullOrWhiteSpace(directory))
-        {
             throw new InvalidDataException("Committed state path is invalid.");
-        }
 
         Directory.CreateDirectory(directory);
         var key = ReadOrCreateKey(directory);
@@ -79,9 +77,7 @@ public static class CommittedSessionStateFile
             finally
             {
                 if (File.Exists(tempPath))
-                {
                     File.Delete(tempPath);
-                }
             }
         }
 

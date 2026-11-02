@@ -27,11 +27,19 @@ public sealed record TelemetrySettings
 
     public TelemetrySettings WithEnvironmentOverrides()
     {
-        var envApiKey = Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_API_KEY", EnvironmentVariableTarget.User);
+        if (Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_DISABLED") == "1" ||
+            Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1")
+            return this with { Enabled = false, PostHogApiKey = "##E2E_DISABLED##", PostHogHost = "http://127.0.0.1:9" };
 
-        if (string.IsNullOrWhiteSpace(envApiKey)) return this;
-
-        return this with { PostHogApiKey = envApiKey };
+        var envApiKey = Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_API_KEY");
+        if (string.IsNullOrWhiteSpace(envApiKey))
+            envApiKey = Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_API_KEY", EnvironmentVariableTarget.User);
+        var envHost = Environment.GetEnvironmentVariable("AXORITH_TELEMETRY_HOST");
+        return this with
+        {
+            PostHogApiKey = string.IsNullOrWhiteSpace(envApiKey) ? PostHogApiKey : envApiKey,
+            PostHogHost = string.IsNullOrWhiteSpace(envHost) ? PostHogHost : envHost
+        };
     }
 
 }

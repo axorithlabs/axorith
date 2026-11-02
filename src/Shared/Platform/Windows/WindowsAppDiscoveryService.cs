@@ -155,9 +155,7 @@ public class WindowsAppDiscoveryService(
             var root = Environment.GetFolderPath(folder);
             if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return;
 
-            var shortcuts = SafeEnumerateFiles(root, "*.lnk");
-
-            foreach (var shortcut in shortcuts)
+            foreach (var shortcut in SafeEnumerateFiles(root, "*.lnk"))
             {
                 try
                 {
@@ -213,9 +211,7 @@ public class WindowsAppDiscoveryService(
 
                             var candidate = TryFindExeInInstallLocation(displayName, installLocation);
                             if (!string.IsNullOrEmpty(candidate))
-                            {
                                 onFound(displayName, candidate, displayIcon);
-                            }
                         }
                         catch (Exception ex)
                         {
@@ -299,9 +295,7 @@ public class WindowsAppDiscoveryService(
             try
             {
                 if (drive is { DriveType: DriveType.Fixed, IsReady: true })
-                {
                     root = drive.RootDirectory.FullName;
-                }
             }
             catch (Exception ex)
             {
@@ -309,9 +303,7 @@ public class WindowsAppDiscoveryService(
             }
 
             if (!string.IsNullOrEmpty(root))
-            {
                 yield return root;
-            }
         }
     }
 
@@ -359,15 +351,11 @@ public class WindowsAppDiscoveryService(
         var trimmed = rawPath.Trim().Trim('"');
         var commaIndex = trimmed.IndexOf(',');
         if (commaIndex > 0)
-        {
             trimmed = trimmed[..commaIndex];
-        }
 
         var exeIndex = trimmed.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
         if (exeIndex >= 0)
-        {
             trimmed = trimmed[..(exeIndex + 4)];
-        }
 
         try
         {
@@ -390,9 +378,7 @@ public class WindowsAppDiscoveryService(
         foreach (var ch in name)
         {
             if (char.IsLetterOrDigit(ch))
-            {
                 builder.Append(char.ToLowerInvariant(ch));
-            }
         }
 
         return builder.ToString();
@@ -447,9 +433,7 @@ public class WindowsAppDiscoveryService(
             if (files != null)
             {
                 foreach (var file in files)
-                {
                     yield return file;
-                }
             }
 
             if (maxDepth.HasValue && depth >= maxDepth.Value) continue;
@@ -468,9 +452,7 @@ public class WindowsAppDiscoveryService(
             foreach (var subDir in subDirs)
             {
                 if (!ShouldSkipDirectory(subDir))
-                {
                     stack.Push((subDir, depth + 1));
-                }
             }
         }
     }

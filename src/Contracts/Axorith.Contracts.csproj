@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Contracts</AssemblyName>
-        <RootNamespace>Axorith.Contracts</RootNamespace>
         <Description>gRPC contracts for Axorith client-server communication</Description>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>

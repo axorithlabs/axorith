@@ -138,7 +138,6 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     private IReadOnlyList<SessionActivity> _sessionHistory = [];
     private DateTimeOffset? _activeSessionStartedAt;
     private string _activeSessionName = string.Empty;
-    private bool _isPresetsPage;
     private readonly CancellationTokenSource _updateCts = new();
     private DateTimeOffset _lastUpdateStatePoll = DateTimeOffset.MinValue;
     private readonly SemaphoreSlim _updateRefreshLock = new(1);
@@ -173,8 +172,8 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     public ObservableCollection<SessionPresetViewModel> Presets { get; } = [];
 
-    public bool IsHomePage => !_isPresetsPage;
-    public bool IsPresetsPage => _isPresetsPage;
+    public bool IsHomePage => !IsPresetsPage;
+    public bool IsPresetsPage { get; private set; }
     public ObservableCollection<string> RecentSessions { get; } = [];
     public bool HasRecentSessions => RecentSessions.Count > 0;
 
@@ -270,9 +269,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                     case SessionEventType.Started:
                         SetActiveSessionPreset(evt.PresetId);
                         if (Presets.FirstOrDefault(preset => preset.Id == evt.PresetId) is { } activePreset)
-                        {
                             ActiveFocusCommitmentMode = activePreset.Model.FocusCommitment.Mode;
-                        }
                         IsSessionActive = true;
                         _ = RefreshSessionStateAsync();
                         break;
@@ -284,9 +281,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                     case SessionEventType.ModuleStopped:
                     case SessionEventType.ModuleError:
                         if (evt.Type == SessionEventType.ModuleError)
-                        {
                             _toastService?.Show(evt.Message ?? "A module failed.", NotificationType.Error, "Sessions");
-                        }
 
                         break;
                     case SessionEventType.ValidationWarning:
@@ -371,9 +366,9 @@ public partial class MainViewModel : ReactiveObject, IDisposable
 
     private void SetPage(bool showPresets)
     {
-        if (_isPresetsPage == showPresets) return;
+        if (IsPresetsPage == showPresets) return;
 
-        _isPresetsPage = showPresets;
+        IsPresetsPage = showPresets;
         this.RaisePropertyChanged(nameof(IsHomePage));
         this.RaisePropertyChanged(nameof(IsPresetsPage));
     }
@@ -385,9 +380,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             ? Presets.FirstOrDefault(preset => preset.Id == id)?.Name ?? string.Empty
             : string.Empty;
         foreach (var preset in Presets)
-        {
             preset.IsActive = preset.Id == presetId;
-        }
     }
 
     private void ClearActiveSession()
@@ -708,9 +701,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             IsStartCountdownRunning = false;
             StartCountdownSeconds = 0;
             if (ReferenceEquals(_startCountdownCts, cts))
-            {
                 _startCountdownCts = null;
-            }
             cts.Dispose();
         }
     }
@@ -762,9 +753,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         catch (Exception ex)
         {
             if (ex is not Grpc.Core.RpcException { StatusCode: Grpc.Core.StatusCode.Internal })
-            {
                 TrackSessionStartFailed(presetVm, sessionInstanceId, "rpc_request", "network_error", ex);
-            }
             _telemetry?.TrackError(ex, "session", "session_start", "error", handled: true, fatal: false,
                 properties: new Dictionary<string, object?>
                 {
@@ -817,9 +806,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         cts?.Cancel();
 
         if (IsCommittedSession)
-        {
             EmergencyUnlockProgress = 0;
-        }
     }
 
     private async Task RunEmergencyUnlockHoldAsync(CancellationTokenSource cts)
@@ -866,9 +853,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (ReferenceEquals(_emergencyUnlockCts, cts))
-                {
                     _emergencyUnlockCts = null;
-                }
 
                 if (completed)
                 {
@@ -896,9 +881,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
         do
-        {
-            yield return true;
-        } while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
+            yield return true; while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
     }
 
 
@@ -931,9 +914,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
             try
             {
                 if (_serviceProvider.GetService<ISchedulerApi>() is { } schedulerApi)
-                {
                     schedules = await schedulerApi.ListSchedulesAsync();
-                }
             }
             catch (Exception)
             {
@@ -949,16 +930,14 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                 {
                     fullPresets.Add(fullPreset);
                     newVms.Add(new SessionPresetViewModel(fullPreset, modules, modulesApi, _serviceProvider,
-                        schedules.Where(schedule => schedule.PresetId == fullPreset.Id).ToArray()));
+                        [.. schedules.Where(schedule => schedule.PresetId == fullPreset.Id)]));
                 }
             }
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 foreach (var preset in Presets)
-                {
                     preset.Dispose();
-                }
 
                 Presets.Clear();
 
@@ -1022,9 +1001,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
                     ActiveFocusCommitmentMode = state.FocusCommitment;
                     IsSessionActive = true;
                     if (!string.IsNullOrWhiteSpace(state.PresetName))
-                    {
                         ActiveWorkspaceName = state.PresetName;
-                    }
                     _activeSessionStartedAt = state.StartedAt;
                     _activeSessionName = state.PresetName ?? string.Empty;
                     _activeSessionEndsAt = state.EndsAt;
@@ -1078,9 +1055,7 @@ public partial class MainViewModel : ReactiveObject, IDisposable
         _activeSessionClock.Stop();
         _disposables.Dispose();
         foreach (var preset in Presets)
-        {
             preset.Dispose();
-        }
     }
 
     private async Task StartBreakAsync()

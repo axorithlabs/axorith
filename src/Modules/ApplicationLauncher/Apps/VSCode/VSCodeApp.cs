@@ -23,20 +23,16 @@ internal sealed class VSCodeApp(
             return args;
 
         var safePath = projectPath.Contains(' ') ? $"\"{projectPath}\"" : projectPath;
-        args = string.IsNullOrWhiteSpace(args) ? safePath : $"{args} {safePath}";
-
-        return args;
+        return string.IsNullOrWhiteSpace(args) ? safePath : $"{args} {safePath}";
     }
 
-    protected override WindowConfigTimings GetWindowConfigTimings()
-    {
+    protected override WindowConfigTimings GetWindowConfigTimings() =>
         // Electron apps can be slow to start
-        return new WindowConfigTimings(
+        new(
             WaitForWindowTimeoutMs: 10000,
             MoveDelayMs: 1000,
             MaximizeSnapDelayMs: 500,
             FinalFocusDelayMs: 500,
             BannerDelayMs: 0
         );
-    }
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -202,9 +203,7 @@ public abstract partial class TimeTriggerViewModel(TimeSpan defaultTime) : Sched
             {
                 hours %= 12;
                 if (!_isAm)
-                {
                     hours += 12;
-                }
             }
 
             Time = new TimeSpan(hours, (int)_minutes.Value, 0);
@@ -270,9 +269,7 @@ public class StopAfterDurationTriggerViewModel : ScheduledTriggerViewModel
         this.RaisePropertyChanged(nameof(HasError));
         this.RaisePropertyChanged(nameof(Description));
         if (DurationHours.HasValue && DurationMinutes.HasValue)
-        {
             Duration = TimeSpan.FromHours((int)DurationHours.Value) + TimeSpan.FromMinutes((int)DurationMinutes.Value);
-        }
     }
 }
 
@@ -292,11 +289,7 @@ public partial class ThenActionTriggerViewModel(SessionEditorViewModel parent, A
 
     public override string IconKey => "PlayIcon";
 
-    public override string Description
-    {
-        get
-        {
-            return Behavior == AfterEndBehavior.StartNextWorkspace
+    public override string Description => Behavior == AfterEndBehavior.StartNextWorkspace
                 ? NextPresetId.HasValue && !string.IsNullOrWhiteSpace(NextPresetName)
                     ? $"Start '{NextPresetName}'"
                     : "Choose a Workspace"
@@ -308,8 +301,6 @@ public partial class ThenActionTriggerViewModel(SessionEditorViewModel parent, A
                     AfterEndBehavior.ShutDownPc => "Turn off the PC",
                     _ => string.Empty
                 };
-        }
-    }
 
     [Reactive(nameof(Description), nameof(HasError))]
     public partial Guid? NextPresetId { get; set; }
@@ -355,7 +346,6 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
 
     private IReadOnlyList<ModuleDefinition> _availableModules = [];
-    private SessionPreset _preset = new(id: Guid.NewGuid());
     private bool _isExistingPreset;
     private FocusCommitmentOptions _focusCommitment = new();
     private int _presetLoadVersion;
@@ -372,21 +362,20 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
     private readonly ObservableAsPropertyHelper<bool> _hasValidationErrors;
     public bool HasValidationErrors => _hasValidationErrors.Value;
 
+    [NotNull]
     public SessionPreset? PresetToEdit
     {
-        get => _preset;
+        get;
         set
         {
             _isExistingPreset = value is not null;
-            _preset = value ?? new SessionPreset { Id = Guid.NewGuid() };
+            field = value ?? new SessionPreset { Id = Guid.NewGuid() };
             if (AvailablePresetsForNext.Count > 0)
-            {
                 UpdateAvailablePresetsForNext();
-            }
 
             if (_isInitialized) LoadFromPreset();
         }
-    }
+    } = new(id: Guid.NewGuid());
 
     public string Name
     {
@@ -563,8 +552,9 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         var moduleValidationErrors = ConfiguredModules
             .ToObservableChangeSet()
             .AutoRefresh(m => m.HasErrors)
+            .AutoRefresh(m => m.HasDelayError)
             .ToCollection()
-            .Select(modules => modules.Any(m => m.HasErrors));
+            .Select(modules => modules.Any(m => m.HasErrors || m.HasDelayError));
 
         var focusCommitmentValidationErrors = this.WhenAnyValue(vm => vm.FocusCommitmentError)
             .Select(error => !string.IsNullOrWhiteSpace(error));
@@ -594,9 +584,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             ConfiguredModules.Remove(moduleVm);
             moduleVm.Dispose();
             if (SelectedModule == moduleVm)
-            {
                 SelectedModule = null;
-            }
 
             UpdateModuleLinks();
         });
@@ -623,9 +611,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
             Triggers.Remove(t);
             if (StopTriggers.Remove(t)) ValidateFocusCommitment();
             if (SelectedTrigger == t)
-            {
                 SelectedTrigger = null;
-            }
             if (SelectedStopTrigger == t) SelectedStopTrigger = null;
         });
 
@@ -760,16 +746,12 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         AvailablePresetsForNext.Clear();
         foreach (var preset in presets)
         {
-            if (preset.Id != _preset.Id)
-            {
+            if (preset.Id != PresetToEdit.Id)
                 AvailablePresetsForNext.Add(new NextPresetOption(preset.Id, preset.Name));
-            }
         }
 
         foreach (var trigger in ThenTriggers.OfType<ThenActionTriggerViewModel>())
-        {
             trigger.RefreshPresetVisibility();
-        }
 
     }
 
@@ -777,36 +759,34 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
     {
         if (_disposed) return;
 
-        _focusCommitment = new FocusCommitmentOptions(_preset.FocusCommitment ?? new FocusCommitmentOptions());
+        _focusCommitment = new FocusCommitmentOptions(PresetToEdit.FocusCommitment ?? new FocusCommitmentOptions());
         FocusCommitmentError = null;
         _customBreakBudgetSelected = _focusCommitment.BreakCount > 0 &&
                                      (_focusCommitment.BreakCount != 1 ||
                                       _focusCommitment.BreakDuration != TimeSpan.FromMinutes(5));
-        Name = _preset.Name;
+        Name = PresetToEdit.Name;
         RaiseFocusCommitmentChanged();
         foreach (var vm in ConfiguredModules)
-        {
             vm.Dispose();
-        }
 
         ConfiguredModules.Clear();
         Triggers.Clear();
         StopTriggers.Clear();
         ThenTriggers.Clear();
 
-        foreach (var configured in _preset.Modules)
+        foreach (var configured in PresetToEdit.Modules)
         {
             var moduleDef = _availableModules.FirstOrDefault(m => m.Id == configured.ModuleId);
             if (moduleDef != null)
             {
                 ConfiguredModules.Add(new ConfiguredModuleViewModel(moduleDef, configured, _modulesApi,
-                    _serviceProvider, _isExistingPreset ? _preset.Id : null));
+                    _serviceProvider, _isExistingPreset ? PresetToEdit.Id : null));
             }
         }
 
         UpdateModuleLinks();
 
-        _scheduleLoadTask = LoadSchedulesAsync(_preset.Id, ++_presetLoadVersion);
+        _scheduleLoadTask = LoadSchedulesAsync(PresetToEdit.Id, ++_presetLoadVersion);
     }
 
     private async Task<bool> LoadSchedulesAsync(Guid presetId, int loadVersion)
@@ -834,11 +814,8 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                     AddThenTrigger(_focusCommitment.AfterEnd, _focusCommitment.NextWorkspaceId);
                 }
 
-                var toRemove = Triggers.Where(t => t is ScheduleTriggerViewModel).ToList();
-                foreach (var t in toRemove)
-                {
+                foreach (var t in Triggers.Where(t => t is ScheduleTriggerViewModel).ToList())
                     Triggers.Remove(t);
-                }
 
                 StopTriggers.Clear();
 
@@ -892,9 +869,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         if (trigger.NextPresetId is { } id)
         {
             if (AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == id) is { } preset)
-            {
                 trigger.SelectedNextPreset = preset;
-            }
             else _ = LoadThenPresetNameAsync(trigger, id);
         }
     }
@@ -912,9 +887,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
 
                     var option = new NextPresetOption(presetId, preset.Name);
                     if (AvailablePresetsForNext.All(p => p.PresetId != presetId))
-                    {
                         AvailablePresetsForNext.Add(option);
-                    }
 
                     trigger.SelectedNextPreset = AvailablePresetsForNext.FirstOrDefault(p => p.PresetId == presetId);
                 });
@@ -930,7 +903,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
     {
         var newConfiguredModule = new ConfiguredModule { ModuleId = defToAdd.Id };
         var newVm = new ConfiguredModuleViewModel(defToAdd, newConfiguredModule, _modulesApi, _serviceProvider,
-            _isExistingPreset ? _preset.Id : null);
+            _isExistingPreset ? PresetToEdit.Id : null);
         ConfiguredModules.Add(newVm);
         UpdateModuleLinks();
     }
@@ -947,6 +920,12 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         if (string.IsNullOrWhiteSpace(Name))
         {
             ErrorMessage = "Preset name cannot be empty.";
+            return;
+        }
+
+        if (ConfiguredModules.Any(module => module.HasDelayError))
+        {
+            ErrorMessage = "Enter a delay greater than 0 seconds or remove the delay before saving.";
             return;
         }
 
@@ -979,7 +958,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         if (!ValidateFocusCommitment(applyOptions: true)) return;
 
         ErrorMessage = string.Empty;
-        _preset.Modules =
+        PresetToEdit.Modules =
         [
             .. ConfiguredModules.Select(vm =>
             {
@@ -987,20 +966,18 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                 return vm.Model;
             })
         ];
-        _preset.Name = Name;
-        _preset.FocusCommitment = new FocusCommitmentOptions(_focusCommitment);
+        PresetToEdit.Name = Name;
+        PresetToEdit.FocusCommitment = new FocusCommitmentOptions(_focusCommitment);
 
         try
         {
-            var existingPreset = await _presetsApi.GetPresetAsync(_preset.Id);
+            var existingPreset = await _presetsApi.GetPresetAsync(PresetToEdit.Id);
             if (existingPreset != null)
-            {
-                await _presetsApi.UpdatePresetAsync(_preset);
-            }
-            else await _presetsApi.CreatePresetAsync(_preset);
+                await _presetsApi.UpdatePresetAsync(PresetToEdit);
+            else await _presetsApi.CreatePresetAsync(PresetToEdit);
 
             var existingSchedules = await _schedulerApi.ListSchedulesAsync();
-            var presetSchedules = existingSchedules.Where(s => s.PresetId == _preset.Id).ToList();
+            var presetSchedules = existingSchedules.Where(s => s.PresetId == PresetToEdit.Id).ToList();
 
             HashSet<Guid> activeTriggerIds = [];
 
@@ -1031,7 +1008,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
                     _ => throw new InvalidOperationException($"Unsupported trigger type: {trigger.GetType().Name}")
                 };
                 schedule.Id = trigger.ExistingScheduleId ?? Guid.NewGuid();
-                schedule.PresetId = _preset.Id;
+                schedule.PresetId = PresetToEdit.Id;
                 await SaveScheduleAsync(trigger, schedule, presetSchedules, activeTriggerIds);
             }
 
@@ -1185,8 +1162,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         for (var i = 0; i < ConfiguredModules.Count; i++)
         {
             var current = ConfiguredModules[i];
-            var next = i < ConfiguredModules.Count - 1 ? ConfiguredModules[i + 1] : null;
-            current.NextModule = next;
+            current.NextModule = i < ConfiguredModules.Count - 1 ? ConfiguredModules[i + 1] : null;
             current.IsFirst = i == 0;
             current.IsLast = i == ConfiguredModules.Count - 1;
         }
@@ -1210,9 +1186,7 @@ public partial class SessionEditorViewModel : ReactiveObject, IDisposable
         AddThenActionTriggerCommand.Dispose();
 
         foreach (var vm in ConfiguredModules)
-        {
             vm.Dispose();
-        }
 
         ConfiguredModules.Clear();
 

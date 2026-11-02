@@ -165,18 +165,12 @@ internal class LinuxSecureStorage : SecureStorageBase
         var filePath = Path.Combine(storageDir, fileName);
 
         if (File.Exists(filePath))
-        {
             File.Delete(filePath);
-        }
     }
 
-    private static string GetSecretFileName(string key)
-    {
+    private static string GetSecretFileName(string key) =>
         // Use SHA256 hash of key as filename for security
-        using var sha = SHA256.Create();
-        var hashBytes = sha.ComputeHash(Encoding.UTF8.GetBytes(key));
-        return Convert.ToHexString(hashBytes).ToLowerInvariant() + ".dat";
-    }
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key))) + ".dat";
 
     private byte[] GetOrCreateFileEncryptionKey()
     {
@@ -259,15 +253,11 @@ internal class LinuxSecureStorage : SecureStorageBase
             {
                 var machineIdFile = "/etc/machine-id";
                 if (File.Exists(machineIdFile))
-                {
                     components.Add(File.ReadAllText(machineIdFile).Trim());
-                }
 
                 var dbusIdFile = "/var/lib/dbus/machine-id";
                 if (File.Exists(dbusIdFile))
-                {
                     components.Add(File.ReadAllText(dbusIdFile).Trim());
-                }
 
                 var productUuidFile = "/sys/class/dmi/id/product_uuid";
                 if (File.Exists(productUuidFile))
@@ -290,12 +280,7 @@ internal class LinuxSecureStorage : SecureStorageBase
 
         var combinedData = string.Join("|", components);
 
-        using var sha512 = SHA512.Create();
-        var hash = sha512.ComputeHash(Encoding.UTF8.GetBytes(combinedData));
-
-        var key = new byte[32];
-        Array.Copy(hash, key, 32);
-        return key;
+        return SHA512.HashData(Encoding.UTF8.GetBytes(combinedData))[..32];
     }
 
     private static byte[] EncryptAesGcm(byte[] data, byte[] key)
@@ -315,9 +300,7 @@ internal class LinuxSecureStorage : SecureStorageBase
         const int nonceLength = 12;
         const int tagLength = 16;
         if (data.Length < nonceLength + tagLength)
-        {
             throw new CryptographicException(invalidDataMessage);
-        }
 
         var ciphertextLength = data.Length - nonceLength - tagLength;
         var plaintext = new byte[ciphertextLength];

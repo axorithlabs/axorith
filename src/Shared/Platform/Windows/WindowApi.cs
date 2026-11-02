@@ -1,9 +1,11 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 using Axorith.Shared.Platform;
+using Microsoft.Win32;
 
 namespace Axorith.Shared.Platform.Windows;
 
@@ -196,13 +198,9 @@ internal static class WindowApi
     public static void FocusWindow(IntPtr windowHandle)
     {
         if (IsIconic(windowHandle))
-        {
             ShowWindow(windowHandle, SwRestore);
-        }
         else if (IsZoomed(windowHandle))
-        {
             ShowWindow(windowHandle, SwShowmaximized);
-        }
 
         SetForegroundWindow(windowHandle);
     }
@@ -236,12 +234,11 @@ internal static class WindowApi
 
         try
         {
-            // Join by device identity: WMI enumeration order does not match EnumDisplayMonitors.
             var deviceParts = monitor.DeviceId.Split('#');
             if (deviceParts.Length >= 3)
             {
                 var instanceName = $"DISPLAY\\{deviceParts[1]}\\{deviceParts[2]}";
-                var name = GetMonitorNameFromEdid(instanceName);
+                var name = GetMonitorNameFromWmi(instanceName) ?? GetMonitorNameFromEdid(instanceName);
                 if (!string.IsNullOrWhiteSpace(name)) return name;
             }
         }
@@ -256,50 +253,84 @@ internal static class WindowApi
             : $"Monitor {monitorIndex + 1}";
     }
 
-    private static string? GetMonitorNameFromEdid(string instanceName)
+    private static string? GetMonitorNameFromWmi(string instanceName)
     {
-        using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM WmiMonitorID");
-        foreach (var obj in searcher.Get())
+        try
         {
-            using var monitor = obj;
-            var deviceInstance = monitor["InstanceName"] as string;
-            if (deviceInstance == null ||
-                !(deviceInstance.Equals(instanceName, StringComparison.OrdinalIgnoreCase) ||
-                  deviceInstance.StartsWith(instanceName + "_", StringComparison.OrdinalIgnoreCase))) continue;
-
-            var userFriendlyName = DecodeUshortArray(obj["UserFriendlyName"] as ushort[]);
-            if (!string.IsNullOrWhiteSpace(userFriendlyName))
+            using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM WmiMonitorID");
+            // Sandbox's virtual-display provider can stall MoveNext; retain WMI with bounded enumeration.
+            searcher.Options = new System.Management.EnumerationOptions
             {
-                return userFriendlyName;
-            }
-
-            var manufacturerName = obj["ManufacturerName"] as ushort[];
-            var productCodeId = obj["ProductCodeID"] as ushort[];
-
-            var manufacturer = DecodeUshortArray(manufacturerName);
-            var productCode = DecodeUshortArray(productCodeId);
-
-            if (!string.IsNullOrWhiteSpace(manufacturer) || !string.IsNullOrWhiteSpace(productCode))
+                ReturnImmediately = true, Rewindable = false, Timeout = TimeSpan.FromSeconds(1)
+            };
+            using var results = searcher.Get();
+            foreach (var item in results)
             {
-                return $"{manufacturer} {productCode}".Trim();
+                using var monitor = item;
+                var deviceInstance = monitor["InstanceName"] as string;
+                if (deviceInstance is null ||
+                    !(deviceInstance.Equals(instanceName, StringComparison.OrdinalIgnoreCase) ||
+                      deviceInstance.StartsWith(instanceName + "_", StringComparison.OrdinalIgnoreCase))) continue;
+                var friendly = DecodeUshortArray(monitor["UserFriendlyName"] as ushort[]);
+                if (!string.IsNullOrWhiteSpace(friendly)) return friendly;
+                var manufacturer = DecodeUshortArray(monitor["ManufacturerName"] as ushort[]);
+                var product = DecodeUshortArray(monitor["ProductCodeID"] as ushort[]);
+                if (!string.IsNullOrWhiteSpace(manufacturer) || !string.IsNullOrWhiteSpace(product))
+                    return $"{manufacturer} {product}".Trim();
             }
         }
-
+        catch (Exception error) when (error is ManagementException or COMException or UnauthorizedAccessException)
+        {
+            // Keep registry EDID and the Windows device name available when WMI fails.
+        }
         return null;
     }
 
-    private static string DecodeUshortArray(ushort[]? arr)
+    private static string DecodeUshortArray(ushort[]? value)
     {
-        if (arr == null || arr.Length == 0) return string.Empty;
-
-        var sb = new StringBuilder();
-        foreach (var c in arr)
+        if (value is null) return "";
+        var text = new StringBuilder();
+        foreach (var character in value)
         {
-            if (c == 0) break;
+            if (character == 0) break;
+            text.Append((char)character);
+        }
+        return text.ToString().Trim();
+    }
 
-            sb.Append((char)c);
+    private static string? GetMonitorNameFromEdid(string instanceName)
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(
+            $@"SYSTEM\CurrentControlSet\Enum\{instanceName}\Device Parameters");
+        return key?.GetValue("EDID") is byte[] edid ? DecodeEdidMonitorName(edid) : null;
+    }
+
+    internal static string? DecodeEdidMonitorName(ReadOnlySpan<byte> edid)
+    {
+        ReadOnlySpan<byte> header = [0, 255, 255, 255, 255, 255, 255, 0];
+        if (edid.Length < 128 || !edid[..8].SequenceEqual(header)) return null;
+        var checksum = 0;
+        foreach (var value in edid[..128]) checksum += value;
+        if ((checksum & 255) != 0) return null;
+
+        for (var offset = 54; offset <= 108; offset += 18)
+        {
+            if (edid[offset] != 0 || edid[offset + 1] != 0 || edid[offset + 2] != 0 ||
+                edid[offset + 3] != 0xFC || edid[offset + 4] != 0) continue;
+            var text = Encoding.ASCII.GetString(edid.Slice(offset + 5, 13));
+            var end = text.IndexOfAny(['\0', '\r', '\n']);
+            var name = (end >= 0 ? text[..end] : text).Trim();
+            if (name.Length > 0) return name;
         }
 
-        return sb.ToString().Trim();
+        var vendor = BinaryPrimitives.ReadUInt16BigEndian(edid.Slice(8, 2));
+        Span<char> manufacturer = stackalloc char[3];
+        for (var i = 0; i < manufacturer.Length; i++)
+        {
+            var letter = (vendor >> (10 - i * 5)) & 31;
+            if (letter is < 1 or > 26) return null;
+            manufacturer[i] = (char)('A' + letter - 1);
+        }
+        return $"{manufacturer} {BinaryPrimitives.ReadUInt16LittleEndian(edid.Slice(10, 2)):X4}";
     }
 }

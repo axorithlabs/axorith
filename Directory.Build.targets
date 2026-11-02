@@ -1,5 +1,5 @@
 <Project>
-    <Target Name="GetVersionFromGit" BeforeTargets="BeforeBuild;GenerateAssemblyInfo">
+    <Target Name="GetVersionFromGit" BeforeTargets="BeforeBuild;GenerateAssemblyInfo" Condition="'$(Version)' == '1.0.0-dev'">
         <PropertyGroup>
             <_SolutionDirTrimmed>$([System.String]::Copy('$(SolutionDir)').TrimEnd('\'))</_SolutionDirTrimmed>
             <_SolutionDirNoSlash>$([System.String]::Copy('$(_SolutionDirTrimmed)').TrimEnd('/'))</_SolutionDirNoSlash>

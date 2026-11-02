@@ -31,7 +31,8 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
         return new ProcessStartResult(launched, false);
     }
 
-    public Task TerminateAsync(Process process, ProcessLifecycleMode lifecycleMode, bool wasAttached)
+    public async Task TerminateAsync(Process process, ProcessLifecycleMode lifecycleMode, bool wasAttached,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(process);
 
@@ -39,7 +40,7 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
         {
             logger.LogInfo("Keeping process {ProcessName} (PID: {ProcessId}) running",
                 process.ProcessName, process.Id);
-            return Task.CompletedTask;
+            return;
         }
 
         logger.LogInfo("Terminating process {ProcessName} (PID: {ProcessId}) with mode {Mode}",
@@ -51,6 +52,7 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
             {
                 // Graceful termination: only close window, never force kill - process may remain open
                 logger.LogDebug("Attempting graceful termination (no force kill)");
+                process.Refresh();
                 process.CloseMainWindow();
                 logger.LogDebug("CloseMainWindow called, process may remain open if it shows dialogs");
                 logger.LogInfo("Process {ProcessName} termination requested (graceful mode - may remain open)",
@@ -60,26 +62,18 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
             {
                 // Force termination: kill immediately without attempting graceful close
                 logger.LogDebug("Force killing process immediately");
-                try
-                {
-                    process.Kill();
-                    logger.LogInfo("Process {ProcessName} killed immediately", process.ProcessName);
-                }
-                catch (Exception killEx)
-                {
-                    logger.LogWarning("Failed to kill process immediately, attempting graceful close as fallback. {ex}",
-                        killEx);
-                    // Fallback: try graceful close if kill fails
-                    process.CloseMainWindow();
-                }
+                var processId = process.Id;
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken)
+                    .ConfigureAwait(false);
+                logger.LogInfo("Process {ProcessId} killed immediately", processId);
             }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to terminate process");
+            throw;
         }
-
-        return Task.CompletedTask;
     }
 
     public Task<Process?> AttachExistingOnlyAsync(string path) => AttachToExistingAsync(path);
@@ -161,6 +155,8 @@ public sealed class ProcessService(IModuleLogger logger, IPlatformProcessService
 
             var processWithWindow = processes.Find(p => p.MainWindowHandle != IntPtr.Zero);
             var selectedProcess = processWithWindow ?? processes[0];
+            foreach (var process in processes)
+                if (!ReferenceEquals(process, selectedProcess)) process.Dispose();
 
             logger.LogInfo("Found existing process {ProcessName} (PID: {ProcessId})",
                 selectedProcess.ProcessName, selectedProcess.Id);

@@ -5,9 +5,11 @@ using NotificationType = Axorith.Sdk.Services.NotificationType;
 
 namespace Axorith.Host.Streaming;
 
-public sealed class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger) : IDisposable
+public sealed class NotificationBroadcaster(ILogger<NotificationBroadcaster> logger,
+    IHostApplicationLifetime? lifetime = null) : IDisposable
 {
-    private readonly GrpcStreamSubscribers<NotificationEvent> _subscribers = new(logger, 100, "notification");
+    private readonly GrpcStreamSubscribers<NotificationEvent> _subscribers = new(logger, 100, "notification",
+        lifetime?.ApplicationStopping ?? default);
 
     public bool HasSubscribers => !_subscribers.IsEmpty;
 

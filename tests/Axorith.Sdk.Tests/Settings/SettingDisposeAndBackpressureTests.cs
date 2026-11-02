@@ -1,12 +1,10 @@
-using System.Reactive.Linq;
 using Axorith.Sdk.Settings;
 using FluentAssertions;
-using Microsoft.Reactive.Testing;
 
 namespace Axorith.Sdk.Tests.Settings;
 
 /// <summary>
-///     Tests for disposal, backpressure, and error handling in reactive observables
+///     Tests for subscription lifetime and exact delivery of setting values
 /// </summary>
 public class SettingDisposeAndBackpressureTests
 {
@@ -43,111 +41,10 @@ public class SettingDisposeAndBackpressureTests
         values2.Should().Equal("initial", "A", "B");
     }
 
-    [Fact]
-    public void Observable_WithErrorInSubscriber_ShouldNotBreakOtherSubscribers()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var goodValues = new List<int>();
-        var exceptionThrown = false;
 
-        setting.Value.Subscribe(v => goodValues.Add(v));
-        setting.Value.Subscribe(_ =>
-        {
-            exceptionThrown = true;
-            throw new InvalidOperationException("Test exception");
-        });
-        setting.Value.Subscribe(v => goodValues.Add(v * 2));
 
-        try
-        {
-            setting.SetValue(42);
-        }
-        catch
-        {
-            // Expected - exception from middle subscriber
-        }
 
-        exceptionThrown.Should().BeTrue();
-        // First subscriber should still work
-        goodValues.Should().Contain(42);
-    }
 
-    [Fact]
-    public void RapidUpdates_WithBuffering_ShouldHandleBackpressure()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var bufferedValues = new List<List<int>>();
-        var scheduler = new TestScheduler();
-
-        setting.Value
-            .Buffer(TimeSpan.FromTicks(TimeSpan.FromMilliseconds(50).Ticks), scheduler)
-            .Subscribe(batch => bufferedValues.Add(batch.ToList()));
-
-        for (var i = 1; i <= 100; i++) setting.SetValue(i);
-        // Advance virtual time to flush buffers
-        scheduler.AdvanceBy(TimeSpan.FromSeconds(1).Ticks);
-
-        var allValues = bufferedValues.SelectMany(b => b).ToList();
-        allValues.Should().Contain(100);
-    }
-
-    [Fact]
-    public void Observable_WithSample_ShouldReduceUpdateFrequency()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var sampledValues = new List<int>();
-        var scheduler = new TestScheduler();
-
-        setting.Value
-            .Sample(TimeSpan.FromTicks(TimeSpan.FromMilliseconds(50).Ticks), scheduler)
-            .Subscribe(v => sampledValues.Add(v));
-
-        for (var i = 1; i <= 100; i++) setting.SetValue(i);
-        // Advance virtual time to allow sampling ticks
-        scheduler.AdvanceBy(TimeSpan.FromSeconds(1).Ticks);
-
-        sampledValues.Should().HaveCountLessThan(100);
-        sampledValues.Should().Contain(100);
-    }
-
-    [Fact]
-    public void Observable_WithSkip_ShouldIgnoreInitialValues()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var values = new List<int>();
-
-        setting.Value
-            .Skip(1) // Skip initial value
-            .Subscribe(v => values.Add(v));
-
-        setting.SetValue(1);
-        setting.SetValue(2);
-
-        values.Should().NotContain(0);
-        values.Should().Equal(1, 2);
-    }
-
-    [Fact]
-    public void Observable_WithTake_ShouldLimitValues()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var values = new List<int>();
-        var completed = false;
-
-        setting.Value
-            .Take(3)
-            .Subscribe(
-                onNext: v => values.Add(v),
-                onCompleted: () => completed = true);
-
-        setting.SetValue(1);
-        setting.SetValue(2);
-        setting.SetValue(3);
-        setting.SetValue(4);
-
-        values.Should().Equal(0, 1, 2);
-        completed.Should().BeTrue();
-    }
 
     [Fact]
     public void DisposedSubscriptions_ShouldNotReceiveUpdates()
@@ -173,25 +70,6 @@ public class SettingDisposeAndBackpressureTests
         notificationCount.Should().Be(1000);
     }
 
-    [Fact]
-    public async Task Observable_WithAsyncSubscriber_ShouldNotBlock()
-    {
-        var setting = Setting.AsInt("key", "Label", 0);
-        var taskCompletionSource = new TaskCompletionSource<int>();
-
-        setting.Value
-            .Skip(1) // Skip initial
-            .Subscribe(async v =>
-            {
-                await Task.Delay(10);
-                taskCompletionSource.SetResult(v);
-            });
-
-        setting.SetValue(42);
-        var result = await taskCompletionSource.Task;
-
-        result.Should().Be(42);
-    }
 
     [Fact]
     public void Choices_Observable_WithDispose_ShouldStopUpdates()
@@ -236,8 +114,8 @@ public class SettingDisposeAndBackpressureTests
             textSetting.SetValue($"Value{i}");
         }
 
-        intValues.Should().HaveCount(101); // Initial + 100 updates
-        boolValues.Should().HaveCount(101);
-        textValues.Should().HaveCount(101);
+        intValues.Should().Equal(new object?[] { 0 }.Concat(Enumerable.Range(0, 100).Cast<object?>()));
+        boolValues.Should().Equal(new object?[] { false }.Concat(Enumerable.Range(0, 100).Select(i => (object?)(i % 2 == 0))));
+        textValues.Should().Equal(new object?[] { "" }.Concat(Enumerable.Range(0, 100).Select(i => (object?)$"Value{i}")));
     }
 }

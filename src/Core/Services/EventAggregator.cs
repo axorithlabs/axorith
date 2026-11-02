@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Axorith.Sdk.Services;
 using Serilog;
 
@@ -6,108 +7,72 @@ namespace Axorith.Core.Services;
 
 public sealed class EventAggregator : IEventAggregator
 {
-    private readonly ConcurrentDictionary<Type, ConcurrentBag<WeakReference<object>>> _subscriptions = new();
+    private readonly ConcurrentDictionary<Type, ImmutableArray<WeakReference<object>>> _subscriptions = new();
 
     public IDisposable Subscribe<TEvent>(Action<TEvent> handler)
     {
-        var eventType = typeof(TEvent);
-        var handlers = _subscriptions.GetOrAdd(eventType, _ => []);
-
-        // Use WeakReference to prevent memory leaks if a subscriber is garbage collected without unsubscribing.
-        var weakHandler = new WeakReference<object>(handler);
-        handlers.Add(weakHandler);
-
+        var reference = new WeakReference<object>(handler);
+        _subscriptions.AddOrUpdate(typeof(TEvent), [reference], (_, handlers) => handlers.Add(reference));
         return new Unsubscriber<TEvent>(this, handler);
     }
 
     public void Publish<TEvent>(TEvent eventMessage)
     {
-        var eventType = typeof(TEvent);
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
+        if (!_subscriptions.TryGetValue(typeof(TEvent), out var handlers)) return;
 
         var hasDeadReferences = false;
-
-        foreach (var weakHandler in handlers)
+        foreach (var reference in handlers)
         {
-            if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
-            {
-                try
-                {
-                    handler(eventMessage);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Event handler threw in EventAggregator for event type {EventType}",
-                        typeof(TEvent).Name);
-                }
-            }
-            else hasDeadReferences = true;
+            if (reference.TryGetTarget(out var target) && target is Action<TEvent> handler)
+                InvokeHandler(handler, eventMessage);
+            else
+                hasDeadReferences = true;
         }
 
-        if (hasDeadReferences)
-        {
-            CleanupDeadReferences(eventType);
-        }
+        if (hasDeadReferences) RemoveHandlers<TEvent>(null);
     }
 
     public Task PublishAsync<TEvent>(TEvent eventMessage, CancellationToken cancellationToken = default)
     {
-        var eventType = typeof(TEvent);
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return Task.CompletedTask;
+        if (!_subscriptions.TryGetValue(typeof(TEvent), out var handlers)) return Task.CompletedTask;
 
+        return Task.WhenAll(GetHandlers<TEvent>(handlers).Select(handler =>
+            Task.Run(() => InvokeHandler(handler, eventMessage), cancellationToken)));
+    }
+
+    private IEnumerable<Action<TEvent>> GetHandlers<TEvent>(ImmutableArray<WeakReference<object>> references)
+    {
         var hasDeadReferences = false;
-        List<Task> tasks = [];
-
-        foreach (var weakHandler in handlers)
+        foreach (var reference in references)
         {
-            if (weakHandler.TryGetTarget(out var handlerTarget) && handlerTarget is Action<TEvent> handler)
-            {
-                tasks.Add(Task.Run(() =>
-                {
-                    try
-                    {
-                        handler(eventMessage);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(ex, "Event handler threw in EventAggregator for event type {EventType}",
-                            typeof(TEvent).Name);
-                    }
-                }, cancellationToken));
-            }
-                    else hasDeadReferences = true;
+            if (reference.TryGetTarget(out var target) && target is Action<TEvent> handler)
+                yield return handler;
+            else
+                hasDeadReferences = true;
         }
 
-        if (hasDeadReferences)
+        if (hasDeadReferences) RemoveHandlers<TEvent>(null);
+    }
+
+    private static void InvokeHandler<TEvent>(Action<TEvent> handler, TEvent eventMessage)
+    {
+        try
         {
-            CleanupDeadReferences(eventType);
+            handler(eventMessage);
         }
-
-        return tasks.Count == 0 ? Task.CompletedTask : Task.WhenAll(tasks);
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Event handler threw in EventAggregator for event type {EventType}", typeof(TEvent).Name);
+        }
     }
 
-    private void CleanupDeadReferences(Type eventType)
-    {
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
-
-        var liveReferences = handlers.Where(wr => wr.TryGetTarget(out _)).ToList();
-        _subscriptions[eventType] = [.. liveReferences];
-    }
-
-    private void Unsubscribe<TEvent>(Action<TEvent> handler)
-    {
-        var eventType = typeof(TEvent);
-        if (!_subscriptions.TryGetValue(eventType, out var handlers)) return;
-
-        var filtered = handlers.Where(wh =>
-            !wh.TryGetTarget(out var target) || !target.Equals(handler)
-        ).ToList();
-
-        _subscriptions[eventType] = [.. filtered];
-    }
+    private void RemoveHandlers<TEvent>(Action<TEvent>? handler) =>
+        // Update the current list atomically so cleanup cannot overwrite a concurrent subscription.
+        _subscriptions.AddOrUpdate(typeof(TEvent), [], (_, handlers) => handlers.RemoveAll(reference =>
+            !reference.TryGetTarget(out var target) || target.Equals(handler)));
 
     private sealed class Unsubscriber<TEvent>(EventAggregator aggregator, Action<TEvent> handler) : IDisposable
     {
-        public void Dispose() => aggregator.Unsubscribe(handler);
+        public void Dispose() => aggregator.RemoveHandlers(handler);
     }
 }

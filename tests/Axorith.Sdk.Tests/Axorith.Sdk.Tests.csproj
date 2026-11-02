@@ -1,10 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <ItemGroup>
-        <PackageReference Include="Moq"  />
-        <PackageReference Include="Microsoft.Reactive.Testing"  />
-    </ItemGroup>
-
-    <ItemGroup>
         <ProjectReference Include="..\..\src\Sdk\Axorith.Sdk.csproj" />
     </ItemGroup>
 

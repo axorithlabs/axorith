@@ -185,6 +185,48 @@ public class EventAggregatorTests
         received.Should().ContainSingle().Which.Should().Be("published");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentUnsubscribeDoesNotLoseOtherSubscriptions(bool publishAsync)
+    {
+        var aggregator = CreateAggregator();
+        var subscriptions = new ConcurrentBag<IDisposable>();
+        var received = 0;
+        const int count = 2000;
+        using var start = new ManualResetEventSlim();
+        var additions = Task.Factory.StartNew(() =>
+        {
+            start.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+            for (var index = 0; index < count; index++)
+            {
+                subscriptions.Add(aggregator.Subscribe<int>(_ => Interlocked.Increment(ref received)));
+                Thread.Yield();
+            }
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        var removals = Task.Factory.StartNew(() =>
+        {
+            start.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+            for (var index = 0; index < count; index++)
+                using (aggregator.Subscribe<int>(_ => { })) { }
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        start.Set();
+        try
+        {
+            await Task.WhenAll(additions, removals).WaitAsync(TimeSpan.FromSeconds(15));
+            if (publishAsync) await aggregator.PublishAsync(1).WaitAsync(TimeSpan.FromSeconds(5));
+            else aggregator.Publish(1);
+            received.Should().Be(count);
+        }
+        finally
+        {
+            await Task.WhenAll(additions, removals);
+            foreach (var subscription in subscriptions) subscription.Dispose();
+        }
+        aggregator.Publish(2);
+        received.Should().Be(count);
+    }
+
     [Fact]
     public void CollectedSubscribersAreWeakAndDoNotPreventPublishing()
     {

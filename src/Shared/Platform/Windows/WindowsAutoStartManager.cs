@@ -6,18 +6,12 @@ using Microsoft.Win32;
 namespace Axorith.Shared.Platform.Windows;
 
 [SupportedOSPlatform("windows")]
-public sealed class WindowsAutoStartManager : IAutoStartManager
+public sealed class WindowsAutoStartManager(ILogger logger) : IAutoStartManager
 {
     private const string RegistryKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string AppName = "Axorith";
-    private readonly ILogger _logger;
-    private readonly string _executablePath;
-
-    public WindowsAutoStartManager(ILogger logger)
-    {
-        _logger = logger;
-        _executablePath = GetExecutablePath();
-    }
+    private readonly ILogger _logger = logger;
+    private readonly string _executablePath = GetExecutablePath();
 
     public bool IsAutoStartEnabled => !string.IsNullOrEmpty(ReadAutoStartCommand("Failed to check auto-start status"));
 

@@ -1,144 +1,76 @@
-# Axorith Test Runner
-# PowerShell script for running tests locally with various options
-
 param(
-    [Parameter(HelpMessage="Test filter (e.g., 'FullyQualifiedName~ActionTests')")]
     [string]$Filter = "",
-    
-    [Parameter(HelpMessage="Generate coverage report")]
     [switch]$Coverage,
-    
-    [Parameter(HelpMessage="Open coverage report in browser")]
     [switch]$OpenReport,
-    
-    [Parameter(HelpMessage="Verbose output")]
     [switch]$Verbose,
-    
-    [Parameter(HelpMessage="Specific test project (Sdk, Core, Shared, or All)")]
-    [ValidateSet("Sdk", "Core", "Shared", "All")]
+    [ValidateSet("Sdk", "Core", "Shared", "Contracts", "Host", "Integrations", "All")]
     [string]$Project = "All",
-    
-    [Parameter(HelpMessage="Clean before running")]
+    [ValidateSet("All", "Unit", "Integration")]
+    [string]$Suite = "All",
+    [ValidateSet("Debug", "Release")]
+    [string]$Configuration = "Release",
+    [switch]$NoBuild,
     [switch]$Clean
 )
 
 $ErrorActionPreference = "Stop"
+$env:AVALONIA_TELEMETRY_OPTOUT = '1'
+$env:AXORITH_TEST_MODE = '1'
+$env:AXORITH_DEV = '1'
+$env:AXORITH_TELEMETRY_DISABLED = '1'
+$env:AXORITH_TELEMETRY_API_KEY = '##E2E_DISABLED##'
+$env:AXORITH_TELEMETRY_HOST = 'http://127.0.0.1:9'
+$root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$results = Join-Path $root "build/$Configuration"
+New-Item -ItemType Directory -Force $results | Out-Null
+$projects = @('Sdk', 'Core', 'Shared', 'Contracts', 'Host', 'Integrations')
+if ($Project -ne 'All') { $projects = @($Project) }
+if ($Suite -eq 'Unit') { $projects = @($projects | Where-Object { $_ -ne 'Integrations' }) }
+if ($Suite -eq 'Integration') { $projects = @($projects | Where-Object { $_ -eq 'Integrations' }) }
+if ($projects.Count -eq 0) { throw 'The selected project and suite contain no test projects.' }
 
-Write-Host "🧪 Axorith Test Runner" -ForegroundColor Cyan
-Write-Host "=====================`n" -ForegroundColor Cyan
-
-# Determine solution/project path
-$solutionPath = Join-Path $PSScriptRoot ".." "Axorith.sln"
-$testProjects = @{
-    "Sdk" = Join-Path $PSScriptRoot ".." "tests" "Axorith.Sdk.Tests" "Axorith.Sdk.Tests.csproj"
-    "Core" = Join-Path $PSScriptRoot ".." "tests" "Axorith.Core.Tests" "Axorith.Core.Tests.csproj"
-    "Shared" = Join-Path $PSScriptRoot ".." "tests" "Axorith.Shared.Tests" "Axorith.Shared.Tests.csproj"
-}
-
-# Clean if requested
 if ($Clean) {
-    Write-Host "🧹 Cleaning solution..." -ForegroundColor Yellow
-    dotnet clean $solutionPath --verbosity quiet
-    Write-Host "✅ Cleaned`n" -ForegroundColor Green
+    & dotnet clean (Join-Path $root 'Axorith.sln') -c $Configuration --verbosity quiet
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
-
-# Build arguments
-$testArgs = @()
-
-# Determine what to test
-if ($Project -eq "All") {
-    $testTarget = $solutionPath
-    Write-Host "📦 Testing: All projects" -ForegroundColor Cyan
-} else {
-    $testTarget = $testProjects[$Project]
-    Write-Host "📦 Testing: Axorith.$Project.Tests" -ForegroundColor Cyan
-}
-
-# Verbosity
-if ($Verbose) {
-    $testArgs += "--verbosity", "detailed"
-} else {
-    $testArgs += "--verbosity", "normal"
-}
-
-# Filter
-if ($Filter) {
-    $testArgs += "--filter", $Filter
-    Write-Host "🔍 Filter: $Filter" -ForegroundColor Cyan
-}
-
-# Coverage
-$coverageDir = Join-Path $PSScriptRoot ".." "coverage"
-$reportDir = Join-Path $PSScriptRoot ".." "coverage-report"
-
-if ($Coverage) {
-    Write-Host "📊 Coverage: Enabled" -ForegroundColor Cyan
-    $testArgs += "--collect:XPlat Code Coverage"
-    $testArgs += "--results-directory", $coverageDir
-    
-    # Clean old coverage
-    if (Test-Path $coverageDir) {
-        Remove-Item $coverageDir -Recurse -Force
+foreach ($name in $projects) {
+    # Coverlet adds roots to collectible assemblies. Verify lifetime normally, then measure the other paths.
+    if ($Coverage -and $name -eq 'Integrations') {
+        $lifetimeArgs = @{ Project = 'Integrations'; Configuration = $Configuration; NoBuild = $NoBuild }
+        & $PSCommandPath @lifetimeArgs
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Copy-Item -LiteralPath (Join-Path $results 'Axorith.Integrations.Tests.trx') `
+            -Destination (Join-Path $results 'Axorith.Integrations.Tests.uninstrumented.trx') -Force
     }
-}
-
-Write-Host "`n⚡ Running tests...`n" -ForegroundColor Yellow
-
-# Run tests
-$testCommand = "dotnet test `"$testTarget`" $($testArgs -join ' ')"
-Write-Host "Command: $testCommand`n" -ForegroundColor DarkGray
-
-try {
-    Invoke-Expression $testCommand
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "`n❌ Tests failed!" -ForegroundColor Red
-        exit $LASTEXITCODE
+    $target = Join-Path $root "tests/Axorith.$name.Tests/Axorith.$name.Tests.csproj"
+    $trxName = "Axorith.$name.Tests.trx"
+    $trxPath = Join-Path $results $trxName
+    if (Test-Path -LiteralPath $trxPath) { Remove-Item -LiteralPath $trxPath }
+    $testArgs = @('test', $target, '-c', $Configuration, '--results-directory', $results,
+        '--logger', "trx;LogFileName=$trxName", '--verbosity', $(if ($Verbose) { 'normal' } else { 'minimal' }))
+    if ($NoBuild) { $testArgs += '--no-build' }
+    $effectiveFilter = $Filter
+    if ($Coverage -and $name -eq 'Integrations') {
+        $excludeLifetime = 'FullyQualifiedName!~RealModulesWithPrivateDependenciesUnloadAfterHostShutdown'
+        $effectiveFilter = if ($Filter) { "($Filter)&$excludeLifetime" } else { $excludeLifetime }
     }
-    
-    Write-Host "`n✅ All tests passed!" -ForegroundColor Green
-    
-    # Generate coverage report
-    if ($Coverage) {
-        Write-Host "`n📈 Generating coverage report..." -ForegroundColor Yellow
-        
-        # Check if reportgenerator is installed
-        $reportGenInstalled = dotnet tool list -g | Select-String "dotnet-reportgenerator-globaltool"
-        
-        if (-not $reportGenInstalled) {
-            Write-Host "Installing ReportGenerator..." -ForegroundColor Yellow
-            dotnet tool install -g dotnet-reportgenerator-globaltool
-        }
-        
-        # Find coverage files
-        $coverageFiles = Get-ChildItem -Path $coverageDir -Filter "coverage.cobertura.xml" -Recurse
-        
-        if ($coverageFiles.Count -eq 0) {
-            Write-Host "⚠️ No coverage files found!" -ForegroundColor Yellow
-        } else {
-            $reports = ($coverageFiles | ForEach-Object { $_.FullName }) -join ";"
-            
-            # Generate report
-            reportgenerator `
-                -reports:$reports `
-                -targetdir:$reportDir `
-                -reporttypes:"Html;Badges;Cobertura" `
-                -verbosity:Warning
-            
-            Write-Host "✅ Coverage report generated: $reportDir\index.html" -ForegroundColor Green
-            
-            # Open report
-            if ($OpenReport) {
-                $indexPath = Join-Path $reportDir "index.html"
-                Write-Host "🌐 Opening report in browser..." -ForegroundColor Cyan
-                Start-Process $indexPath
-            }
-        }
-    }
-    
-} catch {
-    Write-Host "`n❌ Error: $_" -ForegroundColor Red
-    exit 1
+    if ($effectiveFilter) { $testArgs += @('--filter', $effectiveFilter) }
+    if ($Coverage) { $testArgs += '--collect:XPlat Code Coverage' }
+    $testArgs += @('--', 'RunConfiguration.TreatNoTestsAsError=true')
+    & dotnet @testArgs
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if (-not (Test-Path -LiteralPath $trxPath)) { throw "Missing test results: $trxPath" }
+    [xml]$trx = Get-Content -LiteralPath $trxPath -Raw
+    $counters = $trx.TestRun.ResultSummary.Counters
+    if ([int]$counters.executed -eq 0) { throw "$name executed zero tests (all skipped or unmatched filter)." }
+    $skipped = @($trx.TestRun.Results.UnitTestResult | Where-Object outcome -eq 'NotExecuted').Count
+    Write-Host "$name : executed=$($counters.executed), passed=$($counters.passed), failed=$($counters.failed), skipped=$skipped"
 }
-
-Write-Host "`n🎉 Done!" -ForegroundColor Green
+if ($OpenReport) {
+    if (-not $Coverage) { throw '-OpenReport requires -Coverage.' }
+    $reportGenerator = Get-Command reportgenerator -ErrorAction SilentlyContinue
+    if (-not $reportGenerator) { throw 'ReportGenerator is not installed. Raw coverage XML is available in the build directory.' }
+    & $reportGenerator.Source "-reports:$results/**/coverage.cobertura.xml" "-targetdir:$results/coverage-report" '-reporttypes:Html'
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Start-Process (Join-Path $results 'coverage-report/index.html')
+}

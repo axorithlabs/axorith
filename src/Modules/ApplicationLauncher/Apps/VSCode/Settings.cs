@@ -7,12 +7,8 @@ using Axorith.Shared.Utils;
 namespace Axorith.Module.ApplicationLauncher.Apps.VSCode;
 
 internal sealed class Settings(IAppDiscoveryService appDiscovery) : ProjectLauncherSettingsBase(
-    Setting.AsChoice(
-        "CodePath",
-        "VS Code Executable",
-        string.Empty,
-        [new KeyValuePair<string, string>("", "Scanning for VS Code...")],
-        "Path to Visual Studio Code executable."),
+    Setting.AsChoice("CodePath", "VS Code Executable", string.Empty,
+        [new KeyValuePair<string, string>("", "Scanning for VS Code...")], "Path to Visual Studio Code executable."),
     Setting.AsDirectoryPicker("ProjectPath", "Project Path", "", "Path to the folder or workspace to open."),
     "Additional command-line arguments (e.g. --disable-extensions).")
 {

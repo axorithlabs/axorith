@@ -11,11 +11,9 @@ public class HostNotifier(
 {
     public void ShowToast(string message, NotificationType type = NotificationType.Info) => ShowToast(message, type, "Axorith");
 
-    public void ShowToast(string message, NotificationType type, string? category)
-    {
+    public void ShowToast(string message, NotificationType type, string? category) =>
         // Fire and forget broadcast to clients
         _ = notificationBroadcaster.BroadcastAsync(message, type, GetCategory(category));
-    }
 
     public Task ShowSystemAsync(string title, string message, TimeSpan? expiration = null) =>
         ShowSystemAsync(title, message, title, expiration);

@@ -11,14 +11,9 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
     : IPresetsApi
 {
     public Task<IReadOnlyList<PresetSummary>> ListPresetsAsync(CancellationToken ct = default) =>
-        retryPolicy.ExecuteAsync<IReadOnlyList<PresetSummary>>(async () =>
-        {
-            var response = await client.ListPresetsAsync(new ListPresetsRequest(), cancellationToken: ct)
-                .ConfigureAwait(false);
-            return response.Presets
-                .Select(p => new PresetSummary(Guid.Parse(p.Id), p.Name, p.Version, p.ModuleCount))
-                .ToList();
-        });
+        GrpcResultMapper.ExecuteAsync<ListPresetsResponse, IReadOnlyList<PresetSummary>>(retryPolicy,
+            () => client.ListPresetsAsync(new ListPresetsRequest(), cancellationToken: ct),
+            response => [.. response.Presets.Select(p => new PresetSummary(Guid.Parse(p.Id), p.Name, p.Version, p.ModuleCount))]);
 
     public Task<SessionPreset?> GetPresetAsync(Guid presetId, CancellationToken ct = default) =>
         retryPolicy.ExecuteAsync(async () =>
@@ -39,32 +34,18 @@ internal class GrpcPresetsApi(PresetsService.PresetsServiceClient client, AsyncR
     public Task<SessionPreset> CreatePresetAsync(SessionPreset preset, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(preset);
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.CreatePresetAsync(
-                    new CreatePresetRequest { Preset = PresetCodec.ToMessage(preset) }, cancellationToken: ct)
-                .ConfigureAwait(false);
-            return PresetCodec.ToModel(response);
-        });
+        return GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.CreatePresetAsync(
+            new CreatePresetRequest { Preset = PresetCodec.ToMessage(preset) }, cancellationToken: ct), PresetCodec.ToModel);
     }
 
     public Task<SessionPreset> UpdatePresetAsync(SessionPreset preset, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(preset);
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.UpdatePresetAsync(
-                    new UpdatePresetRequest { Preset = PresetCodec.ToMessage(preset) }, cancellationToken: ct)
-                .ConfigureAwait(false);
-            return PresetCodec.ToModel(response);
-        });
+        return GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.UpdatePresetAsync(
+            new UpdatePresetRequest { Preset = PresetCodec.ToMessage(preset) }, cancellationToken: ct), PresetCodec.ToModel);
     }
 
     public Task DeletePresetAsync(Guid presetId, CancellationToken ct = default) =>
-        retryPolicy.ExecuteAsync(async () =>
-        {
-            await client.DeletePresetAsync(
-                    new DeletePresetRequest { PresetId = presetId.ToString() }, cancellationToken: ct)
-                .ConfigureAwait(false);
-        });
+        GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.DeletePresetAsync(
+            new DeletePresetRequest { PresetId = presetId.ToString() }, cancellationToken: ct), response => response);
 }

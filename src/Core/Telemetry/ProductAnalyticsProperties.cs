@@ -53,7 +53,7 @@ public static partial class ProductAnalyticsProperties
                 : null,
             ["endAtDaysOfWeek"] = endAtConfigured
                 ? DayKeys(options.EndAtDaysOfWeek)
-                : Array.Empty<string>(),
+                : [],
             ["breakCount"] = options.BreakCount,
             ["breakDurationMs"] = options.BreakCount > 0 ? (long)options.BreakDuration.TotalMilliseconds : null,
             ["afterEndAction"] = options.AfterEnd switch
@@ -157,7 +157,7 @@ public static partial class ProductAnalyticsProperties
     {
         var recurring = schedule.Type is ScheduleType.Recurring or ScheduleType.StopRecurring;
         var canChain = schedule.Type is ScheduleType.StopRecurring or ScheduleType.StopDuration;
-        var days = recurring ? DayKeys(schedule.DaysOfWeek) : Array.Empty<string>();
+        var days = recurring ? DayKeys(schedule.DaysOfWeek) : [];
         var properties = new Dictionary<string, object?>
         {
             ["scheduleId"] = schedule.Id,

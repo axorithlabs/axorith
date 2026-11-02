@@ -117,7 +117,7 @@ public class ModulesServiceImplTests
     {
         var instanceId = Guid.NewGuid();
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetActions()).Returns(new List<IAction>());
+        mockModule.Setup(m => m.GetActions()).Returns([]);
         _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId))
             .Returns(mockModule.Object);
 
@@ -158,7 +158,7 @@ public class ModulesServiceImplTests
     {
         var instanceId = Guid.NewGuid();
         var mockModule = new Mock<IModule>();
-        mockModule.Setup(m => m.GetSettings()).Returns(new List<ISetting>());
+        mockModule.Setup(m => m.GetSettings()).Returns([]);
 
         _mockSessionManager.Setup(m => m.GetActiveModuleInstanceByInstanceId(instanceId)).Returns(mockModule.Object);
 

@@ -378,12 +378,9 @@ internal sealed class AuthService : IDisposable
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
     }
 
-    private static string BuildLoginResponse(string? error)
-    {
-        return string.IsNullOrEmpty(error)
+    private static string BuildLoginResponse(string? error) => string.IsNullOrEmpty(error)
             ? "<html><body style='background:#121212;color:#e0e0e0;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Axorith Connected!</h1><p>You can now close this tab and return to the app.</p></body></html>"
             : $"<html><body style='background:#121212;color:#ff5555;font-family:sans-serif;text-align:center;padding-top:50px;'><h1>Login Failed</h1><p>Spotify returned error: {WebUtility.HtmlEncode(error)}</p></body></html>";
-    }
 
     private static string GenerateSecureState()
     {
@@ -401,9 +398,7 @@ internal sealed class AuthService : IDisposable
             .TrimEnd('=')
             .Replace('+', '-')
             .Replace('/', '_');
-
-        using var sha256 = SHA256.Create();
-        var challengeBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
+        var challengeBytes = SHA256.HashData(Encoding.UTF8.GetBytes(codeVerifier));
         var codeChallenge = Convert.ToBase64String(challengeBytes)
             .TrimEnd('=')
             .Replace('+', '-')

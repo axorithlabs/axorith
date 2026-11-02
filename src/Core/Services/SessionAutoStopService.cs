@@ -1,13 +1,13 @@
-using Axorith.Core.Services.Abstractions;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Axorith.Core.Models;
+using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Telemetry;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
 
 namespace Axorith.Core.Services;
 
@@ -20,6 +20,7 @@ public class SessionAutoStopService(
     : ISessionAutoStopService
 {
     private readonly object _stateLock = new();
+    private readonly bool _isTestRun = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1";
     private readonly SemaphoreSlim _naturalEndGate = new(1, 1);
     private readonly HashSet<string> _sentNotificationKeys = [];
     private DateTimeOffset _lastCleanup = DateTimeOffset.Now;
@@ -179,16 +180,12 @@ public class SessionAutoStopService(
 
         TimeSpan timeLeft;
         lock (_stateLock)
-        {
             timeLeft = GetRemainingTimeLocked();
-        }
 
         if (timeLeft <= TimeSpan.Zero)
         {
             if (expectedSession != null)
-            {
                 await CompleteNaturallyAsync(expectedSession, nextPresetId, ct, stopSchedule).ConfigureAwait(false);
-            }
             return;
         }
 
@@ -198,21 +195,13 @@ public class SessionAutoStopService(
     private async Task SendNotificationsIfNeededAsync(TimeSpan timeLeft, CancellationToken ct)
     {
         if (timeLeft <= TimeSpan.FromSeconds(15) && timeLeft > TimeSpan.FromSeconds(10))
-        {
             await TrySendNotificationAsync(TimeSpan.FromSeconds(15), "15 seconds", ct).ConfigureAwait(false);
-        }
         else if (timeLeft <= TimeSpan.FromMinutes(1) && timeLeft > TimeSpan.FromSeconds(55))
-        {
             await TrySendNotificationAsync(TimeSpan.FromMinutes(1), "1 minute", ct).ConfigureAwait(false);
-        }
         else if (timeLeft <= TimeSpan.FromMinutes(5) && timeLeft > TimeSpan.FromMinutes(4.9))
-        {
             await TrySendNotificationAsync(TimeSpan.FromMinutes(5), "5 minutes", ct).ConfigureAwait(false);
-        }
         else if (timeLeft <= TimeSpan.FromMinutes(15) && timeLeft > TimeSpan.FromMinutes(14.9))
-        {
             await TrySendNotificationAsync(TimeSpan.FromMinutes(15), "15 minutes", ct).ConfigureAwait(false);
-        }
     }
 
     private async Task TrySendNotificationAsync(TimeSpan threshold, string timeText, CancellationToken ct)
@@ -231,9 +220,7 @@ public class SessionAutoStopService(
         var key = $"{currentSessionId}_{stopAtTicks}_{threshold.TotalSeconds}";
 
         lock (_stateLock)
-        {
             if (!_sentNotificationKeys.Add(key)) return;
-        }
 
         var preset = sessionManager.ActiveSession;
         if (preset == null) return;
@@ -405,9 +392,7 @@ public class SessionAutoStopService(
         if ((DateTimeOffset.Now - _lastCleanup).TotalHours < 1) return;
 
         lock (_stateLock)
-        {
             _sentNotificationKeys.Clear();
-        }
 
         _lastCleanup = DateTimeOffset.Now;
     }
@@ -415,6 +400,9 @@ public class SessionAutoStopService(
     public async Task ExecuteAfterEndActionAsync(AfterEndBehavior behavior)
     {
         if (behavior is AfterEndBehavior.DoNothing or AfterEndBehavior.StartNextWorkspace) return;
+
+        if (_isTestRun)
+            throw new InvalidOperationException("System power and sign-in actions are disabled in test mode.");
 
         if (!OperatingSystem.IsWindows())
         {
@@ -440,11 +428,9 @@ public class SessionAutoStopService(
             {
                 UseShellExecute = false
             };
-            var arguments = behavior == AfterEndBehavior.SignOut ? new[] { "/l" } : new[] { "/s", "/t", "0" };
+            string[] arguments = behavior == AfterEndBehavior.SignOut ? ["/l"] : ["/s", "/t", "0"];
             foreach (var argument in arguments)
-            {
                 startInfo.ArgumentList.Add(argument);
-            }
 
             Process.Start(startInfo)?.Dispose();
             logger.LogInformation("Executed after-end action {Action}.", behavior);

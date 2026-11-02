@@ -31,10 +31,7 @@ public interface IModule : IDisposable
     ///     Called when module instance is created for editing or viewing (before session start).
     ///     Default implementation does nothing. Override to implement lazy loading.
     /// </summary>
-    Task InitializeAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
+    Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>
     ///     Asynchronously validates the provided user settings.

@@ -37,9 +37,7 @@ internal class ModuleScopedSecureStorage(ISecureStorageService underlyingStorage
             underlyingStorage.DeleteSecret($"{LegacySpotifyModuleId}:{key}");
     }
 
-    private string CreateScopedKey(string key)
-    {
+    private string CreateScopedKey(string key) =>
         // Example: "5fd185cb-21d0-4c2b-9185-cb21d03c2b8e:AccessToken"
-        return $"{moduleDefinition.Id}:{key}";
-    }
+        $"{moduleDefinition.Id}:{key}";
 }

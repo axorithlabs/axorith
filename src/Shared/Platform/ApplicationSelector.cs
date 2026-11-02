@@ -24,15 +24,13 @@ public static class ApplicationSelector
         IAppDiscoveryService discovery,
         Func<AppInfo, string> keySelector,
         Func<AppInfo, bool>? filter = null) =>
-        discovery.GetInstalledApplicationsIndex()
-            .Where(app => !string.IsNullOrWhiteSpace(app.ExecutablePath))
-            .Where(app => !IsWindowsSystemExecutable(app.ExecutablePath))
-            .Where(app => filter?.Invoke(app) ?? true)
+        [.. discovery.GetInstalledApplicationsIndex()
+            .Where(app => !string.IsNullOrWhiteSpace(app.ExecutablePath) &&
+                          !IsWindowsSystemExecutable(app.ExecutablePath) && (filter?.Invoke(app) ?? true))
             .OrderBy(app => app.Name, StringComparer.OrdinalIgnoreCase)
             .Select(app => new KeyValuePair<string, string>(keySelector(app),
                 $"{app.Name}\n{app.ExecutablePath}\n{app.IconPath}"))
-            .DistinctBy(choice => Path.GetFileNameWithoutExtension(choice.Key), StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .DistinctBy(choice => Path.GetFileNameWithoutExtension(choice.Key), StringComparer.OrdinalIgnoreCase)];
 
     public static bool IsSupportedLauncherApp(AppInfo app) =>
         LauncherModules.ContainsKey(Path.GetFileName(app.ExecutablePath)) || IsJetBrainsExecutable(app.ExecutablePath);

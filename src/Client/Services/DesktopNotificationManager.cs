@@ -28,10 +28,8 @@ public class DesktopNotificationManager(
     public void Initialize()
     {
         _screens = desktop.MainWindow?.Screens;
-        if (_screens != null)
-            _screens.Changed += QueueReposition;
-        if (desktop.MainWindow != null)
-            desktop.MainWindow.PositionChanged += QueueReposition;
+        _screens?.Changed += QueueReposition;
+        desktop.MainWindow?.PositionChanged += QueueReposition;
 
         _subscription = toastService.Notifications
             .ObserveOn(AvaloniaScheduler.Instance)
@@ -68,7 +66,7 @@ public class DesktopNotificationManager(
     {
         var mainWindow = desktop.MainWindow;
         var screen = (mainWindow?.PlatformImpl != null ? _screens?.ScreenFromWindow(mainWindow) : null)
-                     ?? _screens?.Primary ?? _screens?.All.FirstOrDefault();
+                     ?? _screens?.Primary ?? (_screens is { All.Count: > 0 } ? _screens.All[0] : null);
         return screen is { WorkingArea.Width: > 0, WorkingArea.Height: > 0, Scaling: > 0 } &&
                double.IsFinite(screen.Scaling) ? screen : null;
     }
@@ -135,16 +133,12 @@ public class DesktopNotificationManager(
     public void Dispose()
     {
         _subscription?.Dispose();
-        if (_screens != null)
-            _screens.Changed -= QueueReposition;
-        if (desktop.MainWindow != null)
-            desktop.MainWindow.PositionChanged -= QueueReposition;
+        _screens?.Changed -= QueueReposition;
+        desktop.MainWindow?.PositionChanged -= QueueReposition;
 
         var windows = _openWindows.ToArray();
         _openWindows.Clear();
         foreach (var window in windows)
-        {
             window.Close();
-        }
     }
 }

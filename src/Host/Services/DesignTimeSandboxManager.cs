@@ -237,9 +237,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
     public void DisposeSandboxesForPreset(IEnumerable<Guid> moduleInstanceIds)
     {
         foreach (var instanceId in moduleInstanceIds)
-        {
             DisposeSandbox(instanceId);
-        }
     }
 
     public void ReBroadcast(Guid instanceId)
@@ -266,23 +264,17 @@ public sealed class DesignTimeSandboxManager : IDisposable
         foreach (var (k, v) in initial)
         {
             if (dict.TryGetValue(k, out var s))
-            {
                 s.SetValueFromString(v);
-            }
         }
     }
 
     private void SubscribeAll(Guid instanceId, Sandbox sb)
     {
         foreach (var s in sb.Module.GetSettings())
-        {
             _broadcaster.SubscribeToSetting(instanceId, s);
-        }
 
         foreach (var a in sb.Module.GetActions())
-        {
             _broadcaster.SubscribeToAction(instanceId, a);
-        }
     }
 
     private void BroadcastAll(Guid instanceId, Sandbox sb)
@@ -364,8 +356,7 @@ public sealed class DesignTimeSandboxManager : IDisposable
     {
         try
         {
-            var toDispose = _sandboxes.Keys.ToArray();
-            foreach (var id in toDispose)
+            foreach (var id in _sandboxes.Keys.ToArray())
             {
                 try
                 {

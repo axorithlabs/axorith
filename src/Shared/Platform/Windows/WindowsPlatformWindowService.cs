@@ -7,10 +7,8 @@ namespace Axorith.Shared.Platform.Windows;
 internal class WindowsPlatformWindowService : IPlatformWindowService
 {
     public Task WaitForWindowInitAsync(Process process, int timeoutMs = 5000,
-        CancellationToken cancellationToken = default)
-    {
-        return WindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
-    }
+        CancellationToken cancellationToken = default) =>
+        WindowApi.WaitForWindowInitAsync(process, timeoutMs, cancellationToken);
 
     public void MoveWindowToMonitor(IntPtr windowHandle, int monitorIndex) => WindowApi.MoveWindowToMonitor(windowHandle, monitorIndex);
 

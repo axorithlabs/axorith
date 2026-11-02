@@ -51,11 +51,11 @@ internal sealed class SpotifyApiService(
     public async Task<List<SpotifyDevice>> GetDevicesAsync()
     {
         var response = await ExecuteAsync(client => client.Player.GetAvailableDevices()).ConfigureAwait(false);
-        return response?.Devices.Select(device => new SpotifyDevice(
+        return response?.Devices.ConvertAll(device => new SpotifyDevice(
             device.Id,
             device.Name,
             device.Type,
-            device.IsActive)).ToList() ?? [];
+            device.IsActive)) ?? [];
     }
 
     public async Task<List<KeyValuePair<string, string>>> GetPlaylistsAsync()
@@ -91,10 +91,8 @@ internal sealed class SpotifyApiService(
     {
         var request = new PlayerResumePlaybackRequest { DeviceId = deviceId };
         if (trackUris is null)
-        {
             request.ContextUri = contextUri;
-        }
-        else request.Uris = trackUris.ToList();
+        else request.Uris = [.. trackUris];
 
         return await ExecuteAsync(client => client.Player.ResumePlayback(request)).ConfigureAwait(false);
     }

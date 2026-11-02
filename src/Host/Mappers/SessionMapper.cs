@@ -5,16 +5,13 @@ namespace Axorith.Host.Mappers;
 
 public static class SessionMapper
 {
-    public static SessionEvent CreateEvent(SessionEventType type, Guid? presetId, string? message = null)
+    public static SessionEvent CreateEvent(SessionEventType type, Guid? presetId, string? message = null) => new()
     {
-        return new SessionEvent
-        {
-            Type = type,
-            PresetId = presetId?.ToString() ?? string.Empty,
-            Message = message ?? string.Empty,
-            Timestamp = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow)
-        };
-    }
+        Type = type,
+        PresetId = presetId?.ToString() ?? string.Empty,
+        Message = message ?? string.Empty,
+        Timestamp = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow)
+    };
 
     public static OperationResult CreateResult(bool success, string? message = null,
         IEnumerable<string>? errors = null, IEnumerable<string>? warnings = null)

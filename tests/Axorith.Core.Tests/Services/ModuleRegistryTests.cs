@@ -56,7 +56,7 @@ public class ModuleRegistryTests : IDisposable
                 It.IsAny<IEnumerable<string>>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(new List<ModuleDefinition> { definition1, definition2 });
+            .ReturnsAsync([definition1, definition2]);
 
         await _registry.InitializeAsync(CancellationToken.None);
 
@@ -82,7 +82,7 @@ public class ModuleRegistryTests : IDisposable
                 It.IsAny<IEnumerable<string>>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(new List<ModuleDefinition> { definition });
+            .ReturnsAsync([definition]);
 
         await _registry.InitializeAsync(CancellationToken.None);
 
@@ -99,7 +99,7 @@ public class ModuleRegistryTests : IDisposable
                 It.IsAny<IEnumerable<string>>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<IEnumerable<string>>()))
-            .ReturnsAsync(new List<ModuleDefinition>());
+            .ReturnsAsync([]);
 
         await _registry.InitializeAsync(CancellationToken.None);
 

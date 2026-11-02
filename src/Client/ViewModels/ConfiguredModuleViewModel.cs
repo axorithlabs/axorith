@@ -9,10 +9,10 @@ using Axorith.Client.Adapters;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
 using Axorith.Core.Models;
-using Axorith.Shared.Platform;
-using Axorith.Shared.Utils;
 using Axorith.Sdk;
 using Axorith.Sdk.Settings;
+using Axorith.Shared.Platform;
+using Axorith.Shared.Utils;
 using Axorith.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -63,20 +63,18 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         get;
         set
         {
-            if (!double.TryParse(value, out var seconds) && !string.IsNullOrEmpty(value))
-            {
-                this.RaisePropertyChanged();
-                return;
-            }
-
+            Model.StartDelay = double.TryParse(value, out var seconds) &&
+                               seconds > 0 && seconds < TimeSpan.MaxValue.TotalSeconds
+                ? TimeSpan.FromSeconds(seconds)
+                : TimeSpan.Zero;
             this.RaiseAndSetIfChanged(ref field, value);
-
-            Model.StartDelay = TimeSpan.FromSeconds(Math.Max(0, seconds));
         }
     }
 
     [Reactive]
     public partial bool HasDelay { get; private set; }
+
+    public bool HasDelayError => HasDelay && Model.StartDelay <= TimeSpan.Zero;
 
     [Reactive]
     public partial ConfiguredModuleViewModel? NextModule { get; set; }
@@ -135,6 +133,9 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
 
         StartDelaySecondsString = model.StartDelay.TotalSeconds.ToString("G29");
         HasDelay = model.StartDelay > TimeSpan.Zero;
+
+        _subscriptions.Add(this.WhenAnyValue(vm => vm.HasDelay, vm => vm.StartDelaySecondsString)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(HasDelayError))));
 
         AddDelayCommand = ReactiveCommand.Create(() =>
         {
@@ -223,15 +224,11 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
                 if (Definition.Name == "Application Launcher")
                 {
                     var applicationSetting = Settings.FirstOrDefault(setting => setting.Setting.Key == "ApplicationPath");
-                    if (applicationSetting != null)
-                    {
-                        applicationSetting.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
-                    }
+                    applicationSetting?.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
 
                     var legacyModuleKeySetting = Settings.FirstOrDefault(setting =>
                         setting.Setting.Key == ApplicationSelector.LegacyModuleKeySetting);
-                    if (legacyModuleKeySetting != null)
-                        legacyModuleKeySetting.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
+                    legacyModuleKeySetting?.ValueChanged += (_, _) => UpdateLauncherActionVisibility();
                 }
 
                 foreach (var action in settingsInfo.Actions)
@@ -404,38 +401,22 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         var settingVm = Settings.FirstOrDefault(s => s.Setting.Key == update.SettingKey);
         if (settingVm?.Setting is ModuleSettingAdapter settingAdapter)
         {
-            switch (update.Property)
+            switch (update.Property, update.Value)
             {
-                case SettingProperty.Value:
+                case (SettingProperty.Value, _):
                     settingAdapter.SetValueFromString(update.Value?.ToString());
                     break;
-                case SettingProperty.Label:
-                    if (update.Value is string l)
-                    {
-                        settingAdapter.SetLabel(l);
-                    }
-
+                case (SettingProperty.Label, string label):
+                    settingAdapter.SetLabel(label);
                     break;
-                case SettingProperty.Visibility:
-                    if (update.Value is bool v)
-                    {
-                        settingAdapter.SetVisibility(v);
-                    }
-
+                case (SettingProperty.Visibility, bool visible):
+                    settingAdapter.SetVisibility(visible);
                     break;
-                case SettingProperty.ReadOnly:
-                    if (update.Value is bool r)
-                    {
-                        settingAdapter.SetReadOnly(r);
-                    }
-
+                case (SettingProperty.ReadOnly, bool readOnly):
+                    settingAdapter.SetReadOnly(readOnly);
                     break;
-                case SettingProperty.Choices:
-                    if (update.Value is IReadOnlyList<KeyValuePair<string, string>> c)
-                    {
-                        settingAdapter.SetChoices(c);
-                    }
-
+                case (SettingProperty.Choices, IReadOnlyList<KeyValuePair<string, string>> choices):
+                    settingAdapter.SetChoices(choices);
                     break;
             }
 
@@ -445,21 +426,13 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         var actionVm = Actions.FirstOrDefault(a => a.Key == update.SettingKey);
         if (actionVm?.SourceAction is not ModuleActionAdapter actionAdapter) return;
 
-        switch (update.Property)
+        switch (update.Property, update.Value)
         {
-            case SettingProperty.ActionEnabled:
-                if (update.Value is bool enabled)
-                {
-                    actionAdapter.SetEnabled(enabled);
-                }
-
+            case (SettingProperty.ActionEnabled, bool enabled):
+                actionAdapter.SetEnabled(enabled);
                 break;
-            case SettingProperty.ActionLabel:
-                if (update.Value is string label)
-                {
-                    actionAdapter.SetLabel(label);
-                }
-
+            case (SettingProperty.ActionLabel, string label):
+                actionAdapter.SetLabel(label);
                 break;
         }
     }
@@ -491,16 +464,12 @@ public partial class ConfiguredModuleViewModel : ReactiveObject, IDisposable
         RemoveDelayCommand.Dispose();
 
         foreach (var setting in Settings)
-        {
             setting.Dispose();
-        }
 
         Settings.Clear();
 
         foreach (var action in Actions)
-        {
             action.Dispose();
-        }
 
         Actions.Clear();
 

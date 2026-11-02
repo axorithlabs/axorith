@@ -16,7 +16,6 @@ public class DesignTimeConfiguration
 {
     public int SandboxIdleTtlSeconds { get; init; } = 300;
     public int MaxSandboxes { get; init; } = 5;
-    public int EvictionIntervalSeconds { get; init; } = 60;
 }
 
 public class StreamingConfiguration
@@ -37,7 +36,6 @@ public class GrpcConfiguration
 public class ModulesConfiguration
 {
     public List<string> SearchPaths { get; init; } = [];
-    public bool EnableHotReload { get; init; }
 
     public List<string> AllowedSymlinks { get; init; } = [];
 
@@ -49,44 +47,26 @@ public class ModulesConfiguration
             return [ApplicationPaths.Modules, devPath];
         }
 
-        return SearchPaths
+        return [.. SearchPaths
             .Select(Environment.ExpandEnvironmentVariables)
-            .Select(Path.GetFullPath)
-            .ToList();
+            .Select(Path.GetFullPath)];
     }
 }
 
 public class PersistenceConfiguration
 {
     public string PresetsPath { get; init; } = string.Empty;
-    public string LogsPath { get; init; } = string.Empty;
     public string ConfigPath { get; init; } = string.Empty;
     public string HostInfoPath { get; init; } = string.Empty;
 
-    public string ResolvePresetsPath()
-    {
-        if (string.IsNullOrWhiteSpace(PresetsPath))
-            return ApplicationPaths.Presets;
+    public string ResolvePresetsPath() => string.IsNullOrWhiteSpace(PresetsPath)
+        ? ApplicationPaths.Presets : ApplicationPaths.ExpandPath(PresetsPath);
 
-        return ApplicationPaths.ExpandPath(PresetsPath);
-    }
+    public string ResolveConfigPath() => string.IsNullOrWhiteSpace(ConfigPath)
+        ? ApplicationPaths.Config : ApplicationPaths.ExpandPath(ConfigPath);
 
-
-    public string ResolveConfigPath()
-    {
-        if (string.IsNullOrWhiteSpace(ConfigPath))
-            return ApplicationPaths.Config;
-
-        return ApplicationPaths.ExpandPath(ConfigPath);
-    }
-
-    public string ResolveHostInfoPath()
-    {
-        if (string.IsNullOrWhiteSpace(HostInfoPath))
-            return ApplicationPaths.HostInfoFile;
-
-        return ApplicationPaths.ExpandPath(HostInfoPath);
-    }
+    public string ResolveHostInfoPath() => string.IsNullOrWhiteSpace(HostInfoPath)
+        ? ApplicationPaths.HostInfoFile : ApplicationPaths.ExpandPath(HostInfoPath);
 }
 
 public class SessionConfiguration

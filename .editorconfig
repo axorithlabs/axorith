@@ -34,6 +34,55 @@ csharp_preserve_single_line_blocks = true
 # Preview features must remain explicit because the solution enables modern .NET APIs.
 dotnet_diagnostic.CA2252.severity = error
 
+# Keep redundant code and avoidable allocations out of every project, including tests.
+dotnet_diagnostic.IDE0028.severity = error
+dotnet_diagnostic.IDE0031.severity = error
+dotnet_diagnostic.IDE0051.severity = error
+dotnet_diagnostic.IDE0052.severity = error
+dotnet_diagnostic.IDE0059.severity = error
+dotnet_diagnostic.IDE0063.severity = error
+dotnet_diagnostic.IDE0066.severity = error
+dotnet_diagnostic.IDE0071.severity = error
+dotnet_diagnostic.IDE0090.severity = error
+dotnet_diagnostic.IDE0300.severity = error
+dotnet_diagnostic.IDE0301.severity = error
+dotnet_diagnostic.IDE0302.severity = error
+dotnet_diagnostic.IDE0303.severity = error
+dotnet_diagnostic.IDE0304.severity = error
+dotnet_diagnostic.IDE0305.severity = error
+dotnet_diagnostic.CA1825.severity = error
+dotnet_diagnostic.CA1826.severity = error
+dotnet_diagnostic.CA1835.severity = error
+dotnet_diagnostic.CA1846.severity = error
+dotnet_diagnostic.CA1850.severity = error
+dotnet_diagnostic.CA1854.severity = error
+dotnet_diagnostic.CA1860.severity = error
+dotnet_diagnostic.CA1862.severity = error
+dotnet_diagnostic.CA1864.severity = error
+dotnet_diagnostic.CA1868.severity = error
+dotnet_diagnostic.CA1869.severity = error
+
+[src/**/*.cs]
+csharp_style_expression_bodied_lambdas = true:error
+dotnet_style_prefer_throw_expression = true:error
+dotnet_style_prefer_auto_properties = true:error
+dotnet_style_prefer_compound_assignment = true:error
+dotnet_style_prefer_simplified_boolean_expressions = true:error
+dotnet_diagnostic.IDE0032.severity = error
+dotnet_diagnostic.IDE0016.severity = error
+dotnet_diagnostic.IDE0053.severity = error
+dotnet_diagnostic.IDE0054.severity = error
+dotnet_diagnostic.IDE0075.severity = error
+dotnet_diagnostic.IDE0074.severity = error
+csharp_style_expression_bodied_methods = true:error
+csharp_style_expression_bodied_properties = true:error
+csharp_style_expression_bodied_accessors = true:error
+csharp_style_prefer_primary_constructors = true:error
+dotnet_diagnostic.IDE0022.severity = error
+dotnet_diagnostic.IDE0025.severity = error
+dotnet_diagnostic.IDE0027.severity = error
+dotnet_diagnostic.IDE0290.severity = error
+
 [*.{json,jsonc}]
 indent_size = 2
 

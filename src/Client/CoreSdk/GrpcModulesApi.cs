@@ -25,7 +25,6 @@ internal class GrpcModulesApi(
 {
     private readonly Subject<SettingUpdate> _settingUpdatesSubject = new();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _instanceStreams = new();
-    private readonly ConcurrentDictionary<Guid, ModuleSettingsInfo> _settingsCache = new();
     private readonly SemaphoreSlim _modulesCacheLock = new(1, 1);
     private IReadOnlyList<ModuleDefinition>? _modulesCache;
     private bool _disposed;
@@ -49,9 +48,7 @@ internal class GrpcModulesApi(
         var completedTask = await Task.WhenAny(connectionReadyTcs.Task, timeoutTask).ConfigureAwait(false);
 
         if (completedTask == timeoutTask)
-        {
             logger.LogWarning("Setting updates stream connection timed out for {InstanceId}", moduleInstanceId);
-        }
 
         return Disposable.Create(() =>
         {
@@ -78,17 +75,9 @@ internal class GrpcModulesApi(
         {
             if (_modulesCache != null) return _modulesCache;
 
-            var modules = await retryPolicy.ExecuteAsync(async () =>
-            {
-                var response = await client.ListModulesAsync(
-                        new ListModulesRequest(),
-                        cancellationToken: ct)
-                    .ConfigureAwait(false);
-
-                return response.Modules
-                    .Select(ToModel)
-                    .ToList();
-            }).ConfigureAwait(false);
+            var modules = await GrpcResultMapper.ExecuteAsync(retryPolicy,
+                () => client.ListModulesAsync(new ListModulesRequest(), cancellationToken: ct),
+                response => response.Modules.Select(ToModel).ToList()).ConfigureAwait(false);
 
             _modulesCache = modules;
             return modules;
@@ -100,9 +89,8 @@ internal class GrpcModulesApi(
     }
 
     public Task<BeginEditResult> BeginEditAsync(Guid moduleId, Guid moduleInstanceId,
-        IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default)
-    {
-        return retryPolicy.ExecuteAsync(async () =>
+        IReadOnlyDictionary<string, object?> initialValues, CancellationToken ct = default) =>
+        GrpcResultMapper.ExecuteAsync(retryPolicy, () =>
         {
             var request = new BeginEditRequest
             {
@@ -111,52 +99,15 @@ internal class GrpcModulesApi(
             };
 
             foreach (var (key, val) in initialValues)
-            {
                 request.InitialValues.Add(SettingValueCodec.Create(key, val));
-            }
 
-            var response = await client.BeginEditAsync(request, cancellationToken: ct).ConfigureAwait(false);
-            var settingsInfo = MapSettingsResponse(response.Settings, response.Actions);
-
-            _settingsCache[moduleId] = settingsInfo;
-
-            var opResult = GrpcResultMapper.ToModel(response.Result);
-
-            return new BeginEditResult(settingsInfo, opResult);
-        });
-    }
+            return client.BeginEditAsync(request, cancellationToken: ct);
+        }, response => new BeginEditResult(MapSettingsResponse(response.Settings, response.Actions),
+            GrpcResultMapper.ToModel(response.Result)));
 
     public Task<OperationResult> EndEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
         => GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.EndEditAsync(
             new EndEditRequest { ModuleInstanceId = moduleInstanceId.ToString() }, cancellationToken: ct));
-
-    public Task<OperationResult> SyncEditAsync(Guid moduleInstanceId, CancellationToken ct = default)
-        => GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.SyncEditAsync(
-            new SyncEditRequest { ModuleInstanceId = moduleInstanceId.ToString() }, cancellationToken: ct));
-
-    public Task<ModuleSettingsInfo> GetModuleSettingsAsync(Guid moduleId, CancellationToken ct = default)
-    {
-        return retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await client.GetModuleSettingsAsync(
-                    new GetModuleSettingsRequest { ModuleId = moduleId.ToString() },
-                    cancellationToken: ct)
-                .ConfigureAwait(false);
-            var info = MapSettingsResponse(response.Settings, response.Actions);
-            _settingsCache[moduleId] = info;
-            return info;
-        });
-    }
-
-    public Task<OperationResult> InvokeActionAsync(Guid moduleInstanceId, string actionKey,
-        CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(actionKey);
-
-        return GrpcResultMapper.ExecuteAsync(retryPolicy, () => client.InvokeActionAsync(
-            new InvokeActionRequest { ModuleInstanceId = moduleInstanceId.ToString(), ActionKey = actionKey },
-            cancellationToken: ct));
-    }
 
     public Task<OperationResult> InvokeDesignTimeActionAsync(Guid moduleId, Guid moduleInstanceId,
         string actionKey,
@@ -193,9 +144,8 @@ internal class GrpcModulesApi(
     }
 
     public Task<ValidationResult> ValidateSettingsAsync(Guid moduleId, Guid moduleInstanceId,
-        IReadOnlyDictionary<string, object?> values, CancellationToken ct = default)
-    {
-        return retryPolicy.ExecuteAsync(async () =>
+        IReadOnlyDictionary<string, object?> values, CancellationToken ct = default) =>
+        retryPolicy.ExecuteAsync(async () =>
         {
             var request = new ValidateSettingsRequest
             {
@@ -204,9 +154,7 @@ internal class GrpcModulesApi(
             };
 
             foreach (var (key, val) in values)
-            {
                 request.Values.Add(SettingValueCodec.Create(key, val));
-            }
 
             var response = await client.ValidateSettingsAsync(request, cancellationToken: ct).ConfigureAwait(false);
 
@@ -215,16 +163,10 @@ internal class GrpcModulesApi(
 
             var fieldErrors = new Dictionary<string, string>();
             foreach (var error in response.FieldErrors)
-            {
                 fieldErrors[error.SettingKey] = error.ErrorMessage;
-            }
 
             return ValidationResult.Fail(fieldErrors, response.Message);
         });
-    }
-
-    public ModuleSettingsInfo? GetCachedSettings(Guid moduleId) => _settingsCache.TryGetValue(moduleId, out var cached) ? cached : null;
-
 
     private static ModuleSettingsInfo MapSettingsResponse(
         IEnumerable<Setting> settings,
@@ -241,7 +183,7 @@ internal class GrpcModulesApi(
                 s.IsReadOnly,
                 s.ValueType,
                 SettingValueCodec.GetString(s),
-                s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display)).ToList(),
+                [.. s.Choices.Select(c => new KeyValuePair<string, string>(c.Key, c.Display))],
                 string.IsNullOrWhiteSpace(s.Filter) ? null : s.Filter,
                 s.HasHistory
             ))

@@ -1,6 +1,6 @@
-using System.Text.Json;
 using System.Diagnostics;
 using System.Security.Principal;
+using System.Text.Json;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Shared.Platform;
@@ -50,16 +50,12 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!OperatingSystem.IsWindows())
-        {
             throw new InvalidOperationException("Strict Windows protection is available only on Windows.");
-        }
 
         try
         {
             if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
-            {
                 throw new InvalidOperationException("Strict protection requires Axorith Host to run as administrator.");
-            }
 
             using var softwareKey = Registry.CurrentUser.OpenSubKey("Software", writable: true);
             _ = softwareKey ?? throw new InvalidOperationException("The current user's registry is not writable.");
@@ -68,9 +64,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
                 var state = JsonSerializer.Deserialize<SavedState>(
                     CommittedSessionStateFile.ReadPayload(_statePath), JsonOptions);
                 if (state == null || state.Values == null || state.Values.Count == 0)
-                {
                     throw new InvalidDataException("Saved Windows protection state is empty.");
-                }
             }
         }
         catch (Exception ex)
@@ -110,15 +104,11 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!File.Exists(_statePath))
-        {
             throw new InvalidDataException("The saved Windows policy snapshot is missing; Strict recovery cannot continue safely.");
-        }
 
         var state = JsonSerializer.Deserialize<SavedState>(ReadStatePayload(), JsonOptions);
         if (state?.Values is not { Count: > 0 })
-        {
             throw new InvalidDataException("The saved Windows policy snapshot is invalid.");
-        }
 
         return Task.CompletedTask;
     }
@@ -132,10 +122,8 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true);
             _ = key ?? throw new InvalidOperationException("The current user's startup settings are not writable.");
-            if (key.GetValue(RunValueName) is not null)
-            {
+            if (key.GetValue(RunValueName) is { } existing && !IsRecoveryStartupCommand(existing))
                 throw new InvalidOperationException("The Axorith recovery startup entry is already in use.");
-            }
         }
         catch (Exception ex)
         {
@@ -156,17 +144,13 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
             {
                 var executablePath = Path.Combine(AppContext.BaseDirectory, "Axorith.Host.exe");
                 if (!File.Exists(executablePath))
-                {
                     throw new InvalidOperationException($"The Host executable could not be found at '{executablePath}'.");
-                }
 
                 var recoveryCommand = $"\"{Path.GetFullPath(executablePath)}\"";
                 using var existingKey = Registry.CurrentUser.OpenSubKey(RunKey);
                 var existingValue = existingKey?.GetValue(RunValueName);
                 if (existingValue is not null && !IsRecoveryStartupCommand(existingValue))
-                {
                     throw new InvalidOperationException("The Axorith recovery startup entry is already in use.");
-                }
 
                 using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true)
                                 ?? throw new InvalidOperationException("Windows startup settings are unavailable.");
@@ -203,9 +187,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
                 : CaptureState();
 
             if (!File.Exists(_statePath))
-            {
                 SaveState(state, cancellationToken);
-            }
 
             _protectionStateRequired = true;
 
@@ -216,9 +198,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
             using var list = Registry.CurrentUser.CreateSubKey(DisallowRunPolicy, writable: true)
                              ?? throw new InvalidOperationException("Cannot create the Windows application restriction list.");
             for (var i = 0; i < BlockedExecutables.Length; i++)
-            {
                 list.SetValue($"Axorith_{i}", BlockedExecutables[i], RegistryValueKind.String);
-            }
 
             _processBlocker ??= PlatformServices.CreateProcessBlocker(logger);
             _processBlocker.Block(BlockedProcessNames, rejectRunning: true);
@@ -261,9 +241,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
                 if (key == null)
                 {
                     if (saved.Exists)
-                    {
                         throw new InvalidOperationException($"Windows policy key '{saved.KeyPath}' is unavailable for restoration.");
-                    }
 
                     continue;
                 }
@@ -291,9 +269,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
             {
                 using var key = Registry.CurrentUser.OpenSubKey(path, writable: true);
                 if (key is { ValueCount: 0, SubKeyCount: 0 })
-                {
                     Registry.CurrentUser.DeleteSubKey(path, throwOnMissingSubKey: false);
-                }
             }
 
             NotifyPolicyChanged();
@@ -369,9 +345,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         Capture(ExplorerPolicy, "NoRun");
         Capture(ExplorerPolicy, "DisallowRun");
         for (var i = 0; i < BlockedExecutables.Length; i++)
-        {
             Capture(DisallowRunPolicy, $"Axorith_{i}");
-        }
 
         return new SavedState(values);
 
@@ -379,7 +353,7 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         {
             using var key = Registry.CurrentUser.OpenSubKey(keyPath);
             var keyExisted = key != null;
-            if (key == null || !key.GetValueNames().Contains(name, StringComparer.OrdinalIgnoreCase))
+            if (key?.GetValueNames().Contains(name, StringComparer.OrdinalIgnoreCase) != true)
             {
                 values.Add(new SavedValue(keyPath, name, keyExisted, false));
                 return;
@@ -449,11 +423,9 @@ public sealed class WindowsCommitmentProtectionService(string stateDirectory,
         return true;
     }
 
-    private static void NotifyPolicyChanged()
-    {
+    private static void NotifyPolicyChanged() =>
         _ = SendMessageTimeout(new IntPtr(0xffff), 0x001A, IntPtr.Zero, "Policy",
             0x0002, 2000, out _);
-    }
 
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wParam, string lParam,

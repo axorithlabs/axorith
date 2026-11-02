@@ -15,18 +15,12 @@ public partial class ModuleDefinitionViewModel(ModuleDefinition definition) : Re
     public partial bool IsJustAdded { get; set; }
 }
 
-public partial class CategoryViewModel : ReactiveObject
+public partial class CategoryViewModel(string name, bool isSelected = false) : ReactiveObject
 {
-    public string Name { get; }
+    public string Name { get; } = name;
 
     [Reactive]
-    public partial bool IsSelected { get; set; }
-
-    public CategoryViewModel(string name, bool isSelected = false)
-    {
-        Name = name;
-        IsSelected = isSelected;
-    }
+    public partial bool IsSelected { get; set; } = isSelected;
 }
 
 public partial class ModuleSelectorViewModel : ReactiveObject
@@ -57,7 +51,7 @@ public partial class ModuleSelectorViewModel : ReactiveObject
             .Select(module => module.Category)
             .Where(category => !string.IsNullOrWhiteSpace(category))
             .Distinct()
-            .OrderBy(category => category)
+            .Order()
             .Select(category => new CategoryViewModel(category))
             .Prepend(new CategoryViewModel("All", true)));
 
@@ -75,9 +69,7 @@ public partial class ModuleSelectorViewModel : ReactiveObject
     private void SelectCategory(CategoryViewModel category)
     {
         foreach (var cat in Categories)
-        {
             cat.IsSelected = cat == category;
-        }
 
         SelectedCategory = category.Name;
     }
@@ -94,17 +86,13 @@ public partial class ModuleSelectorViewModel : ReactiveObject
         }
 
         if (!string.IsNullOrEmpty(SelectedCategory) && SelectedCategory != "All")
-        {
             query = query.Where(m => string.Equals(m.Category, SelectedCategory, StringComparison.OrdinalIgnoreCase));
-        }
 
         var result = query.OrderBy(m => m.Name).ToList();
 
         FilteredModules.Clear();
         foreach (var module in result)
-        {
             FilteredModules.Add(new ModuleDefinitionViewModel(module));
-        }
     }
 
     [ReactiveCommand]

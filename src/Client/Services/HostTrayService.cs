@@ -46,7 +46,7 @@ public sealed class HostTrayService(
         };
 
         _showItem = new NativeMenuItem("Show") { IsEnabled = false };
-        _showItem.Click += (_, _) => { ShowMainWindow(desktop); };
+        _showItem.Click += (_, _) => ShowMainWindow(desktop);
 
         _exitItem = new NativeMenuItem("Exit") { IsEnabled = false };
         _exitItem.Click += (_, _) =>
@@ -159,7 +159,7 @@ public sealed class HostTrayService(
             });
         }
 
-        _trayIcon.Clicked += (_, _) => { ShowMainWindow(desktop); };
+        _trayIcon.Clicked += (_, _) => ShowMainWindow(desktop);
 
         var trayIcons = new TrayIcons { _trayIcon };
         Application.Current?.SetValue(TrayIcon.IconsProperty, trayIcons);
@@ -174,8 +174,7 @@ public sealed class HostTrayService(
         {
             try
             {
-                var healthy = await hostController.IsHostReachableAsync(ct);
-                _isHostRunning = healthy;
+                _isHostRunning = await hostController.IsHostReachableAsync(ct);
                 await UpdateMenuAsync();
             }
             catch (Exception ex)
@@ -194,19 +193,16 @@ public sealed class HostTrayService(
         }
     }
 
-    private async Task UpdateMenuAsync()
-    {
-        await Dispatcher.UIThread.InvokeAsync(() =>
+    private async Task UpdateMenuAsync() => await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var isReady = !_isInitializing && !_isChangingHost;
-            if (_showItem != null) _showItem.IsEnabled = isReady;
-            if (_exitItem != null) _exitItem.IsEnabled = isReady;
+            _showItem?.IsEnabled = isReady;
+            _exitItem?.IsEnabled = isReady;
             _hostStatusItem?.Header = _isHostRunning ? "Host: Running" : "Host: Stopped";
             _hostStartStopItem?.Header = _isHostRunning ? "Stop Host" : "Start Host";
-            if (_hostStartStopItem != null) _hostStartStopItem.IsEnabled = isReady && (!_isHostRunning || _canControlHost);
-            if (_hostRestartItem != null) _hostRestartItem.IsEnabled = isReady && _isHostRunning && _canControlHost;
+            _hostStartStopItem?.IsEnabled = isReady && (!_isHostRunning || _canControlHost);
+            _hostRestartItem?.IsEnabled = isReady && _isHostRunning && _canControlHost;
         });
-    }
 
     private void ShowErrorPageImmediate()
     {
@@ -227,9 +223,7 @@ public sealed class HostTrayService(
                     healthMonitor.Resume();
 
                     if (Application.Current is not App app)
-                    {
                         throw new InvalidOperationException("Application.Current is not Axorith.Client.App");
-                    }
 
                     var initializer = services.GetRequiredService<ConnectionInitializer>();
                     var loggerFactory = services.GetRequiredService<ILoggerFactory>();

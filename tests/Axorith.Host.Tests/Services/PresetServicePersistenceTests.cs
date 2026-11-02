@@ -11,21 +11,21 @@ using Axorith.Telemetry;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
-using CorePreset = Axorith.Core.Models.SessionPreset;
 using CoreConfiguredModule = Axorith.Core.Models.ConfiguredModule;
+using CorePreset = Axorith.Core.Models.SessionPreset;
 using SdkModuleDefinition = Axorith.Sdk.ModuleDefinition;
 
 namespace Axorith.Host.Tests.Services;
 
-public sealed class PresetServiceTelemetryTests
+public sealed class PresetServicePersistenceTests
 {
     [Fact]
-    public async Task PresetTelemetry_SkipsIdenticalUpdatesAndDescribesChangedAndDeletedConfiguration()
+    public async Task ConfigurationUpdatesAndDeletionArePersisted()
     {
         var directory = Directory.CreateTempSubdirectory("axorith-preset-telemetry-");
         try
         {
-            var telemetry = new RecordingTelemetryService();
+            var telemetry = NoopTelemetryService.Instance;
             var moduleRegistry = new EmptyModuleRegistry();
             await using var sessionManager = new SessionManager(moduleRegistry, NullLogger<SessionManager>.Instance,
                 TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5),
@@ -57,33 +57,25 @@ public sealed class PresetServiceTelemetryTests
 
             await service.UpdatePreset(new UpdatePresetRequest { Preset = PresetCodec.ToMessage(preset) },
                 GrpcTestContext.Create());
-            Assert.Empty(telemetry.Events);
+            var fresh = new PresetManager(Path.Combine(directory.FullName, "presets"), NullLogger<PresetManager>.Instance);
+            Assert.Equal("private-value", (await fresh.GetPresetByIdAsync(preset.Id, CancellationToken.None))!.Modules[0].Settings["PrivateSetting"]);
 
             var focusChanged = PresetCodec.ToMessage(preset);
             focusChanged.FocusCommitment.Mode = (Axorith.Contracts.FocusCommitmentMode)2;
             await service.UpdatePreset(new UpdatePresetRequest { Preset = focusChanged }, GrpcTestContext.Create());
-            var focusEvents = telemetry.Events.ToArray();
-            Assert.Equal(["PresetUpdated", "ModuleConfigurationSaved"],
-                focusEvents.Select(item => item.Name).ToArray());
-            Assert.False((bool)focusEvents[1].Properties["moduleConfigurationChanged"]!);
+            Assert.Equal((Axorith.Core.Models.FocusCommitmentMode)2,
+                (await fresh.GetPresetByIdAsync(preset.Id, CancellationToken.None))!.FocusCommitment.Mode);
 
             var moduleChanged = PresetCodec.ToMessage(preset);
             moduleChanged.FocusCommitment.Mode = (Axorith.Contracts.FocusCommitmentMode)2;
             moduleChanged.Modules[0].Settings["PrivateSetting"] = "changed-private-value";
             await service.UpdatePreset(new UpdatePresetRequest { Preset = moduleChanged }, GrpcTestContext.Create());
-            var moduleEvent = telemetry.Events.Last(item => item.Name == "ModuleConfigurationSaved");
-            Assert.True((bool)moduleEvent.Properties["moduleConfigurationChanged"]!);
+            Assert.Equal("changed-private-value",
+                (await fresh.GetPresetByIdAsync(preset.Id, CancellationToken.None))!.Modules[0].Settings["PrivateSetting"]);
 
             await service.DeletePreset(new DeletePresetRequest { PresetId = preset.Id.ToString("D") },
                 GrpcTestContext.Create());
-            var deleted = telemetry.Events.Single(item => item.Name == "PresetDeleted").Properties;
-            var deletedPreset = (Dictionary<string, object?>)deleted["preset"]!;
-            Assert.Equal("strict", deletedPreset["commitmentMode"]);
-            Assert.Equal(1, deletedPreset["moduleCount"]);
-            var modules = (Dictionary<string, object?>[])deletedPreset["modules"]!;
-            Assert.Equal("custom", Assert.Single(modules)["type"]);
-            var state = (Dictionary<string, object?>)deleted["$set"]!;
-            Assert.Equal(0, state["presetCount"]);
+            Assert.Null(await fresh.GetPresetByIdAsync(preset.Id, CancellationToken.None));
         }
         finally
         {
@@ -117,16 +109,4 @@ public sealed class PresetServiceTelemetryTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private sealed class RecordingTelemetryService : ITelemetryService
-    {
-        public List<(string Name, Dictionary<string, object?> Properties)> Events { get; } = [];
-        public bool IsEnabled => true;
-        public void SetEnabled(bool enabled) { }
-        public void TrackEvent(string eventName, IReadOnlyDictionary<string, object?>? properties = null) =>
-            Events.Add((eventName, properties is null ? [] : new Dictionary<string, object?>(properties)));
-        public void TrackError(Exception exception, string subsystem, string operation, string severity, bool handled,
-            bool fatal, IReadOnlyDictionary<string, object?>? properties = null) { }
-        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
 }

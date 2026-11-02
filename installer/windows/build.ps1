@@ -6,6 +6,7 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+$WarningPreference = "Stop"
 $env:AVALONIA_TELEMETRY_OPTOUT = '1'
 
 try {

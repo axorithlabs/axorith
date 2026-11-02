@@ -7,42 +7,25 @@ namespace Axorith.Core.Logging;
 
 internal class ModuleLoggerAdapter(ILogger logger, string moduleName) : IModuleLogger
 {
-    private IDisposable BeginModuleScope()
-    {
-        return logger.BeginScope(new Dictionary<string, object>
-        {
-            ["ModuleName"] = Sanitize(moduleName)
-        })!;
-    }
+    public void LogDebug(string messageTemplate, params object[] args) =>
+        Log(LogLevel.Debug, null, messageTemplate, args);
 
-    public void LogDebug(string messageTemplate, params object[] args)
-    {
-        using var scope = BeginModuleScope();
-        logger.LogDebug(Sanitize(messageTemplate), SanitizeArguments(args));
-    }
+    public void LogInfo(string messageTemplate, params object[] args) =>
+        Log(LogLevel.Information, null, messageTemplate, args);
 
-    public void LogInfo(string messageTemplate, params object[] args)
-    {
-        using var scope = BeginModuleScope();
-        logger.LogInformation(Sanitize(messageTemplate), SanitizeArguments(args));
-    }
+    public void LogWarning(string messageTemplate, params object[] args) =>
+        Log(LogLevel.Warning, null, messageTemplate, args);
 
-    public void LogWarning(string messageTemplate, params object[] args)
-    {
-        using var scope = BeginModuleScope();
-        logger.LogWarning(Sanitize(messageTemplate), SanitizeArguments(args));
-    }
+    public void LogError(Exception? exception, string messageTemplate, params object[] args) =>
+        Log(LogLevel.Error, exception, messageTemplate, args);
 
-    public void LogError(Exception? exception, string messageTemplate, params object[] args)
-    {
-        using var scope = BeginModuleScope();
-        logger.LogError(exception, Sanitize(messageTemplate), SanitizeArguments(args));
-    }
+    public void LogFatal(Exception? exception, string messageTemplate, params object[] args) =>
+        Log(LogLevel.Critical, exception, messageTemplate, args);
 
-    public void LogFatal(Exception? exception, string messageTemplate, params object[] args)
+    private void Log(LogLevel level, Exception? exception, string messageTemplate, object[] args)
     {
-        using var scope = BeginModuleScope();
-        logger.LogCritical(exception, Sanitize(messageTemplate), SanitizeArguments(args));
+        using var scope = logger.BeginScope(new Dictionary<string, object> { ["ModuleName"] = Sanitize(moduleName) });
+        logger.Log(level, exception, Sanitize(messageTemplate), SanitizeArguments(args));
     }
 
     private static string Sanitize(string value) => value.Replace("\r", "\\r").Replace("\n", "\\n");

@@ -22,21 +22,12 @@ internal sealed class Settings : LauncherSettingsBase
     {
         _appDiscovery = appDiscovery;
 
-        SteamPath = Setting.AsChoice(
-            key: "SteamPath",
-            label: "Steam Executable",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Scanning for Steam...")],
-            description: "Path to Steam executable."
-        );
+        SteamPath = Setting.AsChoice("SteamPath", "Steam Executable", string.Empty,
+            [new KeyValuePair<string, string>("", "Scanning for Steam...")], description: "Path to Steam executable.");
 
-        SelectedGame = Setting.AsChoice(
-            key: "SelectedGame",
-            label: "Game to Launch",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Select Steam path first...")],
-            description: "Select a game to launch when session starts. Leave empty to just launch Steam."
-        );
+        SelectedGame = Setting.AsChoice("SelectedGame", "Game to Launch", string.Empty,
+            [new KeyValuePair<string, string>("", "Select Steam path first...")],
+            description: "Select a game to launch when session starts. Leave empty to just launch Steam.");
 
         RefreshGamesAction = new Action("RefreshGames", "Refresh Game List");
         RefreshGamesAction.OnInvokeAsync(RefreshGamesAsync);
@@ -54,9 +45,8 @@ internal sealed class Settings : LauncherSettingsBase
         await RefreshGamesAsync();
     }
 
-    private Task RefreshSteamPathAsync()
-    {
-        return Task.Run(() =>
+    private Task RefreshSteamPathAsync() =>
+        Task.Run(() =>
         {
             var steamExe = _appDiscovery.FindKnownApp("steam.exe", "Steam");
 
@@ -66,11 +56,9 @@ internal sealed class Settings : LauncherSettingsBase
             SetDetectedApplicationPath(steamExe, "Steam (Auto-Detected)", "Steam not found",
                 current => $"{Path.GetFileName(current)} (Custom)");
         });
-    }
 
-    private Task RefreshGamesAsync()
-    {
-        return Task.Run(() =>
+    private Task RefreshGamesAsync() =>
+        Task.Run(() =>
         {
             var steamExe = SteamPath.GetCurrentValue();
             var steamDir = SteamGameScanner.GetSteamDirectory(steamExe);
@@ -90,18 +78,13 @@ internal sealed class Settings : LauncherSettingsBase
             choices.AddRange(games.Select(game => new KeyValuePair<string, string>(game.AppId, game.Name)));
 
             if (choices.Count == 1)
-            {
                 choices = [new KeyValuePair<string, string>("", "No games found")];
-            }
 
             SelectedGame.SetChoices(choices);
 
             var current = SelectedGame.GetCurrentValue();
             if (!string.IsNullOrEmpty(current) && choices.All(c => c.Key != current))
-            {
                 SelectedGame.SetValue(string.Empty);
-            }
         });
-    }
 
 }

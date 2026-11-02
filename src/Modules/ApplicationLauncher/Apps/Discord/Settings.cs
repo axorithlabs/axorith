@@ -18,22 +18,17 @@ internal sealed class Settings : LauncherSettingsBase
     {
         _appDiscovery = appDiscovery;
 
-        DiscordPath = Setting.AsChoice(
-            key: "DiscordPath",
-            label: "Discord Executable",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Scanning for Discord...")],
-            description: "Path to Discord executable."
-        );
+        DiscordPath = Setting.AsChoice("DiscordPath", "Discord Executable", string.Empty,
+            [new KeyValuePair<string, string>("", "Scanning for Discord...")],
+            description: "Path to Discord executable.");
 
         SetupBaseReactiveVisibility();
     }
 
     protected override Task InitializeAdditionalAsync() => RefreshPathAsync();
 
-    private Task RefreshPathAsync()
-    {
-        return Task.Run(() =>
+    private Task RefreshPathAsync() =>
+        Task.Run(() =>
         {
             var platform = EnvironmentUtils.GetCurrentPlatform();
             string? path = null;
@@ -60,14 +55,11 @@ internal sealed class Settings : LauncherSettingsBase
                 }
 
                 if (string.IsNullOrEmpty(path))
-                {
                     path = _appDiscovery.FindKnownApp("Discord.exe", "Discord");
-                }
             }
             else path = _appDiscovery.FindKnownApp("discord");
 
             SetDetectedApplicationPath(path, "Discord (Auto-Detected)", "Discord not found");
         });
-    }
 
 }

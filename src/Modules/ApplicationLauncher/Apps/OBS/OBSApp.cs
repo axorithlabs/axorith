@@ -62,9 +62,7 @@ internal sealed class OBSApp : LauncherAppBase
                 var action = _settings.SessionEndAction.GetCurrentValue();
                 await ExecuteActionAsync(action, cancellationToken).ConfigureAwait(false);
                 if (action != ObsSettings.ActionNone)
-                {
                     await Task.Delay(1_500, cancellationToken).ConfigureAwait(false);
-                }
             }
 
             await _webSocketService.DisconnectAsync().ConfigureAwait(false);
@@ -111,40 +109,18 @@ internal sealed class OBSApp : LauncherAppBase
 
     private async Task ExecuteActionAsync(string action, CancellationToken cancellationToken)
     {
-        switch (action)
-        {
-            case ObsSettings.ActionStartStreaming:
-                await _webSocketService.StartStreamingAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStartRecording:
-                await _webSocketService.StartRecordingAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStartBoth:
-                await _webSocketService.StartStreamingAsync(cancellationToken).ConfigureAwait(false);
-                await _webSocketService.StartRecordingAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStartVirtualCam:
-                await _webSocketService.StartVirtualCameraAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStopStreaming:
-                await _webSocketService.StopStreamingAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStopRecording:
-                await _webSocketService.StopRecordingAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStopBoth:
-                await _webSocketService.StopStreamingAsync(cancellationToken).ConfigureAwait(false);
-                await _webSocketService.StopRecordingAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStopVirtualCam:
-                await _webSocketService.StopVirtualCameraAsync(cancellationToken).ConfigureAwait(false);
-                break;
-            case ObsSettings.ActionStopAll:
-                await _webSocketService.StopStreamingAsync(cancellationToken).ConfigureAwait(false);
-                await _webSocketService.StopRecordingAsync(cancellationToken).ConfigureAwait(false);
-                await _webSocketService.StopVirtualCameraAsync(cancellationToken).ConfigureAwait(false);
-                break;
-        }
+        if (action is ObsSettings.ActionStartStreaming or ObsSettings.ActionStartBoth)
+            await _webSocketService.StartStreamingAsync(cancellationToken).ConfigureAwait(false);
+        if (action is ObsSettings.ActionStartRecording or ObsSettings.ActionStartBoth)
+            await _webSocketService.StartRecordingAsync(cancellationToken).ConfigureAwait(false);
+        if (action == ObsSettings.ActionStartVirtualCam)
+            await _webSocketService.StartVirtualCameraAsync(cancellationToken).ConfigureAwait(false);
+        if (action is ObsSettings.ActionStopStreaming or ObsSettings.ActionStopBoth or ObsSettings.ActionStopAll)
+            await _webSocketService.StopStreamingAsync(cancellationToken).ConfigureAwait(false);
+        if (action is ObsSettings.ActionStopRecording or ObsSettings.ActionStopBoth or ObsSettings.ActionStopAll)
+            await _webSocketService.StopRecordingAsync(cancellationToken).ConfigureAwait(false);
+        if (action is ObsSettings.ActionStopVirtualCam or ObsSettings.ActionStopAll)
+            await _webSocketService.StopVirtualCameraAsync(cancellationToken).ConfigureAwait(false);
     }
 
 }

@@ -12,8 +12,9 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
     private readonly string _legacySettingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
     private const long MaxSettingsFileSizeBytes = 1 * 1024 * 1024; // 1 MB max
 
-    private static readonly JsonSerializerOptions DeserializeOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        WriteIndented = true,
         MaxDepth = 32 // Prevent stack overflow from deeply nested JSON
     };
 
@@ -23,9 +24,7 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
         try
         {
             if (!File.Exists(settingsPath))
-            {
                 settingsPath = _legacySettingsPath;
-            }
 
             if (!File.Exists(settingsPath))
                 return LoadDefaults();
@@ -45,12 +44,10 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
 
             // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
             // File size and MaxDepth are validated to prevent DoS attacks
-            var config = JsonSerializer.Deserialize<ClientUiConfiguration>(json, DeserializeOptions); //-V5611
+            var config = JsonSerializer.Deserialize<ClientUiConfiguration>(json, JsonOptions); //-V5611
             config ??= new ClientUiConfiguration();
             if (TelemetryPreference.TryRead(out var telemetryEnabled))
-            {
                 config.TelemetryEnabled = telemetryEnabled;
-            }
             return config;
         }
         catch (Exception ex)
@@ -65,9 +62,7 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
     {
         var configuration = new ClientUiConfiguration();
         if (TelemetryPreference.TryRead(out var telemetryEnabled))
-        {
             configuration.TelemetryEnabled = telemetryEnabled;
-        }
 
         return configuration;
     }
@@ -76,10 +71,7 @@ public sealed class UiSettingsStore(ILogger<UiSettingsStore> logger) : IClientUi
     {
         try
         {
-            var json = JsonSerializer.Serialize(configuration, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(configuration, JsonOptions);
 
             Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
             File.WriteAllText(_settingsPath, json);

@@ -24,9 +24,7 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
             {
                 var dir = Path.GetDirectoryName(initialPath);
                 if (dir != null)
-                {
                     options.SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(dir);
-                }
             }
             catch
             {
@@ -35,12 +33,10 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
         }
 
         if (!string.IsNullOrWhiteSpace(filter))
-        {
             options.FileTypeFilter = ParseFilter(filter);
-        }
 
         var result = await StorageProvider.OpenFilePickerAsync(options);
-        return result.FirstOrDefault()?.Path.LocalPath;
+        return result.Count == 0 ? null : result[0].Path.LocalPath;
     }
 
     public async Task<string?> PickFolderAsync(string title, string? initialPath)
@@ -67,11 +63,10 @@ public sealed class FilePickerService(IClassicDesktopStyleApplicationLifetime de
         }
 
         var result = await StorageProvider.OpenFolderPickerAsync(options);
-        var folder = result.FirstOrDefault();
-
-        if (folder == null)
+        if (result.Count == 0)
             return null;
 
+        var folder = result[0];
         return folder.Path.IsAbsoluteUri ? folder.Path.LocalPath : folder.Path.OriginalString;
     }
 

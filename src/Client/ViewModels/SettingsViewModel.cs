@@ -25,9 +25,7 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly CompositeDisposable _disposables = [];
     private readonly ClientUiConfiguration _config;
-    private readonly ClientOnboardingService? _onboardingService;
     private readonly IToastNotificationService? _toastService;
-    private readonly IObservable<bool> _canRunSetup;
     public MainViewModel? MainViewModel { get; }
     public bool CanCheckForUpdates => MainViewModel is not null;
 
@@ -78,9 +76,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
     public ICommand OpenPrivacyPolicyCommand { get; }
     public ICommand OpenGitHubCommand { get; }
 
-    [Reactive]
-    public partial bool IsRunningSetup { get; private set; }
-
     public SettingsViewModel(
         ShellViewModel shell,
         IClientUiSettingsStore settingsStore,
@@ -98,7 +93,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
         _logger = logger;
         _serviceProvider = serviceProvider;
         _config = options.Value.Ui;
-        _onboardingService = serviceProvider.GetService<ClientOnboardingService>();
         _toastService = serviceProvider.GetService<IToastNotificationService>();
 
         var version = Assembly.GetEntryAssembly()?.GetName().Version;
@@ -111,8 +105,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
         SelectSectionCommand = ReactiveCommand.Create<string>(section => SelectedSection = section);
         OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrl("https://axorith.com/privacy/"));
         OpenGitHubCommand = ReactiveCommand.Create(() => OpenUrl("https://github.com/axorithlabs/axorith"));
-
-        _canRunSetup = this.WhenAnyValue(x => x.IsRunningSetup, running => !running);
     }
 
     private void LoadSettings()
@@ -133,6 +125,8 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
     [ReactiveCommand]
     private void Save()
     {
+        var previous = (_config.TelemetryEnabled, _config.AutoStartEnabled, _config.AutoStartMinimized,
+            _config.MinimizeToTrayOnClose);
         try
         {
             List<string> changedCategories = [];
@@ -146,18 +140,24 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
             _config.AutoStartMinimized = _autoStartMinimized;
             _config.MinimizeToTrayOnClose = _minimizeToTrayOnClose;
 
-            var saved = _settingsStore.Save(_config);
+            if (!_settingsStore.Save(_config))
+            {
+                (_config.TelemetryEnabled, _config.AutoStartEnabled, _config.AutoStartMinimized,
+                    _config.MinimizeToTrayOnClose) = previous;
+                _toastService?.Show("Could not save settings. Your changes are still open; try again.",
+                    NotificationType.Error, "Settings");
+                _logger.LogWarning("Settings were not saved; keeping pending changes.");
+                return;
+            }
             _telemetry.SetEnabled(_telemetryEnabled);
 
             if (_autoStartEnabled)
-            {
                 _autoStartManager.EnableAutoStart(_autoStartMinimized);
-            }
             else _autoStartManager.DisableAutoStart();
 
             HasUnsavedChanges = false;
 
-            if (saved && changedCategories.Count > 0)
+            if (changedCategories.Count > 0)
             {
                 _telemetry.TrackEvent("SettingsChanged", new Dictionary<string, object?>
                 {
@@ -184,13 +184,12 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
         if (HasUnsavedChanges)
         {
             Save();
+            if (HasUnsavedChanges) return;
         }
 
         var mainViewModel = MainViewModel ?? _serviceProvider.GetRequiredService<MainViewModel>();
         if (showPresets)
-        {
             mainViewModel.ShowPresets();
-        }
         else mainViewModel.ShowHome();
 
         await mainViewModel.InitializeAsync();
@@ -205,69 +204,6 @@ public sealed partial class SettingsViewModel : ReactiveObject, IDisposable
         }
         catch
         {
-        }
-    }
-
-    [ReactiveCommand(CanExecute = nameof(_canRunSetup))]
-    private async Task RunSetupWizard()
-    {
-        if (_onboardingService == null)
-            return;
-
-        IsRunningSetup = true;
-
-        try
-        {
-            _telemetry.TrackEvent("OnboardingStarted");
-            var result = await _onboardingService.RunSetupAsync();
-
-            if (result.Errors.Count == 0 && result.ErrorMessage is null)
-            {
-                _telemetry.TrackEvent("OnboardingCompleted", new Dictionary<string, object?>
-                {
-                    ["createdCount"] = result.CreatedCount,
-                    ["createdModuleTypes"] = result.CreatedModuleTypes
-                });
-                if (result.CreatedCount > 0)
-                {
-                    _toastService?.Show(
-                        $"Setup complete: Created {result.CreatedCount} preset(s): {string.Join(", ", result.CreatedPresetNames)}",
-                        NotificationType.Success, "Settings");
-                }
-                else
-                {
-                    _toastService?.Show("No new presets created. Required modules may not be installed.", category: "Settings");
-                }
-            }
-            else
-            {
-                _telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
-                {
-                    ["stage"] = "onboarding",
-                    ["result"] = "failed",
-                    ["errorMessage"] = result.ErrorMessage ?? result.Errors.FirstOrDefault(),
-                    ["errors"] = result.Errors
-                });
-                _toastService?.Show(
-                    $"Setup completed with errors: {result.Errors.FirstOrDefault() ?? result.ErrorMessage}",
-                    NotificationType.Warning, "Settings");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Setup wizard failed");
-            _telemetry.TrackError(ex, "onboarding", "onboarding_create", "error", handled: true, fatal: false);
-            _telemetry.TrackEvent("OnboardingFailed", new Dictionary<string, object?>
-            {
-                ["stage"] = "onboarding",
-                ["result"] = "failed",
-                ["exception"] = ex
-            });
-            _toastService?.Show($"Setup failed: {ex.Message}", NotificationType.Error, "Settings");
-        }
-        finally
-        {
-            IsRunningSetup = false;
         }
     }
 

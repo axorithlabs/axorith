@@ -121,7 +121,8 @@ public class SessionEventBroadcasterTests : IDisposable
         await Task.Delay(50);
 
         // Trigger event
-        _capturedSessionStarted?.Invoke(Guid.NewGuid());
+        var presetId = Guid.NewGuid();
+        _capturedSessionStarted?.Invoke(presetId);
         await Task.Delay(100);
 
         // Cleanup
@@ -130,7 +131,8 @@ public class SessionEventBroadcasterTests : IDisposable
 
         await Task.WhenAll(sub1, sub2);
 
-        receivedEvents2.Should().NotBeEmpty();
+        receivedEvents1.Should().BeEmpty();
+        receivedEvents2.Should().ContainSingle().Which.PresetId.Should().Be(presetId.ToString());
     }
 
 

@@ -7,7 +7,7 @@ namespace Axorith.Client.Controls;
 public sealed class FocusActivityChart : Control
 {
     public static readonly StyledProperty<IReadOnlyList<double>> ValuesProperty =
-        AvaloniaProperty.Register<FocusActivityChart, IReadOnlyList<double>>(nameof(Values), Array.Empty<double>());
+        AvaloniaProperty.Register<FocusActivityChart, IReadOnlyList<double>>(nameof(Values), []);
 
     public static readonly StyledProperty<IBrush?> StrokeProperty =
         AvaloniaProperty.Register<FocusActivityChart, IBrush?>(nameof(Stroke));

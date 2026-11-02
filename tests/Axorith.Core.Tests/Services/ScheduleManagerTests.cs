@@ -157,6 +157,12 @@ public class ScheduleManagerTests : IAsyncDisposable
 
         var filePath = Path.Combine(_testStorageDirectory, "config", "schedules.json");
         File.Exists(filePath).Should().BeTrue();
+        await using var restored = new ScheduleManager(_testStorageDirectory, _mockSessionManager.Object,
+            _mockPresetManager.Object, _mockAutoStopService.Object, _mockNotifier.Object,
+            NullLogger<ScheduleManager>.Instance);
+        await restored.StartAsync(CancellationToken.None);
+        (await restored.ListSchedulesAsync(CancellationToken.None)).Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(schedule);
     }
 
 
@@ -262,7 +268,7 @@ public class ScheduleManagerTests : IAsyncDisposable
 
             var schedules = await newManager.ListSchedulesAsync(CancellationToken.None);
             schedules.Should().HaveCount(1);
-            schedules[0].Name.Should().Be("Persistent");
+            schedules[0].Should().BeEquivalentTo(schedule);
         }
         finally
         {

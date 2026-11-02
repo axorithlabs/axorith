@@ -1,17 +1,17 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using Axorith.Core.Models;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Contracts;
+using Axorith.Core.Models;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Polly.Retry;
+using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
+using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 using OperationResult = Axorith.Client.CoreSdk.Abstractions.OperationResult;
 using SessionEvent = Axorith.Client.CoreSdk.Abstractions.SessionEvent;
 using SessionEventType = Axorith.Client.CoreSdk.Abstractions.SessionEventType;
 using SessionState = Axorith.Client.CoreSdk.Abstractions.SessionState;
-using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
-using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
 
 namespace Axorith.Client.CoreSdk;
 
@@ -54,18 +54,14 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
     public IObservable<SessionEvent> SessionEvents => _eventsSubject.AsObservable();
 
     public Task<IReadOnlyList<SessionActivity>> GetSessionHistoryAsync(CancellationToken ct = default) =>
-        _retryPolicy.ExecuteAsync<IReadOnlyList<SessionActivity>>(async () =>
-        {
-            var response = await _client.GetSessionHistoryAsync(new GetSessionStateRequest(), cancellationToken: ct)
-                .ConfigureAwait(false);
-            return response.Entries.Select(entry => new SessionActivity(
+        GrpcResultMapper.ExecuteAsync<SessionHistory, IReadOnlyList<SessionActivity>>(_retryPolicy,
+            () => _client.GetSessionHistoryAsync(new GetSessionStateRequest(), cancellationToken: ct),
+            response => [.. response.Entries.Select(entry => new SessionActivity(
                 DateTimeOffset.FromUnixTimeMilliseconds(entry.StartedAtUnixMs),
-                DateTimeOffset.FromUnixTimeMilliseconds(entry.EndedAtUnixMs), entry.PresetName)).ToArray();
-        });
+                DateTimeOffset.FromUnixTimeMilliseconds(entry.EndedAtUnixMs), entry.PresetName))]);
 
-    public Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default)
-    {
-        return _retryPolicy.ExecuteAsync(async () =>
+    public Task<SessionState?> GetCurrentSessionAsync(CancellationToken ct = default) =>
+        _retryPolicy.ExecuteAsync(async () =>
         {
             var response = await _client.GetSessionStateAsync(
                     new GetSessionStateRequest(),
@@ -100,7 +96,6 @@ internal class GrpcSessionsApi : ISessionsApi, IDisposable
                 TimeSpan.FromSeconds(response.RemainingSeconds),
                 breakEndsAt is null ? null : TimeSpan.FromSeconds(response.BreakRemainingSeconds));
         });
-    }
 
     public Task<OperationResult> StartSessionAsync(Guid presetId, Guid sessionInstanceId, CancellationToken ct = default)
         => GrpcResultMapper.ExecuteAsync(_retryPolicy, () => _client.StartSessionAsync(

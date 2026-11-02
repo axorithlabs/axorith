@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <RootNamespace>Axorith.Module.ApplicationLauncher</RootNamespace>
 
         <Description>Application Launcher module for Axorith.</Description>
 

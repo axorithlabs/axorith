@@ -1,6 +1,9 @@
-using System.Collections.Concurrent;
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Axorith.Shared.Platform;
@@ -36,7 +39,7 @@ internal static class Program
 
         var loggerFactory = NullLoggerFactory.Instance;
         var pipeFactory = PlatformServices.CreateNamedPipeFactory(loggerFactory);
-        var pipeName = GetPipeName(args);
+        var pipeName = SiteBlockerExtensionIds.ScopePipeName(GetPipeName(args));
         using var shutdown = new CancellationTokenSource();
         var inputMonitor = MonitorStandardInputAsync(shutdown);
         var stateSync = SynchronizeBrowserStateAsync(shutdown.Token);
@@ -178,9 +181,7 @@ internal static class Program
 
                 var messageLength = BinaryPrimitives.ReadInt32LittleEndian(header);
                 if (messageLength <= 0 || messageLength > MaxNativeMessageBytes)
-                {
                     throw new InvalidDataException($"Invalid native message length: {messageLength}.");
-                }
 
                 var messageBytes = new byte[messageLength];
                 await input.ReadExactlyAsync(messageBytes, shutdown.Token).ConfigureAwait(false);
@@ -214,15 +215,54 @@ internal static class Program
         if (browser is "chrome" or "edge" or "chromium" or "firefox")
             return $"axorith-nm-pipe-{browser}";
 
-        // shortcut: Chromium origins default to Chrome; other Chromium launchers must supply --browser.
+        // Chromium does not forward custom manifest arguments to native hosts.
         if (args.Any(arg => arg.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase)))
-            return "axorith-nm-pipe-chrome";
+            return "axorith-nm-pipe-" + (GetLaunchingBrowser() ?? "chrome");
 
         // Firefox passes the add-on ID as an argument; manifest "args" are not passed to the host.
         return args.Any(arg => string.Equals(arg, SiteBlockerExtensionIds.Firefox, StringComparison.OrdinalIgnoreCase))
             ? "axorith-nm-pipe-firefox"
             : "axorith-nm-pipe";
     }
+
+    private static string? GetLaunchingBrowser()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            var processId = Environment.ProcessId;
+            // Some browser versions launch native hosts through cmd.exe.
+            for (var depth = 0; depth < 4; depth++)
+            {
+                using var process = Process.GetProcessById(processId);
+                if (NtQueryInformationProcess(process.Handle, 0, out var info,
+                        (uint)Marshal.SizeOf<ProcessBasicInformation>(), out _) != 0)
+                    return null;
+                var parentId = info.ParentProcessId.ToInt32();
+                if (parentId <= 0 || parentId == processId) return null;
+                using var parent = Process.GetProcessById(parentId);
+                var browser = parent.ProcessName.ToLowerInvariant() switch
+                {
+                    "msedge" => "edge", "chrome" => "chrome", "chromium" => "chromium", _ => null
+                };
+                if (browser is not null) return browser;
+                processId = parentId;
+            }
+        }
+        catch (Exception error) when (error is Win32Exception or ArgumentException or InvalidOperationException
+                                          or DllNotFoundException or EntryPointNotFoundException) { }
+        return null;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ProcessBasicInformation
+    {
+        public IntPtr ExitStatus, PebBaseAddress, AffinityMask, BasePriority, ProcessId, ParentProcessId;
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(IntPtr process, uint informationClass,
+        out ProcessBasicInformation information, uint informationLength, out uint returnLength);
 
     private static string? GetRequestId(string message)
     {
@@ -269,9 +309,7 @@ internal static class Program
             try
             {
                 while (await timer.WaitForNextTickAsync(token))
-                {
                     await FlushLogsAsync();
-                }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -314,9 +352,7 @@ internal static class Program
 
             var batch = new StringBuilder();
             while (LogQueue.TryDequeue(out var logEntry))
-            {
                 batch.AppendLine(logEntry);
-            }
 
             if (batch.Length > 0) await File.AppendAllTextAsync(errorLogPath, batch.ToString());
         }

@@ -20,7 +20,7 @@
         <Version>1.0.0-dev</Version>
 
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <WarningsAsErrors Condition="'$(GenerateDocumentationFile)' == 'true'">$(WarningsAsErrors);CS1591</WarningsAsErrors>
+        <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
 
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
@@ -58,7 +58,7 @@
 
         <PublishTrimmed>false</PublishTrimmed>
         <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
-        <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+        <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
 
         <IncludeSymbols>false</IncludeSymbols>
         <IncludeSource>false</IncludeSource>

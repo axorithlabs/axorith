@@ -43,6 +43,6 @@ $settings = [regex]::Replace($settings,
 $settings = [regex]::Replace($settings,
     $apiHostPattern,
     'public string PostHogHost { get; init; } = "' + $ApiHost + '";', 1)
-Set-Content -Path $telemetrySettingsPath -Value $settings -Encoding UTF8
+Set-Content -Path $telemetrySettingsPath -Value $settings -Encoding UTF8 -NoNewline
 
 Write-Host "Patched desktop PostHog defaults." -ForegroundColor Green

@@ -1,13 +1,13 @@
+using System.Runtime.CompilerServices;
 using Avalonia;
-using Avalonia.Headless;
-using Avalonia.Headless.XUnit;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
-using ReactiveUI.Avalonia;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Axorith.Client.CoreSdk;
@@ -17,9 +17,6 @@ using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Host.Streaming;
 using FluentAssertions;
-using Empty = Google.Protobuf.WellKnownTypes.Empty;
-using Timestamp = Google.Protobuf.WellKnownTypes.Timestamp;
-using INotifier = Axorith.Sdk.Services.INotifier;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
@@ -28,14 +25,17 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
-using System.Runtime.CompilerServices;
+using ReactiveUI.Avalonia;
 using Xunit;
+using Empty = Google.Protobuf.WellKnownTypes.Empty;
+using INotifier = Axorith.Sdk.Services.INotifier;
+using Timestamp = Google.Protobuf.WellKnownTypes.Timestamp;
 
 [assembly: AvaloniaTestApplication(typeof(Axorith.Integrations.Tests.HostGrpcEndToEndTests.TestAppBuilder))]
 
 namespace Axorith.Integrations.Tests;
 
-public sealed class HostTestFactory : WebApplicationFactory<Program>
+public sealed class HostTestFactory : IsolatedHostFactory
 {
     public string TestDataPath { get; }
     public Guid SiteBlockerModuleId { get; }
@@ -144,38 +144,8 @@ public partial class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixt
     {
         var httpClient = factory.CreateDefaultClient();
 
-        var tokenPath = Path.Combine(factory.TestDataPath, "config", ".auth_token");
-
-        var token = string.Empty;
-        for (var i = 0; i < 50; i++)
-        {
-            if (File.Exists(tokenPath))
-            {
-                try
-                {
-                    using var fs = new FileStream(tokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    using var reader = new StreamReader(fs);
-                    token = await reader.ReadToEndAsync();
-                    if (!string.IsNullOrWhiteSpace(token))
-                    {
-                        break;
-                    }
-                }
-                catch
-                {
-                    /* ignore and retry */
-                }
-            }
-
-            await Task.Delay(100);
-        }
-
-        if (string.IsNullOrEmpty(token))
-        {
-            throw new FileNotFoundException(
-                $"Auth token not found at {tokenPath}. Host failed to start or write token.");
-        }
-
+        // Host writes its token before startup completes and CreateDefaultClient returns.
+        var token = await File.ReadAllTextAsync(Path.Combine(factory.TestDataPath, "config", ".auth_token"));
         var channel = TestGrpc.CreateAuthenticatedChannel(httpClient, token);
 
         return (
@@ -185,6 +155,49 @@ public partial class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixt
             new ModulesService.ModulesServiceClient(channel),
             channel
         );
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ClientRetriesTransientGrpcFailuresAndPersistsOnlySuccessfulCreates(int failures)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var fault = new TransientFailureHandler(failures);
+        using var http = factory.CreateDefaultClient(fault);
+        using var channel = TestGrpc.CreateAuthenticatedChannel(http,
+            await File.ReadAllTextAsync(Path.Combine(factory.TestDataPath, "config", ".auth_token"), deadline.Token));
+        var api = new GrpcPresetsApi(new PresetsService.PresetsServiceClient(channel),
+            Policy.Handle<RpcException>(error => error.StatusCode == StatusCode.Unavailable).RetryAsync(1));
+        var preset = new SessionPreset { Id = Guid.NewGuid(), Name = Guid.NewGuid().ToString() };
+        if (failures == 1)
+        {
+            var saved = await api.CreatePresetAsync(preset, deadline.Token);
+            Assert.Equal(preset.Id, saved.Id);
+            Assert.Equal(preset.Name, saved.Name);
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<RpcException>(() => api.CreatePresetAsync(preset, deadline.Token));
+            Assert.Equal(StatusCode.Unavailable, error.StatusCode);
+        }
+        Assert.Equal(2, fault.Attempts);
+        var persisted = await new Axorith.Core.Services.PresetManager(Path.Combine(factory.TestDataPath, "presets"),
+            NullLogger<Axorith.Core.Services.PresetManager>.Instance).GetPresetByIdAsync(preset.Id, deadline.Token);
+        if (failures == 1) Assert.Equal(preset.Name, Assert.IsType<SessionPreset>(persisted).Name);
+        else Assert.Null(persisted);
+        await api.DeletePresetAsync(preset.Id, deadline.Token);
+        Assert.Null(await api.GetPresetAsync(preset.Id, deadline.Token));
+    }
+
+    private sealed class TransientFailureHandler(int failures) : DelegatingHandler
+    {
+        public int Attempts { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            ++Attempts <= failures
+                ? Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+                    { Version = System.Net.HttpVersion.Version20 })
+                : base.SendAsync(request, ct);
     }
 
     [Fact]
@@ -1005,12 +1018,13 @@ public partial class HostGrpcEndToEndTests(HostTestFactory factory) : IClassFixt
             });
     }
 
-    private sealed class WindowsFactAttribute : FactAttribute
+}
+
+internal sealed class WindowsFactAttribute : FactAttribute
+{
+    public WindowsFactAttribute()
     {
-        public WindowsFactAttribute()
-        {
-            if (!OperatingSystem.IsWindows())
-                Skip = "AppBlocker process monitoring requires Windows.";
-        }
+        if (!OperatingSystem.IsWindows())
+            Skip = "AppBlocker process monitoring requires Windows.";
     }
 }

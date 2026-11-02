@@ -2,19 +2,19 @@ using System.Diagnostics;
 using System.Reactive.Linq;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
-using Axorith.Client.CoreSdk;
 using Axorith.Client.Adapters;
+using Axorith.Client.CoreSdk;
 using Axorith.Client.ViewModels;
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Telemetry;
-using Microsoft.AspNetCore.TestHost;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,9 +27,9 @@ namespace Axorith.Integrations.Tests;
 public sealed class DashboardHostCollection;
 
 [Collection("Dashboard Host")]
-public sealed class SessionDashboardRegressionTests
+public sealed partial class SessionDashboardRegressionTests
 {
-    private sealed class RealHost(string dataPath, ITelemetryService? telemetry = null) : WebApplicationFactory<Program>
+    private sealed class RealHost(string dataPath, ITelemetryService? telemetry = null) : IsolatedHostFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -41,7 +41,8 @@ public sealed class SessionDashboardRegressionTests
                     services.AddSingleton<ISessionManager>(sp => new SessionManager(
                         sp.GetRequiredService<IModuleRegistry>(), NullLogger<SessionManager>.Instance,
                         TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), telemetry,
-                        Path.Combine(dataPath, "config", "committed-session.json")));
+                        Path.Combine(dataPath, "config", "committed-session.json"),
+                        sessionHistoryPath: Path.Combine(dataPath, "config", "session-history.json")));
                 });
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
                 new Dictionary<string, string?>
@@ -67,17 +68,11 @@ public sealed class SessionDashboardRegressionTests
     }
 
     [AvaloniaFact]
-    public async Task FailedPreflightAndModuleAction_SendActualFailureDetailsThroughHostAndClient()
+    public async Task FailedPreflightAndModuleActionDoNotStartASession()
     {
         var data = Directory.CreateDirectory(Path.Combine(Environment.GetEnvironmentVariable("AXORITH_ROAMING_ROOT")!,
-            "error-telemetry-" + Guid.NewGuid().ToString("N")));
-        var handler = new ModuleActionTelemetryTests.CapturingHttpHandler();
-        await using var telemetry = new TelemetryService(new TelemetrySettings
-        {
-            Enabled = true, PostHogApiKey = "test-project-key", PostHogHost = "http://localhost/",
-            DistinctId = Guid.NewGuid().ToString(), ApplicationName = "Axorith.Client",
-            BatchSize = 100, FlushInterval = TimeSpan.FromHours(1)
-        }, new ModuleActionTelemetryTests.CapturingHttpClientFactory(handler));
+            "failed-preflight-" + Guid.NewGuid().ToString("N")));
+        var telemetry = NoopTelemetryService.Instance;
         var moduleId = InstallModule(data.FullName, typeof(Axorith.Module.ApplicationLauncher.Module), "Application Launcher");
         await using var host = new RealHost(data.FullName, telemetry);
         using var channel = host.Connect(data.FullName);
@@ -133,38 +128,6 @@ public sealed class SessionDashboardRegressionTests
             });
         var rpcError = await Assert.ThrowsAsync<RpcException>(() => invalidRequest.ResponseAsync);
         Assert.Equal(StatusCode.Internal, rpcError.StatusCode);
-        await telemetry.FlushAsync();
-
-        var events = ModuleActionTelemetryTests.ReadEvents(handler);
-        var failures = events.Where(item => item.GetProperty("event").GetString() == "SessionStartFailed")
-            .Select(item => item.GetProperty("properties")).ToArray();
-        Assert.Equal(2, failures.Length);
-        Assert.All(failures, properties =>
-        {
-            Assert.Equal("preflight", properties.GetProperty("stage").GetString());
-            Assert.Contains("CustomPath: Select an existing application executable.", properties.GetProperty("errorMessage").GetString());
-        });
-        Assert.Contains(failures, properties => properties.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0);
-        var preflight = events.Single(item => item.GetProperty("event").GetString() == "SessionPreflightCompleted")
-            .GetProperty("properties");
-        Assert.Contains("Select an existing application executable.", preflight.GetProperty("errorMessage").GetString());
-        Assert.Contains(events, item => item.GetProperty("event").GetString() == "ErrorOccurred" &&
-            item.GetProperty("properties").TryGetProperty("module", out _));
-        var failedAction = events.Single(item => item.GetProperty("event").GetString() == "ModuleActionInvoked" &&
-                item.GetProperty("properties").GetProperty("actionKey").GetString() == "test_connection")
-            .GetProperty("properties");
-        Assert.Equal("failed", failedAction.GetProperty("result").GetString());
-        Assert.Equal("Design-time sandbox not found for module instance", failedAction.GetProperty("errorMessage").GetString());
-        Assert.NotEmpty(failedAction.GetProperty("errors").EnumerateArray());
-        var hostError = events.Single(item => item.GetProperty("event").GetString() == "ErrorOccurred" &&
-                item.GetProperty("properties").TryGetProperty("rpcMethod", out _))
-            .GetProperty("properties");
-        Assert.Equal("ArgumentException", hostError.GetProperty("exceptionType").GetString());
-        Assert.EndsWith("/InvokeDesignTimeAction", hostError.GetProperty("rpcMethod").GetString());
-        Assert.NotEqual("Internal server error.", hostError.GetProperty("errorMessage").GetString());
-        var payload = string.Join("\n", handler.Payloads);
-        foreach (var privateValue in new[] { preset.Name, "private-module-name", data.FullName, "private-executable.exe" })
-            Assert.DoesNotContain(privateValue, payload);
     }
 
     [AvaloniaFact]

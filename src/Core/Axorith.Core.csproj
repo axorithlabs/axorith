@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Core</AssemblyName>
-        <RootNamespace>Axorith.Core</RootNamespace>
         
         <Description>Core system for Axorith.</Description>
         

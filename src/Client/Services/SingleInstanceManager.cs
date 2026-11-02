@@ -139,9 +139,7 @@ public sealed class SingleInstanceManager : IDisposable
                     _logger.LogInformation("Received activation request: {Message}", message);
 
                     if (message == ActivateCommand)
-                    {
                         ActivationRequested?.Invoke(this, EventArgs.Empty);
-                    }
                 }
 
                 server.Disconnect();

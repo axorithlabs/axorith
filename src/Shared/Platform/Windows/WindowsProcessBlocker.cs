@@ -1,5 +1,5 @@
-using System.ComponentModel;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -74,9 +74,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         get
         {
             lock (_lock)
-            {
                 return _pollingScanCts != null;
-            }
         }
     }
 
@@ -142,9 +140,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         {
             var normalized = NormalizeName(processName);
             if (_targetProcessNames.Remove(normalized))
-            {
                 logger.LogInformation("Removed '{Process}' from block list.", normalized);
-            }
         }
     }
 
@@ -229,16 +225,13 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         List<string> targets;
 
         lock (_lock)
-        {
             targets = [.. _targetProcessNames];
-        }
 
         foreach (var target in targets)
         {
             if (SafeList.Contains(target)) continue;
 
-            var processes = Process.GetProcessesByName(target);
-            foreach (var p in processes)
+            foreach (var p in Process.GetProcessesByName(target))
             {
                 try
                 {
@@ -254,9 +247,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                         logger.LogInformation("Blocked process: {Name} (PID: {Pid})", target, p.Id);
 
                         if (!initialScan)
-                        {
                             ProcessBlocked?.Invoke(target);
-                        }
 
                         killedNames.Add(target);
                     }
@@ -284,9 +275,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     {
         HashSet<string> targets;
         lock (_lock)
-        {
             targets = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
-        }
 
         if (targets.Count == 0) return [];
 
@@ -313,9 +302,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 logger.LogInformation("Blocked renamed process: {Target} (PID: {Pid}, image: {Image})",
                     originalName, process.Id, path);
                 if (!initialScan)
-                {
                     ProcessBlocked?.Invoke(originalName);
-                }
 
                 killedNames.Add(originalName);
             }
@@ -341,9 +328,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     {
         HashSet<string> allowedNames;
         lock (_lock)
-        {
             allowedNames = new HashSet<string>(_targetProcessNames, StringComparer.OrdinalIgnoreCase);
-        }
 
         if (allowedNames.Count == 0) return [];
 
@@ -374,9 +359,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
 
                     var originalName = GetOriginalExecutableName(process.MainModule?.FileName);
                     if (allowedNames.Contains(originalName))
-                    {
                         allowedIds.Add(process.Id);
-                    }
                 }
                 catch (Win32Exception ex)
                 {
@@ -409,9 +392,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                 foreach (var child in children)
                 {
                     if (allowedIds.Add(child))
-                    {
                         pending.Enqueue(child);
-                    }
                 }
             }
 
@@ -432,9 +413,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
                     process.Kill();
                     logger.LogInformation("Blocked non-workspace process: {Name} (PID: {Pid})", processName, processId);
                     if (!initialScan)
-                    {
                         ProcessBlocked?.Invoke(processName);
-                    }
 
                     killedNames.Add(processName);
                 }
@@ -452,9 +431,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         finally
         {
             foreach (var process in processes)
-            {
                 process.Dispose();
-            }
         }
 
         return [.. killedNames];
@@ -463,9 +440,7 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
     private bool IsAllowOnlyMode()
     {
         lock (_lock)
-        {
             return _allowOnlyMode;
-        }
     }
 
     private Dictionary<int, int> GetProcessParentIds()
@@ -557,12 +532,9 @@ internal class WindowsProcessBlocker(ILogger logger) : IProcessBlocker
         });
     }
 
-    private static string NormalizeName(string name)
-    {
-        return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+    private static string NormalizeName(string name) => name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
             ? Path.GetFileNameWithoutExtension(name)
             : name;
-    }
 
     public void Dispose() => UnblockAll();
 }

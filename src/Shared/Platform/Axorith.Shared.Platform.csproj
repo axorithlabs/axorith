@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Shared.Platform</AssemblyName>
-        <RootNamespace>Axorith.Shared.Platform</RootNamespace>
 
         <Description>Platform-specific implementations for Axorith (Windows, Linux, macOS)</Description>
     </PropertyGroup>
@@ -13,6 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Axorith.Shared.Tests" />
         <PackageReference Include="System.Management"  />
         <PackageReference Include="System.Security.Cryptography.ProtectedData"  />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"  />

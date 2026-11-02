@@ -1,12 +1,18 @@
 using System.Reactive;
 using System.Reactive.Linq;
+using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Axorith.Client.CoreSdk;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
 using Axorith.Client.ViewModels;
+using Axorith.Client.Views;
 using Axorith.Contracts;
 using Axorith.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,12 +21,131 @@ using Polly;
 using ReactiveUI;
 using Xunit;
 using AfterEndBehavior = Axorith.Core.Models.AfterEndBehavior;
+using ConfiguredModule = Axorith.Core.Models.ConfiguredModule;
 using FocusCommitmentMode = Axorith.Core.Models.FocusCommitmentMode;
 
 namespace Axorith.Integrations.Tests;
 
 public partial class HostGrpcEndToEndTests
 {
+    [AvaloniaFact]
+    public async Task SessionEditorKeepsDelayWhileTypingAndRejectsInvalidDelayWithoutChangingPersistence()
+    {
+        var clients = await CreateAuthenticatedClientsAsync();
+        using var channel = clients.channel;
+        var retry = Policy.Handle<Exception>().RetryAsync(0);
+        var presets = new GrpcPresetsApi(clients.presets, retry);
+        var scheduler = new GrpcSchedulerApi(new SchedulerService.SchedulerServiceClient(channel), retry);
+        using var modules = new GrpcModulesApi(clients.modules, retry, NullLogger.Instance);
+        using var sessions = new GrpcSessionsApi(clients.sessions, retry, NullLogger.Instance);
+        using var toasts = new ToastNotificationService();
+        var shell = new ShellViewModel();
+        using var services = new ServiceCollection()
+            .AddSingleton(shell)
+            .AddSingleton<IPresetsApi>(presets)
+            .AddSingleton<ISchedulerApi>(scheduler)
+            .AddSingleton<IModulesApi>(modules)
+            .AddSingleton<ISessionsApi>(sessions)
+            .AddSingleton<IUpdatesApi>(new GrpcUpdatesApi(new UpdatesService.UpdatesServiceClient(channel),
+                NullLogger<GrpcUpdatesApi>.Instance))
+            .AddSingleton<IToastNotificationService>(toasts)
+            .AddSingleton<MainViewModel>()
+            .BuildServiceProvider();
+        var preset = new SessionPreset
+        {
+            Id = Guid.NewGuid(), Name = Guid.NewGuid().ToString(),
+            Modules =
+            [
+                new ConfiguredModule { ModuleId = factory.AppBlockerModuleId },
+                new ConfiguredModule { ModuleId = factory.AppBlockerModuleId, StartDelay = TimeSpan.FromSeconds(7) }
+            ]
+        };
+        using var editor = new SessionEditorViewModel(shell, modules, presets, scheduler, toasts, services)
+            { PresetToEdit = preset };
+        await WaitForEditor(editor, 0);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (editor.ConfiguredModules.Any(module => module.IsLoading))
+            await Task.Delay(10, deadline.Token);
+        Dispatcher.UIThread.RunJobs();
+        var delayed = editor.ConfiguredModules[1];
+        var view = new SessionEditorView { DataContext = editor };
+        var window = new Window { Content = view, Width = 900, Height = 1000 };
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            var input = Assert.Single(view.GetVisualDescendants().OfType<TextBox>(),
+                box => box.Classes.Contains("delay-input") && box.IsEffectivelyVisible);
+            Assert.True(input.Focus());
+            Assert.True(editor.SaveAndCloseCommand.CanExecute(null));
+
+            foreach (var existing in new[] { false, true })
+            {
+                if (existing) await presets.CreatePresetAsync(preset);
+                foreach (var invalid in new[] { "", " ", "0", "-1", "abc", "NaN", "∞" })
+                {
+                    input.SelectAll();
+                    window.KeyPressQwerty(PhysicalKey.Backspace, RawInputModifiers.None);
+                    window.KeyReleaseQwerty(PhysicalKey.Backspace, RawInputModifiers.None);
+                    if (invalid.Length > 0) window.KeyTextInput(invalid);
+                    Dispatcher.UIThread.RunJobs();
+                    Assert.Equal(invalid, delayed.StartDelaySecondsString);
+                    Assert.True(delayed.HasDelay);
+                    Assert.True(input.IsEffectivelyVisible);
+                    Assert.True(input.IsFocused);
+                    Assert.Contains("error", input.Classes);
+                    var inputBorder = Assert.Single(input.GetVisualDescendants().OfType<Border>(),
+                        border => border.Name == "PART_BorderElement");
+                    Assert.Equal(Color.Parse("#FF4444"), ((ISolidColorBrush)inputBorder.BorderBrush!).Color);
+                    Assert.True(editor.HasValidationErrors);
+                    Assert.False(editor.SaveAndCloseCommand.CanExecute(null));
+                    await ((ReactiveCommand<Unit, Unit>)editor.SaveAndCloseCommand).Execute();
+                    var persisted = await ReadPersistedDelayPresetAsync(preset.Id);
+                    if (existing) Assert.Equal(TimeSpan.FromSeconds(7), persisted!.Modules[1].StartDelay);
+                    else Assert.Null(persisted);
+                    Assert.Equal(2, editor.ConfiguredModules.Count);
+                }
+                input.Text = "7";
+                Dispatcher.UIThread.RunJobs();
+                Assert.DoesNotContain("error", input.Classes);
+                Assert.False(editor.HasValidationErrors);
+            }
+
+            input.Text = "12";
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(editor.SaveAndCloseCommand.CanExecute(null));
+            await ((ReactiveCommand<Unit, Unit>)editor.SaveAndCloseCommand).Execute();
+            Assert.True(string.IsNullOrEmpty(editor.ErrorMessage), editor.ErrorMessage);
+            var saved = Assert.IsType<SessionPreset>(await ReadPersistedDelayPresetAsync(preset.Id));
+            Assert.Equal(TimeSpan.FromSeconds(12), saved.Modules[1].StartDelay);
+            Assert.Equal(TimeSpan.Zero, saved.Modules[0].StartDelay);
+            using var reopened = new SessionEditorViewModel(shell, modules, presets, scheduler, toasts, services)
+                { PresetToEdit = saved };
+            await WaitForEditor(reopened, 0);
+            var reopenedDelay = reopened.ConfiguredModules[1];
+            Assert.True(reopenedDelay.HasDelay);
+            Assert.Equal("12", reopenedDelay.StartDelaySecondsString);
+            await reopened.ConfiguredModules[0].RemoveDelayCommand.Execute();
+            await reopened.ConfiguredModules[0].AddDelayCommand.Execute();
+            Assert.True(reopenedDelay.HasDelay);
+            Assert.Equal("1", reopenedDelay.StartDelaySecondsString);
+            Assert.Equal(TimeSpan.FromSeconds(1), reopenedDelay.Model.StartDelay);
+            reopenedDelay.StartDelaySecondsString = "";
+            await reopened.ConfiguredModules[0].RemoveDelayCommand.Execute();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(reopenedDelay.HasDelay);
+            Assert.False(reopened.HasValidationErrors);
+            await ((ReactiveCommand<Unit, Unit>)reopened.SaveAndCloseCommand).Execute();
+            Assert.True(string.IsNullOrEmpty(reopened.ErrorMessage), reopened.ErrorMessage);
+            Assert.Equal(TimeSpan.Zero, (await ReadPersistedDelayPresetAsync(preset.Id))!.Modules[1].StartDelay);
+        }
+        finally { window.Close(); }
+    }
+
+    private Task<SessionPreset?> ReadPersistedDelayPresetAsync(Guid id) =>
+        new Axorith.Core.Services.PresetManager(Path.Combine(factory.TestDataPath, "presets"),
+            NullLogger<Axorith.Core.Services.PresetManager>.Instance).GetPresetByIdAsync(id, CancellationToken.None);
+
     [AvaloniaFact]
     public async Task SessionEditorPreservesThenActionsAndSchedulesAcrossRepeatedSaves()
     {

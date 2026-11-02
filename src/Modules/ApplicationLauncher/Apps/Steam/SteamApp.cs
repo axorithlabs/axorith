@@ -38,9 +38,7 @@ internal sealed class SteamApp(
 
         var gameAppId = _settings.SelectedGame.GetCurrentValue();
         if (!string.IsNullOrWhiteSpace(gameAppId))
-        {
             LaunchGame(gameAppId);
-        }
     }
 
     private void LaunchGame(string appId)
@@ -48,8 +46,8 @@ internal sealed class SteamApp(
         try
         {
             Logger.LogInfo("Launching game with AppID {AppId}", appId);
-            using var process = PlatformServices.CreateProcessService()
-                .StartProcess(new ProcessStartInfo($"steam://rungameid/{appId}") { UseShellExecute = true });
+            using var process = PlatformProcessService.StartProcess(
+                new ProcessStartInfo($"steam://rungameid/{appId}") { UseShellExecute = true });
         }
         catch (Exception ex)
         {

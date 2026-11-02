@@ -19,7 +19,7 @@ public class SchedulerServiceImplTests
     {
         _mockScheduleManager = new Mock<IScheduleManager>();
         _mockScheduleManager.Setup(m => m.ListSchedulesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<SessionSchedule>());
+            .ReturnsAsync([]);
         _mockScheduleManager.Setup(m => m.GetConfigurationLockStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Axorith.Core.Models.ConfigurationLockStatus(false, null));
         _service = new SchedulerServiceImpl(

@@ -1,5 +1,5 @@
-using System.Reflection;
 using System.Net;
+using System.Reflection;
 using System.Text.Json;
 using Axorith.Shared.Utils;
 using Axorith.Telemetry;
@@ -87,7 +87,7 @@ public sealed class UpdateService : BackgroundService
         Task<UpdateInfo?> check;
         lock (_checkLock)
         {
-            if (_pendingCheck is null || _pendingCheck.IsCompleted)
+            if (_pendingCheck?.IsCompleted != false)
                 _pendingCheck = CheckForUpdatesCoreAsync(_stoppingToken);
             check = _pendingCheck;
         }

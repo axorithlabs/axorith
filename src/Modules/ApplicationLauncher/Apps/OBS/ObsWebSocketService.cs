@@ -1,21 +1,15 @@
+using System.Diagnostics;
 using Axorith.Sdk.Logging;
 using OBSWebsocketDotNet;
-using System.Diagnostics;
 
 namespace Axorith.Module.ApplicationLauncher.Apps.OBS;
 
-internal sealed class ObsWebSocketService : IDisposable
+internal sealed class ObsWebSocketService(IModuleLogger logger, Settings settings) : IDisposable
 {
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(5);
-    private readonly IModuleLogger _logger;
-    private readonly Settings _settings;
+    private readonly IModuleLogger _logger = logger;
+    private readonly Settings _settings = settings;
     private readonly OBSWebsocket _client = new() { WSTimeout = TimeSpan.FromSeconds(10) };
-
-    public ObsWebSocketService(IModuleLogger logger, Settings settings)
-    {
-        _logger = logger;
-        _settings = settings;
-    }
 
     public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
     {

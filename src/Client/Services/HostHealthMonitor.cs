@@ -85,18 +85,14 @@ public sealed class HostHealthMonitor(
                 logger.LogDebug("Host health check timed out (attempt {Attempt}/{Max})", i + 1, MaxRetries);
 
                 if (i < MaxRetries - 1)
-                {
                     await Task.Delay(RetryDelayMs);
-                }
             }
             catch (Exception ex)
             {
                 logger.LogDebug(ex, "Health check failed (attempt {Attempt}/{Max})", i + 1, MaxRetries);
 
                 if (i < MaxRetries - 1)
-                {
                     await Task.Delay(RetryDelayMs);
-                }
             }
 
         return false;

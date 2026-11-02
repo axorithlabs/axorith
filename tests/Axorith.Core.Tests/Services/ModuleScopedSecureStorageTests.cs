@@ -2,165 +2,70 @@ using Axorith.Core.Services;
 using Axorith.Sdk;
 using Axorith.Sdk.Services;
 using FluentAssertions;
-using Moq;
 
 namespace Axorith.Core.Tests.Services;
 
-/// <summary>
-///     Tests for ModuleScopedSecureStorage that provides sandboxed secure storage per module
-/// </summary>
-public class ModuleScopedSecureStorageTests
+public sealed class ModuleScopedSecureStorageTests
 {
-    private readonly Mock<ISecureStorageService> _mockStorage;
-    private readonly ModuleDefinition _moduleDefinition;
-    private readonly ModuleScopedSecureStorage _scopedStorage;
+    private readonly MemoryStorage _storage = new();
+    private readonly Guid _moduleId = Guid.NewGuid();
+    private ModuleScopedSecureStorage Scope(Guid id) => new(_storage, new ModuleDefinition { Id = id, Name = "Test" });
 
-    public ModuleScopedSecureStorageTests()
+    [Fact]
+    public void StoredSecretsCanBeReadThroughANewScopeAndUpdatedIndependently()
     {
-        _mockStorage = new Mock<ISecureStorageService>();
-        _moduleDefinition = new ModuleDefinition
-        {
-            Id = Guid.Parse("12345678-1234-1234-1234-123456789012"),
-            Name = "Test Module"
-        };
+        Scope(_moduleId).StoreSecret("AccessToken", "first");
+        Scope(_moduleId).StoreSecret("RefreshToken", "refresh");
+        Scope(_moduleId).RetrieveSecret("AccessToken").Should().Be("first");
+        Scope(_moduleId).StoreSecret("AccessToken", "updated");
 
-        _scopedStorage = new ModuleScopedSecureStorage(_mockStorage.Object, _moduleDefinition);
+        Scope(_moduleId).RetrieveSecret("AccessToken").Should().Be("updated");
+        Scope(_moduleId).RetrieveSecret("RefreshToken").Should().Be("refresh");
+        _storage.RetrieveSecret($"{_moduleId}:AccessToken").Should().Be("updated");
+        _storage.RetrieveSecret("AccessToken").Should().BeNull();
     }
 
     [Fact]
-    public void StoreSecret_ShouldPrefixKeyWithModuleId()
+    public void ModulesCannotReadOverwriteOrDeleteEachOthersSecrets()
     {
-        var key = "AccessToken";
-        var secret = "secret-value";
-        var expectedScopedKey = $"{_moduleDefinition.Id}:{key}";
+        var otherId = Guid.NewGuid();
+        Scope(_moduleId).StoreSecret("SharedKey", "first-module");
+        Scope(otherId).RetrieveSecret("SharedKey").Should().BeNull();
+        Scope(otherId).StoreSecret("SharedKey", "other-module");
+        Scope(_moduleId).RetrieveSecret("SharedKey").Should().Be("first-module");
+        Scope(otherId).RetrieveSecret("SharedKey").Should().Be("other-module");
 
-        _scopedStorage.StoreSecret(key, secret);
+        Scope(_moduleId).DeleteSecret("SharedKey");
 
-        _mockStorage.Verify(s => s.StoreSecret(expectedScopedKey, secret), Times.Once);
+        Scope(_moduleId).RetrieveSecret("SharedKey").Should().BeNull();
+        Scope(otherId).RetrieveSecret("SharedKey").Should().Be("other-module");
     }
 
     [Fact]
-    public void RetrieveSecret_ShouldPrefixKeyWithModuleId()
+    public void LauncherMigratesTheLegacySpotifyTokenAndLogoutCannotResurrectIt()
     {
-        var key = "AccessToken";
-        var expectedScopedKey = $"{_moduleDefinition.Id}:{key}";
-        var expectedSecret = "secret-value";
-        _mockStorage.Setup(s => s.RetrieveSecret(expectedScopedKey)).Returns(expectedSecret);
+        var launcherId = Guid.Parse("9b65a0b6-ce3e-4085-9ffa-b47c8fefcffd");
+        const string legacyKey = "04399d2f-43c9-4182-b99d-2f43c97182a6:SpotifyRefreshToken";
+        _storage.StoreSecret(legacyKey, "legacy-token");
 
-        var result = _scopedStorage.RetrieveSecret(key);
+        Scope(_moduleId).RetrieveSecret("SpotifyRefreshToken").Should().BeNull();
+        Scope(launcherId).RetrieveSecret("SpotifyRefreshToken").Should().Be("legacy-token");
+        _storage.RetrieveSecret($"{launcherId}:SpotifyRefreshToken").Should().Be("legacy-token");
+        Scope(launcherId).StoreSecret("SpotifyRefreshToken", "new-token");
+        Scope(launcherId).RetrieveSecret("SpotifyRefreshToken").Should().Be("new-token");
 
-        result.Should().Be(expectedSecret);
-        _mockStorage.Verify(s => s.RetrieveSecret(expectedScopedKey), Times.Once);
+        Scope(launcherId).DeleteSecret("SpotifyRefreshToken");
+
+        Scope(launcherId).RetrieveSecret("SpotifyRefreshToken").Should().BeNull();
+        _storage.RetrieveSecret(legacyKey).Should().BeNull();
     }
 
-    [Fact]
-    public void DeleteSecret_ShouldPrefixKeyWithModuleId()
+    // This boundary stores state; the production scoping/migration code is the component under test.
+    private sealed class MemoryStorage : ISecureStorageService
     {
-        var key = "AccessToken";
-        var expectedScopedKey = $"{_moduleDefinition.Id}:{key}";
-
-        _scopedStorage.DeleteSecret(key);
-
-        _mockStorage.Verify(s => s.DeleteSecret(expectedScopedKey), Times.Once);
-    }
-
-    [Fact]
-    public void MultipleKeys_ShouldAllBePrefixed()
-    {
-        var key1 = "AccessToken";
-        var key2 = "RefreshToken";
-        var secret1 = "access-secret";
-        var secret2 = "refresh-secret";
-
-        _scopedStorage.StoreSecret(key1, secret1);
-        _scopedStorage.StoreSecret(key2, secret2);
-
-        _mockStorage.Verify(s => s.StoreSecret($"{_moduleDefinition.Id}:{key1}", secret1), Times.Once);
-        _mockStorage.Verify(s => s.StoreSecret($"{_moduleDefinition.Id}:{key2}", secret2), Times.Once);
-    }
-
-    [Fact]
-    public void DifferentModules_ShouldHaveIsolatedKeys()
-    {
-        var moduleDefinition2 = new ModuleDefinition
-        {
-            Id = Guid.Parse("87654321-4321-4321-4321-210987654321"),
-            Name = "Another Module"
-        };
-        var scopedStorage2 = new ModuleScopedSecureStorage(_mockStorage.Object, moduleDefinition2);
-
-        var key = "SharedKey";
-        var secret1 = "module1-secret";
-        var secret2 = "module2-secret";
-
-        _scopedStorage.StoreSecret(key, secret1);
-        scopedStorage2.StoreSecret(key, secret2);
-
-        _mockStorage.Verify(s => s.StoreSecret($"{_moduleDefinition.Id}:{key}", secret1), Times.Once);
-        _mockStorage.Verify(s => s.StoreSecret($"{moduleDefinition2.Id}:{key}", secret2), Times.Once);
-    }
-
-    [Fact]
-    public void RetrieveSecret_WhenNotFound_ShouldReturnNull()
-    {
-        var key = "NonExistentKey";
-        var expectedScopedKey = $"{_moduleDefinition.Id}:{key}";
-        _mockStorage.Setup(s => s.RetrieveSecret(expectedScopedKey)).Returns((string?)null);
-
-        var result = _scopedStorage.RetrieveSecret(key);
-
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public void StoreAndRetrieve_RoundTrip_ShouldWork()
-    {
-        var key = "TestKey";
-        var secret = "test-secret-value";
-        var scopedKey = $"{_moduleDefinition.Id}:{key}";
-
-        _mockStorage.Setup(s => s.RetrieveSecret(scopedKey)).Returns(secret);
-
-        _scopedStorage.StoreSecret(key, secret);
-        var retrieved = _scopedStorage.RetrieveSecret(key);
-
-        retrieved.Should().Be(secret);
-    }
-
-    [Fact]
-    public void StoreDelete_ShouldRemoveSecret()
-    {
-        var key = "TestKey";
-        var secret = "test-secret";
-        var scopedKey = $"{_moduleDefinition.Id}:{key}";
-
-        _mockStorage.Setup(s => s.RetrieveSecret(scopedKey)).Returns((string?)null);
-
-        _scopedStorage.StoreSecret(key, secret);
-        _scopedStorage.DeleteSecret(key);
-        var retrieved = _scopedStorage.RetrieveSecret(key);
-
-        retrieved.Should().BeNull();
-        _mockStorage.Verify(s => s.DeleteSecret(scopedKey), Times.Once);
-    }
-
-    [Fact]
-    public void KeyScoping_ShouldPreventCrossModuleAccess()
-    {
-        var key = "SharedSecret";
-        var secret = "module1-only-secret";
-        var scopedKey = $"{_moduleDefinition.Id}:{key}";
-
-        _mockStorage.Setup(s => s.RetrieveSecret(scopedKey)).Returns(secret);
-        _mockStorage.Setup(s => s.RetrieveSecret(It.Is<string>(k => k != scopedKey)))
-            .Returns((string?)null);
-
-        _scopedStorage.StoreSecret(key, secret);
-        var retrieved = _scopedStorage.RetrieveSecret(key);
-
-        retrieved.Should().Be(secret);
-        // Only the scoped key should be used
-        _mockStorage.Verify(s => s.RetrieveSecret(scopedKey), Times.Once);
-        _mockStorage.Verify(s => s.RetrieveSecret(key), Times.Never);
+        private readonly Dictionary<string, string> _secrets = new(StringComparer.Ordinal);
+        public void StoreSecret(string key, string secret) => _secrets[key] = secret;
+        public string? RetrieveSecret(string key) => _secrets.GetValueOrDefault(key);
+        public void DeleteSecret(string key) => _secrets.Remove(key);
     }
 }

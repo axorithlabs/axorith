@@ -74,11 +74,10 @@ public class NativeMessagingRegistrar(
     }
 
     private string[] ReadExtensionIds(string settingName) =>
-        (configuration[$"SiteBlocker:NativeMessaging:{settingName}"] ?? string.Empty)
+        [.. (configuration[$"SiteBlocker:NativeMessaging:{settingName}"] ?? string.Empty)
             .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(id => id.Length == 32 && id.All(character => character is >= 'a' and <= 'p'))
             .Select(id => $"chrome-extension://{id}/")
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+            .Distinct(StringComparer.Ordinal)];
 
 }

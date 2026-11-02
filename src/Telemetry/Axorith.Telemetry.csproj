@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>Axorith.Telemetry</AssemblyName>
-    <RootNamespace>Axorith.Telemetry</RootNamespace>
     <Description>Shared telemetry client for Axorith (PostHog)</Description>
   </PropertyGroup>
 

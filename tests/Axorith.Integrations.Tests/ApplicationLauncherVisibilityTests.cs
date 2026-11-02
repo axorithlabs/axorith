@@ -1,7 +1,7 @@
+using Axorith.Host.Mappers;
 using Axorith.Sdk.Logging;
 using Axorith.Sdk.Services;
 using Axorith.Shared.Platform;
-using Axorith.Host.Mappers;
 using Moq;
 using Xunit;
 using LauncherModule = Axorith.Module.ApplicationLauncher.Module;

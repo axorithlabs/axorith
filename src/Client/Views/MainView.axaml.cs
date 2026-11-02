@@ -32,24 +32,17 @@ public partial class MainView : UserControl
     {
         ObserveViewModel();
         _window = TopLevel.GetTopLevel(this) as Window;
-        if (_window != null) _window.Deactivated += OnWindowDeactivated;
+        _window?.Deactivated += OnWindowDeactivated;
 
         UpdateDialogFocus();
     }
 
     private void OnUnloaded(object? sender, RoutedEventArgs e)
     {
-        if (_observedViewModel != null)
-        {
-            _observedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
-            _observedViewModel = null;
-        }
-
-        if (_window != null)
-        {
-            _window.Deactivated -= OnWindowDeactivated;
-            _window = null;
-        }
+        _observedViewModel?.PropertyChanged -= OnViewModelPropertyChanged;
+        _observedViewModel = null;
+        _window?.Deactivated -= OnWindowDeactivated;
+        _window = null;
 
         CancelEmergencyUnlockInput();
         _dialogWasOpen = false;
@@ -62,10 +55,10 @@ public partial class MainView : UserControl
         if (ReferenceEquals(_observedViewModel, ViewModel))
             return;
 
-        if (_observedViewModel != null) _observedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _observedViewModel?.PropertyChanged -= OnViewModelPropertyChanged;
 
         _observedViewModel = ViewModel;
-        if (_observedViewModel != null) _observedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _observedViewModel?.PropertyChanged += OnViewModelPropertyChanged;
 
         UpdateDialogFocus();
     }
@@ -132,9 +125,7 @@ public partial class MainView : UserControl
     private static bool IsWithin(Control control, Control ancestor)
     {
         for (var current = control; current != null; current = current.GetVisualParent() as Control)
-        {
             if (ReferenceEquals(current, ancestor)) return true;
-        }
 
         return false;
     }

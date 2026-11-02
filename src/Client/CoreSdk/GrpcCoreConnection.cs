@@ -51,12 +51,9 @@ public class GrpcCoreConnection : ICoreConnection
             .WaitAndRetryAsync(
                 retryCount: 5,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                onRetry: (exception, timeSpan, retryCount, _) =>
-                {
-                    _logger.LogWarning(exception,
+                onRetry: (exception, timeSpan, retryCount, _) => _logger.LogWarning(exception,
                         "gRPC call failed, retry {RetryCount} after {Delay}s",
-                        retryCount, timeSpan.TotalSeconds);
-                });
+                        retryCount, timeSpan.TotalSeconds));
     }
 
     public IPresetsApi Presets =>

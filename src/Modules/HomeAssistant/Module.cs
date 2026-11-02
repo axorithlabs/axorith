@@ -33,39 +33,21 @@ public class Module : IModule
 
     public Task<ValidationResult> ValidateSettingsAsync(CancellationToken cancellationToken) => _settings.ValidateAsync();
 
-    public async Task OnSessionStartAsync(CancellationToken cancellationToken)
+    public Task OnSessionStartAsync(CancellationToken cancellationToken) =>
+        CallServiceAsync(_settings.StartEntityId, ending: false, cancellationToken);
+
+    public Task OnSessionEndAsync(CancellationToken cancellationToken) =>
+        CallServiceAsync(_settings.EndEntityId, ending: true, cancellationToken);
+
+    private async Task CallServiceAsync(Setting<string> setting, bool ending, CancellationToken ct)
     {
         _settings.LoadToken();
-
-        var entityId = _settings.StartEntityId.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(entityId))
-            return;
-
-        await CallServiceAsync("turn_on", entityId, cancellationToken);
-    }
-
-    public async Task OnSessionEndAsync(CancellationToken cancellationToken)
-    {
-        _settings.LoadToken();
-
-        var entityId = _settings.EndEntityId.GetCurrentValue();
-        if (string.IsNullOrWhiteSpace(entityId))
-            return;
-
-        var domain = entityId.Split('.')[0].ToLowerInvariant();
-        var service = "turn_off";
-
-        if (domain is "script" or "scene" or "automation" or "input_button") service = "turn_on";
-
-        await CallServiceAsync(service, entityId, cancellationToken);
-    }
-
-    private async Task CallServiceAsync(string service, string entityId, CancellationToken ct)
-    {
-        var url = _settings.BaseUrl.GetCurrentValue();
-        var token = _settings.AccessToken.GetCurrentValue();
-
-        await _client.CallServiceAsync(url, token, "homeassistant", service, entityId, ct);
+        var entityId = setting.GetCurrentValue();
+        if (string.IsNullOrWhiteSpace(entityId)) return;
+        var turnOn = !ending || entityId.Split('.')[0].ToLowerInvariant() is
+            "script" or "scene" or "automation" or "input_button";
+        await _client.CallServiceAsync(_settings.BaseUrl.GetCurrentValue(), _settings.AccessToken.GetCurrentValue(),
+            "homeassistant", turnOn ? "turn_on" : "turn_off", entityId, ct);
     }
 
     private async Task TestConnectionAsync()

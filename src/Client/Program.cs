@@ -40,13 +40,9 @@ internal static class Program
             activationTask.Wait(TimeSpan.FromSeconds(5));
 
             if (activationTask.Result)
-            {
                 earlyLogger.Information("Activation request sent successfully - exiting");
-            }
             else
-            {
                 earlyLogger.Warning("Failed to activate existing instance - exiting anyway");
-            }
 
             _singleInstanceManager.Dispose();
             earlyLogger.Dispose();
@@ -64,9 +60,7 @@ internal static class Program
         var isTestRun = Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") == "1";
         var telemetryEnabled = !isTestRun && TelemetryPreference.ReadOrDefault(LoadLegacyTelemetryEnabledSetting());
         if (!isTestRun)
-        {
             TelemetryPreference.Save(telemetryEnabled);
-        }
 
         var telemetrySettings = new TelemetrySettings()
                 .WithEnvironmentOverrides() with
@@ -86,9 +80,7 @@ internal static class Program
         var resolvedLogsPath = Environment.ExpandEnvironmentVariables(logsPath);
         var logsDir = Path.GetDirectoryName(resolvedLogsPath);
         if (!string.IsNullOrEmpty(logsDir))
-        {
             Directory.CreateDirectory(logsDir);
-        }
 
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration)
@@ -133,23 +125,17 @@ internal static class Program
 
     internal static SingleInstanceManager? GetSingleInstanceManager() => _singleInstanceManager;
 
-    public static AppBuilder BuildAvaloniaApp()
-    {
-        return AppBuilder.Configure<App>()
+    public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .LogToTrace()
             .UseReactiveUI()
-            .AfterSetup(_ =>
-            {
-                Dispatcher.UIThread.UnhandledException += (_, e) =>
+            .AfterSetup(_ => Dispatcher.UIThread.UnhandledException += (_, e) =>
                 {
                     Log.Error(e.Exception, "Unhandled exception in UI thread");
                     Telemetry?.TrackError(e.Exception, "client", "startup", "error", handled: e.Handled,
                         fatal: false);
                     // Don't mark as handled - let Avalonia decide whether to crash or not
-                };
-            });
-    }
+                });
 
     private static bool LoadLegacyTelemetryEnabledSetting()
     {
@@ -157,19 +143,13 @@ internal static class Program
         {
             var settingsPath = Path.Combine(ApplicationPaths.Config, "clientsettings.json");
             if (!File.Exists(settingsPath))
-            {
                 settingsPath = Path.Combine(AppContext.BaseDirectory, "clientsettings.json");
-            }
             if (!File.Exists(settingsPath))
-            {
                 return true;
-            }
 
             var json = File.ReadAllText(settingsPath);
             if (string.IsNullOrWhiteSpace(json))
-            {
                 return true;
-            }
 
             using var doc = JsonDocument.Parse(json);
             return !doc.RootElement.TryGetProperty("TelemetryEnabled", out var prop) || prop.GetBoolean();

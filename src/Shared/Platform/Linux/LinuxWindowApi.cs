@@ -50,9 +50,7 @@ internal static class LinuxWindowApi
         try
         {
             var output = CommandRunner.RunChecked("xrandr", ["--query"]);
-            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var line in lines)
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (!line.Contains(" connected ") || !line.Contains('+'))
                     continue;

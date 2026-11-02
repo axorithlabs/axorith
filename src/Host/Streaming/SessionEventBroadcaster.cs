@@ -12,11 +12,13 @@ public sealed class SessionEventBroadcaster : IDisposable
     private readonly GrpcStreamSubscribers<SessionEvent> _subscribers;
     private bool _disposed;
 
-    public SessionEventBroadcaster(ISessionManager sessionManager, ILogger<SessionEventBroadcaster> logger)
+    public SessionEventBroadcaster(ISessionManager sessionManager, ILogger<SessionEventBroadcaster> logger,
+        IHostApplicationLifetime? lifetime = null)
     {
         _sessionManager = sessionManager;
         _logger = logger;
-        _subscribers = new GrpcStreamSubscribers<SessionEvent>(logger, 100, "session event");
+        _subscribers = new GrpcStreamSubscribers<SessionEvent>(logger, 100, "session event",
+            lifetime?.ApplicationStopping ?? default);
 
         _sessionManager.SessionStarted += OnSessionStarted;
         _sessionManager.SessionStopped += OnSessionStopped;

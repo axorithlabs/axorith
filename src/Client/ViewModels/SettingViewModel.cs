@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
-using System.Drawing.Imaging;
-using System.Runtime.Versioning;
 using System.Collections.ObjectModel;
+using System.Drawing.Imaging;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Runtime.Versioning;
 using System.Windows.Input;
-using Avalonia.Threading;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Axorith.Client.CoreSdk.Abstractions;
 using Axorith.Client.Services;
 using Axorith.Client.Services.Abstractions;
@@ -178,7 +178,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
                 : value;
 
             var current = Setting.GetCurrentValueAsObject();
-            if (current != null && current.Equals(boxedValue)) return;
+            if (current?.Equals(boxedValue) == true) return;
 
             Setting.SetValueFromObject(boxedValue);
             this.RaisePropertyChanged();
@@ -436,7 +436,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         var currentList = Setting.GetCurrentValueAsObject() switch
         {
             List<string> list => list.ToHashSet(),
-            string value when value.Length > 0 => value.Split('|').ToHashSet(),
+            string value when value.Length > 0 => [.. value.Split('|')],
             _ => []
         };
 
@@ -449,9 +449,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
             itemVm.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName == nameof(MultiChoiceItemViewModel.IsSelected))
-                {
                     OnMultiChoiceChanged();
-                }
             };
 
             MultiChoices.Add(itemVm);
@@ -484,9 +482,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         };
 
         if (!string.IsNullOrEmpty(result))
-        {
             StringValue = result;
-        }
     }
 
     private void LoadHistory()
@@ -496,9 +492,7 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         if (!_uiConfig.InputHistory.TryGetValue(Setting.Key, out var items)) return;
 
         foreach (var item in items)
-        {
             History.Add(item);
-        }
     }
 
     [ReactiveCommand]
@@ -531,15 +525,11 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         if (!isValidPath) return;
 
         if (History.Contains(value))
-        {
             History.Move(History.IndexOf(value), 0);
-        }
         else History.Insert(0, value);
 
         while (History.Count > 5)
-        {
             History.RemoveAt(History.Count - 1);
-        }
 
         _uiConfig.InputHistory[Setting.Key] = [.. History];
         _uiSettingsStore.Save(_uiConfig);
@@ -552,22 +542,17 @@ public partial class SettingViewModel : ReactiveObject, IDisposable
         else Dispatcher.UIThread.Post(() => { if (!_disposed) action(); });
     }
 
-    private bool IsTextBasedSetting()
-    {
-        return Setting.ControlType is
+    private bool IsTextBasedSetting() => Setting.ControlType is
             SettingControlType.Text or
             SettingControlType.TextArea or
             SettingControlType.FilePicker or
             SettingControlType.DirectoryPicker or
             SettingControlType.Secret;
-    }
 
     public void OnFocusGained()
     {
         if (IsTextBasedSetting())
-        {
             _isUserEditing = true;
-        }
     }
 
     public void OnFocusLost()

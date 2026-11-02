@@ -183,7 +183,7 @@ internal sealed class Settings : LauncherSettingsBase
             return;
 
         var choices = ((ISetting)ApplicationPath).GetCurrentChoices();
-        if (choices == null || choices.Any(choice => choice.Key == selectedPath))
+        if (choices?.Any(choice => choice.Key == selectedPath) != false)
             return;
 
         var fileName = Path.GetFileName(selectedPath);

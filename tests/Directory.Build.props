@@ -1,18 +1,15 @@
 <Project>
     <Import Project="../Directory.Build.props" />
 
+    <ItemGroup>
+        <Compile Include="$(MSBuildThisFileDirectory)TestEnvironment.cs" Link="TestEnvironment.cs" />
+    </ItemGroup>
+
     <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Axorith.Benchmarks'">
         <IsTestProject>true</IsTestProject>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Axorith.Core.Tests' or '$(MSBuildProjectName)' == 'Axorith.Sdk.Tests' or '$(MSBuildProjectName)' == 'Axorith.Shared.Tests'">
-        <CollectCoverage>true</CollectCoverage>
-        <CoverletOutputFormat>cobertura</CoverletOutputFormat>
-        <CoverletOutput>$(OutputPath)coverage.cobertura.xml</CoverletOutput>
-        <ExcludeByFile>**/obj/**/*.*;**/bin/**/*.*</ExcludeByFile>
-    </PropertyGroup>
-
-    <ItemGroup Condition="'$(CollectCoverage)' == 'true'">
+    <ItemGroup Condition="'$(IsTestProject)' == 'true'">
         <PackageReference Include="coverlet.collector"  PrivateAssets="all"
                           IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
     </ItemGroup>

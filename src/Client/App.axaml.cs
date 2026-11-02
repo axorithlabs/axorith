@@ -92,16 +92,12 @@ public class App : Application
             sp.GetRequiredService<IToastNotificationService>(), desktop));
         services.AddSingleton<IAutoStartManager>(sp => PlatformServices.CreateAutoStartManager(
             sp.GetRequiredService<ILoggerFactory>().CreateLogger<IAutoStartManager>()));
-        services.AddSingleton<IAppDiscoveryService>(sp =>
-            PlatformServices.CreateAppDiscoveryService(sp.GetRequiredService<ILoggerFactory>()));
-        services.AddSingleton<ClientOnboardingService>();
 
         Services = services.BuildServiceProvider();
 
         var shellViewModel = Services.GetRequiredService<ShellViewModel>();
         shellViewModel.Services = Services;
-        var loadingViewModel = Services.GetRequiredService<LoadingViewModel>();
-        shellViewModel.Content = loadingViewModel;
+        shellViewModel.Content = Services.GetRequiredService<LoadingViewModel>();
 
         var windowStateManager = Services.GetRequiredService<WindowStateManager>();
 
@@ -133,33 +129,24 @@ public class App : Application
         _notificationManager.Initialize();
 
         var singleInstanceManager = Program.GetSingleInstanceManager();
-        if (singleInstanceManager != null)
-        {
-            singleInstanceManager.ActivationRequested += (_, _) =>
+        singleInstanceManager?.ActivationRequested += (_, _) =>
             {
                 logger.LogInformation("Activation requested from another instance");
                 Dispatcher.UIThread.Post(() => ActivateMainWindow());
             };
-        }
 
         if (Environment.GetEnvironmentVariable("AXORITH_TEST_MODE") != "1")
-        {
             ApplyAutoStartSettings(uiSettingsStore, Services, logger);
-        }
 
         _mainWindow.Closing += (_, e) =>
         {
             try
             {
                 if (_isShuttingDown)
-                {
                     return;
-                }
 
                 if (_mainWindow.WindowState != WindowState.Minimized)
-                {
                     windowStateManager.SaveWindowState(_mainWindow);
-                }
 
                 var options = Services.GetService<IOptions<Configuration>>();
                 var cfg = options?.Value ?? clientConfig;
@@ -197,14 +184,11 @@ public class App : Application
     private static ICoreConnection GetCoreConnection(IServiceProvider services) =>
         services.GetRequiredService<CoreConnectionHolder>().GetRequiredConnection();
 
-    private void RegisterShutdownHandler(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> logger)
-    {
+    private void RegisterShutdownHandler(IClassicDesktopStyleApplicationLifetime desktop, ILogger<App> logger) =>
         desktop.ShutdownRequested += (_, _) =>
         {
             if (_isShuttingDown)
-            {
                 return;
-            }
 
             _isShuttingDown = true;
 
@@ -214,9 +198,7 @@ public class App : Application
 
             var windowStateManager = Services.GetService<WindowStateManager>();
             if (windowStateManager != null && desktop.MainWindow is { WindowState: not WindowState.Minimized } mainWindow)
-            {
                 windowStateManager.SaveWindowState(mainWindow);
-            }
 
             try
             {
@@ -229,7 +211,6 @@ public class App : Application
 
             logger.LogInformation("Client shutdown complete");
         };
-    }
 
     private static void ApplyAutoStartSettings(UiSettingsStore settingsStore, IServiceProvider services,
         ILogger<App> logger)
@@ -240,9 +221,7 @@ public class App : Application
             var autoStartManager = services.GetService<IAutoStartManager>();
 
             if (autoStartManager == null)
-            {
                 return;
-            }
 
             if (config.AutoStartEnabled && !autoStartManager.IsAutoStartEnabled)
             {
@@ -264,21 +243,15 @@ public class App : Application
     private void ActivateMainWindow()
     {
         if (_mainWindow == null)
-        {
             return;
-        }
 
         try
         {
             if (_mainWindow.WindowState == WindowState.Minimized)
-            {
                 _mainWindow.WindowState = WindowState.Normal;
-            }
 
             if (!_mainWindow.ShowInTaskbar)
-            {
                 _mainWindow.ShowInTaskbar = true;
-            }
 
             _mainWindow.Show();
             _mainWindow.Activate();

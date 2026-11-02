@@ -159,7 +159,7 @@ public sealed class SiteBlockerAllowListTests
                 var request = new ExtensionRequest(command,
                     root.TryGetProperty("mode", out var mode) ? mode.GetString() : null,
                     root.TryGetProperty("sites", out var sites)
-                        ? sites.EnumerateArray().Select(site => site.GetString()!).ToArray()
+                        ? [.. sites.EnumerateArray().Select(site => site.GetString()!)]
                         : []);
                 requests.Add(request);
                 await writer.WriteLineAsync(JsonSerializer.Serialize(new
@@ -186,7 +186,7 @@ public sealed class SiteBlockerAllowListTests
     }
 
     private static NamedPipeServerStream CreateChromeExtensionPipe() =>
-        new("axorith-nm-pipe-chrome", PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        new(Axorith.Shared.Utils.SiteBlockerExtensionIds.ScopePipeName("axorith-nm-pipe-chrome"), PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
     private sealed record ExtensionRequest(string Command, string? Mode, string[] Sites);
 }

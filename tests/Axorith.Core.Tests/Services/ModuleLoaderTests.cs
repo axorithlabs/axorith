@@ -126,8 +126,7 @@ public sealed class ModuleLoaderTests : IDisposable
         foreach (var definition in definitions)
         {
             var context = definition.LoadContext;
-            if (context is not null)
-                context.Unload();
+            context?.Unload();
             definition.LoadContext = null;
             definition.ModuleType = null;
         }

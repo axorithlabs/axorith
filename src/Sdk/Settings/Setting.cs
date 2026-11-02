@@ -13,75 +13,61 @@ public abstract class Setting
     ///     Creates a setting that is rendered as a text input field.
     /// </summary>
     public static Setting<string> AsText(string key, string label, string defaultValue, string? description = null,
-        bool isVisible = true, bool isReadOnly = false)
-    {
-        return CreateString(key, label, defaultValue, SettingControlType.Text, description, isVisible, isReadOnly);
-    }
+        bool isVisible = true, bool isReadOnly = false) =>
+        CreateString(key, label, defaultValue, SettingControlType.Text, description, isVisible, isReadOnly);
 
     /// <summary>
     ///     Creates a setting that is rendered as a text area input field.
     /// </summary>
     public static Setting<string> AsTextArea(string key, string label, string defaultValue, string? description = null,
-        bool isVisible = true, bool isReadOnly = false)
-    {
-        return CreateString(key, label, defaultValue, SettingControlType.TextArea, description, isVisible, isReadOnly);
-    }
+        bool isVisible = true, bool isReadOnly = false) =>
+        CreateString(key, label, defaultValue, SettingControlType.TextArea, description, isVisible, isReadOnly);
 
     /// <summary>
     ///     Creates a setting that is rendered as a checkbox.
     /// </summary>
     public static Setting<bool> AsCheckbox(string key, string label, bool defaultValue, string? description = null,
-        bool isVisible = true, bool isReadOnly = false)
-    {
-        return Create(key, label, description, defaultValue, SettingControlType.Checkbox, isVisible, isReadOnly,
+        bool isVisible = true, bool isReadOnly = false) =>
+        Create(key, label, description, defaultValue, SettingControlType.Checkbox, isVisible, isReadOnly,
             SettingPersistence.Persisted, b => b.ToString(), s => bool.TryParse(s, out var b) && b);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field.
     /// </summary>
     public static Setting<decimal> AsNumber(string key, string label, decimal defaultValue, string? description = null,
-        bool isVisible = true, bool isReadOnly = false)
-    {
-        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+        bool isVisible = true, bool isReadOnly = false) =>
+        Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
             SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
             s => decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : defaultValue);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field bound to an integer value.
     /// </summary>
     public static Setting<int> AsInt(string key, string label, int defaultValue, string? description = null,
-        bool isVisible = true, bool isReadOnly = false)
-    {
-        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+        bool isVisible = true, bool isReadOnly = false) =>
+        Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
             SettingPersistence.Persisted, i => i.ToString(CultureInfo.InvariantCulture),
             s => int.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : defaultValue);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field bound to a double value.
     /// </summary>
     public static Setting<double> AsDouble(string key, string label, double defaultValue, string? description = null,
-        bool isVisible = true, bool isReadOnly = false)
-    {
-        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+        bool isVisible = true, bool isReadOnly = false) =>
+        Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
             SettingPersistence.Persisted, d => d.ToString(CultureInfo.InvariantCulture),
             s => double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : defaultValue);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a numeric input field bound to a TimeSpan value (in seconds).
     /// </summary>
     public static Setting<TimeSpan> AsTimeSpan(string key, string label, TimeSpan defaultValue,
-        string? description = null, bool isVisible = true, bool isReadOnly = false)
-    {
-        return Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
+        string? description = null, bool isVisible = true, bool isReadOnly = false) =>
+        Create(key, label, description, defaultValue, SettingControlType.Number, isVisible, isReadOnly,
             SettingPersistence.Persisted, ts => ts.TotalSeconds.ToString(CultureInfo.InvariantCulture), s =>
                 double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var sec)
                     ? TimeSpan.FromSeconds(sec)
                     : defaultValue);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a dropdown/choice list.
@@ -133,31 +119,25 @@ public abstract class Setting
     ///     This ensures sensitive data (API tokens, passwords) never appear in plaintext on disk.
     /// </summary>
     public static Setting<string> AsSecret(string key, string label, string? description = null, bool isVisible = true,
-        bool isReadOnly = false)
-    {
-        return CreateString(key, label, string.Empty, SettingControlType.Secret, description, isVisible, isReadOnly,
+        bool isReadOnly = false) =>
+        CreateString(key, label, string.Empty, SettingControlType.Secret, description, isVisible, isReadOnly,
             SettingPersistence.Ephemeral);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a text field with a file browser button.
     /// </summary>
     public static Setting<string> AsFilePicker(string key, string label, string defaultValue, string? filter = null,
-        string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
-    {
-        return CreateString(key, label, defaultValue, SettingControlType.FilePicker, description, isVisible, isReadOnly,
+        string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true) =>
+        CreateString(key, label, defaultValue, SettingControlType.FilePicker, description, isVisible, isReadOnly,
             filter: filter, hasHistory: useHistory);
-    }
 
     /// <summary>
     ///     Creates a setting that is rendered as a text field with a directory browser button.
     /// </summary>
     public static Setting<string> AsDirectoryPicker(string key, string label, string defaultValue,
-        string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true)
-    {
-        return CreateString(key, label, defaultValue, SettingControlType.DirectoryPicker, description, isVisible,
+        string? description = null, bool isVisible = true, bool isReadOnly = false, bool useHistory = true) =>
+        CreateString(key, label, defaultValue, SettingControlType.DirectoryPicker, description, isVisible,
             isReadOnly, hasHistory: useHistory);
-    }
 
     private static Setting<string> CreateString(string key, string label, string defaultValue,
         SettingControlType controlType, string? description, bool isVisible, bool isReadOnly,
@@ -244,20 +224,11 @@ public class Setting<T> : ISetting, IDisposable
             default:
                 try
                 {
-                    if (typeof(T) == typeof(TimeSpan))
-                    {
-                        if (value is IConvertible)
-                        {
-                            var seconds = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-                            _value.OnNext((T)(object)TimeSpan.FromSeconds(seconds));
-                            return;
-                        }
-                    }
-
-
                     if (value is IConvertible)
                     {
-                        var converted = (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
+                        var converted = typeof(T) == typeof(TimeSpan)
+                            ? (T)(object)TimeSpan.FromSeconds(Convert.ToDouble(value, CultureInfo.InvariantCulture))
+                            : (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
                         _value.OnNext(converted);
                     }
                 }

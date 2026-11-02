@@ -15,9 +15,7 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
         try
         {
             if (config.BannerDelayMs > 0)
-            {
                 await Task.Delay(config.BannerDelayMs, cancellationToken).ConfigureAwait(false);
-            }
 
             await windowService.WaitForWindowInitAsync(process, config.WaitForWindowTimeoutMs, cancellationToken)
                 .ConfigureAwait(false);
@@ -38,9 +36,7 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
             if (moveToMonitor && monitorIndex is { } idx)
             {
                 if (config.MoveDelayMs > 0)
-                {
                     await Task.Delay(config.MoveDelayMs, cancellationToken).ConfigureAwait(false);
-                }
 
                 logger.LogDebug("Moving window to monitor {MonitorIndex}", idx);
                 windowService.MoveWindowToMonitor(windowHandle, idx);
@@ -54,17 +50,13 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
                     windowService.SetWindowState(windowHandle, WindowState.Maximized);
 
                     if (config.MaximizeSnapDelayMs > 0)
-                    {
-                        await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
-                    }
+                            await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
 
-                    var current = windowService.GetWindowState(windowHandle);
+                        var current = windowService.GetWindowState(windowHandle);
                     if (current != WindowState.Maximized)
-                    {
-                        logger.LogWarning("Failed to maximize window");
-                    }
+                            logger.LogWarning("Failed to maximize window");
 
-                    if (moveToMonitor && monitorIndex is { } snapIndex)
+                        if (moveToMonitor && monitorIndex is { } snapIndex)
                     {
                         var (mx, my, mWidth, mHeight) = windowService.GetMonitorBounds(snapIndex);
                         var (wx, wy, wWidth, wHeight) = windowService.GetWindowBounds(windowHandle);
@@ -89,11 +81,9 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
                     windowService.SetWindowState(windowHandle, WindowState.Minimized);
 
                     if (config.MaximizeSnapDelayMs > 0)
-                    {
-                        await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
-                    }
+                            await Task.Delay(config.MaximizeSnapDelayMs, cancellationToken).ConfigureAwait(false);
 
-                    if (windowService.GetWindowState(windowHandle) != WindowState.Minimized)
+                        if (windowService.GetWindowState(windowHandle) != WindowState.Minimized)
                     {
                         logger.LogDebug("Re-applying minimize state after revert");
                         windowService.SetWindowState(windowHandle, WindowState.Minimized);
@@ -115,9 +105,7 @@ public sealed class WindowService(IModuleLogger logger, IPlatformWindowService w
             }
 
             if (config.FinalFocusDelayMs > 0)
-            {
                 await Task.Delay(config.FinalFocusDelayMs, cancellationToken).ConfigureAwait(false);
-            }
 
             if (config.BringToForeground && config.State != "Minimized")
             {

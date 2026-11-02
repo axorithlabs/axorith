@@ -2,16 +2,27 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using Axorith.Shared.Platform;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Axorith.Integrations.Tests;
 
 using LauncherModule = Axorith.Module.ApplicationLauncher.Module;
 
-public sealed class ApplicationLauncherExecutionTests
+public sealed partial class ApplicationLauncherExecutionTests(ITestOutputHelper output)
 {
-    [WindowsFact]
+    [WindowsTheory]
+    [InlineData("LaunchNew", "TerminateForce", false, true)]
+    [InlineData("LaunchNew", "KeepRunning", false, false)]
+    [InlineData("LaunchNew", "TerminateGraceful", false, false)]
+    [InlineData("LaunchOrAttach", "TerminateForce", false, true)]
+    [InlineData("LaunchOrAttach", "TerminateForce", true, false)]
+    [InlineData("AttachExisting", "TerminateForce", true, false)]
+    [InlineData("AttachExisting", "TerminateForce", false, false)]
+    [InlineData("LaunchNew", "TerminateForce", true, true)]
+    [InlineData("LaunchNew", "TerminateForce", false, true, true)]
     [SupportedOSPlatform("windows")]
-    public async Task StartsTheConfiguredExecutableAndTerminatesItWhenTheSessionEnds()
+    public async Task RealProcessLifetimeRespectsLaunchAttachAndStopModes(string mode, string lifecycle,
+        bool alreadyRunning, bool shouldExit, bool disposeOnly = false)
     {
         var directory = Path.Combine(Path.GetTempPath(), "AxorithLauncher", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -22,27 +33,59 @@ public sealed class ApplicationLauncherExecutionTests
         var module = new LauncherModule(new TestModuleLogger(), new EmptyAppDiscovery(), new NoopNotifier(),
             new TestHttpClientFactory(), new EmptySecureStorage(), PlatformServices.CreateProcessService(),
             new ImmediateWindowService());
+        var existingId = 0;
         try
         {
+            if (alreadyRunning)
+            {
+                using var existing = Process.Start(new ProcessStartInfo(executable, "-t 127.0.0.1")
+                    { UseShellExecute = false, CreateNoWindow = true })!;
+                existingId = existing.Id;
+            }
             await module.InitializeAsync(CancellationToken.None);
             var settings = module.GetSettings().ToDictionary(setting => setting.Key);
             settings["ApplicationPath"].SetValueFromString("custom-app");
             settings["CustomPath"].SetValueFromString(executable);
             settings["ApplicationArgs"].SetValueFromString("-t 127.0.0.1");
-            settings["ProcessMode"].SetValueFromString("LaunchNew");
-            settings["LifecycleMode"].SetValueFromString("TerminateForce");
+            settings["ProcessMode"].SetValueFromString(mode);
+            settings["LifecycleMode"].SetValueFromString(lifecycle);
             Assert.Equal(Axorith.Sdk.ValidationStatus.Ok,
                 (await module.ValidateSettingsAsync(CancellationToken.None)).Status);
 
             await module.OnSessionStartAsync(CancellationToken.None);
+            if (mode == "AttachExisting" && !alreadyRunning)
+            {
+                await module.OnSessionEndAsync(CancellationToken.None);
+                Assert.Empty(Process.GetProcessesByName(processName));
+                return;
+            }
 
-            using var process = await WaitForProcessAsync(processName, TimeSpan.FromSeconds(5));
+            using var process = await WaitForProcessAsync(processName, TimeSpan.FromSeconds(5),
+                mode == "LaunchNew" ? existingId : 0);
             Assert.NotNull(process);
             Assert.False(process.HasExited);
+            var running = Process.GetProcessesByName(processName);
+            Assert.Equal(mode == "LaunchNew" && alreadyRunning ? 2 : 1, running.Length);
+            foreach (var item in running) item.Dispose();
 
-            await module.OnSessionEndAsync(CancellationToken.None);
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.True(process.HasExited);
+            if (disposeOnly) module.Dispose();
+            else await module.OnSessionEndAsync(CancellationToken.None);
+            if (shouldExit)
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.True(process.HasExited);
+            }
+            else
+            {
+                module.Dispose();
+                await Task.Delay(250);
+                Assert.False(process.HasExited, "Attached/KeepRunning processes must survive; graceful close must not force-kill a console app.");
+            }
+            if (alreadyRunning)
+            {
+                using var existing = Process.GetProcessById(existingId);
+                Assert.False(existing.HasExited, "A pre-existing process must survive even when LaunchNew kills another instance.");
+            }
         }
         finally
         {
@@ -59,6 +102,60 @@ public sealed class ApplicationLauncherExecutionTests
             }
 
             module.Dispose();
+            await DeleteDirectoryAsync(directory);
+        }
+    }
+
+    [WindowsTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [SupportedOSPlatform("windows")]
+    public async Task ForceStopTerminatesTheLaunchedProcessTree(bool disposeOnly)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "AxorithLauncher", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var childName = $"axorith-child-{Guid.NewGuid():N}";
+        var childPath = Path.Combine(directory, childName + ".exe");
+        File.Copy(Path.Combine(Environment.SystemDirectory, "ping.exe"), childPath);
+        var script = Path.Combine(directory, "parent.ps1");
+        await File.WriteAllTextAsync(script, """
+            param($ChildPath)
+            $child = Start-Process -FilePath $ChildPath -ArgumentList '-t 127.0.0.1' -WindowStyle Hidden -PassThru
+            $child.WaitForExit()
+            """);
+        using var module = new LauncherModule(new TestModuleLogger(), new EmptyAppDiscovery(), new NoopNotifier(),
+            new TestHttpClientFactory(), new EmptySecureStorage(), PlatformServices.CreateProcessService(),
+            new ImmediateWindowService());
+        try
+        {
+            await module.InitializeAsync(CancellationToken.None);
+            var settings = module.GetSettings().ToDictionary(setting => setting.Key);
+            settings["ApplicationPath"].SetValueFromString("custom-app");
+            settings["CustomPath"].SetValueFromString(Path.Combine(Environment.SystemDirectory,
+                "WindowsPowerShell", "v1.0", "powershell.exe"));
+            settings["ApplicationArgs"].SetValueFromString(
+                $"-NoProfile -NonInteractive -WindowStyle Hidden -File \"{script}\" \"{childPath}\"");
+            settings["ProcessMode"].SetValueFromString("LaunchNew");
+            settings["LifecycleMode"].SetValueFromString("TerminateForce");
+            await module.OnSessionStartAsync(CancellationToken.None);
+            using var child = await WaitForProcessAsync(childName, TimeSpan.FromSeconds(10));
+            Assert.NotNull(child);
+            if (disposeOnly) module.Dispose();
+            else await module.OnSessionEndAsync(CancellationToken.None);
+            await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(child.HasExited);
+        }
+        finally
+        {
+            module.Dispose();
+            foreach (var process in Process.GetProcessesByName(childName))
+            {
+                using (process)
+                {
+                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+                }
+            }
             await DeleteDirectoryAsync(directory);
         }
     }
@@ -82,12 +179,15 @@ public sealed class ApplicationLauncherExecutionTests
         }
     }
 
-    private static async Task<Process?> WaitForProcessAsync(string processName, TimeSpan timeout)
+    private static async Task<Process?> WaitForProcessAsync(string processName, TimeSpan timeout, int excludedId = 0)
     {
         var timer = Stopwatch.StartNew();
         while (timer.Elapsed < timeout)
         {
-            var process = Process.GetProcessesByName(processName).FirstOrDefault();
+            var processes = Process.GetProcessesByName(processName);
+            var process = processes.FirstOrDefault(candidate => candidate.Id != excludedId);
+            foreach (var candidate in processes)
+                if (!ReferenceEquals(candidate, process)) candidate.Dispose();
             if (process is not null)
                 return process;
             await Task.Delay(20);
@@ -96,9 +196,9 @@ public sealed class ApplicationLauncherExecutionTests
         return null;
     }
 
-    private sealed class WindowsFactAttribute : FactAttribute
+    private sealed class WindowsTheoryAttribute : TheoryAttribute
     {
-        public WindowsFactAttribute()
+        public WindowsTheoryAttribute()
         {
             if (!OperatingSystem.IsWindows())
                 Skip = "The real executable launch check requires Windows.";

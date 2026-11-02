@@ -48,9 +48,7 @@ $notifier.Show($toast)
             await process.WaitForExitAsync();
 
             if (process.ExitCode != 0)
-            {
                 logger.LogWarning("Failed to show notification via PowerShell. ExitCode: {Code}", process.ExitCode);
-            }
         }
         catch (Exception ex)
         {

@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Client</AssemblyName>
-        <RootNamespace>Axorith.Client</RootNamespace>
         
         <Description>UI client for Axorith.</Description>
         
@@ -18,7 +16,7 @@
         <!-- Size optimizations for Release -->
         <PublishSingleFile Condition="'$(Configuration)' == 'Release'">false</PublishSingleFile>
         <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
-        <PublishReadyToRunShowWarnings Condition="'$(Configuration)' == 'Release'">false</PublishReadyToRunShowWarnings>
+        <PublishReadyToRunShowWarnings Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRunShowWarnings>
         
         <!-- Startup performance -->
         <TieredCompilation>true</TieredCompilation>

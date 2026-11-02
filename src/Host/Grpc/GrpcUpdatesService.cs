@@ -5,14 +5,9 @@ using Grpc.Core;
 
 namespace Axorith.Host.Grpc;
 
-public class GrpcUpdatesService : UpdatesService.UpdatesServiceBase
+public class GrpcUpdatesService(UpdateService updateService) : UpdatesService.UpdatesServiceBase
 {
-    private readonly UpdateService _updateService;
-
-    public GrpcUpdatesService(UpdateService updateService)
-    {
-        _updateService = updateService;
-    }
+    private readonly UpdateService _updateService = updateService;
 
     public override async Task<UpdateInfoResponse> GetUpdateInfo(Empty request, ServerCallContext context)
     {

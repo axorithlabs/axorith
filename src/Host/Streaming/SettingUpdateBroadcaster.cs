@@ -26,11 +26,12 @@ public class SettingUpdateBroadcaster : IDisposable
     private readonly int _valueBatchWindowMs;
 
     public SettingUpdateBroadcaster(ISessionManager sessionManager, ILogger<SettingUpdateBroadcaster> logger,
-        IOptions<Configuration>? options)
+        IOptions<Configuration>? options, IHostApplicationLifetime? lifetime = null)
     {
         _sessionManager = sessionManager;
         _logger = logger;
-        _subscribers = new GrpcStreamSubscribers<SettingUpdate>(logger, 1024, "setting update");
+        _subscribers = new GrpcStreamSubscribers<SettingUpdate>(logger, 1024, "setting update",
+            lifetime?.ApplicationStopping ?? default);
         var streaming = options?.Value.Streaming;
         _choicesThrottleMs = Math.Clamp(streaming?.ChoicesThrottleMs ?? 200, 0, 10_000);
         _valueBatchWindowMs = Math.Clamp(streaming?.ValueBatchWindowMs ?? 16, 0, 1000);
@@ -96,15 +97,11 @@ public class SettingUpdateBroadcaster : IDisposable
 
             var settings = moduleInstance.GetSettings();
             foreach (var setting in settings)
-            {
                 SubscribeToSetting(configuredModule.InstanceId, setting, disposables);
-            }
 
             var actions = moduleInstance.GetActions();
             foreach (var action in actions)
-            {
                 SubscribeToAction(configuredModule.InstanceId, action, disposables);
-            }
 
             _logger.LogDebug(
                 "Subscribed to {SettingCount} settings and {ActionCount} actions for module {ModuleName} (InstanceId: {InstanceId})",
@@ -120,9 +117,7 @@ public class SettingUpdateBroadcaster : IDisposable
         _logger.LogDebug("Session stopped: {PresetId}. Cleaning up all runtime subscriptions.", presetId);
 
         foreach (var key in _moduleSubscriptions.Keys.ToArray())
-        {
             UnsubscribeModuleInstance(key);
-        }
 
         _logger.LogInformation("All setting subscriptions cleared.");
     }
@@ -208,9 +203,7 @@ public class SettingUpdateBroadcaster : IDisposable
         _sessionManager.SessionStopped -= OnSessionStopped;
 
         foreach (var disposables in _moduleSubscriptions.Values)
-        {
             disposables.Dispose();
-        }
 
         _moduleSubscriptions.Clear();
 

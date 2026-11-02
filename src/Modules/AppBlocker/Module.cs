@@ -57,17 +57,16 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
 
     public void SetWorkspaceApplications(IEnumerable<string> processNames)
     {
-        _workspaceApplications = processNames
+        _workspaceApplications = [.. processNames
             .Select(name => Path.GetFileNameWithoutExtension(name.Trim()))
             .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
         _workspaceApplicationsReceived = true;
     }
 
     public Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
-        var processes = _settings.IsAllowList ? _workspaceApplications : _settings.GetProcesses().ToArray();
+        var processes = _settings.IsAllowList ? _workspaceApplications : [.. _settings.GetProcesses()];
         if (_settings.IsAllowList && processes.Length == 0)
         {
             throw new InvalidOperationException(
@@ -138,11 +137,8 @@ public class Module : IModule, ISessionBreakParticipant, ICommittedSessionValida
     {
         var now = DateTime.UtcNow;
 
-        if (_lastNotificationTime.TryGetValue(processName, out var lastTime))
-        {
-            if (now - lastTime < _notificationCooldown)
-                return;
-        }
+        if (_lastNotificationTime.TryGetValue(processName, out var lastTime) && now - lastTime < _notificationCooldown)
+            return;
 
         _lastNotificationTime[processName] = now;
 

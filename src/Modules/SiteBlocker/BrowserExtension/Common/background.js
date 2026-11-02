@@ -40,12 +40,12 @@ function connectToHost() {
             .catch(error => console.error("Axorith: Native message failed:", error));
     });
     
-    nativePort.onDisconnect.addListener(() => {
+    nativePort.onDisconnect.addListener(port => {
         messageQueue = messageQueue.then(async () => {
             const state = await extensionApi.storage.local.get(STORAGE_KEY_RETAIN);
             if (!state[STORAGE_KEY_RETAIN]) await unblockSites();
         }).catch(error => console.error("Axorith: Disconnect cleanup failed:", error));
-        const error = extensionApi.runtime.lastError;
+        const error = port?.error ?? extensionApi.runtime.lastError;
         if (error) {
             console.warn(`Axorith: Failed to connect/disconnected from ${hostName}: ${error.message}`);
             handleConnectionFailure();

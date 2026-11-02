@@ -9,8 +9,7 @@ namespace Axorith.Module.AppBlocker;
 
 internal sealed class Settings : IDisposable
 {
-    private static Dictionary<string, string[]>? _categoryProcesses;
-    private static readonly Lock _loadLock = new();
+    private static readonly Lazy<Dictionary<string, string[]>> CategoryProcesses = new(LoadCategories);
 
     private readonly Setting<string> _mode;
     private readonly Setting<List<string>> _categories;
@@ -23,33 +22,17 @@ internal sealed class Settings : IDisposable
 
     public Settings(IAppDiscoveryService appDiscovery)
     {
-        EnsureCategoriesLoaded();
-
-        _mode = Setting.AsChoice(
-            key: "Mode",
-            label: "Blocking Mode",
-            defaultValue: "BlockList",
-            initialChoices:
+        _mode = Setting.AsChoice("Mode", "Blocking Mode", "BlockList",
             [
                 new KeyValuePair<string, string>("BlockList", "Block selected apps"),
                 new KeyValuePair<string, string>("AllowList", "Only allow Workspace apps")
-            ],
-            description: "Block selected apps, or allow only applications configured in this Workspace.");
+            ], description: "Block selected apps, or allow only applications configured in this Workspace.");
 
-        _categories = Setting.AsMultiChoice(
-            key: "Categories",
-            label: "Block Categories",
-            defaultValues: [],
-            initialChoices: BuildCategoryChoices(),
-            description: "Select categories to block. Apps from selected categories will be automatically terminated."
-        );
+        _categories = Setting.AsMultiChoice("Categories", "Block Categories", [], BuildCategoryChoices(),
+            description: "Select categories to block. Apps from selected categories will be automatically terminated.");
 
-        _customProcessList = Setting.AsTextArea(
-            key: "CustomProcessList",
-            label: "Custom Apps",
-            defaultValue: "",
-            description: "Additional process names to block (comma or newline separated). Example: notepad, calc"
-        );
+        _customProcessList = Setting.AsTextArea("CustomProcessList", "Custom Apps", "",
+            description: "Additional process names to block (comma or newline separated). Example: notepad, calc");
 
         var appChoices = ApplicationSelector.GetInstalledChoices(appDiscovery,
             app => Path.GetFileNameWithoutExtension(app.ExecutablePath));
@@ -109,9 +92,7 @@ internal sealed class Settings : IDisposable
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var category in _categories.GetCurrentValue())
-        {
-            if (_categoryProcesses!.TryGetValue(category, out var processes)) result.UnionWith(processes);
-        }
+            if (CategoryProcesses.Value.TryGetValue(category, out var processes)) result.UnionWith(processes);
 
         result.UnionWith(_customProcessList.GetCurrentValue()
             .Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -119,34 +100,18 @@ internal sealed class Settings : IDisposable
         return result;
     }
 
-    private static void EnsureCategoriesLoaded()
+    private static Dictionary<string, string[]> LoadCategories()
     {
-        if (_categoryProcesses != null)
-            return;
-
-        lock (_loadLock)
+        var moduleDirectory = Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? AppContext.BaseDirectory;
+        var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_apps.json");
+        if (!File.Exists(jsonPath)) return [];
+        try
         {
-            if (_categoryProcesses != null)
-                return;
-
-            var moduleDirectory = Path.GetDirectoryName(typeof(Settings).Assembly.Location) ?? AppContext.BaseDirectory;
-            var jsonPath = Path.Combine(moduleDirectory, "Data", "blocked_apps.json");
-
-            if (!File.Exists(jsonPath))
-            {
-                _categoryProcesses = new();
-                return;
-            }
-
-            try
-            {
-                var json = File.ReadAllText(jsonPath);
-                _categoryProcesses = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) ?? new();
-            }
-            catch
-            {
-                _categoryProcesses = new();
-            }
+            return JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(jsonPath)) ?? [];
+        }
+        catch
+        {
+            return [];
         }
     }
 
@@ -165,9 +130,7 @@ internal sealed class Settings : IDisposable
             ["Office"] = "Office Apps (Word, Excel, LibreOffice...)"
         };
 
-        return _categoryProcesses?.Keys
-            .Select(category => KeyValuePair.Create(category, descriptions.GetValueOrDefault(category, category)))
-            .ToList() ?? [];
+        return [.. CategoryProcesses.Value.Keys.Select(category => KeyValuePair.Create(category, descriptions.GetValueOrDefault(category, category)))];
     }
 
     public void Dispose()

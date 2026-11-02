@@ -22,41 +22,21 @@ internal sealed class Settings : LauncherSettingsBase
     {
         _appDiscovery = appDiscovery;
 
-        BrowserPath = Setting.AsChoice(
-            key: "BrowserPath",
-            label: "Browser",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Scanning for browsers...")],
-            description: "Select the browser to launch."
-        );
+        BrowserPath = Setting.AsChoice("BrowserPath", "Browser", string.Empty,
+            [new KeyValuePair<string, string>("", "Scanning for browsers...")],
+            description: "Select the browser to launch.");
 
-        StartUrl = Setting.AsText(
-            key: "StartUrl",
-            label: "Start URL",
-            defaultValue: string.Empty,
-            description: "Optional URL to open when browser starts."
-        );
+        StartUrl = Setting.AsText("StartUrl", "Start URL", string.Empty,
+            description: "Optional URL to open when browser starts.");
 
-        ProfileName = Setting.AsText(
-            key: "ProfileName",
-            label: "Profile Name",
-            defaultValue: string.Empty,
-            description: "Optional browser profile name (Chrome: 'Profile 1', Firefox: profile name)."
-        );
+        ProfileName = Setting.AsText("ProfileName", "Profile Name", string.Empty,
+            description: "Optional browser profile name (Chrome: 'Profile 1', Firefox: profile name).");
 
-        IncognitoMode = Setting.AsCheckbox(
-            key: "IncognitoMode",
-            label: "Private/Incognito Mode",
-            defaultValue: false,
-            description: "Launch browser in private/incognito mode."
-        );
+        IncognitoMode = Setting.AsCheckbox("IncognitoMode", "Private/Incognito Mode", false,
+            description: "Launch browser in private/incognito mode.");
 
-        AdditionalArgs = Setting.AsText(
-            key: "AdditionalArgs",
-            label: "Additional Arguments",
-            defaultValue: string.Empty,
-            description: "Additional command-line arguments to pass to the browser."
-        );
+        AdditionalArgs = Setting.AsText("AdditionalArgs", "Additional Arguments", string.Empty,
+            description: "Additional command-line arguments to pass to the browser.");
 
         SetupBaseReactiveVisibility();
     }
@@ -89,9 +69,8 @@ internal sealed class Settings : LauncherSettingsBase
         return string.IsNullOrEmpty(path) ? null : BrowserProfiles.GetProfile(path);
     }
 
-    private Task RefreshBrowsersAsync()
-    {
-        return Task.Run(() =>
+    private Task RefreshBrowsersAsync() =>
+        Task.Run(() =>
         {
             var uniqueBrowsers = _appDiscovery.GetInstalledApplicationsIndex()
                 .Where(ApplicationSelector.IsBrowserApp)
@@ -101,13 +80,11 @@ internal sealed class Settings : LauncherSettingsBase
                 .ToList();
 
             var choices = uniqueBrowsers
-                .Select(b => new KeyValuePair<string, string>(b.ExecutablePath, b.Name))
-                .ToList();
+                .ConvertAll(b => new KeyValuePair<string, string>(b.ExecutablePath, b.Name))
+;
 
             if (choices.Count == 0)
-            {
                 choices.Add(new KeyValuePair<string, string>("", "No browsers found"));
-            }
 
             var current = BrowserPath.GetCurrentValue();
             if (!string.IsNullOrEmpty(current) &&
@@ -119,11 +96,8 @@ internal sealed class Settings : LauncherSettingsBase
             BrowserPath.SetChoices(choices);
 
             if (string.IsNullOrEmpty(current) && choices.Count > 0 && !string.IsNullOrEmpty(choices[0].Key))
-            {
                 BrowserPath.SetValue(choices[0].Key);
-            }
         });
-    }
 
     private static AppInfo PickBestBrowserEntry(IGrouping<string, AppInfo> group)
     {

@@ -136,7 +136,7 @@ public class ScheduleManager(
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            return _schedules.ToList();
+            return [.. _schedules];
         }
         finally
         {
@@ -150,7 +150,7 @@ public class ScheduleManager(
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            return _schedules.Where(s => s.PresetId == presetId && s.IsEnabled).ToList();
+            return [.. _schedules.Where(s => s.PresetId == presetId && s.IsEnabled)];
         }
         finally
         {
@@ -166,9 +166,7 @@ public class ScheduleManager(
         if (lockMinutes <= 0) return new ConfigurationLockStatus(false, null);
 
         if (lockMinutes is not (5 or 15 or 60))
-        {
             throw new InvalidOperationException("Schedule lock must be Off, 5 minutes, 15 minutes, or 1 hour.");
-        }
 
         var now = DateTimeOffset.Now;
         var schedules = await ListSchedulesAsync(cancellationToken).ConfigureAwait(false);
@@ -178,7 +176,7 @@ public class ScheduleManager(
             .Where(run => run.HasValue)
             .Select(run => run.GetValueOrDefault() - now)
             .Where(remaining => remaining >= TimeSpan.FromSeconds(-30) && remaining <= TimeSpan.FromMinutes(lockMinutes))
-            .OrderBy(remaining => remaining)
+            .Order()
             .Select(remaining => (TimeSpan?)remaining)
             .FirstOrDefault();
 
@@ -192,14 +190,10 @@ public class ScheduleManager(
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            var existing = _schedules.FirstOrDefault(s => s.Id == schedule.Id);
-            if (existing != null)
-            {
-                _schedules.Remove(existing);
-            }
-
-            _schedules.Add(schedule);
-            await SaveToDiskAsync(cancellationToken);
+            var updated = _schedules.Where(s => s.Id != schedule.Id).Append(schedule).ToList();
+            await SaveToDiskAsync(updated, cancellationToken);
+            _schedules.Clear();
+            _schedules.AddRange(updated);
             return schedule;
         }
         finally
@@ -213,8 +207,10 @@ public class ScheduleManager(
         await _lock.WaitAsync(cancellationToken);
         try
         {
-            _schedules.RemoveAll(s => s.Id == scheduleId);
-            await SaveToDiskAsync(cancellationToken);
+            var updated = _schedules.Where(s => s.Id != scheduleId).ToList();
+            await SaveToDiskAsync(updated, cancellationToken);
+            _schedules.Clear();
+            _schedules.AddRange(updated);
         }
         finally
         {
@@ -231,8 +227,10 @@ public class ScheduleManager(
             var schedule = _schedules.FirstOrDefault(s => s.Id == scheduleId);
             if (schedule != null)
             {
+                var previous = schedule.IsEnabled;
                 schedule.IsEnabled = enabled;
-                await SaveToDiskAsync(cancellationToken);
+                try { await SaveToDiskAsync(_schedules, cancellationToken); }
+                catch { schedule.IsEnabled = previous; throw; }
             }
 
             return schedule;
@@ -326,8 +324,8 @@ public class ScheduleManager(
             _lock.Release();
         }
 
-        toStop = toStop.OrderBy(x => x.RunTime).ToList();
-        toRun = toRun.OrderBy(x => x.RunTime).ToList();
+        toStop = [.. toStop.OrderBy(x => x.RunTime)];
+        toRun = [.. toRun.OrderBy(x => x.RunTime)];
 
         foreach (var (schedule, runTime) in toStop)
         {
@@ -447,8 +445,10 @@ public class ScheduleManager(
         await _lock.WaitAsync(ct);
         try
         {
+            var previous = schedule.LastRun;
             schedule.LastRun = now;
-            await SaveToDiskAsync(ct);
+            try { await SaveToDiskAsync(_schedules, ct); }
+            catch { schedule.LastRun = previous; throw; }
         }
         finally
         {
@@ -469,9 +469,7 @@ public class ScheduleManager(
     {
         var key = $"{schedule.Id}_{runTime.Ticks}_{triggerAction}_{skipReason}";
         if (_reportedScheduleTriggerSkips.Add(key))
-        {
             TrackScheduleTriggered(schedule, triggerAction, "skipped", skipReason: skipReason);
-        }
     }
 
     private static bool IsTriggerWindow(TimeSpan timeLeft) =>
@@ -563,22 +561,27 @@ public class ScheduleManager(
         }
     }
 
-    private async Task SaveToDiskAsync(CancellationToken ct)
+    private async Task SaveToDiskAsync(IReadOnlyList<SessionSchedule> schedules, CancellationToken ct)
     {
+        var tempPath = _storagePath + ".tmp";
         try
         {
             var dir = Path.GetDirectoryName(_storagePath);
             if (dir != null)
-            {
                 Directory.CreateDirectory(dir);
-            }
 
-            await using var stream = File.Create(_storagePath);
-            await JsonSerializer.SerializeAsync(stream, _schedules, _jsonOptions, ct);
+            await using (var stream = File.Create(tempPath))
+                await JsonSerializer.SerializeAsync(stream, schedules, _jsonOptions, ct);
+            File.Move(tempPath, _storagePath, overwrite: true);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save schedules to {Path}", TelemetryGuard.SafePath(_storagePath));
+            throw;
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
         }
     }
 

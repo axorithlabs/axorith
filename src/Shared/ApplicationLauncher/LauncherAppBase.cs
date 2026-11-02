@@ -14,6 +14,8 @@ public abstract class LauncherAppBase(
 {
     protected IModuleLogger Logger { get; } = logger;
 
+    protected IPlatformProcessService PlatformProcessService { get; } = processService;
+
     protected ProcessService ProcessService { get; } = new(logger, processService);
 
     protected WindowService WindowService { get; } = new(logger, windowService);
@@ -36,6 +38,9 @@ public abstract class LauncherAppBase(
     public virtual async Task OnSessionStartAsync(CancellationToken cancellationToken)
     {
         var processConfig = BuildProcessConfig();
+        var existingProcesses = PlatformProcessService.FindProcesses(processConfig.ApplicationPath);
+        var existingIds = existingProcesses.Select(process => process.Id).ToHashSet();
+        foreach (var process in existingProcesses) process.Dispose();
 
         Logger.LogInfo("Starting in {Mode} mode for {AppPath}",
             processConfig.StartMode, processConfig.ApplicationPath);
@@ -76,8 +81,10 @@ public abstract class LauncherAppBase(
                 return;
             }
 
+            CurrentProcess.Dispose();
             CurrentProcess = fallback;
-            AttachedToExisting = true;
+            // A launcher handoff still belongs to this session unless the target was already running.
+            AttachedToExisting = existingIds.Contains(fallback.Id);
             await WindowService.ConfigureWindowAsync(CurrentProcess, BuildWindowConfig(), cancellationToken)
                 .ConfigureAwait(false);
             await OnAfterWindowConfigurationAsync(cancellationToken).ConfigureAwait(false);
@@ -90,7 +97,7 @@ public abstract class LauncherAppBase(
 
     public virtual async Task OnSessionEndAsync(CancellationToken cancellationToken = default)
     {
-        if (CurrentProcess == null || CurrentProcess.HasExited)
+        if (CurrentProcess?.HasExited != false)
         {
             Logger.LogDebug("Process already exited or not started");
             return;
@@ -102,7 +109,8 @@ public abstract class LauncherAppBase(
         Logger.LogInfo("Session ending. Lifecycle mode: {Mode}, Attached to existing: {Attached}",
             lifecycleSetting, AttachedToExisting);
 
-        await ProcessService.TerminateAsync(CurrentProcess, lifecycle, AttachedToExisting).ConfigureAwait(false);
+        await ProcessService.TerminateAsync(CurrentProcess, lifecycle, AttachedToExisting, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public virtual void Dispose()
@@ -113,9 +121,7 @@ public abstract class LauncherAppBase(
             if (process is { HasExited: false })
             {
                 var lifecycleSetting = Settings.LifecycleMode.GetCurrentValue();
-                var lifecycle = lifecycleSetting == "KeepRunning"
-                    ? ProcessLifecycleMode.KeepRunning
-                    : ProcessLifecycleMode.TerminateGraceful;
+                var lifecycle = LauncherConfiguration.ParseLifecycleMode(lifecycleSetting);
 
                 ProcessService.TerminateAsync(process, lifecycle, AttachedToExisting).GetAwaiter().GetResult();
             }

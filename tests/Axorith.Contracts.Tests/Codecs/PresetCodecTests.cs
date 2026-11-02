@@ -57,6 +57,11 @@ public sealed class PresetCodecTests
         result.FocusCommitment.EndAtDaysOfWeek.Should().Equal(DayOfWeek.Monday, DayOfWeek.Friday);
         result.FocusCommitment.BreakDuration.Should().Be(TimeSpan.FromMinutes(10));
         result.FocusCommitment.NextWorkspaceId.Should().Be(nextPresetId);
+        result.FocusCommitment.Mode.Should().Be(preset.FocusCommitment.Mode);
+        result.FocusCommitment.EndCondition.Should().Be(preset.FocusCommitment.EndCondition);
+        result.FocusCommitment.BreakCount.Should().Be(2);
+        result.FocusCommitment.AfterEnd.Should().Be(preset.FocusCommitment.AfterEnd);
+        result.FocusCommitment.ScheduleLockMinutes.Should().Be(15);
         PresetCodec.ToSummary(result).ModuleCount.Should().Be(1);
     }
 

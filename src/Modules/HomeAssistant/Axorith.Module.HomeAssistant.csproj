@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Module.HomeAssistant</AssemblyName>
-        <RootNamespace>Axorith.Module.HomeAssistant</RootNamespace>
         
         <Description>Home Assistant integration for Axorith.</Description>
     </PropertyGroup>

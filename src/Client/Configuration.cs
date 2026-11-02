@@ -12,8 +12,6 @@ public class HostConnectionConfiguration
 
     public int Port { get; set; } = 5901;
 
-    public int ConnectionTimeout { get; set; } = 10;
-
     public int HealthCheckInterval { get; set; } = 5;
 
     public bool AutoStartHost { get; set; } = true;

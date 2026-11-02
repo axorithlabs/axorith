@@ -1,6 +1,7 @@
 using System.Globalization;
 using Axorith.Sdk.Settings;
 using FluentAssertions;
+using static Axorith.Sdk.Tests.Settings.SetValueFromStringTests;
 
 namespace Axorith.Sdk.Tests.Settings;
 
@@ -14,31 +15,15 @@ public class SettingErrorHandlingTests
     [InlineData("abc123")]
     [InlineData("12.34.56")]
     [InlineData("")]
-    public void IntSetting_DeserializeInvalidFormat_ShouldFallBackToDefault(string invalidInput)
-    {
-        var defaultValue = 999;
-        var setting = Setting.AsInt("key", "Label", defaultValue);
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString(invalidInput);
-
-        setting.GetCurrentValue().Should().Be(defaultValue);
-    }
+    public void IntSetting_DeserializeInvalidFormat_ShouldFallBackToDefault(string invalidInput) =>
+        SetAndAssert(Setting.AsInt("key", "Label", 999), invalidInput, 999);
 
     [Theory]
     [InlineData("not-a-number")]
     [InlineData("invalid123")]
     [InlineData("12.34.56")]
-    public void DoubleSetting_DeserializeInvalidFormat_ShouldFallBackToDefault(string invalidInput)
-    {
-        var defaultValue = 99.9;
-        var setting = Setting.AsDouble("key", "Label", defaultValue);
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString(invalidInput);
-
-        setting.GetCurrentValue().Should().Be(defaultValue);
-    }
+    public void DoubleSetting_DeserializeInvalidFormat_ShouldFallBackToDefault(string invalidInput) =>
+        SetAndAssert(Setting.AsDouble("key", "Label", 99.9), invalidInput, 99.9);
 
     [Theory]
     [InlineData("infinity", double.PositiveInfinity)]
@@ -48,42 +33,17 @@ public class SettingErrorHandlingTests
     public void DoubleSetting_DeserializeSpecialValues_ShouldParseCorrectly(string input, double expected)
     {
         var setting = Setting.AsDouble("key", "Label", 0.0);
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromString(input);
+        ((ISetting)setting).SetValueFromString(input);
 
-        // Special doubles require special comparison
-        if (double.IsNaN(expected))
-        {
-            setting.GetCurrentValue().Should().Be(double.NaN);
-        }
-        else if (double.IsPositiveInfinity(expected))
-        {
-            setting.GetCurrentValue().Should().Be(double.PositiveInfinity);
-        }
-        else if (double.IsNegativeInfinity(expected))
-        {
-            setting.GetCurrentValue().Should().Be(double.NegativeInfinity);
-        }
-        else
-        {
-            setting.GetCurrentValue().Should().Be(expected);
-        }
+        setting.GetCurrentValue().Should().Be(expected);
     }
 
     [Theory]
     [InlineData("not-a-number")]
     [InlineData("12.34.56")]
-    public void DecimalSetting_DeserializeInvalidFormat_ShouldFallBackToDefault(string invalidInput)
-    {
-        var defaultValue = 100m;
-        var setting = Setting.AsNumber("key", "Label", defaultValue);
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString(invalidInput);
-
-        setting.GetCurrentValue().Should().Be(defaultValue);
-    }
+    public void DecimalSetting_DeserializeInvalidFormat_ShouldFallBackToDefault(string invalidInput) =>
+        SetAndAssert(Setting.AsNumber("key", "Label", 100m), invalidInput, 100m);
 
     [Theory]
     [InlineData("yes")]
@@ -91,49 +51,35 @@ public class SettingErrorHandlingTests
     [InlineData("1")]
     [InlineData("0")]
     [InlineData("random")]
-    public void BoolSetting_DeserializeInvalidFormat_ShouldBeFalse(string invalidInput)
-    {
-        var setting = Setting.AsCheckbox("key", "Label", true);
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString(invalidInput);
-
-        setting.GetCurrentValue().Should().BeFalse();
-    }
+    public void BoolSetting_DeserializeInvalidFormat_ShouldBeFalse(string invalidInput) =>
+        SetAndAssert(Setting.AsCheckbox("key", "Label", true), invalidInput, false);
 
     [Fact]
-    public void TimeSpanSetting_DeserializeInvalidSeconds_ShouldFallBackToDefault()
-    {
-        var defaultValue = TimeSpan.FromMinutes(5);
-        var setting = Setting.AsTimeSpan("key", "Label", defaultValue);
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString("not-a-number");
-
-        setting.GetCurrentValue().Should().Be(defaultValue);
-    }
+    public void TimeSpanSetting_DeserializeInvalidSeconds_ShouldFallBackToDefault() =>
+        SetAndAssert(Setting.AsTimeSpan("key", "Label", TimeSpan.FromMinutes(5)),
+            "not-a-number", TimeSpan.FromMinutes(5));
 
     [Fact]
     public void ISetting_SetValueFromObject_WithIncompatibleType_ShouldNotCrash()
     {
         var setting = Setting.AsInt("key", "Label", 0);
-        var iSetting = (ISetting)setting;
+        setting.SetValue(123);
 
-        var act = () => iSetting.SetValueFromObject(new object());
+        var act = () => ((ISetting)setting).SetValueFromObject(new object());
 
         act.Should().NotThrow();
-        setting.GetCurrentValue().Should().Be(0);
+        setting.GetCurrentValue().Should().Be(123);
     }
 
     [Fact]
     public void ISetting_SetValueFromObject_WithNull_ShouldHandleGracefully()
     {
         var setting = Setting.AsText("key", "Label", "default");
-        var iSetting = (ISetting)setting;
+        setting.SetValue("changed");
 
-        iSetting.SetValueFromObject(null);
+        ((ISetting)setting).SetValueFromObject(null);
 
-        setting.GetCurrentValue().Should().Be("default");
+        setting.GetCurrentValue().Should().Be("changed");
     }
 
     [Theory]
@@ -171,10 +117,9 @@ public class SettingErrorHandlingTests
     public void ISetting_SetValueFromString_WithExtremelyLongString_ShouldHandle()
     {
         var setting = Setting.AsText("key", "Label", "default");
-        var iSetting = (ISetting)setting;
         var longString = new string('X', 1_000_000); // 1MB string
 
-        var act = () => iSetting.SetValueFromString(longString);
+        var act = () => ((ISetting)setting).SetValueFromString(longString);
 
         act.Should().NotThrow();
         setting.GetCurrentValue().Should().HaveLength(1_000_000);
@@ -184,9 +129,8 @@ public class SettingErrorHandlingTests
     public void IntSetting_SetValueFromObject_WithDouble_ShouldConvert()
     {
         var setting = Setting.AsInt("key", "Label", 0);
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromObject(42.7);
+        ((ISetting)setting).SetValueFromObject(42.7);
 
         setting.GetCurrentValue().Should().Be(43);
     }
@@ -195,54 +139,40 @@ public class SettingErrorHandlingTests
     public void DoubleSetting_SetValueFromObject_WithInt_ShouldConvert()
     {
         var setting = Setting.AsDouble("key", "Label", 0.0);
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromObject(42);
+        ((ISetting)setting).SetValueFromObject(42);
 
         setting.GetCurrentValue().Should().Be(42.0);
     }
 
-    [Fact]
-    public void TimeSpanSetting_SetValueFromObject_WithDouble_ShouldInterpretAsSeconds()
+    [Theory]
+    [InlineData(60.0, 60.0)]
+    [InlineData(-1.5, -1.5)]
+    [InlineData(42, 42.0)]
+    public void TimeSpanSetting_SetValueFromObject_WithConvertible_ShouldInterpretAsSeconds(object input, double seconds)
     {
-        var setting = Setting.AsTimeSpan("key", "Label", TimeSpan.Zero);
-        var iSetting = (ISetting)setting;
+        using var setting = Setting.AsTimeSpan("key", "Label", TimeSpan.FromHours(1));
 
-        iSetting.SetValueFromObject(60.0); // 60 seconds
+        ((ISetting)setting).SetValueFromObject(input);
 
-        setting.GetCurrentValue().Should().Be(TimeSpan.FromSeconds(60));
+        setting.GetCurrentValue().Should().Be(TimeSpan.FromSeconds(seconds));
     }
 
     [Fact]
-    public void TextSetting_SetValueFromString_WithNull_ShouldUseDefault()
-    {
-        var setting = Setting.AsText("key", "Label", "default");
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString(null);
-
-        setting.GetCurrentValue().Should().Be("default");
-    }
+    public void TextSetting_SetValueFromString_WithNull_ShouldUseDefault() =>
+        SetAndAssert(Setting.AsText("key", "Label", "default"), null, "default");
 
     [Fact]
-    public void SecretSetting_SetValueFromString_WithNull_ShouldUseEmptyString()
-    {
-        var setting = Setting.AsSecret("key", "Label");
-        var iSetting = (ISetting)setting;
-
-        iSetting.SetValueFromString(null);
-
-        setting.GetCurrentValue().Should().BeEmpty();
-    }
+    public void SecretSetting_SetValueFromString_WithNull_ShouldUseEmptyString() =>
+        SetAndAssert(Setting.AsSecret("key", "Label"), null, string.Empty);
 
     [Fact]
     public void Setting_GetValueAsString_AfterMultipleUpdates_ShouldReturnLatest()
     {
         var setting = Setting.AsInt("key", "Label", 0);
-        var iSetting = (ISetting)setting;
 
         for (var i = 1; i <= 100; i++) setting.SetValue(i);
-        var result = iSetting.GetValueAsString();
+        var result = ((ISetting)setting).GetValueAsString();
 
         result.Should().Be("100");
     }

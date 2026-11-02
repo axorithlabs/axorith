@@ -39,9 +39,7 @@ public static class LauncherConfiguration
 
         int? monitorIndex = null;
         if (moveToMonitor && int.TryParse(settings.TargetMonitor.GetCurrentValue(), out var parsedIndex))
-        {
             monitorIndex = parsedIndex;
-        }
 
         return new WindowConfig(
             state,

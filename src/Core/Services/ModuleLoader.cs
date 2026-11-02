@@ -63,12 +63,9 @@ public class ModuleLoader(ILogger<ModuleLoader> logger) : IModuleLoader
             };
 
             if (Debugger.IsAttached)
-            {
                 logger.LogDebug("Development mode: Symlinked module directories are allowed");
-            }
 
-            var moduleDirectories = Directory.EnumerateDirectories(path, "*", enumerationOptions);
-            foreach (var moduleDir in moduleDirectories)
+            foreach (var moduleDir in Directory.EnumerateDirectories(path, "*", enumerationOptions))
             {
                 var jsonFile = Path.Combine(moduleDir, "module.json");
 

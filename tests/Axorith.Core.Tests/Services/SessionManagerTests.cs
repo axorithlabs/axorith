@@ -8,7 +8,7 @@ using Moq;
 
 namespace Axorith.Core.Tests.Services;
 
-public class SessionManagerTests
+public class SessionManagerTests : IAsyncLifetime
 {
     private readonly Mock<IModuleRegistry> _mockRegistry;
     private readonly SessionManager _sessionManager;
@@ -18,6 +18,9 @@ public class SessionManagerTests
         _mockRegistry = new Mock<IModuleRegistry>();
         _sessionManager = SessionManagerTestFactory.CreateManager(_mockRegistry.Object);
     }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _sessionManager.DisposeAsync().AsTask();
 
     [Fact]
     public void ActiveSession_Initially_ShouldBeNull() => _sessionManager.ActiveSession.Should().BeNull();

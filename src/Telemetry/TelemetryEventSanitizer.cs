@@ -10,7 +10,7 @@ internal static partial class TelemetryEventSanitizer
         "nextWorkspaceId", "nextPresetId", "previousSessionInstanceId"];
     private static readonly HashSet<string> NumberProperties = [
         "durationMs", "plannedDurationMs", "breakDurationMs", "latencyMs", "moduleCount", "breakCount", "breaksUsed",
-        "occurrenceCount", "blockedAttemptCount", "configuredEntryCount", "reconnectCount", "createdCount",
+        "occurrenceCount", "blockedAttemptCount", "configuredEntryCount", "reconnectCount",
         "errorCode", "nativeErrorCode", "httpStatusCode",
         "presetCount", "scheduleCount", "enabledScheduleCount", "presetVersion",
         "endAtMinuteOfDay", "scheduleLockMinutes", "startDelayMs", "targetMonitorIndex", "webSocketPort",
@@ -47,7 +47,7 @@ internal static partial class TelemetryEventSanitizer
             "uninstall_cleanup",
             "preflight", "session_initialization", "module_validation", "module_startup", "rpc_request",
             "update_check", "update_download", "update_install", "installer_launch", "settings_save",
-            "schedule_save", "preset_save", "onboarding"],
+            "schedule_save", "preset_save"],
         ["failureReason"] = [
             "validation_failed", "protection_unavailable", "module_unavailable", "timeout", "cancelled",
             "session_already_running", "invalid_settings", "network_error", "preset_not_found", "validation_warning",
@@ -73,11 +73,11 @@ internal static partial class TelemetryEventSanitizer
         ["oneTimeDayOfWeek"] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
         ["subsystem"] = [
             "client", "host", "installer", "session", "module", "update", "preset", "schedule",
-            "onboarding", "settings", "telemetry", "commitment"],
+            "settings", "telemetry", "commitment"],
         ["operation"] = [
             "startup", "session_start", "session_stop", "module_execution", "design_time_action",
             "update_check", "update_download", "update_install", "settings_save", "schedule_save",
-            "preset_save", "onboarding_create", "connection_initialize", "rpc_request", "unknown"],
+            "preset_save", "connection_initialize", "rpc_request", "unknown"],
         ["severity"] = ["debug", "information", "warning", "error", "fatal"],
         ["protectionState"] = ["inactive", "active", "degraded", "recovered", "failed"],
         ["platform"] = ["windows"],
@@ -200,7 +200,7 @@ internal static partial class TelemetryEventSanitizer
 
         if (key == "modules") return container == "preset" ? SanitizeModules(value) : null;
 
-        if (key is "createdModuleTypes" or "changedCategories" or
+        if (key is "changedCategories" or
             "categories" or "daysOfWeek" or "endAtDaysOfWeek" or "customProcessNames" or "customSiteDomains")
         {
             return SanitizeStringList(key, value);
@@ -257,7 +257,6 @@ internal static partial class TelemetryEventSanitizer
             if (item is not string text) continue;
             string? safe = key switch
             {
-                "createdModuleTypes" => text is "Developer" or "Gamer" or "Streamer" ? text : null,
                 "changedCategories" => EnumValues["category"].Contains(text) ? text : null,
                 "categories" => CategoryValues.Contains(text) ? text : null,
                 "daysOfWeek" or "endAtDaysOfWeek" => DayValues.Contains(text) ? text : null,

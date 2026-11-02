@@ -18,18 +18,14 @@ public static class CommitmentStatePaths
         if (!secure)
         {
             if (migrateLegacy)
-            {
                 MigrateLegacyStateInPlace(fallbackDirectory);
-            }
 
             return fallbackDirectory;
         }
 
         var directory = GetProtectedDirectory();
         if (migrateLegacy)
-        {
             MigrateLegacyState(fallbackDirectory, directory);
-        }
 
         return directory;
     }
@@ -57,9 +53,7 @@ public static class CommitmentStatePaths
 
             var payload = CommittedSessionStateFile.ReadPayloadOrLegacy(path);
             if (payload == File.ReadAllText(path))
-            {
                 CommittedSessionStateFile.WritePayload(path, payload);
-            }
         }
     }
 
@@ -84,9 +78,7 @@ public static class CommitmentStatePaths
                 File.Delete(oldPath);
                 var tempPath = oldPath + ".tmp";
                 if (File.Exists(tempPath))
-                {
                     File.Delete(tempPath);
-                }
             }
         }
     }
@@ -96,9 +88,7 @@ public static class CommitmentStatePaths
         Directory.CreateDirectory(path);
         var directory = new DirectoryInfo(path);
         if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
-        {
             throw new IOException($"Committed session storage cannot use a reparse point: '{path}'.");
-        }
 
         var administrators = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
         var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);

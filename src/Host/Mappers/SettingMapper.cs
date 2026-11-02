@@ -110,9 +110,7 @@ public static class SettingMapper
                 {
                     var choiceList = new ChoiceList();
                     foreach (var (key, display) in choices)
-                    {
                         choiceList.Choices.Add(new Choice { Key = key, Display = display });
-                    }
 
                     update.ChoiceList = choiceList;
                 }

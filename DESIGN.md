@@ -74,7 +74,6 @@ Keep the palette neutral and nearly flat. Do not add purple, neon, gradients, pu
 
 - **Dashboard:** Distinguish idle, active, break, and blocked/attention states. Show the next useful action prominently. Keep stop and emergency unlock actions visually distinct and explain their consequences.
 - **Preset editor:** Organize configuration by when a session starts, what it runs, when it stops, and what happens next. Show validation errors where they can be fixed.
-- **Setup wizard:** Show scan progress, selectable preset categories, selected state, and a clear create/cancel footer.
 - **Settings:** Group related toggles and explain their effect in one short supporting line.
 
 Use realistic labels such as “Deep Work”, “Coding”, or “Gaming”. Show actual modules and meaningful times; do not invent percentages, cloud status, or analytics.

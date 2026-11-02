@@ -17,7 +17,7 @@ public sealed record SessionOverview(TimeSpan Today, TimeSpan Week, int SessionC
                 LocalDay(now.LocalDateTime.Date.AddDays(day - 5)), now).TotalMinutes).ToArray();
         return new SessionOverview(Overlap(activity, today, now, now), Overlap(activity, week, now, now),
             activity.Count(session => session.StartedAt >= week && session.StartedAt <= now), daily,
-            history.OrderByDescending(session => session.EndedAt).Take(5).ToArray(), activity.Count > 0);
+            [.. history.OrderByDescending(session => session.EndedAt).Take(5)], activity.Count > 0);
     }
 
     private static DateTimeOffset LocalDay(DateTime date) => new(date, TimeZoneInfo.Local.GetUtcOffset(date));

@@ -3,12 +3,14 @@ using Axorith.Core.Services;
 using Axorith.Core.Services.Abstractions;
 using Axorith.Sdk;
 using Axorith.Shared.Exceptions;
+using Axorith.Telemetry;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Axorith.Core.Tests.Services;
 
-public class SessionManagerNegativeTests
+public class SessionManagerNegativeTests : IAsyncLifetime
 {
     private readonly Mock<IModuleRegistry> _mockRegistry;
     private readonly SessionManager _sessionManager;
@@ -18,6 +20,9 @@ public class SessionManagerNegativeTests
         _mockRegistry = new Mock<IModuleRegistry>();
         _sessionManager = SessionManagerTestFactory.CreateManager(_mockRegistry.Object);
     }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _sessionManager.DisposeAsync().AsTask();
 
     [Fact]
     public Task StartSessionAsync_WithValidationFailure_ShouldRollbackAndStop() =>
@@ -29,15 +34,49 @@ public class SessionManagerNegativeTests
         AssertStartFailsAsync(module => module.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Module start failed")));
 
-    [Fact]
-    public Task StartSessionAsync_WithValidationTimeout_ShouldRollback() =>
-        AssertStartFailsAsync(module => module.Setup(m => m.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException()));
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ModuleTimeoutCancelsThePendingOperationAndRollsBack(bool duringValidation)
+    {
+        var module = SessionManagerTestFactory.CreateModule();
+        var entered = false;
+        var cancelled = false;
+        async Task WaitForCancellation(CancellationToken token)
+        {
+            entered = true;
+            try { await Task.Delay(Timeout.InfiniteTimeSpan, token); }
+            finally { cancelled = token.IsCancellationRequested; }
+        }
+        if (duringValidation)
+            module.Setup(value => value.ValidateSettingsAsync(It.IsAny<CancellationToken>()))
+                .Returns(async (CancellationToken token) =>
+                {
+                    await WaitForCancellation(token);
+                    return ValidationResult.Success;
+                });
+        else
+            module.Setup(value => value.OnSessionStartAsync(It.IsAny<CancellationToken>()))
+                .Returns((CancellationToken token) => WaitForCancellation(token));
+        var preset = SessionManagerTestFactory.CreatePreset(SessionManagerTestFactory.Register(_mockRegistry, module));
+        await using var manager = new SessionManager(_mockRegistry.Object, NullLogger<SessionManager>.Instance,
+            TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1),
+            NoopTelemetryService.Instance);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-    [Fact]
-    public Task StartSessionAsync_WithSessionStartTimeout_ShouldRollback() =>
-        AssertStartFailsAsync(module => module.Setup(m => m.OnSessionStartAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException()));
+        var error = await Assert.ThrowsAsync<SessionException>(() => manager.StartSessionAsync(preset, deadline.Token))
+            .WaitAsync(TimeSpan.FromSeconds(6));
+
+        error.InnerException.Should().BeOfType<TimeoutException>();
+        entered.Should().BeTrue();
+        cancelled.Should().BeTrue();
+        deadline.IsCancellationRequested.Should().BeFalse("the module deadline must fire before the test deadline");
+        manager.IsSessionRunning.Should().BeFalse();
+        manager.ActiveSession.Should().BeNull();
+        module.Verify(value => value.OnSessionEndAsync(It.IsAny<CancellationToken>()),
+            duringValidation ? Times.Never() : Times.Once());
+        module.Verify(value => value.Dispose(), Times.Once());
+    }
 
     [Fact]
     public async Task StartSessionAsync_WithMultipleModules_OneFailsValidation_ShouldRollback()

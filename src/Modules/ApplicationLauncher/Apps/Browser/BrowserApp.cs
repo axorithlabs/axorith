@@ -48,20 +48,15 @@ internal sealed class BrowserApp(
 
         var sanitizedUrl = SanitizeUrl(startUrl);
         if (sanitizedUrl.Contains(' '))
-        {
             args.Append($"\"{sanitizedUrl}\"");
-        }
         else args.Append(sanitizedUrl);
 
         return args.ToString().Trim();
     }
 
-    private static string SanitizeArgument(string argument)
-    {
-        return string.IsNullOrWhiteSpace(argument)
+    private static string SanitizeArgument(string argument) => string.IsNullOrWhiteSpace(argument)
             ? string.Empty
             : argument.Replace("\"", "").Replace("'", "").Replace(";", "").Replace("&", "").Replace("|", "");
-    }
 
     private static string SanitizeAdditionalArguments(string arguments)
     {
@@ -97,26 +92,19 @@ internal sealed class BrowserApp(
             return string.Empty;
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
             throw new InvalidOperationException($"Invalid URL format: {url}");
-        }
 
         if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-        {
             throw new InvalidOperationException($"Only HTTP and HTTPS URLs are allowed. Got: {uri.Scheme}");
-        }
 
         return uri.AbsoluteUri;
     }
 
-    protected override WindowConfigTimings GetWindowConfigTimings()
-    {
-        return new WindowConfigTimings(
+    protected override WindowConfigTimings GetWindowConfigTimings() => new(
             WaitForWindowTimeoutMs: 10000,
             MoveDelayMs: 500,
             MaximizeSnapDelayMs: 500,
             FinalFocusDelayMs: 500,
             BannerDelayMs: 0
         );
-    }
 }

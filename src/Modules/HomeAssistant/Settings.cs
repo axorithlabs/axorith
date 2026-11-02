@@ -11,7 +11,7 @@ namespace Axorith.Module.HomeAssistant;
 internal sealed class Settings : IDisposable
 {
     private readonly ISecureStorageService _secureStorage;
-    private readonly CompositeDisposable _disposables = new();
+    private readonly CompositeDisposable _disposables = [];
     private const string TokenStorageKey = "HaAccessToken";
 
     private const string SetupInstructions =
@@ -42,42 +42,21 @@ internal sealed class Settings : IDisposable
     {
         _secureStorage = secureStorage;
 
-        Instructions = Setting.AsTextArea(
-            key: "Instructions",
-            label: "Setup Guide",
-            defaultValue: SetupInstructions,
-            description: "Follow these steps to connect Axorith to Home Assistant.",
-            isReadOnly: true
-        );
+        Instructions = Setting.AsTextArea("Instructions", "Setup Guide", SetupInstructions,
+            description: "Follow these steps to connect Axorith to Home Assistant.", isReadOnly: true);
 
-        BaseUrl = Setting.AsText(
-            key: "BaseUrl",
-            label: "HA URL",
-            defaultValue: "https://homeassistant.local:8123",
-            description: "An HTTPS Home Assistant address. HTTP is supported only on loopback addresses."
-        );
+        BaseUrl = Setting.AsText("BaseUrl", "HA URL", "https://homeassistant.local:8123",
+            description: "An HTTPS Home Assistant address. HTTP is supported only on loopback addresses.");
 
-        AccessToken = Setting.AsSecret(
-            key: "AccessToken",
-            label: "Access Token",
-            description: "Long-Lived Access Token."
-        );
+        AccessToken = Setting.AsSecret("AccessToken", "Access Token", "Long-Lived Access Token.");
 
-        StartEntityId = Setting.AsText(
-            key: "StartEntityId",
-            label: "On Session Start (Entity ID)",
-            defaultValue: "",
+        StartEntityId = Setting.AsText("StartEntityId", "On Session Start (Entity ID)", "",
             description:
-            "Entity to activate when session starts (e.g. 'script.focus', 'scene.work', 'light.desk'). Leave empty to do nothing."
-        );
+            "Entity to activate when session starts (e.g. 'script.focus', 'scene.work', 'light.desk'). Leave empty to do nothing.");
 
-        EndEntityId = Setting.AsText(
-            key: "EndEntityId",
-            label: "On Session End (Entity ID)",
-            defaultValue: "",
+        EndEntityId = Setting.AsText("EndEntityId", "On Session End (Entity ID)", "",
             description:
-            "Entity to activate/deactivate when session ends. Scripts/Scenes are turned ON. Lights/Switches are turned OFF."
-        );
+            "Entity to activate/deactivate when session ends. Scripts/Scenes are turned ON. Lights/Switches are turned OFF.");
 
         TestConnectionAction = new Action("TestConnection", "TEST", settingKey: BaseUrl.Key);
 
@@ -128,9 +107,7 @@ internal sealed class Settings : IDisposable
         var baseUrl = BaseUrl.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(baseUrl)) errors[BaseUrl.Key] = "Home Assistant URL is required.";
         else if (!HaClient.IsSecureEndpoint(baseUrl))
-        {
             errors[BaseUrl.Key] = "Use HTTPS, or HTTP on a loopback address. URLs must not contain credentials.";
-        }
 
         var token = AccessToken.GetCurrentValue();
         if (string.IsNullOrWhiteSpace(token)) token = _secureStorage.RetrieveSecret(TokenStorageKey);

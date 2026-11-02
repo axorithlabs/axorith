@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Module.SiteBlocker</AssemblyName>
-        <RootNamespace>Axorith.Module.SiteBlocker</RootNamespace>
 
         <Description>Site Blocker module for Axorith.</Description>
     </PropertyGroup>

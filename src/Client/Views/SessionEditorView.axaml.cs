@@ -19,7 +19,7 @@ public partial class SessionEditorView : UserControl
 
             var comboBox = control.FindAncestorOfType<ComboBox>();
 
-            if (comboBox == null || comboBox.IsDropDownOpen) return;
+            if (comboBox?.IsDropDownOpen != false) return;
 
             e.Handled = true;
 

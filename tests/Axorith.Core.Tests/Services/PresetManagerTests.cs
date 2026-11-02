@@ -40,6 +40,11 @@ public class PresetManagerTests : IDisposable
         var files = Directory.GetFiles(_testPresetsDirectory, "*.json");
         files.Should().HaveCount(1);
         files[0].Should().EndWith($"{preset.Id}.json");
+        var restored = await new PresetManager(_testPresetsDirectory, NullLogger<PresetManager>.Instance)
+            .GetPresetByIdAsync(preset.Id, CancellationToken.None);
+        restored.Should().NotBeNull();
+        restored!.Id.Should().Be(preset.Id);
+        restored.Name.Should().Be(preset.Name);
     }
 
     [Fact]
@@ -157,7 +162,7 @@ public class PresetManagerTests : IDisposable
         var loaded = await _manager.LoadAllPresetsAsync(CancellationToken.None);
 
         loaded[0].Modules.Should().HaveCount(1);
-        loaded[0].Modules[0].ModuleId.Should().NotBe(Guid.Empty);
+        loaded[0].Modules[0].ModuleId.Should().Be(preset.Modules[0].ModuleId);
         loaded[0].Modules[0].Settings["setting1"].Should().Be("value1");
     }
 
@@ -201,6 +206,52 @@ public class PresetManagerTests : IDisposable
         Assert.Equal(4, persisted.Version);
         Assert.Equal("OBS Studio", persisted.Modules[0].CustomName);
         Assert.Equal("OBS", persisted.Modules[0].Settings["LegacyLauncherModuleKey"]);
+    }
+
+    [Fact]
+    public async Task ConcurrentReadersAndUpdatesPreserveCompletePresets()
+    {
+        var preset = new SessionPreset
+        {
+            Id = Guid.NewGuid(), Name = "Revision 0", Version = 4,
+            Modules = [.. Enumerable.Range(0, 100).Select(_ => new ConfiguredModule
+            {
+                ModuleId = Guid.NewGuid(),
+                Settings = new Dictionary<string, string> { ["payload"] = new('x', 4096) }
+            })]
+        };
+        await _manager.SavePresetAsync(preset, CancellationToken.None);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readers = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
+        {
+            await start.Task.WaitAsync(deadline.Token);
+            for (var read = 0; read < 30; read++)
+            {
+                var loaded = await _manager.GetPresetByIdAsync(preset.Id, deadline.Token);
+                loaded.Should().NotBeNull();
+                loaded!.Name.Should().StartWith("Revision ");
+                loaded.Modules.Should().BeEquivalentTo(preset.Modules);
+            }
+        }, deadline.Token)).ToArray();
+        var writer = Task.Run(async () =>
+        {
+            await start.Task.WaitAsync(deadline.Token);
+            for (var revision = 1; revision <= 30; revision++)
+            {
+                preset.Name = $"Revision {revision}";
+                await _manager.SavePresetAsync(preset, deadline.Token);
+            }
+        }, deadline.Token);
+        start.SetResult();
+
+        await Task.WhenAll(readers.Append(writer)).WaitAsync(TimeSpan.FromSeconds(20));
+
+        var restored = await new PresetManager(_testPresetsDirectory, NullLogger<PresetManager>.Instance)
+            .GetPresetByIdAsync(preset.Id, deadline.Token);
+        restored.Should().NotBeNull();
+        restored!.Name.Should().Be("Revision 30");
+        restored.Modules.Should().BeEquivalentTo(preset.Modules);
     }
 
     [Fact]

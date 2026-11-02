@@ -1,5 +1,4 @@
-using System.Text;
-using System.Text.Json;
+using System.Net.Http.Json;
 using Axorith.Sdk.Logging;
 
 namespace Axorith.Module.HomeAssistant;
@@ -29,14 +28,11 @@ internal class HaClient(IHttpClientFactory clientFactory, IModuleLogger logger)
 
         logger.LogDebug("Calling HA Service: {Url} for Entity: {Entity}", url, entityId);
 
-        var payload = new { entity_id = entityId };
-        var json = JsonSerializer.Serialize(payload);
-
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
             request.Headers.Add("Authorization", $"Bearer {token}");
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            request.Content = JsonContent.Create(new { entity_id = entityId });
 
             using var response = await _client.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();

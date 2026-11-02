@@ -53,9 +53,7 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             {
                 var preset = await LoadPresetFileAsync(filePath, cancellationToken).ConfigureAwait(false);
                 if (preset != null)
-                {
                     presets.Add(preset);
-                }
             }
             catch (Exception ex)
             {
@@ -123,9 +121,8 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
             logger.LogError(ex, "Failed to save preset '{PresetName}'", preset.Name);
 
             if (File.Exists(tempFilePath))
-            {
                 File.Delete(tempFilePath);
-            }
+            throw;
         }
         finally
         {
@@ -133,12 +130,13 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         }
     }
 
-    public Task DeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
+    public async Task DeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(presetsDirectory, $"{presetId}.json");
         logger.LogInformation("Deleting preset with ID {PresetId} from {FilePath}", presetId,
             TelemetryGuard.SafePath(filePath));
 
+        await FileLock.WaitAsync(cancellationToken);
         try
         {
             if (File.Exists(filePath))
@@ -155,25 +153,36 @@ public class PresetManager(string presetsDirectory, ILogger<PresetManager> logge
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to delete preset file {FilePath}", TelemetryGuard.SafePath(filePath));
+            throw;
         }
-
-        return Task.CompletedTask;
+        finally
+        {
+            FileLock.Release();
+        }
     }
 
     private async Task<SessionPreset?> LoadPresetFileAsync(string filePath, CancellationToken cancellationToken)
     {
-        var fileInfo = new FileInfo(filePath);
-        if (fileInfo.Length > MaxPresetFileSizeBytes)
-        {
-            logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)",
-                TelemetryGuard.SafePath(filePath), fileInfo.Length);
-            return null;
-        }
-
         SessionPreset? preset;
-        await using (var stream = File.OpenRead(filePath))
+        await FileLock.WaitAsync(cancellationToken);
+        try
+        {
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length > MaxPresetFileSizeBytes)
+            {
+                logger.LogWarning("Preset file {FilePath} exceeds maximum size limit ({Size} bytes)",
+                    TelemetryGuard.SafePath(filePath), fileInfo.Length);
+                return null;
+            }
+
+            await using var stream = File.OpenRead(filePath);
             preset = await JsonSerializer.DeserializeAsync<SessionPreset>(stream, _jsonOptions, cancellationToken)
                 .ConfigureAwait(false);
+        }
+        finally
+        {
+            FileLock.Release();
+        }
         if (preset == null) return null;
 
         var changed = preset.Version < CurrentPresetVersion;

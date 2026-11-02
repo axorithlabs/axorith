@@ -38,10 +38,7 @@ internal class ModuleActionAdapter(
 
     public void Invoke() => _ = Task.Run(() => InvokeCoreAsync(throwOnError: false));
 
-    public async Task InvokeAsync()
-    {
-        await InvokeCoreAsync(throwOnError: true).ConfigureAwait(false);
-    }
+    public Task InvokeAsync() => InvokeCoreAsync(throwOnError: true);
 
     private async Task InvokeCoreAsync(bool throwOnError)
     {

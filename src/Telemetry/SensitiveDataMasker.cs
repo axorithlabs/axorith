@@ -4,8 +4,6 @@ namespace Axorith.Telemetry;
 
 internal static class SensitiveDataMasker
 {
-    public const string MaskValue = "***";
-
     private static readonly FrozenSet<string> SensitiveKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         // Authentication & secrets

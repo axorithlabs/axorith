@@ -45,39 +45,23 @@ internal sealed class Settings : LauncherSettingsBase
     {
         _appDiscovery = appDiscovery;
 
-        ObsPath = Setting.AsChoice(
-            key: "ObsPath",
-            label: "OBS Studio Executable",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Scanning for OBS...")],
-            description: "Path to OBS Studio executable."
-        );
+        ObsPath = Setting.AsChoice("ObsPath", "OBS Studio Executable", string.Empty,
+            [new KeyValuePair<string, string>("", "Scanning for OBS...")],
+            description: "Path to OBS Studio executable.");
 
-        EnableWebSocket = Setting.AsCheckbox(
-            key: "EnableWebSocket",
-            label: "Enable WebSocket Control",
-            defaultValue: false,
+        EnableWebSocket = Setting.AsCheckbox("EnableWebSocket", "Enable WebSocket Control", false,
             description:
-            "Control OBS via WebSocket. To enable: Open OBS → Tools → WebSocket Server Settings → Enable WebSocket server → Copy port and password."
-        );
+            "Control OBS via WebSocket. To enable: Open OBS → Tools → WebSocket Server Settings → Enable WebSocket server → Copy port and password.");
 
-        WebSocketPort = Setting.AsInt(
-            key: "WebSocketPort",
-            label: "WebSocket Port",
-            defaultValue: DefaultObsWebSocketPort,
+        WebSocketPort = Setting.AsInt("WebSocketPort", "WebSocket Port", DefaultObsWebSocketPort,
             description: "OBS WebSocket server port. Find it in OBS: Tools → WebSocket Server Settings.",
-            isVisible: false
-        );
+            isVisible: false);
 
         _webSocketPasswordId = Setting.AsText("WebSocketPasswordId", "WebSocket Password Reference",
             Guid.NewGuid().ToString("D"), isVisible: false);
-        WebSocketPassword = Setting.AsSecret(
-            key: "WebSocketPassword",
-            label: "WebSocket Password",
-            description:
+        WebSocketPassword = Setting.AsSecret("WebSocketPassword", "WebSocket Password",
             "OBS WebSocket password. Find it in OBS: Tools → WebSocket Server Settings → Show Connect Info.",
-            isVisible: false
-        );
+            isVisible: false);
         _passwordSubscription = WebSocketPassword.Value.Skip(1).Subscribe(password =>
         {
             var key = $"ObsWebSocketPassword:{_webSocketPasswordId.GetCurrentValue()}";
@@ -87,27 +71,16 @@ internal sealed class Settings : LauncherSettingsBase
         _passwordIdSubscription = _webSocketPasswordId.Value.Skip(1).Subscribe(id =>
             WebSocketPassword.SetValue(secureStorage.RetrieveSecret($"ObsWebSocketPassword:{id}") ?? string.Empty));
 
-        SessionStartAction = Setting.AsChoice(
-            key: "SessionStartAction",
-            label: "Action on Session Start",
-            defaultValue: ActionNone,
-            initialChoices:
+        SessionStartAction = Setting.AsChoice("SessionStartAction", "Action on Session Start", ActionNone,
             [
                 new KeyValuePair<string, string>(ActionNone, "None"),
                 new KeyValuePair<string, string>(ActionStartStreaming, "Start Streaming"),
                 new KeyValuePair<string, string>(ActionStartRecording, "Start Recording"),
                 new KeyValuePair<string, string>(ActionStartBoth, "Start Streaming + Recording"),
                 new KeyValuePair<string, string>(ActionStartVirtualCam, "Start Virtual Camera")
-            ],
-            description: "Action to perform when session starts.",
-            isVisible: false
-        );
+            ], description: "Action to perform when session starts.", isVisible: false);
 
-        SessionEndAction = Setting.AsChoice(
-            key: "SessionEndAction",
-            label: "Action on Session End",
-            defaultValue: ActionNone,
-            initialChoices:
+        SessionEndAction = Setting.AsChoice("SessionEndAction", "Action on Session End", ActionNone,
             [
                 new KeyValuePair<string, string>(ActionNone, "None (Keep Running)"),
                 new KeyValuePair<string, string>(ActionStopStreaming, "Stop Streaming"),
@@ -115,10 +88,7 @@ internal sealed class Settings : LauncherSettingsBase
                 new KeyValuePair<string, string>(ActionStopBoth, "Stop Streaming + Recording"),
                 new KeyValuePair<string, string>(ActionStopVirtualCam, "Stop Virtual Camera"),
                 new KeyValuePair<string, string>(ActionStopAll, "Stop Everything")
-            ],
-            description: "Action to perform when session ends.",
-            isVisible: false
-        );
+            ], description: "Action to perform when session ends.", isVisible: false);
 
         EnableWebSocket.Value.Subscribe(enabled =>
         {
@@ -181,9 +151,7 @@ internal sealed class Settings : LauncherSettingsBase
         var path = possiblePaths.FirstOrDefault(File.Exists);
 
         if (string.IsNullOrEmpty(path))
-        {
             path = await Task.Run(() => _appDiscovery.FindKnownApp("obs64.exe", "OBS Studio")).ConfigureAwait(false);
-        }
 
         SetDetectedApplicationPath(path, "OBS Studio (Auto-Detected)", "OBS Studio not found");
     }

@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Shared.Exceptions</AssemblyName>
-        <RootNamespace>Axorith.Shared.Exceptions</RootNamespace>
         <Description>Shared exceptions for Axorith.</Description>
     </PropertyGroup>
 </Project>

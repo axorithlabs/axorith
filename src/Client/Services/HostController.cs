@@ -43,9 +43,7 @@ public sealed class HostController(
         catch
         {
             lock (_portLock)
-            {
                 _cachedPort = null;
-            }
 
             return false;
         }
@@ -145,9 +143,7 @@ public sealed class HostController(
             var startTimestampUtc = DateTime.UtcNow;
 
             lock (_portLock)
-            {
                 _cachedPort = null;
-            }
 
             try
             {
@@ -214,9 +210,7 @@ public sealed class HostController(
                         }
 
                         lock (_portLock)
-                        {
                             _cachedPort = null;
-                        }
 
                         logger.LogInformation(
                             "Host info file detected with valid port {Port} after {ElapsedMs}ms. Host is ready.",
@@ -261,9 +255,7 @@ public sealed class HostController(
         {
             var token = await tokenProvider.GetTokenAsync(ct);
             if (string.IsNullOrEmpty(token))
-            {
                 throw new InvalidOperationException("Cannot stop Host gracefully because its authentication token is unavailable.");
-            }
 
             var port = GetDiscoveredPort();
             using var channel = CreateAuthenticatedChannel(token, port);
@@ -272,9 +264,7 @@ public sealed class HostController(
                 new ShutdownRequest { Reason = "Client tray stop", TimeoutSeconds = 10 },
                 deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: ct);
             if (!response.Accepted)
-            {
                 throw new InvalidOperationException(response.Message);
-            }
 
             logger.LogInformation("Shutdown requested to Host");
 
@@ -315,9 +305,7 @@ public sealed class HostController(
         var credentials = CallCredentials.FromInterceptor((_, metadata) =>
         {
             if (!string.IsNullOrEmpty(token))
-            {
                 metadata.Add(AuthConstants.TokenHeaderName, token);
-            }
 
             return Task.CompletedTask;
         });

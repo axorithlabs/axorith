@@ -23,7 +23,7 @@ internal static class SteamGameScanner
 
     public static List<SteamGame> GetInstalledGames(string steamDirectory)
     {
-        List<SteamGame> games = [];
+        Dictionary<string, SteamGame> games = [];
         var libraries = GetLibraryFolders(steamDirectory);
 
         foreach (var steamappsPath in libraries.Select(library => Path.Combine(library, "steamapps"))
@@ -34,10 +34,8 @@ internal static class SteamGameScanner
                 foreach (var manifestPath in Directory.EnumerateFiles(steamappsPath, "appmanifest_*.acf"))
                 {
                     var game = ParseAppManifest(manifestPath);
-                    if (game != null && games.All(g => g.AppId != game.AppId))
-                    {
-                        games.Add(game);
-                    }
+                    if (game != null)
+                        games.TryAdd(game.AppId, game);
                 }
             }
             catch
@@ -46,7 +44,7 @@ internal static class SteamGameScanner
             }
         }
 
-        return games.OrderBy(g => g.Name).ToList();
+        return [.. games.Values.OrderBy(g => g.Name)];
     }
 
     private static List<string> GetLibraryFolders(string steamDirectory)
@@ -67,9 +65,7 @@ internal static class SteamGameScanner
             {
                 var libPath = match.Groups[1].Value.Replace(@"\\", @"\");
                 if (Directory.Exists(libPath) && !libraries.Contains(libPath, StringComparer.OrdinalIgnoreCase))
-                {
                     libraries.Add(libPath);
-                }
             }
         }
         catch

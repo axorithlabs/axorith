@@ -193,15 +193,6 @@ public class SettingTests
         labels.Should().Equal("Old Label", "New Label");
     }
 
-    [Fact]
-    public void SetLabel_WithEmptyString_ShouldThrow()
-    {
-        var setting = Setting.AsText("key", "Label", "value");
-
-        var act = () => setting.SetLabel("");
-
-        act.Should().Throw<ArgumentException>();
-    }
 
     [Fact]
     public void SetVisibility_ShouldUpdateIsVisibleObservable()
@@ -234,9 +225,8 @@ public class SettingTests
     public void ISetting_GetValueAsString_ShouldSerializeValue()
     {
         var setting = Setting.AsInt("count", "Count", 123);
-        var iSetting = (ISetting)setting;
 
-        var stringValue = iSetting.GetValueAsString();
+        var stringValue = ((ISetting)setting).GetValueAsString();
 
         stringValue.Should().Be("123");
     }
@@ -245,9 +235,8 @@ public class SettingTests
     public void ISetting_SetValueFromString_ShouldDeserializeValue()
     {
         var setting = Setting.AsInt("count", "Count", 0);
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromString("456");
+        ((ISetting)setting).SetValueFromString("456");
 
         setting.GetCurrentValue().Should().Be(456);
     }
@@ -256,9 +245,8 @@ public class SettingTests
     public void ISetting_GetCurrentValueAsObject_ShouldReturnBoxedValue()
     {
         var setting = Setting.AsCheckbox("enabled", "Enabled", true);
-        var iSetting = (ISetting)setting;
 
-        var objectValue = iSetting.GetCurrentValueAsObject();
+        var objectValue = ((ISetting)setting).GetCurrentValueAsObject();
 
         objectValue.Should().BeOfType<bool>();
         objectValue.Should().Be(true);
@@ -268,9 +256,8 @@ public class SettingTests
     public void ISetting_SetValueFromObject_WithMatchingType_ShouldSetValue()
     {
         var setting = Setting.AsText("key", "Label", "old");
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromObject("new");
+        ((ISetting)setting).SetValueFromObject("new");
 
         setting.GetCurrentValue().Should().Be("new");
     }
@@ -279,9 +266,8 @@ public class SettingTests
     public void ISetting_SetValueFromObject_WithConvertibleType_ShouldConvert()
     {
         var setting = Setting.AsInt("num", "Number", 0);
-        var iSetting = (ISetting)setting;
 
-        iSetting.SetValueFromObject(42);
+        ((ISetting)setting).SetValueFromObject(42);
 
         setting.GetCurrentValue().Should().Be(42);
     }

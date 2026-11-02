@@ -149,9 +149,7 @@ public partial class SessionPresetViewModel : ReactiveObject, IDisposable
         _validationSubscription?.Dispose();
 
         foreach (var vm in Modules)
-        {
             vm.Dispose();
-        }
 
         Modules.Clear();
     }

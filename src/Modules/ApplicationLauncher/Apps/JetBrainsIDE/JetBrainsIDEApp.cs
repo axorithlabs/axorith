@@ -20,9 +20,7 @@ internal sealed class JetBrainsIDEApp(
         var projectPath = _settings.ProjectPath.GetCurrentValue();
 
         if (!string.IsNullOrWhiteSpace(projectPath))
-        {
             args = string.IsNullOrWhiteSpace(args) ? projectPath : $"{args} {projectPath}";
-        }
 
         return args;
     }
@@ -44,15 +42,13 @@ internal sealed class JetBrainsIDEApp(
         return null;
     }
 
-    protected override WindowConfigTimings GetWindowConfigTimings()
-    {
+    protected override WindowConfigTimings GetWindowConfigTimings() =>
         // JetBrains IDEs are slow to start - use longer timeouts
-        return new WindowConfigTimings(
+        new(
             WaitForWindowTimeoutMs: 15000,
             MoveDelayMs: 5000,
             MaximizeSnapDelayMs: 5000,
             FinalFocusDelayMs: 2000,
             BannerDelayMs: 0
         );
-    }
 }

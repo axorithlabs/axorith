@@ -7,10 +7,13 @@ namespace Axorith.Client.CoreSdk;
 internal static class GrpcResultMapper
 {
     public static Task<OperationResult> ExecuteAsync(AsyncRetryPolicy retryPolicy,
-        Func<AsyncUnaryCall<Axorith.Contracts.OperationResult>> request) => retryPolicy.ExecuteAsync(async () =>
+        Func<AsyncUnaryCall<Axorith.Contracts.OperationResult>> request) => ExecuteAsync(retryPolicy, request, ToModel);
+
+    public static Task<TModel> ExecuteAsync<TResponse, TModel>(AsyncRetryPolicy retryPolicy,
+        Func<AsyncUnaryCall<TResponse>> request, Func<TResponse, TModel> toModel) => retryPolicy.ExecuteAsync(async () =>
     {
         using var call = request();
-        return ToModel(await call.ResponseAsync.ConfigureAwait(false));
+        return toModel(await call.ResponseAsync.ConfigureAwait(false));
     });
 
     public static OperationResult ToModel(Axorith.Contracts.OperationResult response) =>

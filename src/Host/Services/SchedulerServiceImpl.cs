@@ -1,12 +1,12 @@
 using Axorith.Contracts;
-using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Models;
+using Axorith.Core.Services.Abstractions;
 using Axorith.Core.Telemetry;
 using Axorith.Telemetry;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using SessionSchedule = Axorith.Core.Models.SessionSchedule;
 using ContractConfigurationLockStatus = Axorith.Contracts.ConfigurationLockStatus;
+using SessionSchedule = Axorith.Core.Models.SessionSchedule;
 
 namespace Axorith.Host.Services;
 
@@ -60,38 +60,31 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
     public override async Task<Empty> DeleteSchedule(DeleteScheduleRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ScheduleId, out var id))
-        {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid Schedule ID"));
-        }
 
         logger.LogInformation("Deleting schedule {Id}", id);
 
         var existing = await GetMutableScheduleAsync(id, context.CancellationToken);
         await scheduleManager.DeleteScheduleAsync(id, context.CancellationToken);
         if (existing is not null)
-        {
             await TrackScheduleChangedAsync(existing, "delete", context.CancellationToken).ConfigureAwait(false);
-        }
         return new Empty();
     }
 
     public override async Task<Schedule> SetEnabled(SetScheduleEnabledRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.ScheduleId, out var id))
-        {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid Schedule ID"));
-        }
 
         var existing = await GetMutableScheduleAsync(id, context.CancellationToken);
         logger.LogInformation("Setting schedule {Id} enabled: {Enabled}", id, request.Enabled);
+        var wasEnabled = existing?.IsEnabled;
 
         var updated = await scheduleManager.SetEnabledAsync(id, request.Enabled, context.CancellationToken)
             ?? throw new RpcException(new Status(StatusCode.NotFound, "Schedule not found"));
 
-        if (existing?.IsEnabled != updated.IsEnabled)
-        {
+        if (wasEnabled != updated.IsEnabled)
             await TrackScheduleChangedAsync(updated, "update", context.CancellationToken).ConfigureAwait(false);
-        }
 
         return ScheduleCodec.ToMessage(updated);
     }
@@ -100,9 +93,7 @@ public class SchedulerServiceImpl(IScheduleManager scheduleManager, ILogger<Sche
         ConfigurationLockStatusRequest request, ServerCallContext context)
     {
         if (!Guid.TryParse(request.PresetId, out var presetId))
-        {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid preset ID."));
-        }
 
         var status = await scheduleManager.GetConfigurationLockStatusAsync(presetId, context.CancellationToken);
         return new ContractConfigurationLockStatus

@@ -1,7 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>Axorith.Shim</AssemblyName>
-        <RootNamespace>Axorith.Shim</RootNamespace>
 
         <Description>Shim for Axorith.</Description>
         

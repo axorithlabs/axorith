@@ -11,8 +11,9 @@ public sealed class WindowStateManager
     private readonly string _stateFilePath;
     private const long MaxStateFileSizeBytes = 1 * 1024 * 1024; // 1 MB max
 
-    private static readonly JsonSerializerOptions DeserializeOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        WriteIndented = true,
         MaxDepth = 32 // Prevent stack overflow from deeply nested JSON
     };
 
@@ -36,7 +37,7 @@ public sealed class WindowStateManager
                 IsMaximized = window.WindowState == Avalonia.Controls.WindowState.Maximized
             };
 
-            var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(state, JsonOptions);
             Directory.CreateDirectory(Path.GetDirectoryName(_stateFilePath)!);
             File.WriteAllText(_stateFilePath, json);
         }
@@ -56,14 +57,12 @@ public sealed class WindowStateManager
 
             var fileInfo = new FileInfo(_stateFilePath);
             if (fileInfo.Length > MaxStateFileSizeBytes)
-            {
                 return; // File too large, use default state
-            }
 
             var json = File.ReadAllText(_stateFilePath);
             // V5611: System.Text.Json is safe - no polymorphic deserialization or type name handling
             // File size and MaxDepth are validated to prevent DoS attacks
-            var state = JsonSerializer.Deserialize<WindowState>(json, DeserializeOptions); //-V5611
+            var state = JsonSerializer.Deserialize<WindowState>(json, JsonOptions); //-V5611
 
             if (state is null)
                 return;
@@ -85,9 +84,7 @@ public sealed class WindowStateManager
             else window.Position = new PixelPoint(state.X, state.Y);
 
             if (state.IsMaximized)
-            {
                 window.WindowState = Avalonia.Controls.WindowState.Maximized;
-            }
         }
         catch
         {

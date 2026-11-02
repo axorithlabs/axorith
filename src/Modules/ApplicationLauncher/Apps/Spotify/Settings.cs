@@ -36,86 +36,42 @@ internal sealed class Settings : LauncherSettingsBase
     {
         _appDiscovery = appDiscovery;
 
-        SpotifyPath = Setting.AsChoice(
-            key: "SpotifyPath",
-            label: "Spotify Executable",
-            defaultValue: string.Empty,
-            initialChoices: [new KeyValuePair<string, string>("", "Scanning for Spotify...")],
-            description: "Select installed Spotify or enter custom path."
-        );
+        SpotifyPath = Setting.AsChoice("SpotifyPath", "Spotify Executable", string.Empty,
+            [new KeyValuePair<string, string>("", "Scanning for Spotify...")],
+            description: "Select installed Spotify or enter custom path.");
 
-        EnablePlayback = Setting.AsCheckbox(
-            key: "EnablePlayback",
-            label: "Enable Playback Control",
-            defaultValue: true,
-            description: "When enabled, the module will control Spotify playback on session start/end."
-        );
+        EnablePlayback = Setting.AsCheckbox("EnablePlayback", "Enable Playback Control", true,
+            description: "When enabled, the module will control Spotify playback on session start/end.");
 
-        AuthStatus = Setting.AsText(
-            key: "AuthStatus",
-            label: "Authentication",
-            defaultValue: "Not authenticated",
-            isReadOnly: true);
+        AuthStatus = Setting.AsText("AuthStatus", "Authentication", "Not authenticated", isReadOnly: true);
 
-        DeviceSelectionMode = Setting.AsChoice(
-            key: "DeviceSelectionMode",
-            label: "Target Device",
-            defaultValue: ModeLocalComputer,
-            initialChoices:
+        DeviceSelectionMode = Setting.AsChoice("DeviceSelectionMode", "Target Device", ModeLocalComputer,
             [
                 new KeyValuePair<string, string>(ModeLocalComputer, "Local Computer (Recommended)"),
                 new KeyValuePair<string, string>(ModeLastActive, "Most Recently Active Device"),
                 new KeyValuePair<string, string>(ModeSpecificName, "Specific Device Name (Advanced)")
-            ],
-            description: "How to select the device for playback."
-        );
+            ], description: "How to select the device for playback.");
 
-        SpecificDeviceName = Setting.AsText(
-            key: "SpecificDeviceName",
-            label: "Device Name",
-            defaultValue: "",
-            description: "The exact name of the device to control (e.g. 'Living Room Speaker').",
-            isVisible: false
-        );
+        SpecificDeviceName = Setting.AsText("SpecificDeviceName", "Device Name", "",
+            description: "The exact name of the device to control (e.g. 'Living Room Speaker').", isVisible: false);
 
-        PlaybackContext = Setting.AsChoice(
-            key: "PlaybackContext",
-            label: "Playback Source",
-            defaultValue: CustomUrlValue,
-            initialChoices:
+        PlaybackContext = Setting.AsChoice("PlaybackContext", "Playback Source", CustomUrlValue,
             [
                 new KeyValuePair<string, string>(CustomUrlValue, "Enter a custom URL...")
-            ],
-            description: "Select a source or enter a custom URL.");
+            ], description: "Select a source or enter a custom URL.");
 
-        CustomUrl = Setting.AsText(
-            key: "CustomUrl",
-            label: "Custom URL",
-            defaultValue: string.Empty,
-            description: "URL of the track, playlist, or album to play.",
-            isVisible: false);
+        CustomUrl = Setting.AsText("CustomUrl", "Custom URL", string.Empty,
+            description: "URL of the track, playlist, or album to play.", isVisible: false);
 
-        Volume = Setting.AsInt(
-            key: "Volume",
-            label: "Volume",
-            defaultValue: 80,
-            description: "Playback volume (0-100).");
+        Volume = Setting.AsInt("Volume", "Volume", 80, description: "Playback volume (0-100).");
 
-        Shuffle = Setting.AsChoice(
-            key: "Shuffle",
-            label: "Shuffle Mode",
-            defaultValue: "false",
-            initialChoices:
+        Shuffle = Setting.AsChoice("Shuffle", "Shuffle Mode", "false",
             [
                 new KeyValuePair<string, string>("true", "On"),
                 new KeyValuePair<string, string>("false", "Off")
             ]);
 
-        RepeatMode = Setting.AsChoice(
-            key: "RepeatMode",
-            label: "Repeat Mode",
-            defaultValue: "off",
-            initialChoices:
+        RepeatMode = Setting.AsChoice("RepeatMode", "Repeat Mode", "off",
             [
                 new KeyValuePair<string, string>("off", "Off"),
                 new KeyValuePair<string, string>("context", "Repeat Playlist/Album"),
@@ -125,7 +81,7 @@ internal sealed class Settings : LauncherSettingsBase
         LoginAction = new Action(key: "Login", label: "Login to Spotify");
         LogoutAction = new Action(key: "Logout", label: "Logout", isEnabled: false);
 
-        DeviceSelectionMode.Value.Subscribe(mode => { SpecificDeviceName.SetVisibility(mode == ModeSpecificName); });
+        DeviceSelectionMode.Value.Subscribe(mode => SpecificDeviceName.SetVisibility(mode == ModeSpecificName));
 
         EnablePlayback.Value.Subscribe(enabled =>
         {
